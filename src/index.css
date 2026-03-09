@@ -1,0 +1,282 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url("https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap");
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  overflow-x: hidden;
+
+  background-color: rgb(255, 255, 255);
+}
+
+footer {
+  overflow-x: hidden;
+}
+
+/* Input box effects */
+
+.-z-1 {
+  z-index: -1;
+}
+
+.origin-0 {
+  transform-origin: 0%;
+}
+
+/* Global scrollbar for all elements */
+*::-webkit-scrollbar {
+  width: 1px;
+  height: 1px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #2563eb; /* blue */
+  border-radius: 9999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #3b82f6; /* lighter blue */
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2563eb transparent;
+}
+
+.text_shadow {
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.sample {
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.clip-hero {
+  clip-path: polygon(0 0, 100% 0, 100% 80%, 0 100%);
+}
+
+.poppins-thin {
+  font-family: "Poppins", sans-serif;
+  font-weight: 100;
+  font-style: normal;
+}
+
+.poppins-extralight {
+  font-family: "Poppins", sans-serif;
+  font-weight: 200;
+  font-style: normal;
+}
+
+.poppins-light {
+  font-family: "Poppins", sans-serif;
+  font-weight: 300;
+  font-style: normal;
+}
+
+.poppins-regular {
+  font-family: "Poppins", sans-serif;
+  font-weight: 400;
+  font-style: normal;
+}
+
+.poppins-medium {
+  font-family: "Poppins", sans-serif;
+  font-weight: 500;
+  font-style: normal;
+}
+
+.poppins-semibold {
+  font-family: "Poppins", sans-serif;
+  font-weight: 600;
+  font-style: normal;
+}
+
+.poppins-bold {
+  font-family: "Poppins", sans-serif;
+  font-weight: 700;
+  font-style: normal;
+}
+
+.poppins-extrabold {
+  font-family: "Poppins", sans-serif;
+  font-weight: 800;
+  font-style: normal;
+}
+
+.poppins-black {
+  font-family: "Poppins", sans-serif;
+  font-weight: 900;
+  font-style: normal;
+}
+
+.poppins-thin-italic {
+  font-family: "Poppins", sans-serif;
+  font-weight: 100;
+  font-style: italic;
+}
+
+.poppins-extralight-italic {
+  font-family: "Poppins", sans-serif;
+  font-weight: 200;
+  font-style: italic;
+}
+
+.poppins-light-italic {
+  font-family: "Poppins", sans-serif;
+  font-weight: 300;
+  font-style: italic;
+}
+
+.poppins-regular-italic {
+  font-family: "Poppins", sans-serif;
+  font-weight: 400;
+  font-style: italic;
+}
+
+.poppins-medium-italic {
+  font-family: "Poppins", sans-serif;
+  font-weight: 500;
+  font-style: italic;
+}
+
+.poppins-semibold-italic {
+  font-family: "Poppins", sans-serif;
+  font-weight: 600;
+  font-style: italic;
+}
+
+.poppins-bold-italic {
+  font-family: "Poppins", sans-serif;
+  font-weight: 700;
+  font-style: italic;
+}
+
+.poppins-extrabold-italic {
+  font-family: "Poppins", sans-serif;
+  font-weight: 800;
+  font-style: italic;
+}
+
+.poppins-black-italic {
+  font-family: "Poppins", sans-serif;
+  font-weight: 900;
+  font-style: italic;
+}
+
+.poppins-black-dummy {
+  font-family: "Poppins", sans-serif;
+  font-weight: 900;
+  font-style: italic;
+}
+
+:root {
+  --app-bg: #020617;
+  --app-text: #e2e8f0;
+  --app-surface: rgba(15, 23, 42, 0.72);
+  --app-surface-strong: rgba(2, 6, 23, 0.82);
+  --app-border: rgba(255, 255, 255, 0.08);
+  --app-muted-text: #94a3b8;
+  --color-darkerPrimary: #0E0F14;
+  --color-darkPrimary: #15161D;
+  --color-medPrimary: #212229;
+  --color-softPrimary: #1C2D6E;
+  --color-softerPrimary: #E6ECFA;
+  --color-brandPrimary: #093FB4;
+  --color-brandSecondary: #345FD1;
+  --color-brandTertiary: #A0BDF7;
+  --color-lighter: #DDE7FC;
+  --color-light: #C6D8F6;
+  --color-redaccent: #FF5252;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  background: var(--app-bg);
+  color: var(--app-text);
+}
+
+body {
+  background-color: var(--app-bg);
+  color: var(--app-text);
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+[data-theme="light"] body {
+  background-color: var(--app-bg);
+  color: var(--app-text);
+}
+
+[data-theme="light"] .selection\:bg-blue-500\/30::selection {
+  background-color: rgba(59, 130, 246, 0.18);
+}
+
+[data-theme="light"] [class*="bg-slate-950"],
+[data-theme="light"] [class*="bg-slate-900"],
+[data-theme="light"] [class*="bg-\[\#020617\]"],
+[data-theme="light"] [class*="bg-gray-800"],
+[data-theme="light"] [class*="bg-gray-900"],
+[data-theme="light"] [class*="bg-black"] {
+  background-color: var(--app-surface) !important;
+}
+
+[data-theme="light"] [class*="border-white/5"],
+[data-theme="light"] [class*="border-white/10"],
+[data-theme="light"] [class*="border-slate-800"],
+[data-theme="light"] [class*="border-slate-700"],
+[data-theme="light"] [class*="border-gray-700"],
+[data-theme="light"] [class*="border-gray-600"] {
+  border-color: var(--app-border) !important;
+}
+
+[data-theme="light"] [class*="text-slate-200"],
+[data-theme="light"] [class*="text-slate-300"],
+[data-theme="light"] [class*="text-slate-400"],
+[data-theme="light"] [class*="text-slate-500"],
+[data-theme="light"] [class*="text-gray-400"],
+[data-theme="light"] [class*="text-gray-500"] {
+  color: var(--app-muted-text) !important;
+}
+
+[data-theme="light"] [class*="text-white"] {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] input,
+[data-theme="light"] select,
+[data-theme="light"] textarea {
+  color: #0f172a;
+}
+
+[data-theme="light"] input::placeholder,
+[data-theme="light"] textarea::placeholder {
+  color: #64748b;
+}
+
+[data-theme="light"] input[type="date"] {
+  color-scheme: light;
+}
+
+[data-theme="light"] .theme-force-brand,
+[data-theme="light"] [class*="bg-blue-600"],
+[data-theme="light"] [class*="from-blue-600"],
+[data-theme="light"] [class*="to-blue-600"] {
+  color: white !important;
+}
+
+[data-theme="light"] [class*="shadow-blue-900"],
+[data-theme="light"] [class*="shadow-blue-600"],
+[data-theme="light"] [class*="shadow-red-600"] {
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.12) !important;
+}
