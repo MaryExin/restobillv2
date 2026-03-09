@@ -43,6 +43,7 @@ const Orderlist = ({
   const [productlist, setproductlist] = useState([]);
   const [showDeleteItemModal, setShowDeleteItemModal] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
+  const [summaryCart, setSummaryCart] = useState(false);
 
   const [productcart, setproductcart] = useState({
     customer: tableselected || "",
@@ -143,104 +144,17 @@ const Orderlist = ({
     }
   `;
 
-  const requestRemoveItem = (code) => {
-    setItemToDelete(code);
-    setShowDeleteItemModal(true);
+  const getCategoryIcon = (name) => {
+    const lower = (name || "").toLowerCase();
+    if (lower.includes("pizza")) return <FaPizzaSlice />;
+    if (lower.includes("burger") || lower.includes("meat"))
+      return <FaHamburger />;
+    if (lower.includes("dessert") || lower.includes("ice"))
+      return <FaIceCream />;
+    if (lower.includes("drink") || lower.includes("beverage"))
+      return <FaCoffee />;
+    return <FaUtensils />;
   };
-
-  const confirmRemoveItem = () => {
-    if (!itemToDelete) return;
-    removeItem(itemToDelete);
-    setItemToDelete(null);
-    setShowDeleteItemModal(false);
-  };
-
-  const cancelRemoveItem = () => {
-    setItemToDelete(null);
-    setShowDeleteItemModal(false);
-  };
-
-  const handlePrint = useReactToPrint({
-    content: () => printRef.current,
-    documentTitle: `Order-Table-${tableselected}`,
-    pageStyle: printPageStyle,
-    onAfterPrint: () => {
-      setIsReprint(false);
-      clearCart();
-      setShowqrModal(false);
-      setShowConfirmModal(false);
-      setShowCartMobile(false);
-      setShowDesktopCartActions(false);
-      setshoworderlist(false);
-    },
-  });
-
-  const handlePrintAll = useReactToPrint({
-    content: () => printAllRef.current,
-    documentTitle: `Order-Table-${tableselected}-All`,
-    pageStyle: printPageStyle,
-    onAfterPrint: () => {
-      setIsReprint(false);
-      setShowqrModal(false);
-      setShowConfirmModal(false);
-      setShowCartMobile(false);
-      setShowDesktopCartActions(false);
-      setshoworderlist(false);
-    },
-  });
-
-const handleBillingPrint = useReactToPrint({
-  content: () => billingPrintRef.current,
-  documentTitle: billingSelectedTransaction?.transaction_id || "receipt",
-  pageStyle: `
-    @page {
-      size: 80mm auto;
-      margin: 0;
-    }
-
-    @media print {
-      html,
-      body {
-        margin: 0 !important;
-        padding: 0 !important;
-        background: #ffffff !important;
-        background-color: #ffffff !important;
-        color: #000000 !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-        font-family: monospace !important;
-        font-size: 12px !important;
-      }
-
-      table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-
-      th,
-      td {
-        padding: 2px 0;
-      }
-
-      hr {
-        margin: 4px 0;
-        border: 1px dashed #000;
-      }
-    }
-  `,
-  onAfterPrint: () => {
-    setTimeout(() => {
-      setBillingSelectedTransaction(null);
-      setBillingDetailedProduct([]);
-      setShowBillingModal(false);
-      setShowCartMobile(false);
-      setShowDesktopCartActions(false);
-      setShowqrModal(false);
-      setShowConfirmModal(false);
-      setshoworderlist(false);
-    }, 100);
-  },
-});
 
   useEffect(() => {
     if (!tableselected) return;
@@ -257,18 +171,6 @@ const handleBillingPrint = useReactToPrint({
 
     setOriginalLoadedItems([]);
   }, [tableselected]);
-
-  const getCategoryIcon = (name) => {
-    const lower = (name || "").toLowerCase();
-    if (lower.includes("pizza")) return <FaPizzaSlice />;
-    if (lower.includes("burger") || lower.includes("meat"))
-      return <FaHamburger />;
-    if (lower.includes("dessert") || lower.includes("ice"))
-      return <FaIceCream />;
-    if (lower.includes("drink") || lower.includes("beverage"))
-      return <FaCoffee />;
-    return <FaUtensils />;
-  };
 
   useEffect(() => {
     if (!apiHost) return;
@@ -377,6 +279,30 @@ const handleBillingPrint = useReactToPrint({
     (item) => item.isLoadedFromDB !== true,
   );
 
+  const groupedSummaryOrders = useMemo(() => {
+    const grouped = {};
+
+    cartSummaryItems.forEach((item) => {
+      const rawCategory = String(item.item_category || "").trim();
+      const category = rawCategory || "Recent Orders";
+
+      if (!grouped[category]) {
+        grouped[category] = [];
+      }
+
+      grouped[category].push(item);
+    });
+
+    return Object.entries(grouped)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([category, items]) => ({
+        category,
+        items: [...items].sort((a, b) =>
+          String(a.name || "").localeCompare(String(b.name || "")),
+        ),
+      }));
+  }, [cartSummaryItems]);
+
   const hasLoadedItemsChanged = useMemo(() => {
     if (originalLoadedItems.length === 0) return false;
     if (loadedCartItems.length !== originalLoadedItems.length) return true;
@@ -401,6 +327,23 @@ const handleBillingPrint = useReactToPrint({
     originalLoadedItems.length > 0 &&
     additionalCartItems.length === 0 &&
     !hasLoadedItemsChanged;
+
+  const requestRemoveItem = (code) => {
+    setItemToDelete(code);
+    setShowDeleteItemModal(true);
+  };
+
+  const confirmRemoveItem = () => {
+    if (!itemToDelete) return;
+    removeItem(itemToDelete);
+    setItemToDelete(null);
+    setShowDeleteItemModal(false);
+  };
+
+  const cancelRemoveItem = () => {
+    setItemToDelete(null);
+    setShowDeleteItemModal(false);
+  };
 
   const addToCart = (product) => {
     setproductcart((prev) => {
@@ -684,7 +627,6 @@ const handleBillingPrint = useReactToPrint({
         setBillingDetailedProduct(Array.isArray(data) ? data : []);
         setBillingSelectedTransaction(item);
         setTimeout(() => handleBillingPrint(), 200);
-        
       })
       .catch((error) => console.error("Fetch error:", error));
   };
@@ -1103,6 +1045,13 @@ const handleBillingPrint = useReactToPrint({
                 )}
               </div>
 
+              <button
+                onClick={() => setSummaryCart(true)}
+                className="mx-4 mt-4 px-4 py-3 bg-blue-600 hover:bg-blue-500 rounded-2xl text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-lg"
+              >
+                <FaReceipt /> View Full Summary
+              </button>
+
               <div className="absolute top-[10px] right-4 z-20 flex flex-row gap-2">
                 <button
                   onClick={() => setShowDesktopCartActions((prev) => !prev)}
@@ -1509,6 +1458,224 @@ const handleBillingPrint = useReactToPrint({
       </AnimatePresence>
 
       <AnimatePresence>
+        {summaryCart && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className={`fixed inset-0 z-[380] flex items-center justify-center p-4 ${
+              isDark ? "bg-black/70" : "bg-slate-900/40"
+            }`}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 10 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 10 }}
+              className={`w-full max-w-7xl max-h-[90vh] overflow-hidden rounded-[1.8rem] shadow-2xl transition-colors ${
+                isDark
+                  ? "bg-slate-900 border border-white/10"
+                  : "bg-white border border-slate-200"
+              }`}
+            >
+              <div
+                className={`px-5 py-4 flex items-center justify-between ${
+                  isDark
+                    ? "border-b border-white/10 bg-white/5"
+                    : "border-b border-slate-200 bg-slate-50"
+                }`}
+              >
+                <div>
+                  <h2
+                    className={`text-lg font-black ${
+                      isDark ? "text-white" : "text-slate-900"
+                    }`}
+                  >
+                    Summary Cart
+                  </h2>
+                  <p
+                    className={`text-xs mt-1 ${
+                      isDark ? "text-slate-400" : "text-slate-500"
+                    }`}
+                  >
+                    Table <span className="font-bold">{tableselected}</span>
+                    {transactionId ? (
+                      <>
+                        {" "}
+                        • Transaction ID{" "}
+                        <span className="font-mono font-bold">
+                          {transactionId}
+                        </span>
+                      </>
+                    ) : (
+                      <> • New unsaved order</>
+                    )}
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => setSummaryCart(false)}
+                  className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
+                    isDark
+                      ? "bg-white/10 hover:bg-white/20 text-slate-300"
+                      : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                  }`}
+                >
+                  <FiX size={16} />
+                </button>
+              </div>
+
+              <div className="p-4 overflow-y-auto max-h-[calc(90vh-73px)] custom-scrollbar">
+                {instructions && (
+                  <div
+                    className={`rounded-xl px-4 py-3 mb-4 ${
+                      isDark
+                        ? "bg-amber-500/10 border border-amber-500/20"
+                        : "bg-amber-50 border border-amber-200"
+                    }`}
+                  >
+                    <p className="text-[10px] uppercase tracking-widest font-bold text-amber-500 mb-1">
+                      General Instructions
+                    </p>
+                    <p
+                      className={`text-xs whitespace-pre-wrap break-words ${
+                        isDark ? "text-slate-200" : "text-slate-800"
+                      }`}
+                    >
+                      {instructions}
+                    </p>
+                  </div>
+                )}
+
+                {groupedSummaryOrders.length === 0 ? (
+                  <div
+                    className={`rounded-xl p-8 text-center ${
+                      isDark
+                        ? "bg-white/5 border border-white/10"
+                        : "bg-slate-50 border border-slate-200"
+                    }`}
+                  >
+                    <FaShoppingCart
+                      className={`mx-auto text-3xl mb-3 ${
+                        isDark ? "text-slate-700" : "text-slate-300"
+                      }`}
+                    />
+                    <p
+                      className={`text-sm font-medium ${
+                        isDark ? "text-slate-400" : "text-slate-500"
+                      }`}
+                    >
+                      No order entries yet.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {groupedSummaryOrders.map((group, categoryIndex) => (
+                      <div key={group.category}>
+                        <div className="mb-3">
+                          <div
+                            className={`inline-flex items-center gap-3 px-4 py-3 rounded-2xl ${
+                              isDark
+                                ? "bg-white/5 border border-white/10 text-slate-200"
+                                : "bg-slate-50 border border-slate-200 text-slate-800"
+                            }`}
+                          >
+                            <span>{getCategoryIcon(group.category)}</span>
+                            <div>
+                              <p className="text-[10px] uppercase tracking-widest opacity-80">
+                                Category
+                              </p>
+                              <p className="font-bold">{group.category}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+                          {group.items.map((item, index) => (
+                            <div
+                              key={`${group.category}-${item.code}-${index}`}
+                              className={`rounded-xl p-3 ${
+                                isDark
+                                  ? "bg-slate-950/50 border border-white/5"
+                                  : "bg-white border border-slate-200"
+                              }`}
+                            >
+                              <p
+                                className={`text-xs font-semibold break-words ${
+                                  isDark ? "text-white" : "text-slate-900"
+                                }`}
+                              >
+                                {item.name}
+                              </p>
+
+                              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                <span
+                                  className={`text-[10px] px-2 py-0.5 rounded-full border ${
+                                    item.isLoadedFromDB
+                                      ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                                      : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                                  }`}
+                                >
+                                  {item.isLoadedFromDB ? "Saved" : "New"}
+                                </span>
+
+                                <span
+                                  className={`text-[10px] ${
+                                    isDark ? "text-slate-400" : "text-slate-500"
+                                  }`}
+                                >
+                                  Qty: {item.quantity}
+                                </span>
+                              </div>
+
+                              {item.code && (
+                                <p
+                                  className={`text-[10px] mt-1 break-words ${
+                                    isDark ? "text-slate-500" : "text-slate-500"
+                                  }`}
+                                >
+                                  {item.code}
+                                </p>
+                              )}
+
+                              {item.itemInstruction && (
+                                <p className="text-[10px] text-amber-500 mt-2 break-words">
+                                  Note: {item.itemInstruction}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+                  <button
+                    onClick={() => setSummaryCart(false)}
+                    className={`w-full py-3 rounded-xl font-bold transition-all ${
+                      isDark
+                        ? "bg-white/10 text-white hover:bg-white/20"
+                        : "bg-slate-200 text-slate-800 hover:bg-slate-300"
+                    }`}
+                  >
+                    Close
+                  </button>
+
+                  <button
+                    onClick={handleGenerateQR}
+                    className="w-full py-3 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-500 transition-all"
+                  >
+                    Continue Order Action
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {showSaveSuccessModal && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -1625,7 +1792,7 @@ const handleBillingPrint = useReactToPrint({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className={`fixed inset-0 z-[200] backdrop-blur-xl flex items-center justify-center p-4 ${
+            className={`fixed inset-0 z-[400] backdrop-blur-xl flex items-center justify-center p-4 ${
               isDark ? "bg-slate-950/60" : "bg-slate-200/60"
             }`}
           >
@@ -1688,9 +1855,7 @@ const handleBillingPrint = useReactToPrint({
               <button
                 onClick={() => setShowqrModal(false)}
                 className={`w-full py-4 font-black rounded-2xl transition-colors ${
-                  isDark
-                    ? "bg-white text-slate-900"
-                    : "bg-slate-900 text-white"
+                  isDark ? "bg-white text-slate-900" : "bg-slate-900 text-white"
                 }`}
               >
                 Close
@@ -2163,6 +2328,7 @@ const handleBillingPrint = useReactToPrint({
       <style jsx>{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 4px;
+          height: 4px;
         }
         .custom-scrollbar::-webkit-scrollbar-track {
           background: transparent;
@@ -2170,6 +2336,13 @@ const handleBillingPrint = useReactToPrint({
         .custom-scrollbar::-webkit-scrollbar-thumb {
           background: ${isDark ? "#1e293b" : "#cbd5e1"};
           border-radius: 10px;
+        }
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .no-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
         }
       `}</style>
     </>
@@ -2446,9 +2619,7 @@ const PrintableReceipt = React.forwardRef(
 
         {instructions && (
           <div className="border-t border-dashed border-black pt-2 mt-2">
-            <p className="font-bold uppercase text-[10px] mb-1">
-              Instructions
-            </p>
+            <p className="font-bold uppercase text-[10px] mb-1">Instructions</p>
             <p className="text-[11px] whitespace-pre-wrap break-words">
               {instructions}
             </p>
