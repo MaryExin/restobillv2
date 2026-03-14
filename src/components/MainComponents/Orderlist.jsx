@@ -144,6 +144,47 @@ const Orderlist = ({
     }
   `;
 
+  const handlePrint = useReactToPrint({
+    content: () => printRef.current,
+    documentTitle: transactionId
+      ? `additional-order-${transactionId}`
+      : `new-order-${tableselected}`,
+    pageStyle: printPageStyle,
+    onAfterPrint: () => {
+      setIsReprint(false);
+      setShowqrModal(false);
+      setShowCartMobile(false);
+      setShowDesktopCartActions(false);
+      setshoworderlist(false);
+    },
+  });
+
+  const handlePrintAll = useReactToPrint({
+    content: () => printAllRef.current,
+    documentTitle: transactionId
+      ? `full-order-${transactionId}`
+      : `full-order-${tableselected}`,
+    pageStyle: printPageStyle,
+    onAfterPrint: () => {
+      setIsReprint(false);
+      setShowqrModal(false);
+      setShowCartMobile(false);
+      setShowDesktopCartActions(false);
+    },
+  });
+
+  const handleBillingPrint = useReactToPrint({
+    content: () => billingPrintRef.current,
+    documentTitle: billingSelectedTransaction?.transaction_id
+      ? `billing-${billingSelectedTransaction.transaction_id}`
+      : `billing-${tableselected}`,
+    pageStyle: printPageStyle,
+    onAfterPrint: () => {
+      setBillingSelectedTransaction(null);
+      setBillingDetailedProduct([]);
+    },
+  });
+
   const getCategoryIcon = (name) => {
     const lower = (name || "").toLowerCase();
     if (lower.includes("pizza")) return <FaPizzaSlice />;
@@ -626,7 +667,11 @@ const Orderlist = ({
       .then((data) => {
         setBillingDetailedProduct(Array.isArray(data) ? data : []);
         setBillingSelectedTransaction(item);
-        setTimeout(() => handleBillingPrint(), 200);
+        setTimeout(() => {
+          if (billingPrintRef.current) {
+            handleBillingPrint();
+          }
+        }, 200);
       })
       .catch((error) => console.error("Fetch error:", error));
   };
@@ -726,7 +771,12 @@ const Orderlist = ({
     if (!result.ok) return;
 
     setShowConfirmModal(false);
-    handlePrint();
+
+    setTimeout(() => {
+      if (printRef.current) {
+        handlePrint();
+      }
+    }, 150);
   };
 
   const handlePrintOnly = () => {
@@ -747,7 +797,9 @@ const Orderlist = ({
     setShowConfirmModal(false);
 
     setTimeout(() => {
-      handlePrintAll();
+      if (printAllRef.current) {
+        handlePrintAll();
+      }
     }, 150);
   };
 
@@ -866,7 +918,7 @@ const Orderlist = ({
             </div>
 
             <div className="flex items-center gap-2">
-              {transactionId !== "" && (
+              {transactionId && (
                 <button
                   onClick={openBillingModal}
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-white font-semibold text-sm flex items-center gap-2"
@@ -1569,7 +1621,7 @@ const Orderlist = ({
                   </div>
                 ) : (
                   <div className="space-y-6">
-                    {groupedSummaryOrders.map((group, categoryIndex) => (
+                    {groupedSummaryOrders.map((group) => (
                       <div key={group.category}>
                         <div className="mb-3">
                           <div
