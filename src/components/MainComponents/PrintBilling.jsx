@@ -15,6 +15,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import useApiHost from "../../hooks/useApiHost";
 import { useTheme } from "../../context/ThemeContext";
+
 const PrintBilling = () => {
   const { theme } = useTheme();
   const isDark = theme === "dark";
@@ -22,9 +23,7 @@ const PrintBilling = () => {
   const dateInputRef = useRef(null);
 
   // const [apiHost, setApiHost] = useState("");
-  const [dateFrom, setDateFrom] = useState(
-    new Date().toISOString().split("T")[0],
-  );
+  const [dateFrom, setDateFrom] = useState("");
   const [originalTableList, setOriginalTableList] = useState([]);
   const [tablelist, setTablelist] = useState([]);
   const [searchtable, setsearchtable] = useState("");
@@ -34,36 +33,71 @@ const PrintBilling = () => {
   const [transpertable, settranspertable] = useState([]);
   const [showtranslistpertable, setshowtranslistpertable] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDateLoading, setIsDateLoading] = useState(true);
 
   // --- PAGINATION STATE ---
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12; // Adjusted for a nice 6x2 or 4x3 grid
 
   const handleCalendarClick = () => {
-    if (
-      dateInputRef.current &&
-      typeof dateInputRef.current.showPicker === "function"
-    ) {
-      dateInputRef.current.showPicker();
-    }
+    // date now comes from backend open shift; keep function/refs without breaking structure
+    return;
   };
 
-// useEffect(() => {
-//   fetch("./ip.txt")
-//     .then((res) => res.text())
-//     .then((data) => setApiHost(data.trim()));
-// }, []);
-const apiHost = useApiHost();
+  // useEffect(() => {
+  //   fetch("./ip.txt")
+  //     .then((res) => res.text())
+  //     .then((data) => setApiHost(data.trim()));
+  // }, []);
+  const apiHost = useApiHost();
 
   useEffect(() => {
     if (!apiHost) return;
+
+    let isMounted = true;
+    setIsDateLoading(true);
+
+    fetch(`${apiHost}/api/get_open_shift_date.php`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({}),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!isMounted) return;
+
+        const backendDate =
+          data?.selectedDate || data?.shiftDate || "";
+
+        setDateFrom(backendDate);
+        setCurrentPage(1);
+        setIsDateLoading(false);
+      })
+      .catch((error) => {
+        console.error("Fetch open shift date error:", error);
+        if (!isMounted) return;
+        setDateFrom("");
+        setIsDateLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [apiHost]);
+
+  useEffect(() => {
+    if (!apiHost || !dateFrom) return;
     setIsLoading(true);
+
     fetch(`${apiHost}/api/table_list.php?date=${dateFrom}`)
       .then((res) => res.json())
       .then((data) => {
-        const sorted = [...data].sort((a, b) => {
-          const numA = parseInt(a.table_number.replace(/^\D+/g, "")) || 0;
-          const numB = parseInt(b.table_number.replace(/^\D+/g, "")) || 0;
+        const safeData = Array.isArray(data) ? data : [];
+        const sorted = [...safeData].sort((a, b) => {
+          const numA = parseInt(String(a.table_number || "").replace(/^\D+/g, "")) || 0;
+          const numB = parseInt(String(b.table_number || "").replace(/^\D+/g, "")) || 0;
           return numA - numB;
         });
         setOriginalTableList(sorted);
@@ -101,7 +135,7 @@ const apiHost = useApiHost();
   const totalPages = Math.ceil(tablelist.length / itemsPerPage);
 
   const table_trasaction = (table_number) => {
-    if (!apiHost) return;
+    if (!apiHost || !dateFrom) return;
     fetch(
       `${apiHost}/api/transactio_per_table.php?date=${dateFrom}&table_number=${table_number}`,
     )
@@ -119,7 +153,9 @@ const apiHost = useApiHost();
       className={`flex items-center gap-2 px-6 py-2 rounded-full border transition-all duration-300 ${
         statusFilter === value
           ? "bg-blue-600 border-blue-400 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]"
-          : "bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-600"
+          : isDark
+            ? "bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-600"
+            : "bg-white border-slate-200 text-slate-600 hover:border-slate-300 shadow-sm"
       }`}
     >
       <Icon size={12} />
@@ -130,9 +166,19 @@ const apiHost = useApiHost();
   );
 
   return (
-    <div className={isDark ? "min-h-screen bg-[#020617] text-slate-200 p-4 sm:p-8" : "min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-8"}>
+    <div
+      className={
+        isDark
+          ? "min-h-screen bg-[#020617] text-slate-200 p-4 sm:p-8"
+          : "min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-8"
+      }
+    >
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className={`absolute top-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full blur-[120px] ${isDark ? "bg-blue-600/10" : "bg-blue-600/15"}`} />
+        <div
+          className={`absolute top-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full blur-[120px] ${
+            isDark ? "bg-blue-600/10" : "bg-blue-600/15"
+          }`}
+        />
       </div>
 
       <AnimatePresence>
@@ -149,7 +195,11 @@ const apiHost = useApiHost();
         <nav className="mb-8 flex justify-between items-center">
           <button
             onClick={() => navigate("/")}
-            className={`flex items-center gap-3 mt-2 px-10 py-6 rounded-full transition-all ${isDark ? "bg-slate-900/50 border border-white/5 text-slate-400 hover:text-white" : "bg-white border border-slate-200 text-slate-600 hover:text-slate-900 shadow-sm"}`}
+            className={`flex items-center gap-3 mt-2 px-10 py-6 rounded-full transition-all ${
+              isDark
+                ? "bg-slate-900/50 border border-white/5 text-slate-400 hover:text-white"
+                : "bg-white border border-slate-200 text-slate-600 hover:text-slate-900 shadow-sm"
+            }`}
           >
             <FaArrowLeft size={14} />
             <span className="text-sm font-bold uppercase">Back To Menu</span>
@@ -160,7 +210,11 @@ const apiHost = useApiHost();
         </nav>
 
         <header className="mb-10">
-          <h1 className={`text-4xl sm:text-5xl font-black mb-2 ${isDark ? "text-white" : "text-slate-900"}`}>
+          <h1
+            className={`text-4xl sm:text-5xl font-black mb-2 ${
+              isDark ? "text-white" : "text-slate-900"
+            }`}
+          >
             Print Billing
           </h1>
           <p className="text-slate-400">
@@ -170,16 +224,20 @@ const apiHost = useApiHost();
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <div
-            className="relative group cursor-pointer"
+            className="relative group"
             onClick={handleCalendarClick}
           >
-            <FaCalendarAlt className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-500 pointer-events-none z-20" />
+            <FaCalendarAlt className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none z-20" />
             <input
               ref={dateInputRef}
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className={`w-full rounded-2xl py-4 pl-12 pr-4 focus:ring-2 focus:ring-blue-500/40 cursor-pointer ${isDark ? "bg-slate-900/50 border border-slate-800 text-white [color-scheme:dark]" : "bg-white border border-slate-200 text-slate-900 [color-scheme:light] shadow-sm"}`}
+              type="text"
+              value={isDateLoading ? "Loading..." : dateFrom || "No open shift"}
+              readOnly
+              className={`w-full rounded-2xl py-4 pl-12 pr-4 ${
+                isDark
+                  ? "bg-slate-900/50 border border-slate-800 text-white"
+                  : "bg-white border border-slate-200 text-slate-900 shadow-sm"
+              }`}
             />
           </div>
 
@@ -190,7 +248,11 @@ const apiHost = useApiHost();
               placeholder="Search table number..."
               value={searchtable}
               onChange={(e) => setsearchtable(e.target.value)}
-              className={`w-full rounded-2xl py-4 pl-12 pr-4 ${isDark ? "bg-slate-900/50 border border-slate-800 text-white" : "bg-white border border-slate-200 text-slate-900 shadow-sm"}`}
+              className={`w-full rounded-2xl py-4 pl-12 pr-4 ${
+                isDark
+                  ? "bg-slate-900/50 border border-slate-800 text-white"
+                  : "bg-white border border-slate-200 text-slate-900 shadow-sm"
+              }`}
             />
           </div>
         </div>
@@ -202,12 +264,16 @@ const apiHost = useApiHost();
         </div>
 
         <main className="flex-grow">
-          {isLoading ? (
+          {isLoading || isDateLoading ? (
             <div className="grid grid-cols-3 sm:grid-cols-6 gap-4">
               {[...Array(6)].map((_, i) => (
                 <div
                   key={i}
-                  className="aspect-square rounded-[2rem] bg-slate-900 animate-pulse"
+                  className={`aspect-square rounded-[2rem] animate-pulse ${
+                    isDark
+                      ? "bg-slate-900"
+                      : "bg-white border border-slate-200 shadow-sm"
+                  }`}
                 />
               ))}
             </div>
@@ -225,19 +291,35 @@ const apiHost = useApiHost();
                     whileHover={{ y: -5 }}
                     key={index}
                     onClick={() => table_trasaction(table.table_number)}
-                    className="aspect-square rounded-[2rem] bg-slate-900/40 border border-white/5 hover:border-blue-500/50 flex flex-col items-center justify-center relative overflow-hidden transition-all shadow-xl"
+                    className={`aspect-square rounded-[2rem] border flex flex-col items-center justify-center relative overflow-hidden transition-all shadow-xl ${
+                      isDark
+                        ? "bg-slate-900/40 border-white/5 hover:border-blue-500/50"
+                        : "bg-white border-slate-200 hover:border-blue-400/50"
+                    }`}
                   >
-                    <span className="text-[10px] font-black text-slate-500 uppercase">
+                    <span
+                      className={`text-[10px] font-black uppercase ${
+                        isDark ? "text-slate-500" : "text-slate-400"
+                      }`}
+                    >
                       Table
                     </span>
-                    <span className="text-4xl font-black text-white">
-                      {table.table_number.replace(/^\D+/g, "")}
+                    <span
+                      className={`text-4xl font-black ${
+                        isDark ? "text-white" : "text-slate-900"
+                      }`}
+                    >
+                      {String(table.table_number || "").replace(/^\D+/g, "")}
                     </span>
                     <div
-                      className={`absolute top-4 right-4 w-3 h-3 rounded-full ${isPending ? "bg-amber-500 animate-pulse" : "bg-emerald-500"}`}
+                      className={`absolute top-4 right-4 w-3 h-3 rounded-full ${
+                        isPending ? "bg-amber-500 animate-pulse" : "bg-emerald-500"
+                      }`}
                     />
                     <span
-                      className={`absolute bottom-4 text-[9px] font-bold uppercase tracking-widest ${isPending ? "text-amber-500" : "text-emerald-500"}`}
+                      className={`absolute bottom-4 text-[9px] font-bold uppercase tracking-widest ${
+                        isPending ? "text-amber-500" : "text-emerald-500"
+                      }`}
                     >
                       {table.status_label}
                     </span>
@@ -248,8 +330,14 @@ const apiHost = useApiHost();
           )}
 
           {/* NO RESULTS STATE */}
-          {!isLoading && currentItems.length === 0 && (
-            <div className="text-center py-20 bg-slate-900/20 border-2 border-dashed border-slate-800 rounded-3xl">
+          {!isLoading && !isDateLoading && currentItems.length === 0 && (
+            <div
+              className={`text-center py-20 border-2 border-dashed rounded-3xl ${
+                isDark
+                  ? "bg-slate-900/20 border-slate-800"
+                  : "bg-white border-slate-200"
+              }`}
+            >
               <p className="text-slate-500 font-bold uppercase tracking-widest">
                 No Tables Found
               </p>
@@ -263,7 +351,11 @@ const apiHost = useApiHost();
             <button
               disabled={currentPage === 1}
               onClick={() => setCurrentPage((prev) => prev - 1)}
-              className="p-4 rounded-full bg-slate-900/50 border border-slate-800 text-slate-400 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed transition-all"
+              className={`p-4 rounded-full border disabled:opacity-20 disabled:cursor-not-allowed transition-all ${
+                isDark
+                  ? "bg-slate-900/50 border-slate-800 text-slate-400 hover:text-white"
+                  : "bg-white border-slate-200 text-slate-500 hover:text-slate-900 shadow-sm"
+              }`}
             >
               <FaChevronLeft />
             </button>
@@ -276,7 +368,9 @@ const apiHost = useApiHost();
                   className={`w-10 h-10 rounded-xl font-bold text-xs transition-all ${
                     currentPage === i + 1
                       ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
-                      : "bg-slate-900/50 text-slate-500 hover:bg-slate-800"
+                      : isDark
+                        ? "bg-slate-900/50 text-slate-500 hover:bg-slate-800"
+                        : "bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 shadow-sm"
                   }`}
                 >
                   {i + 1}
@@ -287,7 +381,11 @@ const apiHost = useApiHost();
             <button
               disabled={currentPage === totalPages}
               onClick={() => setCurrentPage((prev) => prev + 1)}
-              className="p-4 rounded-full bg-slate-900/50 border border-slate-800 text-slate-400 hover:text-white disabled:opacity-20 disabled:cursor-not-allowed transition-all"
+              className={`p-4 rounded-full border disabled:opacity-20 disabled:cursor-not-allowed transition-all ${
+                isDark
+                  ? "bg-slate-900/50 border-slate-800 text-slate-400 hover:text-white"
+                  : "bg-white border-slate-200 text-slate-500 hover:text-slate-900 shadow-sm"
+              }`}
             >
               <FaChevronRight />
             </button>

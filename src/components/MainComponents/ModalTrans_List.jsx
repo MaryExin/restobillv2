@@ -1,21 +1,31 @@
 import React, { useState, useRef, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useReactToPrint } from "react-to-print";
-import { FiX, FiPrinter, FiClock, FiCheckCircle } from "react-icons/fi";
+import {
+  FiX,
+  FiPrinter,
+  FiClock,
+  FiCheckCircle,
+  FiPercent,
+} from "react-icons/fi";
 import Receipt from "./Receipt";
 import { useTheme } from "../../context/ThemeContext";
 import useApiHost from "../../hooks/useApiHost";
+import ModalDiscountTransaction from "./ModalDiscountTransaction";
 
 const ModalTrans_List = ({
   tableselected,
   data = [],
   setshowtranslistpertable,
+  dateFrom,
 }) => {
   const apiHost = useApiHost();
   const [activeTab, setActiveTab] = useState("pending");
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [detailedproduct, setdetailedproduct] = useState([]);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const [showDiscountModal, setShowDiscountModal] = useState(false);
+  const [discountTransaction, setDiscountTransaction] = useState(null);
   const componentRef = useRef(null);
   const { isDark } = useTheme();
 
@@ -49,9 +59,7 @@ const ModalTrans_List = ({
       }
     `,
     onAfterPrint: () => {
-      // optional reset if you want
-      // setSelectedTransaction(null);
-      // setdetailedproduct([]);
+      // optional reset
     },
   });
 
@@ -99,6 +107,12 @@ const ModalTrans_List = ({
     } finally {
       setIsLoadingDetails(false);
     }
+  };
+
+  const onOpenDiscountModal = (item, e) => {
+    e.stopPropagation();
+    setDiscountTransaction(item);
+    setShowDiscountModal(true);
   };
 
   return (
@@ -231,11 +245,24 @@ const ModalTrans_List = ({
                         </p>
                       </div>
 
-                      {activeTab === "pending" && (
-                        <div className="p-3 bg-blue-500/10 text-blue-500 rounded-xl group-hover:bg-blue-500 group-hover:text-white transition-all">
-                          <FiPrinter size={18} />
-                        </div>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {activeTab === "pending" && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={(e) => onOpenDiscountModal(item, e)}
+                              className="p-3 bg-amber-500/10 text-amber-500 rounded-xl hover:bg-amber-500 hover:text-white transition-all"
+                              title="Add Discount"
+                            >
+                              <FiPercent size={18} />
+                            </button>
+
+                            <div className="p-3 bg-blue-500/10 text-blue-500 rounded-xl group-hover:bg-blue-500 group-hover:text-white transition-all">
+                              <FiPrinter size={18} />
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </motion.div>
                   ))
                 ) : (
@@ -258,6 +285,19 @@ const ModalTrans_List = ({
             </div>
           </motion.div>
         </motion.div>
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showDiscountModal && discountTransaction && (
+          <ModalDiscountTransaction
+            isOpen={showDiscountModal}
+            onClose={() => setShowDiscountModal(false)}
+            transaction={discountTransaction}
+            dateFrom={dateFrom}
+            apiHost={apiHost}
+            isDark={isDark}
+          />
+        )}
       </AnimatePresence>
 
       {selectedTransaction && detailedproduct.length > 0 && (
