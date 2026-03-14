@@ -28,17 +28,8 @@ const ViewOrdering = () => {
   const [showorderlist, setshoworderlist] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const saved = localStorage.getItem("viewordering_date");
-    if (saved) return saved;
-
-    const today = new Date();
-    const local = new Date(today.getTime() - today.getTimezoneOffset() * 60000)
-      .toISOString()
-      .split("T")[0];
-
-    return local;
-  });
+  const [selectedDate, setSelectedDate] = useState("");
+  const [isDateLoading, setIsDateLoading] = useState(true);
 
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [showPendingConfirmModal, setShowPendingConfirmModal] = useState(false);
@@ -53,10 +44,6 @@ const ViewOrdering = () => {
   const itemsPerPage = 15;
   const apiHost = useApiHost();
 
-  useEffect(() => {
-    localStorage.setItem("viewordering_date", selectedDate);
-  }, [selectedDate]);
-
   const sortFloorTables = (list) => {
     return [...list].sort((a, b) =>
       String(a.table_number).localeCompare(String(b.table_number), undefined, {
@@ -69,11 +56,50 @@ const ViewOrdering = () => {
   useEffect(() => {
     if (!apiHost) return;
 
+    let isMounted = true;
+    setIsDateLoading(true);
+
+    fetch(`${apiHost}/api/get_open_shift_date.php`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({}),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!isMounted) return;
+
+        const backendDate =
+          data?.selectedDate ||
+          data?.shiftDate ||
+          "";
+
+        setSelectedDate(backendDate);
+        setCurrentPage(1);
+        setIsDateLoading(false);
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setSelectedDate("");
+        setIsDateLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [apiHost]);
+
+  useEffect(() => {
+    if (!apiHost || !selectedDate) return;
+
     const loadTables = () => {
       fetch(`${apiHost}/api/table_list.php?date=${selectedDate}&onlyPending=true`)
         .then((res) => res.json())
         .then((data) => {
-          setOriginalTableList(sortFloorTables(data));
+          setOriginalTableList(
+            sortFloorTables(Array.isArray(data) ? data : []),
+          );
           setIsLoading(false);
         })
         .catch(() => setIsLoading(false));
@@ -578,17 +604,13 @@ const ViewOrdering = () => {
               <label className="block text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 mb-2">
                 Date
               </label>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => {
-                  setSelectedDate(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className={`bg-transparent outline-none w-full ${
+              <div
+                className={`min-w-[140px] ${
                   isDark ? "text-white" : "text-slate-900"
                 }`}
-              />
+              >
+                {isDateLoading ? "Loading..." : selectedDate || "No open shift"}
+              </div>
             </div>
 
             <div className="relative group w-full lg:w-96">
@@ -620,7 +642,7 @@ const ViewOrdering = () => {
         </header>
 
         <main className="min-h-[50vh]">
-          {isLoading ? (
+          {isLoading || isDateLoading ? (
             <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
               {[...Array(10)].map((_, i) => (
                 <div
