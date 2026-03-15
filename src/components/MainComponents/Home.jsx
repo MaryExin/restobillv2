@@ -44,6 +44,15 @@ const Home = () => {
       icon: <FaChartPie className="text-2xl mb-4" />,
       color: isDark ? "from-indigo-600/80" : "from-indigo-500/70",
     },
+     {
+      id: "transactionrecords",
+      title: "Transaction Records",
+      description: "Transaction Records",
+      image: Billing,
+      path: "/transactionrecords",
+      icon: <FaChartPie className="text-2xl mb-4" />,
+      color: isDark ? "from-indigo-600/80" : "from-indigo-500/70",
+    },
   ];
 
   const handleCardClick = (item) => {
