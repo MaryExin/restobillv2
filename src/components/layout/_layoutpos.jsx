@@ -66,7 +66,7 @@ const LayoutPos = ({ children }) => {
 
       try {
         const response = await fetch(
-          `${apiHost}/api/get_shift_details.php?user_id=${userId}`
+          `${apiHost}/api/get_shift_details.php?user_id=${userId}`,
         );
 
         const result = await response.json();
@@ -178,6 +178,15 @@ const LayoutPos = ({ children }) => {
         badge: "Cashier",
       },
       {
+        id: "payment",
+        title: "Payment",
+        description: "Receive customer payments and complete checkout.",
+        image: Billing,
+        path: "/payments",
+        icon: <FaReceipt className="text-[26px]" />,
+        badge: "Checkout",
+      },
+      {
         id: "salesdashboard",
         title: "Sales Dashboard",
         description: "View summary, sales performance, and business insights.",
@@ -196,7 +205,7 @@ const LayoutPos = ({ children }) => {
         badge: "Records",
       },
     ],
-    []
+    [],
   );
 
   const quickActions = (
@@ -275,13 +284,19 @@ const LayoutPos = ({ children }) => {
               className: "text-[28px] sm:text-[30px]",
             })}
             color={
-              item.id === "ordering"
-                ? "orange"
-                : item.id === "billing"
-                  ? "violet"
-                  : item.id === "salesdashboard"
-                    ? "indigo"
-                    : "slate"
+              disabled
+                ? "slate"
+                : item.id === "ordering"
+                  ? "orange"
+                  : item.id === "billing"
+                    ? "violet"
+                    : item.id === "salesdashboard"
+                      ? "indigo"
+                      : item.id === "transactionrecords"
+                        ? "green"
+                        : item.id === "payment"
+                          ? "blue"
+                          : "slate"
             }
             disabled={disabled}
             onClick={() => !disabled && handleCardClick(item)}
@@ -316,7 +331,10 @@ const LayoutPos = ({ children }) => {
         onZReadingSubmit={() => setIsPosReadingOpen(false)}
       />
 
-      <PosReports open={isReportsOpen} onClose={() => setIsReportsOpen(false)} />
+      <PosReports
+        open={isReportsOpen}
+        onClose={() => setIsReportsOpen(false)}
+      />
 
       <div
         className="absolute inset-0"
