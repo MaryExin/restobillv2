@@ -2306,21 +2306,24 @@ const Orderlist = ({
                           </p>
                         </div>
 
-                        {billingTab === "pending" && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={(e) => onOpenDiscountModal(item, e)}
-                              className="p-3 bg-amber-500/10 text-amber-500 rounded-xl hover:bg-amber-500 hover:text-white transition-all"
-                              title="Add Discount"
-                            >
-                              <FiPercent size={18} />
-                            </button>
-                            <div className="p-3 bg-blue-500/10 text-blue-500 rounded-xl group-hover:bg-blue-500 group-hover:text-white transition-all">
-                              <FiPrinter size={18} />
-                            </div>
-                          </>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {billingTab === "pending" && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={(e) => onOpenDiscountModal(item, e)}
+                                className="p-3 bg-amber-500/10 text-amber-500 rounded-xl hover:bg-amber-500 hover:text-white transition-all"
+                                title="Add Discount"
+                              >
+                                <FiPercent size={18} />
+                              </button>
+
+                              <div className="p-3 bg-blue-500/10 text-blue-500 rounded-xl group-hover:bg-blue-500 group-hover:text-white transition-all">
+                                <FiPrinter size={18} />
+                              </div>
+                            </>
+                          )}
+                        </div>
                       </motion.div>
                     ))
                   ) : (
