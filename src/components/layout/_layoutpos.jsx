@@ -13,6 +13,7 @@ import {
   FaUtensils,
   FaChartPie,
   FaWallet,
+  FaCoins,
 } from "react-icons/fa";
 import { FiX } from "react-icons/fi";
 import { HiOutlineStatusOnline } from "react-icons/hi";
@@ -56,15 +57,15 @@ const LayoutPos = ({ children }) => {
 
   const menuOptions = useMemo(
     () => [
-      {
-        id: "ordering",
-        title: "Ordering",
-        description: "Manage and create customer orders quickly and smoothly.",
-        image: Ordering,
-        path: "/ordering",
-        icon: <FaUtensils className="text-[26px]" />,
-        badge: "Operations",
-      },
+      // {
+      //   id: "ordering",
+      //   title: "Ordering",
+      //   description: "Manage and create customer orders quickly and smoothly.",
+      //   image: Ordering,
+      //   path: "/ordering",
+      //   icon: <FaUtensils className="text-[26px]" />,
+      //   badge: "Operations",
+      // },
       {
         id: "billing",
         title: "Billing",
@@ -92,6 +93,15 @@ const LayoutPos = ({ children }) => {
         path: "/transactionrecords",
         icon: <FaHistory className="text-[26px]" />,
         badge: "Records",
+      },
+      {
+        id: "payments",
+        title: "Payments",
+        description: "Payments and Collections.",
+        image: Billing,
+        path: "/payments",
+        icon: <FaCoins className="text-[26px]" />,
+        badge: "Cashier.",
       },
     ],
     [],
@@ -152,13 +162,13 @@ const LayoutPos = ({ children }) => {
         color="orange"
         onClick={() => navigate("/ordering")}
       />
-
+      {/* 
       <PosQuickActionTile
         label="Orders"
         icon={<FaClipboardList className="text-[28px] sm:text-[30px]" />}
         color="orange"
         onClick={() => navigate("/ordering")}
-      />
+      /> */}
 
       <PosQuickActionTile
         label="Trans. Records"
@@ -195,7 +205,11 @@ const LayoutPos = ({ children }) => {
                 ? "violet"
                 : item.id === "salesdashboard"
                   ? "indigo"
-                  : "slate"
+                  : item.id === "payments"
+                    ? "green"
+                    : item.id === "transactionrecords"
+                      ? "blue"
+                      : "slate"
           }
           onClick={() => handleCardClick(item)}
         />

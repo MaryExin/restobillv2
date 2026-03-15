@@ -83,14 +83,6 @@ const ModalPRChecking = ({
     setIMSBusunitClass,
   } = useZustandIMSBusunitCode();
 
-<<<<<<< HEAD
-  console.log(
-    "imsBusunitCodeSelected in ModalPRChecking: ",
-    imsBusunitCodeSelected,
-  );
-=======
->>>>>>> master
-
   const { isAutoPricing } = useAutoPricingStatus();
 
   // import PRPrintableComponent from "../InventoryManagement/PRPrintableComponent";
@@ -102,8 +94,6 @@ const ModalPRChecking = ({
       </div>
     );
   });
-
-
 
   const DRToPrint = React.forwardRef(({ text }, ref) => (
     <div
@@ -162,7 +152,7 @@ const ModalPRChecking = ({
   const [qtyInputValues, setQtyInputValues] = useState({});
 
   const [isEditSuccess, setIsSuccessEdit] = useState(false); //Edit Costs and Qty
-   const [isEmailSuccess, setIsEmailSuccess] = useState(false);
+  const [isEmailSuccess, setIsEmailSuccess] = useState(false);
 
   const [newQtyEdit, setNewQtyEdit] = useState({});
   const [newCostEdit, setNewCostEdit] = useState({});
@@ -775,26 +765,12 @@ const ModalPRChecking = ({
 
   //Delivery Patch Mutation Hook
 
-<<<<<<< HEAD
-  const {
-    data: deliveryDetailsPatchData,
-    isLoading: deliveryDetailsPatchIsLoading,
-    isError: deliveryDetailsPatchIsError,
-    isSuccess: deliveryDetailsPatchIsSuccess,
-    mutate: deliveryDetailsPatchMutate,
-  } = useSecuredMutation(
-    localStorage.getItem("apiendpoint") +
-      import.meta.env.VITE_EDIT_DELIVERY_DETAILS_ENDPOINT,
-    "PATCH",
-  );
-=======
   const { data: deliveryDetailsPatchData, mutate: deliveryDetailsPatchMutate } =
     useSecuredMutation(
       localStorage.getItem("apiendpoint") +
         import.meta.env.VITE_EDIT_DELIVERY_DETAILS_ENDPOINT,
       "PATCH",
     );
->>>>>>> master
 
   useEffect(() => {
     if (deliveryDetailsPatchData) {
@@ -827,26 +803,12 @@ const ModalPRChecking = ({
 
   //Shipping Details Patch Mutation Hook
 
-<<<<<<< HEAD
-  const {
-    data: shippingDetailsPatchData,
-    isLoading: shippingDetailsPatchIsLoading,
-    isError: shippingDetailsPatchIsError,
-    isSuccess: shippingDetailsPatchIsSuccess,
-    mutate: shippingDetailsPatchMutate,
-  } = useSecuredMutation(
-    localStorage.getItem("apiendpoint") +
-      import.meta.env.VITE_EDIT_SHIPPING_DELIVERY_DETAILS_ENDPOINT,
-    "PATCH",
-  );
-=======
   const { data: shippingDetailsPatchData, mutate: shippingDetailsPatchMutate } =
     useSecuredMutation(
       localStorage.getItem("apiendpoint") +
         import.meta.env.VITE_EDIT_SHIPPING_DELIVERY_DETAILS_ENDPOINT,
       "PATCH",
     );
->>>>>>> master
 
   useEffect(() => {
     if (shippingDetailsPatchData) {
@@ -1206,19 +1168,11 @@ const ModalPRChecking = ({
 
     // 5. Expiry Date Validation
     const hasNoExpiryRole = roles[0].some(
-<<<<<<< HEAD
-      (item) => item.rolename === "IMS-NOEXPIRY",
-    );
-
-    if (!hasNoExpiryRole) {
-      const hasMissingExpiryDate = filteredItems.some(
-=======
       (role) => role.rolename === "IMS-NOEXPIRY",
     );
 
     if (!hasNoExpiryRole) {
       const hasMissingExpiryDate = updatedQueueDetails.some(
->>>>>>> master
         (item) => !item.expiryDate,
       );
 
@@ -1538,57 +1492,57 @@ const ModalPRChecking = ({
     }
   }, [supplierProductItems]);
   // Send Email Mutation
-    const {
-      data: poEmail,
-      isLoading: poEmailIsLoading,
-      mutate: sendEmailMutate,
-    } = useSecuredMutation(
-      localStorage.getItem("apiendpoint") +
-        import.meta.env.VITE_SEND_EMAIL_ENDPOINT,
-      "POST"
-    );
+  const {
+    data: poEmail,
+    isLoading: poEmailIsLoading,
+    mutate: sendEmailMutate,
+  } = useSecuredMutation(
+    localStorage.getItem("apiendpoint") +
+      import.meta.env.VITE_SEND_EMAIL_ENDPOINT,
+    "POST",
+  );
 
   const handleSubmitEmail = async () => {
     const payload = {
-    username: productItems[0].email, // change to actual logged-in user
-    items: productItems.map(item => ({
-      prd_queue_code: item.prd_queue_code,
-      transdate: item.transdate,
-      orderedby: item.orderedby,
-      orderedbyname: item.orderedbyname,
-      payee: item.payee,
-      payeename: item.payeename,
-      address: item.address,
-      productname: item.productname,
-      quantity: item.quantity,
-      uom: item.uom,
-      uomval: item.uomval,
-      cost_per_uom: item.cost_per_uom,
-      total: item.total,
-      pr_fullname: item.pr_fullname
-    }))
+      username: productItems[0].email, // change to actual logged-in user
+      items: productItems.map((item) => ({
+        prd_queue_code: item.prd_queue_code,
+        transdate: item.transdate,
+        orderedby: item.orderedby,
+        orderedbyname: item.orderedbyname,
+        payee: item.payee,
+        payeename: item.payeename,
+        address: item.address,
+        productname: item.productname,
+        quantity: item.quantity,
+        uom: item.uom,
+        uomval: item.uomval,
+        cost_per_uom: item.cost_per_uom,
+        total: item.total,
+        pr_fullname: item.pr_fullname,
+      })),
+    };
+    sendEmailMutate({ payload });
   };
-    sendEmailMutate({payload});
+  useEffect(() => {
+    if (poEmail && poEmail.message === "Purchase Order sent successfully") {
+      setIsEmailSuccess(true);
+    }
+  }, [poEmail]);
+  const [isDisabled, setIsDisabled] = useState(false);
+  const [secondsLeft, setSecondsLeft] = useState(0);
 
-  };
-      useEffect(() => {
-        if (poEmail && poEmail.message === "Purchase Order sent successfully") {
-          setIsEmailSuccess(true);
-        } }, [poEmail]);
-        const [isDisabled, setIsDisabled] = useState(false);
-        const [secondsLeft, setSecondsLeft] = useState(0);
+  useEffect(() => {
+    if (secondsLeft > 0) {
+      const timer = setTimeout(() => {
+        setSecondsLeft(secondsLeft - 1);
+      }, 1000);
 
-        useEffect(() => {
-      if (secondsLeft > 0) {
-        const timer = setTimeout(() => {
-          setSecondsLeft(secondsLeft - 1);
-        }, 1000);
-
-        return () => clearTimeout(timer);
-      } else if (secondsLeft === 0 && isDisabled) {
-        setIsDisabled(false);
-      }
-    }, [secondsLeft, isDisabled]);
+      return () => clearTimeout(timer);
+    } else if (secondsLeft === 0 && isDisabled) {
+      setIsDisabled(false);
+    }
+  }, [secondsLeft, isDisabled]);
   return (
     <>
       {showchargesdeduc && (
@@ -2689,53 +2643,11 @@ const ModalPRChecking = ({
                       )}
                     </div>
 
-<<<<<<< HEAD
-                    {/* Table Body */}
-                    {productItems &&
-                      productItems.map((item, index) =>
-                        item.prd_queue_code_new === productTrackingId ? null : (
-                          <div
-                            key={index}
-                            className={`grid grid-cols-12 p-2 ${
-                              index % 2 === 0 ? "bg-white" : "bg-gray-50"
-                            }${
-                              item.prd_queue_code_new === productTrackingId &&
-                              transactionType === "Billing"
-                                ? "hidden"
-                                : ""
-                            }`}
-                          >
-                            <div className="col-span-5 truncate">
-                              {item.productname}
-                            </div>
-                            <div className="col-span-2 text-center">
-                              {item.quantity}
-                            </div>
-                            <div className="col-span-1 text-center">{`${item.uomval}${item.uom}`}</div>
-                            {transactionType !== "PR" && (
-                              <>
-                                <div className="col-span-2 text-center">
-                                  ₱{item.cost_per_uom} ea
-                                </div>
-                                <div className="col-span-2 text-right">
-                                  ₱{item.total}
-                                </div>
-                              </>
-                            )}
-                            {item.deletestatus == "Inactive" && (
-                              <div className=" text-red-600 col-span-2 text-right">
-                                Voided
-                              </div>
-                            )}
-                          </div>
-                        ),
-=======
                     <div>
                       {isStatus === "Approved" && transactionType === "PR" && (
                         <h1 className="text-2xl font-bold text-gray-800">
                           Purchase Request
                         </h1>
->>>>>>> master
                       )}
                       {isStatus === "Approved" && transactionType === "PO" && (
                         <h1 className="text-2xl font-bold text-gray-800">
@@ -2861,19 +2773,6 @@ const ModalPRChecking = ({
                         )}
                       </div>
 
-<<<<<<< HEAD
-                  {/* Total */}
-                  {transactionType !== "PR" && (
-                    <div className="flex justify-end mt-3 text-2xl font-bold">
-                      <div className="bg-gray-200 px-4 py-2 rounded font-semibold">
-                        Total: ₱
-                        {parseFloat(
-                          visibleItemsTotal + totalchargededuc,
-                        ).toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-=======
                       {/* Table Body */}
                       {productItems &&
                         productItems.map((item, index) =>
@@ -2927,7 +2826,6 @@ const ModalPRChecking = ({
                               })
                             : ""}
                         </p>
->>>>>>> master
                       </div>
                     </div>
                     {listofcharge &&
@@ -4147,60 +4045,6 @@ const ModalPRChecking = ({
                   productItems[0].payee === imsBusunitCodeSelected) ||
                 (isStatus === "Pending" &&
                   imsBusunitCodeSelected === productItems[0].orderedby)) &&
-<<<<<<< HEAD
-                (transactionType === "PR" || transactionType === "PO") &&
-                roles[0].findIndex(
-                  (item) => item.rolename === `IMS-${transactionType}-APPROVER`,
-                ) !== -1 && (
-                  <div className="flex flex-row w-full justify-end px-5 space-x-3">
-                    {transactionType === "PR" ||
-                      (transactionType === "PO" && (
-                        <button
-                          onClick={() => {
-                            navigate(
-                              `/purchaserequest/${productItems[0].prd_queue_code}?type=${transactionType}`,
-                            );
-                            setproductTrackingId("");
-                          }}
-                          className="self-start bg-gradient-to-br from-yellow-500 to-zinc-500  py-1 px-8 rounded-sm text-white  hover:scale-95 duration-200"
-                        >
-                          Edit
-                        </button>
-                      ))}
-
-                    {["PR", "PO"].includes(transactionType) &&
-                      roles[0].some(
-                        (item) =>
-                          item.rolename === `IMS-${transactionType}-APPROVER`,
-                      ) && (
-                        <button
-                          onClick={() => {
-                            if (
-                              (productItems[0].payeename == null ||
-                                productItems[0].payeename === "") &&
-                              transactionType === "PO"
-                            ) {
-                              setPayeeError(true);
-                              return;
-                            }
-                            setPRPOYesNoModalOpen(true);
-                          }}
-                          className={`self-start bg-green-700  py-1 px-5 rounded-sm text-white hover:scale-95 duration-200 ${
-                            getPayeeNameByQueueCode(productItems) == null &&
-                            transactionType === "PO"
-                              ? "opacity-50 cursor-not-allowed"
-                              : ""
-                          }`}
-                        >
-                          {transactionType === "PR"
-                            ? "Approve "
-                            : productItems[0].payee.substring(0, 2) === "BU" &&
-                                imsBusunitCodeSelected === productItems[0].payee
-                              ? "Approve by Seller"
-                              : "Approve by Purchaser"}
-                        </button>
-                      )}
-=======
                 (transactionType === "PR" || transactionType === "PO") && (
                   <div className="flex flex-row w-full justify-end px-5 space-x-3">
                     {/* ================= EDIT BUTTON ================= */}
@@ -4252,10 +4096,9 @@ const ModalPRChecking = ({
                             : "Approve by Purchaser"}
                       </button>
                     )}
->>>>>>> master
                   </div>
                 )}
-                {transactionType === "PO" && productItems[0].email && ( 
+              {transactionType === "PO" && productItems[0].email && (
                 <div className="flex flex-row w-full justify-end px-5 space-x-3 mt-5">
                   <button
                     disabled={isDisabled}
