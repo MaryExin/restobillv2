@@ -306,7 +306,7 @@ const VirtualTable = ({
         themeMode === "dark" ? "border-white/5" : "border-slate-200/70"
       }`}
     >
-      <div className="overflow-hidden" style={{ maxHeight: height }}>
+      <div className="overflow-y-hidden" style={{ maxHeight: height }}>
         <HeaderRow />
         {sortedRows.length === 0 ? (
           <div className="py-10 text-center opacity-70">{emptyText}</div>
@@ -316,6 +316,7 @@ const VirtualTable = ({
             itemCount={sortedRows.length}
             itemSize={rowHeight}
             width={Math.max(totalWidth, 900)}
+            style={{ overflowX: "hidden", overflowY: "auto" }}
           >
             {Row}
           </List>
