@@ -21,11 +21,18 @@ import {
 import { IoMdClose } from "react-icons/io";
 import { IoQrCode } from "react-icons/io5";
 import { useReactToPrint } from "react-to-print";
-import { FiX, FiPrinter, FiClock, FiCheckCircle } from "react-icons/fi";
+import {
+  FiX,
+  FiPrinter,
+  FiClock,
+  FiCheckCircle,
+  FiPercent,
+} from "react-icons/fi";
 import Receipt from "./Receipt";
 import { useNavigate } from "react-router-dom";
 import useApiHost from "../../hooks/useApiHost";
 import { useTheme } from "../../context/ThemeContext";
+import ModalDiscountTransaction from "./ModalDiscountTransaction";
 
 const Orderlist = ({
   tableselected,
@@ -83,6 +90,8 @@ const Orderlist = ({
     useState(false);
   const [selectedInstructionItem, setSelectedInstructionItem] = useState(null);
   const [itemInstructionText, setItemInstructionText] = useState("");
+  const [showDiscountModal, setShowDiscountModal] = useState(false);
+  const [discountTransaction, setDiscountTransaction] = useState(null);
 
   const printRef = useRef();
   const printAllRef = useRef();
@@ -801,6 +810,12 @@ const Orderlist = ({
         handlePrintAll();
       }
     }, 150);
+  };
+
+  const onOpenDiscountModal = (item, e) => {
+    e.stopPropagation();
+    setDiscountTransaction(item);
+    setShowDiscountModal(true);
   };
 
   const requestSaveOnly = () => {
@@ -2148,7 +2163,17 @@ const Orderlist = ({
           </motion.div>
         )}
       </AnimatePresence>
-
+      <AnimatePresence>
+        {showDiscountModal && discountTransaction && (
+          <ModalDiscountTransaction
+            isOpen={showDiscountModal}
+            onClose={() => setShowDiscountModal(false)}
+            transaction={discountTransaction}
+            apiHost={apiHost}
+            isDark={isDark}
+          />
+        )}
+      </AnimatePresence>
       <AnimatePresence>
         {showBillingModal && (
           <motion.div
@@ -2282,9 +2307,19 @@ const Orderlist = ({
                         </div>
 
                         {billingTab === "pending" && (
-                          <div className="p-3 bg-blue-500/10 text-blue-500 rounded-xl group-hover:bg-blue-500 group-hover:text-white transition-all">
-                            <FiPrinter size={18} />
-                          </div>
+                          <>
+                            <button
+                              type="button"
+                              onClick={(e) => onOpenDiscountModal(item, e)}
+                              className="p-3 bg-amber-500/10 text-amber-500 rounded-xl hover:bg-amber-500 hover:text-white transition-all"
+                              title="Add Discount"
+                            >
+                              <FiPercent size={18} />
+                            </button>
+                            <div className="p-3 bg-blue-500/10 text-blue-500 rounded-xl group-hover:bg-blue-500 group-hover:text-white transition-all">
+                              <FiPrinter size={18} />
+                            </div>
+                          </>
                         )}
                       </motion.div>
                     ))

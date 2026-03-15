@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { colorSchemes } from "../constants/ColorSchemes";
 
 const ThemeContext = createContext(null);
@@ -25,33 +31,34 @@ const applyCssVariables = (mode, scheme) => {
   const root = document.documentElement;
   const body = document.body;
 
-  const palette = mode === "dark"
-    ? {
-        darkerPrimary: scheme.darkerPrimary,
-        darkPrimary: scheme.darkPrimary,
-        medPrimary: scheme.medPrimary,
-        softPrimary: scheme.softPrimary,
-        softerPrimary: scheme.softerPrimary,
-        brandPrimary: scheme.brandPrimary,
-        brandSecondary: scheme.brandSecondary,
-        brandTertiary: scheme.brandTertiary,
-        lighter: scheme.lighter,
-        light: scheme.light,
-        redaccent: scheme.redaccent,
-      }
-    : {
-        darkerPrimary: "#F8FAFC",
-        darkPrimary: "#FFFFFF",
-        medPrimary: scheme.softerPrimary,
-        softPrimary: scheme.lighter,
-        softerPrimary: "#F8FAFC",
-        brandPrimary: scheme.brandPrimary,
-        brandSecondary: scheme.brandSecondary,
-        brandTertiary: scheme.brandTertiary,
-        lighter: "#FFFFFF",
-        light: scheme.light,
-        redaccent: scheme.redaccent,
-      };
+  const palette =
+    mode === "dark"
+      ? {
+          darkerPrimary: scheme.darkerPrimary,
+          darkPrimary: scheme.darkPrimary,
+          medPrimary: scheme.medPrimary,
+          softPrimary: scheme.softPrimary,
+          softerPrimary: scheme.softerPrimary,
+          brandPrimary: scheme.brandPrimary,
+          brandSecondary: scheme.brandSecondary,
+          brandTertiary: scheme.brandTertiary,
+          lighter: scheme.lighter,
+          light: scheme.light,
+          redaccent: scheme.redaccent,
+        }
+      : {
+          darkerPrimary: "#F8FAFC",
+          darkPrimary: "#FFFFFF",
+          medPrimary: scheme.softerPrimary,
+          softPrimary: scheme.lighter,
+          softerPrimary: "#F8FAFC",
+          brandPrimary: scheme.brandPrimary,
+          brandSecondary: scheme.brandSecondary,
+          brandTertiary: scheme.brandTertiary,
+          lighter: "#FFFFFF",
+          light: scheme.light,
+          redaccent: scheme.redaccent,
+        };
 
   root.setAttribute("data-theme", mode);
   root.style.colorScheme = mode;
@@ -63,14 +70,8 @@ const applyCssVariables = (mode, scheme) => {
     root.style.setProperty(`--color-${key}`, value);
   });
 
-  root.style.setProperty(
-    "--app-bg",
-    mode === "dark" ? "#020617" : "#f8fafc",
-  );
-  root.style.setProperty(
-    "--app-text",
-    mode === "dark" ? "#e2e8f0" : "#0f172a",
-  );
+  root.style.setProperty("--app-bg", mode === "dark" ? "#020617" : "#f8fafc");
+  root.style.setProperty("--app-text", mode === "dark" ? "#e2e8f0" : "#0f172a");
   root.style.setProperty(
     "--app-surface",
     mode === "dark" ? "rgba(15,23,42,0.72)" : "rgba(255,255,255,0.86)",
@@ -91,26 +92,37 @@ const applyCssVariables = (mode, scheme) => {
 
 export const ThemeProvider = ({ children }) => {
   const [theme, setTheme] = useState(() => {
-    if (typeof window === "undefined") return "dark";
-    return localStorage.getItem(STORAGE_KEY) || "dark";
+    if (typeof window === "undefined") return "light";
+    return localStorage.getItem(STORAGE_KEY) || "light";
   });
 
   const [schemeName] = useState(() => {
-    if (typeof window === "undefined") return colorSchemes[0]?.name || "Royal Azure";
-    return localStorage.getItem(SCHEME_KEY) || colorSchemes[0]?.name || "Royal Azure";
+    if (typeof window === "undefined") {
+      return colorSchemes[0]?.name || "Royal Azure";
+    }
+    return (
+      localStorage.getItem(SCHEME_KEY) || colorSchemes[0]?.name || "Royal Azure"
+    );
   });
 
   const scheme = useMemo(() => {
-    return colorSchemes.find((item) => item.name === schemeName)?.colors || DEFAULT_SCHEME;
+    return (
+      colorSchemes.find((item) => item.name === schemeName)?.colors ||
+      DEFAULT_SCHEME
+    );
   }, [schemeName]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       localStorage.setItem(STORAGE_KEY, theme);
       if (!localStorage.getItem(SCHEME_KEY)) {
-        localStorage.setItem(SCHEME_KEY, colorSchemes[0]?.name || "Royal Azure");
+        localStorage.setItem(
+          SCHEME_KEY,
+          colorSchemes[0]?.name || "Royal Azure",
+        );
       }
     }
+
     applyCssVariables(theme, scheme);
   }, [theme, scheme]);
 
@@ -120,12 +132,15 @@ export const ThemeProvider = ({ children }) => {
       isDark: theme === "dark",
       isLight: theme === "light",
       setTheme,
-      toggleTheme: () => setTheme((prev) => (prev === "dark" ? "light" : "dark")),
+      toggleTheme: () =>
+        setTheme((prev) => (prev === "dark" ? "light" : "dark")),
     }),
     [theme],
   );
 
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+  return (
+    <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
+  );
 };
 
 export const useTheme = () => {
