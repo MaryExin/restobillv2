@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { FaUtensils, FaReceipt, FaChartPie } from "react-icons/fa";
+import { FaUtensils, FaReceipt, FaChartPie, FaCoins } from "react-icons/fa";
 import { IoMdClose } from "react-icons/io";
 import Background from "../../assets/background.png";
 import Ordering from "../../assets/Ordering.jpg";
@@ -33,6 +33,15 @@ const Home = () => {
       image: Billing,
       path: "/printbilling",
       icon: <FaReceipt className="text-2xl mb-4" />,
+      color: isDark ? "from-indigo-600/80" : "from-indigo-500/70",
+    },
+    {
+      id: "payments",
+      title: "Payment & Collections",
+      description: "Process payment and collections",
+      image: Billing,
+      path: "/payments",
+      icon: <FaCoins className="text-2xl mb-4" />,
       color: isDark ? "from-indigo-600/80" : "from-indigo-500/70",
     },
     {

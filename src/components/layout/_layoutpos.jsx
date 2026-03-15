@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   FaHome,
   FaBoxOpen,
@@ -8,21 +10,28 @@ import {
   FaClipboardList,
   FaHistory,
   FaFileAlt,
+  FaCog,
   FaUserCircle,
+  FaUtensils,
+  FaWallet,
+  FaChartPie,
 } from "react-icons/fa";
 import { FiX } from "react-icons/fi";
 import { HiOutlineStatusOnline } from "react-icons/hi";
-import { useNavigate } from "react-router-dom";
+import { IoMdClose } from "react-icons/io";
 
-// Components
-import PosQuickActionTile from "../PosCoreComponents/Common/PosQuickActionTile";
 import OpenNewDay from "../PosCoreComponents/Actions/OpenNewDay";
 import SwitchUser from "../PosCoreComponents/Actions/SwitchUser";
 import PosReading from "../PosCoreComponents/Actions/PosReading";
 import PosReports from "../PosCoreComponents/PosReports";
 import ModalYesNoReusable from "../Modals/ModalYesNoReusable";
 
-// Hooks & Context
+import Ordering from "../../assets/Ordering.jpg";
+import Billing from "../../assets/Billing.jpg";
+
+import { useTheme } from "../../context/ThemeContext";
+import PosQuickActionTile from "../MainComponents/Common/PosQuickActionTile";
+
 import useZustandLoginCred from "../../context/useZustandLoginCred";
 import useApiHost from "../../hooks/useApiHost";
 
@@ -33,6 +42,8 @@ const FOOTER_HEIGHT = 118;
 const LayoutPos = ({ children }) => {
   const navigate = useNavigate();
   const apiHost = useApiHost();
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
 
   const { userId } = useZustandLoginCred();
 
@@ -41,10 +52,12 @@ const LayoutPos = ({ children }) => {
 
   const [isPosReadingOpen, setIsPosReadingOpen] = useState(false);
   const [isReportsOpen, setIsReportsOpen] = useState(false);
-
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
 
-  // 🔹 FETCH SHIFT DETAILS
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [dashboardPassword, setDashboardPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+
   useEffect(() => {
     const fetchShiftData = async () => {
       if (!userId) return;
@@ -57,7 +70,6 @@ const LayoutPos = ({ children }) => {
         );
 
         const result = await response.json();
-
         setDateSelection(result);
       } catch (error) {
         console.error("Error fetching shift details:", error);
@@ -69,7 +81,6 @@ const LayoutPos = ({ children }) => {
     fetchShiftData();
   }, [userId, apiHost]);
 
-  // 🔹 BRANCH INFO
   const branchInfo = useMemo(() => {
     return {
       title: "Point of Sales",
@@ -78,7 +89,7 @@ const LayoutPos = ({ children }) => {
       userName: dateselection?.userName || "Guest",
       userRole: dateselection?.userRole || "User",
       shiftStatus: dateselection?.Shift_Status || "Closed",
-      terminalNo: "1",
+      terminalNo: localStorage.getItem("posTerminalNumber") || "1",
       shiftNo: dateselection?.Shift_ID || "0",
       openingDate: dateselection?.Opening_DateTime || "N/A",
       openedBy: dateselection?.opened_by_name || "N/A",
@@ -87,28 +98,106 @@ const LayoutPos = ({ children }) => {
     };
   }, [dateselection]);
 
-  const isClosed = branchInfo.shiftStatus !== "Open";
+  const isClosed = branchInfo.shiftStatus?.toLowerCase() !== "open";
 
   const COLORS = {
     brandSecondary: "var(--color-brandSecondary, #169b43)",
   };
 
-  // 🔹 LOGOUT BUTTON CLICK
   const handleClose = () => {
     setIsLogoutConfirmOpen(true);
   };
 
   const handleLogoutConfirm = () => {
     setIsLogoutConfirmOpen(false);
-
     localStorage.removeItem("posTerminalNumber");
-
     navigate("/");
   };
 
   const handleLogoutCancel = () => {
     setIsLogoutConfirmOpen(false);
   };
+
+  const handleCardClick = (item) => {
+    if (item.id === "salesdashboard") {
+      setShowPasswordModal(true);
+      setDashboardPassword("");
+      setPasswordError("");
+      return;
+    }
+
+    if (
+      (item.id === "ordering" ||
+        item.id === "billing" ||
+        item.id === "transactionrecords") &&
+      isClosed
+    ) {
+      return;
+    }
+
+    navigate(item.path);
+  };
+
+  const handlePasswordSubmit = () => {
+    if (dashboardPassword === "1234") {
+      setShowPasswordModal(false);
+      setDashboardPassword("");
+      setPasswordError("");
+      navigate("/salesdashboard");
+      return;
+    }
+
+    setPasswordError("Incorrect password.");
+  };
+
+  const handleClosePasswordModal = () => {
+    setShowPasswordModal(false);
+    setDashboardPassword("");
+    setPasswordError("");
+  };
+
+  const menuOptions = useMemo(
+    () => [
+      {
+        id: "ordering",
+        title: "Ordering",
+        description: "Manage and create customer orders quickly and smoothly.",
+        image: Ordering,
+        path: "/ordering",
+        icon: <FaUtensils className="text-[26px]" />,
+        badge: "Operations",
+      },
+      {
+        id: "billing",
+        title: "Billing",
+        description:
+          "Process payments, print billing, and finalize transactions.",
+        image: Billing,
+        path: "/printbilling",
+        icon: <FaWallet className="text-[26px]" />,
+        badge: "Cashier",
+      },
+      {
+        id: "salesdashboard",
+        title: "Sales Dashboard",
+        description: "View summary, sales performance, and business insights.",
+        image: Billing,
+        path: "/salesdashboard",
+        icon: <FaChartPie className="text-[26px]" />,
+        badge: "Restricted",
+      },
+      {
+        id: "transactionrecords",
+        title: "Transaction Records",
+        description: "Review past transactions and trace billing history.",
+        image: Billing,
+        path: "/transactionrecords",
+        icon: <FaHistory className="text-[26px]" />,
+        badge: "Records",
+      },
+    ],
+    []
+  );
 
   const quickActions = (
     <>
@@ -133,14 +222,15 @@ const LayoutPos = ({ children }) => {
         icon={<FaReceipt className="text-[28px] sm:text-[30px]" />}
         color="orange"
         disabled={isClosed}
-        onClick={() => !isClosed && navigate("/posNewTransaction")}
+        onClick={() => !isClosed && navigate("/ordering")}
       />
 
       <PosQuickActionTile
         label="Orders"
         icon={<FaClipboardList className="text-[28px] sm:text-[30px]" />}
         color="orange"
-        onClick={() => {}}
+        disabled={isClosed}
+        onClick={() => !isClosed && navigate("/ordering")}
       />
 
       <PosQuickActionTile
@@ -148,15 +238,15 @@ const LayoutPos = ({ children }) => {
         icon={<FaHistory className="text-[28px] sm:text-[30px]" />}
         color="orange"
         disabled={isClosed}
-        onClick={() => !isClosed && navigate("/posTransactionRecord")}
+        onClick={() => !isClosed && navigate("/transactionrecords")}
       />
 
-      <SwitchUser disabled={isClosed} />
+      <SwitchUser />
 
       <PosQuickActionTile
         label="POS Reading"
         icon={<FaFileAlt className="text-[28px] sm:text-[30px]" />}
-        color="indigo"
+        color="slate"
         disabled={isClosed}
         onClick={() => !isClosed && setIsPosReadingOpen(true)}
       />
@@ -167,13 +257,46 @@ const LayoutPos = ({ children }) => {
         color="indigo"
         onClick={() => setIsReportsOpen(true)}
       />
+
+      {menuOptions.map((item) => {
+        const disabled =
+          item.id !== "salesdashboard" &&
+          (item.id === "ordering" ||
+            item.id === "billing" ||
+            item.id === "transactionrecords")
+            ? isClosed
+            : false;
+
+        return (
+          <PosQuickActionTile
+            key={item.id}
+            label={item.title}
+            icon={React.cloneElement(item.icon, {
+              className: "text-[28px] sm:text-[30px]",
+            })}
+            color={
+              item.id === "ordering"
+                ? "orange"
+                : item.id === "billing"
+                  ? "violet"
+                  : item.id === "salesdashboard"
+                    ? "indigo"
+                    : "slate"
+            }
+            disabled={disabled}
+            onClick={() => !disabled && handleCardClick(item)}
+          />
+        );
+      })}
     </>
   );
 
   return (
-    <div className="theme-page relative h-screen w-full overflow-hidden bg-[#dfe4ef]">
-
-      {/* LOGOUT CONFIRMATION MODAL */}
+    <div
+      className={`theme-page relative h-screen w-full overflow-hidden transition-colors duration-300 ${
+        isDark ? "bg-[#0f172a]" : "bg-[#dfe4ef]"
+      }`}
+    >
       {isLogoutConfirmOpen && (
         <ModalYesNoReusable
           header="Logout Confirmation"
@@ -186,7 +309,6 @@ const LayoutPos = ({ children }) => {
         />
       )}
 
-      {/* MODALS */}
       <PosReading
         isOpen={isPosReadingOpen}
         onClose={() => setIsPosReadingOpen(false)}
@@ -196,7 +318,6 @@ const LayoutPos = ({ children }) => {
 
       <PosReports open={isReportsOpen} onClose={() => setIsReportsOpen(false)} />
 
-      {/* BACKGROUND */}
       <div
         className="absolute inset-0"
         style={{
@@ -207,63 +328,194 @@ const LayoutPos = ({ children }) => {
         }}
       />
 
-      <div className="relative z-10 w-full h-screen overflow-hidden">
+      <div
+        className={`absolute inset-0 ${
+          isDark
+            ? "bg-[linear-gradient(180deg,rgba(2,6,23,0.78),rgba(2,6,23,0.82)_28%,rgba(2,6,23,0.88)_70%,rgba(2,6,23,0.92)_100%)]"
+            : "bg-[linear-gradient(180deg,rgba(255,255,255,0.18),rgba(255,255,255,0.08)_26%,rgba(255,255,255,0.18)_70%,rgba(255,255,255,0.12)_100%)]"
+        }`}
+      />
 
-        {/* HEADER */}
+      <AnimatePresence>
+        {showPasswordModal && (
+          <motion.div
+            className={`fixed inset-0 z-[100] flex items-center justify-center px-4 backdrop-blur-sm ${
+              isDark ? "bg-black/55" : "bg-slate-900/30"
+            }`}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 10 }}
+              className={`w-full max-w-md rounded-[28px] border p-6 shadow-[0_30px_80px_rgba(0,0,0,0.25)] ${
+                isDark
+                  ? "border-white/10 bg-slate-950"
+                  : "border-white/70 bg-white"
+              }`}
+            >
+              <div className="mb-5 flex items-center justify-between">
+                <div>
+                  <h2
+                    className={`text-xl font-black ${
+                      isDark ? "text-white" : "text-slate-900"
+                    }`}
+                  >
+                    Sales Dashboard
+                  </h2>
+                  <p
+                    className={`mt-1 text-sm ${
+                      isDark ? "text-slate-400" : "text-slate-500"
+                    }`}
+                  >
+                    Enter password to continue.
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleClosePasswordModal}
+                  className={`grid h-10 w-10 place-items-center rounded-full transition-all ${
+                    isDark
+                      ? "text-slate-400 hover:bg-slate-800 hover:text-white"
+                      : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                  }`}
+                >
+                  <IoMdClose size={20} />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <input
+                  type="password"
+                  value={dashboardPassword}
+                  onChange={(e) => {
+                    setDashboardPassword(e.target.value);
+                    setPasswordError("");
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handlePasswordSubmit();
+                  }}
+                  placeholder="Enter password"
+                  className={`w-full rounded-2xl border px-5 py-4 outline-none transition-all ${
+                    isDark
+                      ? "border-slate-800 bg-slate-900/60 text-white focus:border-cyan-400/40 focus:ring-4 focus:ring-cyan-500/10"
+                      : "border-slate-300 bg-slate-50 text-slate-900 focus:border-cyan-400 focus:ring-4 focus:ring-cyan-500/10"
+                  }`}
+                />
+
+                {passwordError && (
+                  <p className="text-sm text-red-500">{passwordError}</p>
+                )}
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={handleClosePasswordModal}
+                    className={`flex-1 rounded-2xl px-5 py-4 font-semibold transition-all ${
+                      isDark
+                        ? "bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
+                        : "bg-slate-200 text-slate-700 hover:bg-slate-300"
+                    }`}
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    onClick={handlePasswordSubmit}
+                    className="flex-1 rounded-2xl bg-gradient-to-b from-cyan-500 to-sky-600 px-5 py-4 font-bold text-white transition-all hover:brightness-110"
+                  >
+                    Enter
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="relative z-10 h-screen w-full overflow-hidden">
         <header
-          className="fixed top-0 left-0 right-0 z-40 px-3 py-2 border-b sm:px-4"
+          className="fixed left-0 right-0 top-0 z-40 border-b px-3 py-2 sm:px-4"
           style={{
             height: `${HEADER_HEIGHT}px`,
-            background:
-              "linear-gradient(180deg, rgba(102,213,215,0.96) 0%, rgba(125,217,222,0.92) 100%)",
-            borderColor: "rgba(255,255,255,0.75)",
-            backdropFilter: "blur(4px)",
+            background: isDark
+              ? "linear-gradient(180deg, rgba(15,23,42,0.95) 0%, rgba(30,41,59,0.92) 100%)"
+              : "linear-gradient(180deg, rgba(102,213,215,0.96) 0%, rgba(125,217,222,0.92) 100%)",
+            borderColor: isDark
+              ? "rgba(255,255,255,0.08)"
+              : "rgba(255,255,255,0.75)",
+            backdropFilter: "blur(6px)",
           }}
         >
           <div className="flex items-start justify-between gap-3">
-
             <div className="min-w-0">
-              <div className="text-[18px] font-black text-slate-800 sm:text-[20px]">
+              <div
+                className={`text-[18px] leading-none font-black sm:text-[20px] ${
+                  isDark ? "text-white" : "text-slate-800"
+                }`}
+              >
                 {branchInfo.title}
               </div>
 
-              <div className="mt-1 text-[10px] font-medium text-slate-600 sm:text-[12px]">
+              <div
+                className={`mt-1 text-[10px] font-medium sm:text-[12px] ${
+                  isDark ? "text-slate-300" : "text-slate-600"
+                }`}
+              >
                 {branchInfo.subtitle}
               </div>
 
-              <div className="flex items-center gap-2 mt-2 text-slate-800">
+              <div
+                className={`mt-2 flex items-center gap-2 ${
+                  isDark ? "text-white" : "text-slate-800"
+                }`}
+              >
                 <HiOutlineStatusOnline
                   className="text-[17px]"
                   style={{ color: COLORS.brandSecondary }}
                 />
-
-                <div className="text-[16px] font-black sm:text-[18px]">
-                  {branchInfo.branch}
+                <div className="text-[16px] font-black tracking-tight sm:text-[18px]">
+                  {isLoading ? "Loading..." : branchInfo.branch}
                 </div>
               </div>
             </div>
 
             <div className="flex items-start gap-2 sm:gap-3">
-
               <div className="hidden pr-1 text-right sm:block">
-                <div className="text-[14px] font-black text-slate-800">
+                <div
+                  className={`text-[14px] font-black ${
+                    isDark ? "text-white" : "text-slate-800"
+                  }`}
+                >
                   {branchInfo.userName}
                 </div>
-
-                <div className="text-[12px] font-medium text-slate-700">
+                <div
+                  className={`text-[12px] font-medium ${
+                    isDark ? "text-slate-300" : "text-slate-700"
+                  }`}
+                >
                   {branchInfo.userRole}
                 </div>
               </div>
 
-              <div className="grid h-11 w-11 place-items-center rounded-full border border-white/75 bg-white/90 shadow-lg sm:h-12 sm:w-12">
+              <div
+                className={`grid h-11 w-11 place-items-center rounded-full border shadow-[0_10px_24px_rgba(0,0,0,0.12)] sm:h-12 sm:w-12 ${
+                  isDark
+                    ? "border-white/10 bg-white/10"
+                    : "border-white/75 bg-white/90"
+                }`}
+              >
                 <FaUserCircle className="text-[30px] text-blue-500 sm:text-[34px]" />
               </div>
 
               <button
+                type="button"
                 onClick={handleClose}
-                className="grid h-11 w-11 place-items-center rounded-2xl text-white shadow-lg sm:h-12 sm:w-12 transition-transform active:scale-90"
+                className="grid h-11 w-11 place-items-center rounded-2xl text-white shadow-[0_10px_24px_rgba(0,0,0,0.16)] sm:h-12 sm:w-12"
                 style={{
-                  background: "linear-gradient(180deg, #ff6825 0%, #ef4b17 100%)",
+                  background:
+                    "linear-gradient(180deg, #ff6825 0%, #ef4b17 100%)",
                 }}
               >
                 <FiX className="text-[22px]" />
@@ -272,14 +524,20 @@ const LayoutPos = ({ children }) => {
           </div>
 
           <div className="absolute left-0 right-0 flex items-center justify-between px-4 -bottom-6">
-            <div className="flex gap-4 px-3 py-1 bg-white/40 backdrop-blur-md rounded-full text-[10px] font-bold text-slate-700 border border-white/50">
+            <div
+              className={`flex gap-4 rounded-full border px-3 py-1 text-[10px] font-bold backdrop-blur-md ${
+                isDark
+                  ? "border-white/10 bg-white/10 text-slate-200"
+                  : "border-white/50 bg-white/40 text-slate-700"
+              }`}
+            >
               <span>Terminal: {branchInfo.terminalNo}</span>
               <span>Shift: {branchInfo.shiftNo}</span>
               <span
                 className={
                   branchInfo.shiftStatus === "Open"
-                    ? "text-green-700"
-                    : "text-orange-600"
+                    ? "text-green-600"
+                    : "text-orange-500"
                 }
               >
                 Status: {branchInfo.shiftStatus}
@@ -288,27 +546,41 @@ const LayoutPos = ({ children }) => {
           </div>
         </header>
 
-        {/* MAIN */}
         <main
-          className="h-full px-3 overflow-y-auto sm:px-4"
+          className="h-full overflow-y-auto px-3 sm:px-4"
           style={{
             paddingTop: `${HEADER_HEIGHT + 28}px`,
-            paddingBottom: `${FOOTER_HEIGHT + 16}px`,
+            paddingBottom: `${FOOTER_HEIGHT + 18}px`,
           }}
         >
           {children}
         </main>
 
-        {/* FOOTER */}
         <div
-          className="fixed bottom-0 left-0 right-0 z-40 px-3 pt-2 pb-3 sm:px-4 sm:pb-4"
+          className="fixed bottom-0 left-0 right-0 z-40 px-3 pb-3 pt-2 sm:px-4 sm:pb-4"
           style={{
-            background:
-              "linear-gradient(180deg, rgba(223,228,239,0.1) 0%, rgba(223,228,239,0.98) 100%)",
+            background: isDark
+              ? "linear-gradient(180deg, rgba(15,23,42,0.08) 0%, rgba(15,23,42,0.92) 20%, rgba(15,23,42,0.98) 100%)"
+              : "linear-gradient(180deg, rgba(223,228,239,0.10) 0%, rgba(223,228,239,0.92) 20%, rgba(223,228,239,0.98) 100%)",
             backdropFilter: "blur(6px)",
           }}
         >
           <div className="flex flex-wrap gap-2 sm:gap-2.5">{quickActions}</div>
+        </div>
+
+        <div className="pointer-events-none fixed bottom-3 right-3 z-50 sm:bottom-4 sm:right-4">
+          <div
+            className={`grid h-12 w-12 place-items-center rounded-full border shadow-[0_12px_30px_rgba(0,0,0,0.18)] sm:h-14 sm:w-14 ${
+              isDark
+                ? "border-white/10 bg-slate-900/85"
+                : "border-white/75 bg-white/88"
+            }`}
+          >
+            <FaCog
+              className="text-[24px] sm:text-[26px]"
+              style={{ color: COLORS.brandSecondary }}
+            />
+          </div>
         </div>
       </div>
     </div>

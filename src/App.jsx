@@ -8,6 +8,8 @@ import GlobalThemeToggle from "./components/common/GlobalThemeToggle";
 import PosLogin from "./pages/PosCore/PosLogin";
 import PosSelectBusunit from "./pages/PosCore/PosSelectBusunit";
 import PosHomeScreen from "./pages/PosCore/PosHomeScreen";
+import PosPayment from "./components/MainComponents/PosPayment";
+
 const App = () => {
   return (
     <HashRouter>
@@ -19,6 +21,12 @@ const App = () => {
         <Route exact path="/transactionrecords" element={<TransactionRecords />} />
         <Route exact path="/poscoreselectbusunit" element={<PosSelectBusunit />} />
         <Route exact path="/poscorehomescreen" element={<PosHomeScreen />} />
+        <Route
+          exact
+          path="/transactionrecords"
+          element={<TransactionRecords />}
+        />
+        <Route exact path="/payments" element={<PosPayment />} />
       </Routes>
       <GlobalThemeToggle />
     </HashRouter>
