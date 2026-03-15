@@ -2168,7 +2168,7 @@ const PosPayment = () => {
                 </div>
                 <button
                   type="button"
-                  onClick={() => navigate("/")}
+                  onClick={() => navigate("/poscorehomescreen")}
                   className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-black shadow-sm backdrop-blur transition-all ${
                     isDark
                       ? "border border-white/10 bg-slate-900/60 text-slate-200 hover:bg-slate-800/80 hover:text-white"

@@ -554,7 +554,7 @@ const ViewOrdering = () => {
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <nav className="mb-8 flex justify-between items-center">
             <button
-              onClick={() => navigate("/")}
+              onClick={() => navigate("/poscorehomescreen")}
               className={`flex items-center gap-3 mt-6 px-10 py-6 rounded-full transition-all ${
                 isDark
                   ? "bg-slate-900/50 border border-white/5 text-slate-400 hover:text-white"

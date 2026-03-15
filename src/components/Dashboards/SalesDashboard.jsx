@@ -1244,7 +1244,7 @@ const SalesDashboard = () => {
 
           <div className="text-[11px] opacity-70">
             <button
-              onClick={() => navigate("/")}
+              onClick={() => navigate("/poscorehomescreen")}
               className={`flex items-center gap-3 px-6 py-2 ${
                 theme === "dark"
                   ? "bg-slate-900/50 border border-white/5 rounded-full text-slate-400 hover:text-white transition-all"
