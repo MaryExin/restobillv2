@@ -20,33 +20,36 @@ const SwitchUser = () => {
   const apiHost = useApiHost();
 
   // 🔹 FETCH SHIFT STATUS
-  useEffect(() => {
+useEffect(() => {
 
-    const fetchShift = async () => {
+  const fetchShift = async () => {
 
-      if (!userId) return;
+    if (!userId) return;
 
-      try {
+    try {
 
-        const response = await fetch(
-          `${apiHost}/api/get_shift_details.php?user_id=${userId}`
-        );
+      const response = await fetch(
+        `${apiHost}/api/get_shift_details.php?user_id=${userId}`
+      );
 
-        const result = await response.json();
+      const result = await response.json();
 
-        setDateSelection(result);
+      setDateSelection(result);
 
-      } catch (error) {
+    } catch (error) {
 
-        console.error("Error fetching shift:", error);
+      console.error("Error fetching shift:", error);
 
-      }
+    }
 
-    };
+  };
 
-    fetchShift();
+  fetchShift();
 
-  }, [userId, apiHost]);
+  // 🔥 allow global refresh
+  window.refreshSwitchUserShift = fetchShift;
+
+}, [userId, apiHost]);
 
   // 🔹 DISABLE SWITCH USER IF SHIFT CLOSED
   const isClosed = useMemo(() => {

@@ -5,45 +5,52 @@ import useZustandLoginCred from "../../context/useZustandLoginCred";
 import { colorSchemes } from "../../constants/ColorSchemes";
 import "../../fonts/font-style.css";
 import useApiHost from "../../hooks/useApiHost";
+
 const PosHomeScreenComponent = () => {
   const { userId } = useZustandLoginCred();
-  
-  // Update 'your_project_name' to match your htdocs folder
-   const apiHost = useApiHost();
+  const apiHost = useApiHost();
 
   const [dateselection, setDateSelection] = useState(null);
   const [userSelectedTheme, setUserSelectedTheme] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch data using the same pattern as your Login component
-  useEffect(() => {
-    const fetchShiftData = async () => {
-      if (!userId) return;
-      setIsLoading(true);
-      try {
-        // 1. Fetch Shift Details
-        const response = await fetch(`${apiHost}/api/get_shift_details.php?user_id=${userId}`);
-        const result = await response.json();
-        setDateSelection(result);
+  // Fetch data
+useEffect(() => {
 
-        // 2. Fetch Theme (Simulating the endpoint in your login style)
-        // Adjust the theme endpoint path if different
-        const themeResponse = await fetch(`${apiHost}/api/read_selected_theme.php?user_id=${userId}`);
-        const themeResult = await themeResponse.json();
-        setUserSelectedTheme(themeResult);
-        
-      } catch (error) {
-        console.error("Error fetching POS data:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const fetchShiftData = async () => {
 
-    fetchShiftData();
-  }, [userId, apiHost]);
+    if (!userId) return;
+
+    try {
+
+      const response = await fetch(
+        `${apiHost}/api/get_shift_details.php?user_id=${userId}`
+      );
+
+      const result = await response.json();
+
+      setDateSelection(result);
+
+    } catch (error) {
+
+      console.error("Error fetching POS data:", error);
+
+    }
+
+  };
+
+  fetchShiftData();
+
+  // expose refresh function globally
+  window.refreshShiftPanel = fetchShiftData;
+
+}, [userId, apiHost]);
 
   const formatDisplayDate = (dateValue) => {
-    if (!dateValue || dateValue === "0000-00-00 00:00:00" || dateValue === "0000-00-00") {
+    if (!dateValue || 
+        dateValue === "0000-00-00 00:00:00" || 
+        dateValue === "0000-00-00" || 
+        dateValue === "N/A") {
       return "N/A";
     }
     const date = new Date(dateValue);
@@ -59,20 +66,23 @@ const PosHomeScreenComponent = () => {
   };
 
   const branchInfo = useMemo(() => {
+    // Standardize status to handle case sensitivity
+    const status = dateselection?.Shift_Status || "Closed";
+    
     return {
       title: "Point of Sales",
       subtitle: "Restaurant (Version: 1.0.1-1) Offline",
-      branch: dateselection?.Unit_Name,
-      userName: "",
-      userRole: "Manager",
-      shiftStatus: dateselection?.Shift_Status || "Closed",
-      terminalNo: "1",
+      branch: dateselection?.Unit_Name || "N/A",
+      userName: dateselection?.userName || "Guest",
+      userRole: dateselection?.userRole || "User",
+      shiftStatus: status, // This will be "Open" or "Closed"
+      terminalNo: dateselection?.terminal_number || "1",
       shiftNo: dateselection?.Shift_ID || "N/A",
       openingDate: dateselection?.Opening_DateTime
         ? formatDisplayDate(dateselection.Opening_DateTime)
         : "N/A",
       openedBy: dateselection?.opened_by_name || "N/A",
-      closedDate: dateselection?.Closing_DateTime
+      closedDate: dateselection?.Closing_DateTime && dateselection.Closing_DateTime !== "0000-00-00 00:00:00"
         ? formatDisplayDate(dateselection.Closing_DateTime)
         : "N/A",
       closedBy: dateselection?.closed_by_name || "N/A",
@@ -116,9 +126,12 @@ const PosHomeScreenComponent = () => {
             <div className="text-[20px] font-black tracking-tight sm:text-[24px]">
               Recent Shift
             </div>
+            {/* FIX: Ensuring the color logic checks for "Open" correctly */}
             <div
               className={`text-[24px] font-black leading-none sm:text-[32px] ${
-                branchInfo.shiftStatus === "Open" ? "text-green-600" : "text-orange-500"
+                branchInfo.shiftStatus.toLowerCase() === "open" 
+                  ? "text-[#22c55e]" // bright green
+                  : "text-[#f97316]" // bright orange
               }`}
             >
               {branchInfo.shiftStatus}

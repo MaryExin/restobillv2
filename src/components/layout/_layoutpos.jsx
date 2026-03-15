@@ -58,28 +58,45 @@ const LayoutPos = ({ children }) => {
   const [dashboardPassword, setDashboardPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
 
-  useEffect(() => {
-    const fetchShiftData = async () => {
-      if (!userId) return;
+useEffect(() => {
 
-      setIsLoading(true);
+  const fetchShiftData = async () => {
 
-      try {
-        const response = await fetch(
-          `${apiHost}/api/get_shift_details.php?user_id=${userId}`,
-        );
+    if (!userId) return;
 
-        const result = await response.json();
-        setDateSelection(result);
-      } catch (error) {
-        console.error("Error fetching shift details:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    setIsLoading(true);
 
-    fetchShiftData();
-  }, [userId, apiHost]);
+    try {
+
+      const response = await fetch(
+        `${apiHost}/api/get_shift_details.php?user_id=${userId}`
+      );
+
+      const result = await response.json();
+
+      console.log("LayoutPos shift refresh:", result);
+
+      setDateSelection(result);
+
+    } catch (error) {
+
+      console.error("Error fetching shift details:", error);
+
+    } finally {
+
+      setIsLoading(false);
+
+    }
+
+  };
+
+  // initial load
+  fetchShiftData();
+
+  // expose refresh function globally
+  window.refreshLayoutShift = fetchShiftData;
+
+}, [userId, apiHost]);
 
   const branchInfo = useMemo(() => {
     return {

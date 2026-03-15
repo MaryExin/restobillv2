@@ -611,7 +611,7 @@ export default function TransactionRecords({ onClose }) {
       <div className="relative z-10 mx-auto max-w-[1700px] p-4 sm:p-6 lg:p-8">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <button
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/poscorehomescreen")}
             className={`inline-flex items-center gap-3 rounded-2xl border px-5 py-3 font-semibold transition ${
               isDark
                 ? "border-white/5 bg-white/[0.03] text-slate-300 hover:text-white"
