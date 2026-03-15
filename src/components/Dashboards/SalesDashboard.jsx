@@ -306,7 +306,7 @@ const VirtualTable = ({
         themeMode === "dark" ? "border-white/5" : "border-slate-200/70"
       }`}
     >
-      <div className="overflow-auto" style={{ maxHeight: height }}>
+      <div className="overflow-hidden" style={{ maxHeight: height }}>
         <HeaderRow />
         {sortedRows.length === 0 ? (
           <div className="py-10 text-center opacity-70">{emptyText}</div>
@@ -331,7 +331,6 @@ const SalesDashboard = () => {
   // Theme
   const { theme, toggleTheme } = useTheme();
   const T = theme === "dark" ? DARK : WHITE;
-
 
   const apiHost = useApiHost();
 
@@ -641,37 +640,37 @@ const SalesDashboard = () => {
     };
   }, [perProduct, theme]);
 
-const exportReport = async (report) => {
-  if (!apiBase) return;
+  const exportReport = async (report) => {
+    if (!apiBase) return;
 
-  try {
-    const qs = new URLSearchParams({
-      report,
-      datefrom: dateFrom,
-      dateto: dateTo,
-      includeVoided: includeVoided ? "1" : "",
-      voidOnly: voidOnly ? "1" : "",
-    });
+    try {
+      const qs = new URLSearchParams({
+        report,
+        datefrom: dateFrom,
+        dateto: dateTo,
+        includeVoided: includeVoided ? "1" : "",
+        voidOnly: voidOnly ? "1" : "",
+      });
 
-    const url = `${apiBase}/export_report.php?${qs.toString()}`;
+      const url = `${apiBase}/export_report.php?${qs.toString()}`;
 
-    const res = await fetch(url);
-    const blob = await res.blob();
+      const res = await fetch(url);
+      const blob = await res.blob();
 
-    const filename = `${report}_${dateFrom}_${dateTo}.csv`;
+      const filename = `${report}_${dateFrom}_${dateTo}.csv`;
 
-    const link = document.createElement("a");
-    link.href = window.URL.createObjectURL(blob);
-    link.download = filename;
+      const link = document.createElement("a");
+      link.href = window.URL.createObjectURL(blob);
+      link.download = filename;
 
-    document.body.appendChild(link);
-    link.click();
+      document.body.appendChild(link);
+      link.click();
 
-    document.body.removeChild(link);
-  } catch (err) {
-    console.error("Export failed:", err);
-  }
-};
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error("Export failed:", err);
+    }
+  };
 
   // Columns (hour labels 12-hour)
   const hourlyColumns = useMemo(() => {
@@ -1651,7 +1650,7 @@ const exportReport = async (report) => {
           <motion.button
             type="button"
             onClick={() => setIsFilterOpen(true)}
-            className="rounded-full px-4 py-3 text-xs font-extrabold text-white shadow-2xl flex items-center gap-2"
+            className="rounded-full px-4 py-3 text-xs font-extrabold text-white shadow-2xl flex items-center gap-2 "
             style={{
               background:
                 theme === "dark"
