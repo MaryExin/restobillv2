@@ -1,4 +1,6 @@
-import React, { useMemo, useState } from "react";
+"use client";
+
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -11,61 +13,160 @@ import {
   FaCog,
   FaUserCircle,
   FaUtensils,
-  FaChartPie,
   FaWallet,
-  FaCoins,
+  FaChartPie,
 } from "react-icons/fa";
 import { FiX } from "react-icons/fi";
 import { HiOutlineStatusOnline } from "react-icons/hi";
 import { IoMdClose } from "react-icons/io";
 
-import Background from "../../assets/background.png";
+import OpenNewDay from "../PosCoreComponents/Actions/OpenNewDay";
+import SwitchUser from "../PosCoreComponents/Actions/SwitchUser";
+import PosReading from "../PosCoreComponents/Actions/PosReading";
+import PosReports from "../PosCoreComponents/PosReports";
+import ModalYesNoReusable from "../Modals/ModalYesNoReusable";
+
 import Ordering from "../../assets/Ordering.jpg";
 import Billing from "../../assets/Billing.jpg";
+
 import { useTheme } from "../../context/ThemeContext";
 import PosQuickActionTile from "../MainComponents/Common/PosQuickActionTile";
 
+import useZustandLoginCred from "../../context/useZustandLoginCred";
+import useApiHost from "../../hooks/useApiHost";
+
+const POS_HOME_BG = "/pos-home-bg.png";
 const HEADER_HEIGHT = 96;
 const FOOTER_HEIGHT = 118;
-const POS_HOME_BG = "/pos-home-bg.png";
-const branchInfo = {
-  title: "Point of Sales",
-  subtitle: "Restaurant (Version: 1.0.1-1) Offline",
-  branch: "CNC - STA MARIA",
-  userName: "Supervisor Admin",
-  userRole: "Manager",
-  shiftStatus: "Closed",
-  terminalNo: "1",
-  shiftNo: "14",
-  openingDate: "Feb 25, 2026 07:53 AM",
-  openedBy: "Supervisor Admin",
-  closedDate: "Feb 26, 2026 01:12 AM",
-  closedBy: "Supervisor Admin",
-};
 
 const LayoutPos = ({ children }) => {
   const navigate = useNavigate();
-  const { isDark } = useTheme();
+  const apiHost = useApiHost();
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+
+  const { userId } = useZustandLoginCred();
+
+  const [dateselection, setDateSelection] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const [isPosReadingOpen, setIsPosReadingOpen] = useState(false);
+  const [isReportsOpen, setIsReportsOpen] = useState(false);
+  const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
 
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [dashboardPassword, setDashboardPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
 
+  useEffect(() => {
+    const fetchShiftData = async () => {
+      if (!userId) return;
+
+      setIsLoading(true);
+
+      try {
+        const response = await fetch(
+          `${apiHost}/api/get_shift_details.php?user_id=${userId}`
+        );
+
+        const result = await response.json();
+        setDateSelection(result);
+      } catch (error) {
+        console.error("Error fetching shift details:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchShiftData();
+  }, [userId, apiHost]);
+
+  const branchInfo = useMemo(() => {
+    return {
+      title: "Point of Sales",
+      subtitle: "Restaurant (Version: 1.0.1-1) Offline",
+      branch: dateselection?.Unit_Name || "N/A",
+      userName: dateselection?.userName || "Guest",
+      userRole: dateselection?.userRole || "User",
+      shiftStatus: dateselection?.Shift_Status || "Closed",
+      terminalNo: localStorage.getItem("posTerminalNumber") || "1",
+      shiftNo: dateselection?.Shift_ID || "0",
+      openingDate: dateselection?.Opening_DateTime || "N/A",
+      openedBy: dateselection?.opened_by_name || "N/A",
+      closedDate: dateselection?.Closing_DateTime || "N/A",
+      closedBy: dateselection?.closed_by_name || "N/A",
+    };
+  }, [dateselection]);
+
+  const isClosed = branchInfo.shiftStatus?.toLowerCase() !== "open";
+
   const COLORS = {
     brandSecondary: "var(--color-brandSecondary, #169b43)",
   };
 
+  const handleClose = () => {
+    setIsLogoutConfirmOpen(true);
+  };
+
+  const handleLogoutConfirm = () => {
+    setIsLogoutConfirmOpen(false);
+    localStorage.removeItem("posTerminalNumber");
+    navigate("/");
+  };
+
+  const handleLogoutCancel = () => {
+    setIsLogoutConfirmOpen(false);
+  };
+
+  const handleCardClick = (item) => {
+    if (item.id === "salesdashboard") {
+      setShowPasswordModal(true);
+      setDashboardPassword("");
+      setPasswordError("");
+      return;
+    }
+
+    if (
+      (item.id === "ordering" ||
+        item.id === "billing" ||
+        item.id === "transactionrecords") &&
+      isClosed
+    ) {
+      return;
+    }
+
+    navigate(item.path);
+  };
+
+  const handlePasswordSubmit = () => {
+    if (dashboardPassword === "1234") {
+      setShowPasswordModal(false);
+      setDashboardPassword("");
+      setPasswordError("");
+      navigate("/salesdashboard");
+      return;
+    }
+
+    setPasswordError("Incorrect password.");
+  };
+
+  const handleClosePasswordModal = () => {
+    setShowPasswordModal(false);
+    setDashboardPassword("");
+    setPasswordError("");
+  };
+
   const menuOptions = useMemo(
     () => [
-      // {
-      //   id: "ordering",
-      //   title: "Ordering",
-      //   description: "Manage and create customer orders quickly and smoothly.",
-      //   image: Ordering,
-      //   path: "/ordering",
-      //   icon: <FaUtensils className="text-[26px]" />,
-      //   badge: "Operations",
-      // },
+      {
+        id: "ordering",
+        title: "Ordering",
+        description: "Manage and create customer orders quickly and smoothly.",
+        image: Ordering,
+        path: "/ordering",
+        icon: <FaUtensils className="text-[26px]" />,
+        badge: "Operations",
+      },
       {
         id: "billing",
         title: "Billing",
@@ -94,51 +195,9 @@ const LayoutPos = ({ children }) => {
         icon: <FaHistory className="text-[26px]" />,
         badge: "Records",
       },
-      {
-        id: "payments",
-        title: "Payments",
-        description: "Payments and Collections.",
-        image: Billing,
-        path: "/payments",
-        icon: <FaCoins className="text-[26px]" />,
-        badge: "Cashier.",
-      },
     ],
-    [],
+    []
   );
-
-  const handleClose = () => {
-    console.log("Close POS");
-  };
-
-  const handleCardClick = (item) => {
-    if (item.id === "salesdashboard") {
-      setShowPasswordModal(true);
-      setDashboardPassword("");
-      setPasswordError("");
-      return;
-    }
-
-    navigate(item.path);
-  };
-
-  const handlePasswordSubmit = () => {
-    if (dashboardPassword === "1234") {
-      setShowPasswordModal(false);
-      setDashboardPassword("");
-      setPasswordError("");
-      navigate("/salesdashboard");
-      return;
-    }
-
-    setPasswordError("Incorrect password.");
-  };
-
-  const handleClosePasswordModal = () => {
-    setShowPasswordModal(false);
-    setDashboardPassword("");
-    setPasswordError("");
-  };
 
   const quickActions = (
     <>
@@ -146,7 +205,7 @@ const LayoutPos = ({ children }) => {
         label="Home"
         icon={<FaHome className="text-[28px] sm:text-[30px]" />}
         color="green"
-        onClick={() => navigate("/")}
+        onClick={() => navigate("/poscorehomescreen")}
       />
 
       <PosQuickActionTile
@@ -156,64 +215,79 @@ const LayoutPos = ({ children }) => {
         onClick={() => {}}
       />
 
+      <OpenNewDay />
+
       <PosQuickActionTile
         label="New Transaction"
         icon={<FaReceipt className="text-[28px] sm:text-[30px]" />}
         color="orange"
-        onClick={() => navigate("/ordering")}
+        disabled={isClosed}
+        onClick={() => !isClosed && navigate("/ordering")}
       />
-      {/* 
+
       <PosQuickActionTile
         label="Orders"
         icon={<FaClipboardList className="text-[28px] sm:text-[30px]" />}
         color="orange"
-        onClick={() => navigate("/ordering")}
-      /> */}
+        disabled={isClosed}
+        onClick={() => !isClosed && navigate("/ordering")}
+      />
 
       <PosQuickActionTile
         label="Trans. Records"
         icon={<FaHistory className="text-[28px] sm:text-[30px]" />}
         color="orange"
-        onClick={() => navigate("/transactionrecords")}
+        disabled={isClosed}
+        onClick={() => !isClosed && navigate("/transactionrecords")}
       />
+
+      <SwitchUser />
 
       <PosQuickActionTile
         label="POS Reading"
         icon={<FaFileAlt className="text-[28px] sm:text-[30px]" />}
         color="slate"
-        disabled
-        onClick={() => {}}
+        disabled={isClosed}
+        onClick={() => !isClosed && setIsPosReadingOpen(true)}
       />
 
       <PosQuickActionTile
         label="Reports"
         icon={<FaFileAlt className="text-[28px] sm:text-[30px]" />}
         color="indigo"
-        onClick={() => setShowPasswordModal(true)}
+        onClick={() => setIsReportsOpen(true)}
       />
-      {menuOptions.map((item) => (
-        <PosQuickActionTile
-          key={item.id}
-          label={item.title}
-          icon={React.cloneElement(item.icon, {
-            className: "text-[28px] sm:text-[30px]",
-          })}
-          color={
-            item.id === "ordering"
-              ? "orange"
-              : item.id === "billing"
-                ? "violet"
-                : item.id === "salesdashboard"
-                  ? "indigo"
-                  : item.id === "payments"
-                    ? "green"
-                    : item.id === "transactionrecords"
-                      ? "blue"
-                      : "slate"
-          }
-          onClick={() => handleCardClick(item)}
-        />
-      ))}
+
+      {menuOptions.map((item) => {
+        const disabled =
+          item.id !== "salesdashboard" &&
+          (item.id === "ordering" ||
+            item.id === "billing" ||
+            item.id === "transactionrecords")
+            ? isClosed
+            : false;
+
+        return (
+          <PosQuickActionTile
+            key={item.id}
+            label={item.title}
+            icon={React.cloneElement(item.icon, {
+              className: "text-[28px] sm:text-[30px]",
+            })}
+            color={
+              item.id === "ordering"
+                ? "orange"
+                : item.id === "billing"
+                  ? "violet"
+                  : item.id === "salesdashboard"
+                    ? "indigo"
+                    : "slate"
+            }
+            disabled={disabled}
+            onClick={() => !disabled && handleCardClick(item)}
+          />
+        );
+      })}
     </>
   );
 
@@ -223,6 +297,27 @@ const LayoutPos = ({ children }) => {
         isDark ? "bg-[#0f172a]" : "bg-[#dfe4ef]"
       }`}
     >
+      {isLogoutConfirmOpen && (
+        <ModalYesNoReusable
+          header="Logout Confirmation"
+          message="Are you sure you want to exit POS?"
+          setYesNoModalOpen={setIsLogoutConfirmOpen}
+          triggerYesNoEvent={handleLogoutConfirm}
+          triggerNoEvent={handleLogoutCancel}
+          yesLabel="Logout"
+          noLabel="Cancel"
+        />
+      )}
+
+      <PosReading
+        isOpen={isPosReadingOpen}
+        onClose={() => setIsPosReadingOpen(false)}
+        onXReadingSubmit={() => setIsPosReadingOpen(false)}
+        onZReadingSubmit={() => setIsPosReadingOpen(false)}
+      />
+
+      <PosReports open={isReportsOpen} onClose={() => setIsReportsOpen(false)} />
+
       <div
         className="absolute inset-0"
         style={{
@@ -381,7 +476,7 @@ const LayoutPos = ({ children }) => {
                   style={{ color: COLORS.brandSecondary }}
                 />
                 <div className="text-[16px] font-black tracking-tight sm:text-[18px]">
-                  {branchInfo.branch}
+                  {isLoading ? "Loading..." : branchInfo.branch}
                 </div>
               </div>
             </div>
@@ -427,11 +522,34 @@ const LayoutPos = ({ children }) => {
               </button>
             </div>
           </div>
+
+          <div className="absolute left-0 right-0 flex items-center justify-between px-4 -bottom-6">
+            <div
+              className={`flex gap-4 rounded-full border px-3 py-1 text-[10px] font-bold backdrop-blur-md ${
+                isDark
+                  ? "border-white/10 bg-white/10 text-slate-200"
+                  : "border-white/50 bg-white/40 text-slate-700"
+              }`}
+            >
+              <span>Terminal: {branchInfo.terminalNo}</span>
+              <span>Shift: {branchInfo.shiftNo}</span>
+              <span
+                className={
+                  branchInfo.shiftStatus === "Open"
+                    ? "text-green-600"
+                    : "text-orange-500"
+                }
+              >
+                Status: {branchInfo.shiftStatus}
+              </span>
+            </div>
+          </div>
         </header>
+
         <main
           className="h-full overflow-y-auto px-3 sm:px-4"
           style={{
-            paddingTop: `${HEADER_HEIGHT + 14}px`,
+            paddingTop: `${HEADER_HEIGHT + 28}px`,
             paddingBottom: `${FOOTER_HEIGHT + 18}px`,
           }}
         >
