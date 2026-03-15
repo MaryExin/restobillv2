@@ -531,6 +531,12 @@ const ModalDiscountTransaction = ({
   const [errorMessage, setErrorMessage] = useState("");
   const [showItemsModal, setShowItemsModal] = useState(false);
 
+  const safeCustomerCount = Math.max(Number(customerCount) || 1, 1);
+  const safeQualifiedCount = Math.max(
+    Math.min(Number(qualifiedCount) || 0, safeCustomerCount),
+    0,
+  );
+
   useEffect(() => {
     if (!isOpen || !apiHost || !transaction?.transaction_id) return;
 
@@ -865,7 +871,18 @@ const ModalDiscountTransaction = ({
                             type="number"
                             min="1"
                             value={customerCount}
+                            onFocus={() => {
+                              if (customerCount === 1) setCustomerCount("");
+                            }}
                             onChange={(e) => setCustomerCount(e.target.value)}
+                            onBlur={() => {
+                              if (
+                                customerCount === "" ||
+                                Number(customerCount) < 1
+                              ) {
+                                setCustomerCount(1);
+                              }
+                            }}
                             className={`w-full rounded-lg px-3 py-2 text-sm outline-none ${inputClass}`}
                           />
                         </div>
@@ -877,9 +894,24 @@ const ModalDiscountTransaction = ({
                           <input
                             type="number"
                             min="0"
-                            max={customerCount}
+                            max={customerCount || 1}
                             value={qualifiedCount}
+                            onFocus={() => {
+                              if (qualifiedCount === 1) setQualifiedCount("");
+                            }}
                             onChange={(e) => setQualifiedCount(e.target.value)}
+                            onBlur={() => {
+                              if (qualifiedCount === "") {
+                                setQualifiedCount(1);
+                              } else if (Number(qualifiedCount) < 0) {
+                                setQualifiedCount(0);
+                              } else if (
+                                Number(qualifiedCount) >
+                                Number(customerCount || 1)
+                              ) {
+                                setQualifiedCount(customerCount || 1);
+                              }
+                            }}
                             className={`w-full rounded-lg px-3 py-2 text-sm outline-none ${inputClass}`}
                           />
                         </div>
