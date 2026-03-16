@@ -101,7 +101,9 @@ const PrintableDiscountReceipt = React.forwardRef(
               </td>
             </tr>
             <tr>
-              <td style={{ fontWeight: "700", padding: "1px 0" }}>Billing No.:</td>
+              <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                Billing No.:
+              </td>
               <td style={{ textAlign: "right", padding: "1px 0" }}>
                 {transaction?.billing_no || transaction?.billingNo || "-"}
               </td>
@@ -720,6 +722,7 @@ const ModalDiscountTransaction = ({
   const [manualDiscount, setManualDiscount] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [showItemsModal, setShowItemsModal] = useState(false);
+  const [qualifiedPrompt, setQualifiedPrompt] = useState("");
 
   useEffect(() => {
     if (!isOpen || !apiHost || !transaction?.transaction_id) return;
@@ -749,7 +752,38 @@ const ModalDiscountTransaction = ({
       });
   }, [isOpen, apiHost, transaction]);
 
+  useEffect(() => {
+    if (!isOpen) {
+      setCustomerCount(1);
+      setQualifiedCount(1);
+      setQualifiedPrompt("");
+      setManualDiscount("");
+      setDiscountType("Senior Citizen Discount");
+    }
+  }, [isOpen]);
+
   const isManualDiscount = discountType === "Manual Discount";
+
+  const validateQualifiedCounts = (nextTotal, nextQualified) => {
+    if (isManualDiscount) {
+      setQualifiedPrompt("");
+      return;
+    }
+
+    const totalNum = Number(nextTotal || 0);
+    const qualifiedNum = Number(nextQualified || 0);
+
+    if (totalNum > 0 && qualifiedNum > totalNum) {
+      setCustomerCount(1);
+      setQualifiedCount(1);
+      setQualifiedPrompt("Qualified should not be more than total customers.");
+      return;
+    }
+
+    setQualifiedPrompt("");
+  };
+
+  const isPrintDisabled = !isManualDiscount && Boolean(qualifiedPrompt);
 
   const computed = useMemo(() => {
     const safeCustomerCount = Math.max(Number(customerCount) || 1, 1);
@@ -853,7 +887,10 @@ const ModalDiscountTransaction = ({
           .toLowerCase() === "yes",
     ).length;
 
-    const netAfterDiscount = Math.max(grossTotal - computedDiscount, 0);
+    const netAfterDiscount = Math.max(
+      grossTotal - computedDiscount - vatExemption,
+      0,
+    );
 
     return {
       discountableGross,
@@ -1032,7 +1069,12 @@ const ModalDiscountTransaction = ({
                         <button
                           key={type.label}
                           type="button"
-                          onClick={() => setDiscountType(type.label)}
+                          onClick={() => {
+                            setDiscountType(type.label);
+                            setQualifiedPrompt("");
+                            setCustomerCount(1);
+                            setQualifiedCount(1);
+                          }}
                           className={`w-full rounded-lg border px-3 py-2.5 text-left transition-all ${
                             active
                               ? "border-blue-600 bg-blue-600 text-white"
@@ -1090,60 +1132,100 @@ const ModalDiscountTransaction = ({
                         />
                       </div>
                     ) : (
-                      <div className="grid grid-cols-2 gap-2.5">
-                        <div>
-                          <label className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
-                            Total Customers
-                          </label>
-                          <input
-                            type="number"
-                            min="1"
-                            value={customerCount}
-                            onFocus={() => {
-                              if (customerCount === 1) setCustomerCount("");
-                            }}
-                            onChange={(e) => setCustomerCount(e.target.value)}
-                            onBlur={() => {
-                              if (
-                                customerCount === "" ||
-                                Number(customerCount) < 1
-                              ) {
-                                setCustomerCount(1);
-                              }
-                            }}
-                            className={`w-full rounded-lg px-3 py-2 text-sm outline-none ${inputClass}`}
-                          />
+                      <>
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <div>
+                            <label className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
+                              Total Customers
+                            </label>
+                            <input
+                              type="number"
+                              min="1"
+                              value={customerCount}
+                              onFocus={() => {
+                                if (customerCount === 1) setCustomerCount("");
+                              }}
+                              onChange={(e) => {
+                                const nextValue = e.target.value;
+                                setCustomerCount(nextValue);
+                                if (qualifiedPrompt) {
+                                  validateQualifiedCounts(
+                                    nextValue,
+                                    qualifiedCount,
+                                  );
+                                }
+                              }}
+                              onBlur={() => {
+                                const normalized =
+                                  customerCount === "" ||
+                                  Number(customerCount) < 1
+                                    ? 1
+                                    : Number(customerCount);
+                                setCustomerCount(normalized);
+                                validateQualifiedCounts(
+                                  normalized,
+                                  qualifiedCount,
+                                );
+                              }}
+                              className={`w-full rounded-lg px-3 py-2 text-sm outline-none ${
+                                qualifiedPrompt
+                                  ? isDark
+                                    ? "bg-slate-900/70 border border-red-500 text-white placeholder:text-slate-500"
+                                    : "bg-white border border-red-500 text-slate-900 placeholder:text-slate-400"
+                                  : inputClass
+                              }`}
+                            />
+                          </div>
+
+                          <div>
+                            <label className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
+                              Qualified
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              max={customerCount || 1}
+                              value={qualifiedCount}
+                              onFocus={() => {
+                                if (qualifiedCount === 1) setQualifiedCount("");
+                              }}
+                              onChange={(e) => {
+                                const nextValue = e.target.value;
+                                setQualifiedCount(nextValue);
+                                if (qualifiedPrompt) {
+                                  validateQualifiedCounts(
+                                    customerCount,
+                                    nextValue,
+                                  );
+                                }
+                              }}
+                              onBlur={() => {
+                                const normalized =
+                                  qualifiedCount === "" ||
+                                  Number(qualifiedCount) < 0
+                                    ? 1
+                                    : Number(qualifiedCount);
+                                setQualifiedCount(normalized);
+                                validateQualifiedCounts(
+                                  customerCount,
+                                  normalized,
+                                );
+                              }}
+                              className={`w-full rounded-lg px-3 py-2 text-sm outline-none ${
+                                qualifiedPrompt
+                                  ? isDark
+                                    ? "bg-slate-900/70 border border-red-500 text-white placeholder:text-slate-500"
+                                    : "bg-white border border-red-500 text-slate-900 placeholder:text-slate-400"
+                                  : inputClass
+                              }`}
+                            />
+                          </div>
                         </div>
 
-                        <div>
-                          <label className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
-                            Qualified
-                          </label>
-                          <input
-                            type="number"
-                            min="0"
-                            max={customerCount || 1}
-                            value={qualifiedCount}
-                            onFocus={() => {
-                              if (qualifiedCount === 1) setQualifiedCount("");
-                            }}
-                            onChange={(e) => setQualifiedCount(e.target.value)}
-                            onBlur={() => {
-                              if (qualifiedCount === "") {
-                                setQualifiedCount(1);
-                              } else if (Number(qualifiedCount) < 0) {
-                                setQualifiedCount(0);
-                              } else if (
-                                Number(qualifiedCount) >
-                                Number(customerCount || 1)
-                              ) {
-                                setQualifiedCount(customerCount || 1);
-                              }
-                            }}
-                            className={`w-full rounded-lg px-3 py-2 text-sm outline-none ${inputClass}`}
-                          />
-                        </div>
-                      </div>
+                        <p className="mt-2 text-xs font-semibold text-red-500 min-h-[18px]">
+                          {qualifiedPrompt}
+                        </p>
+                      </>
                     )}
                   </div>
                 </div>
@@ -1229,8 +1311,15 @@ const ModalDiscountTransaction = ({
                 </button>
 
                 <button
-                  onClick={() => handlePrint?.()}
-                  className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white transition-all hover:bg-blue-500"
+                  onClick={() => {
+                    if (!isPrintDisabled) handlePrint?.();
+                  }}
+                  disabled={isPrintDisabled}
+                  className={`flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-bold text-white transition-all ${
+                    isPrintDisabled
+                      ? "cursor-not-allowed bg-slate-400 opacity-60"
+                      : "bg-blue-600 hover:bg-blue-500"
+                  }`}
                 >
                   <FiPrinter size={14} />
                   Print Billing
