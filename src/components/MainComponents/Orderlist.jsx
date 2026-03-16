@@ -182,17 +182,19 @@ const Orderlist = ({
     },
   });
 
-  const handleBillingPrint = useReactToPrint({
-    content: () => billingPrintRef.current,
-    documentTitle: billingSelectedTransaction?.transaction_id
+const handleBillingPrint = useReactToPrint({
+  content: () => billingPrintRef.current,
+  documentTitle: billingSelectedTransaction?.billing_no
+    ? `billing-${billingSelectedTransaction.billing_no}`
+    : billingSelectedTransaction?.transaction_id
       ? `billing-${billingSelectedTransaction.transaction_id}`
       : `billing-${tableselected}`,
-    pageStyle: printPageStyle,
-    onAfterPrint: () => {
-      setBillingSelectedTransaction(null);
-      setBillingDetailedProduct([]);
-    },
-  });
+  pageStyle: printPageStyle,
+  onAfterPrint: () => {
+    setBillingSelectedTransaction(null);
+    setBillingDetailedProduct([]);
+  },
+});
 
   const getCategoryIcon = (name) => {
     const lower = (name || "").toLowerCase();
@@ -657,33 +659,104 @@ const Orderlist = ({
       });
   };
 
-  const onBillingTransactionClick = (item) => {
-    if (!apiHost) return;
-    if (billingTab !== "pending") return;
+  const saveBillingToServer = async (transaction, detailedItems) => {
+  if (!apiHost || !transaction?.transaction_id) {
+    throw new Error("Missing transaction data.");
+  }
 
-    const txId = item?.transaction_id || transactionId;
-    if (!txId) return;
+  const payload = {
+    transaction_id: transaction.transaction_id,
+    printTitle: "BILLING", // change to "RECEIPT" if needed
+    transStatus: "Pending for Payment", // or "Settled" if receipt/payment final
+    category_code: transaction.Category_Code || transaction.category_code || "Crab & Crack",
+    unit_code: transaction.Unit_Code || transaction.unit_code || "BU-247001cd32f1",
 
-    fetch(
-      `${apiHost}/api/bill_trans_per_table.php?transaction_id=${encodeURIComponent(
-        txId,
-      )}`,
-    )
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to fetch transaction");
-        return res.json();
-      })
-      .then((data) => {
-        setBillingDetailedProduct(Array.isArray(data) ? data : []);
-        setBillingSelectedTransaction(item);
-        setTimeout(() => {
-          if (billingPrintRef.current) {
-            handleBillingPrint();
-          }
-        }, 200);
-      })
-      .catch((error) => console.error("Fetch error:", error));
+    TotalSales: Number(transaction.TotalSales || 0),
+    Discount: Number(transaction.Discount || 0),
+    OtherCharges: Number(transaction.OtherCharges || 0),
+    TotalAmountDue: Number(transaction.TotalAmountDue || 0),
+    payment_amount: Number(transaction.payment_amount || 0),
+    change_amount: Number(transaction.change_amount || 0),
+
+    customer_exclusive_id: transaction.customer_exclusive_id || "",
+    customer_head_count: Number(transaction.customer_head_count || 1),
+    customer_count_for_discount: Number(
+      transaction.customer_count_for_discount || 0,
+    ),
+    discount_type: transaction.discount_type || "",
+    VATableSales: Number(transaction.VATableSales || 0),
+    VATableSales_VAT: Number(transaction.VATableSales_VAT || 0),
+    VATExemptSales: Number(transaction.VATExemptSales || 0),
+    VATExemptSales_VAT: Number(transaction.VATExemptSales_VAT || 0),
+    VATZeroRatedSales: Number(transaction.VATZeroRatedSales || 0),
+    payment_method: transaction.payment_method || "Cash",
+    cashier: transaction.cashier || "System",
+
+    cart_items: (detailedItems || []).map((item) => ({
+      databaseID: item.ID || item.id || item.databaseID,
+      selling_price: Number(item.selling_price || 0),
+    })),
   };
+
+  const response = await fetch(`${apiHost}/api/billing.php`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const result = await response.json();
+
+  if (!response.ok || result.status !== "success") {
+    throw new Error(result.message || "Failed to save billing.");
+  }
+
+  return result;
+};
+
+const onBillingTransactionClick = async (item) => {
+  if (!apiHost) return;
+  if (billingTab !== "pending") return;
+
+  const txId = item?.transaction_id || transactionId;
+  if (!txId) return;
+
+  try {
+    // 1. fetch detailed items first
+    const detailRes = await fetch(
+      `${apiHost}/api/bill_trans_per_table.php?transaction_id=${encodeURIComponent(txId)}`,
+    );
+
+    if (!detailRes.ok) {
+      throw new Error("Failed to fetch transaction details");
+    }
+
+    const detailData = await detailRes.json();
+    const detailedItems = Array.isArray(detailData) ? detailData : [];
+
+    // 2. save/update billing in billing.php
+    const billingResult = await saveBillingToServer(item, detailedItems);
+
+    // 3. update state for printing
+    setBillingDetailedProduct(detailedItems);
+    setBillingSelectedTransaction({
+      ...item,
+      billing_no: billingResult.billing_no,
+      invoice_no: billingResult.invoice_no,
+    });
+
+    // 4. trigger print
+    setTimeout(() => {
+      if (billingPrintRef.current) {
+        handleBillingPrint();
+      }
+    }, 200);
+  } catch (error) {
+    console.error("Billing transaction click error:", error);
+    alert(error.message || "Failed to process billing.");
+  }
+};
 
   const saveOrderToServer = async () => {
     if (productcart.items.length === 0) {
@@ -1040,11 +1113,11 @@ const Orderlist = ({
                       }`}
                     >
                       <div
-                        className={`w-full relative ${
+                        className={`h-40 w-full relative ${
                           isDark ? "bg-slate-800" : "bg-slate-100"
                         }`}
                       >
-                        {/* {p.image_url ? (
+                        {p.image_url ? (
                           <img
                             src={p.image_url}
                             alt={p.item_name}
@@ -1058,7 +1131,7 @@ const Orderlist = ({
                           >
                             <FaUtensils size={32} />
                           </div>
-                        )} */}
+                        )}
 
                         <div className="absolute top-3 right-3 bg-blue-600 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <FaPlus size={12} className="text-white" />
@@ -2282,7 +2355,10 @@ const Orderlist = ({
                         initial={{ opacity: 0, x: -10 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.05 }}
-                        onClick={() => onBillingTransactionClick(item)}
+                        onClick={(e) => {
+                          if (e.target.closest("button")) return;
+                          onBillingTransactionClick(item);
+                        }}
                         className={`group flex items-center justify-between p-4 rounded-2xl transition-all cursor-pointer ${
                           isDark
                             ? "bg-slate-800/40 border border-white/5 hover:border-blue-500/50 hover:bg-slate-800"
