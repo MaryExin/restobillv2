@@ -1040,11 +1040,11 @@ const Orderlist = ({
                       }`}
                     >
                       <div
-                        className={`h-40 w-full relative ${
+                        className={`w-full relative ${
                           isDark ? "bg-slate-800" : "bg-slate-100"
                         }`}
                       >
-                        {p.image_url ? (
+                        {/* {p.image_url ? (
                           <img
                             src={p.image_url}
                             alt={p.item_name}
@@ -1058,7 +1058,7 @@ const Orderlist = ({
                           >
                             <FaUtensils size={32} />
                           </div>
-                        )}
+                        )} */}
 
                         <div className="absolute top-3 right-3 bg-blue-600 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <FaPlus size={12} className="text-white" />

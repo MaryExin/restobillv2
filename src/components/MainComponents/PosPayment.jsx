@@ -2053,55 +2053,80 @@ const PosPayment = () => {
 
   const navigate = useNavigate();
 
-  const fetchAll = async () => {
-    setIsLoading(true);
-    setErrorMessage("");
+const safeReadJson = async (response, label) => {
+  const text = await response.text();
 
-    try {
-      const [pendingRes, mopRes, chargesRes] = await Promise.all([
-        fetch(`${apiHost}/api/pos_payment_read_pending.php`),
-        fetch(`${apiHost}/api/pos_payment_read_mode_of_payment.php`),
-        fetch(`${apiHost}/api/pos_payment_read_other_charges.php`),
-      ]);
+  if (!text || !text.trim()) {
+    throw new Error(`${label} returned an empty response.`);
+  }
 
-      const [pendingData, mopData, chargesData] = await Promise.all([
-        pendingRes.json(),
-        mopRes.json(),
-        chargesRes.json(),
-      ]);
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    console.error(`${label} invalid JSON:`, text);
+    throw new Error(`${label} returned invalid JSON.`);
+  }
+};
 
-      if (!pendingRes.ok || !pendingData?.success) {
-        throw new Error(
-          pendingData?.message || "Failed to load pending transactions.",
-        );
-      }
+const fetchAll = async () => {
+  setIsLoading(true);
+  setErrorMessage("");
 
-      if (!mopRes.ok || !mopData?.success) {
-        throw new Error(mopData?.message || "Failed to load mode of payments.");
-      }
+  try {
+    const [pendingRes, mopRes, chargesRes] = await Promise.all([
+      fetch(`${apiHost}/api/pos_payment_read_pending.php`),
+      fetch(`${apiHost}/api/pos_payment_read_mode_of_payment.php`),
+      fetch(`${apiHost}/api/pos_payment_read_other_charges.php`),
+    ]);
 
-      if (!chargesRes.ok || !chargesData?.success) {
-        throw new Error(
-          chargesData?.message || "Failed to load other charges.",
-        );
-      }
+    const [pendingData, mopData, chargesData] = await Promise.all([
+      safeReadJson(pendingRes, "Pending transactions API"),
+      safeReadJson(mopRes, "Mode of payment API"),
+      safeReadJson(chargesRes, "Other charges API"),
+    ]);
 
-      setTransactions(
-        Array.isArray(pendingData?.transactions)
-          ? pendingData.transactions
-          : [],
+    if (!pendingRes.ok || !pendingData?.success) {
+      throw new Error(
+        pendingData?.message || "Failed to load pending transactions."
       );
-      setModeOfPayments(Array.isArray(mopData?.modes) ? mopData.modes : []);
-      setChargeOptions(
-        Array.isArray(chargesData?.charges) ? chargesData.charges : [],
-      );
-    } catch (error) {
-      console.error(error);
-      setErrorMessage(error.message || "Failed to load data.");
-    } finally {
-      setIsLoading(false);
     }
-  };
+
+    if (!mopRes.ok || !mopData?.success) {
+      throw new Error(
+        mopData?.message || "Failed to load mode of payments."
+      );
+    }
+
+    if (!chargesRes.ok || !chargesData?.success) {
+      throw new Error(
+        chargesData?.message || "Failed to load other charges."
+      );
+    }
+
+    setTransactions(
+      Array.isArray(pendingData?.transactions)
+        ? pendingData.transactions
+        : []
+    );
+
+    setModeOfPayments(
+      Array.isArray(mopData?.modes)
+        ? mopData.modes
+        : []
+    );
+
+    setChargeOptions(
+      Array.isArray(chargesData?.charges)
+        ? chargesData.charges
+        : []
+    );
+  } catch (error) {
+    console.error(error);
+    setErrorMessage(error.message || "Failed to load data.");
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   useEffect(() => {
     fetchAll();
