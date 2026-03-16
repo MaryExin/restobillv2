@@ -182,16 +182,16 @@ const PrintBilling = () => {
         />
       </div>
 
-      <AnimatePresence>
-        {showtranslistpertable && (
-          <ModalTrans_List
-            tableselected={tableselected}
-            data={transpertable}
-            setshowtranslistpertable={setshowtranslistpertable}
-            dateFrom={dateFrom}
-          />
-        )}
-      </AnimatePresence>
+<AnimatePresence>
+  {showtranslistpertable && (
+    <ModalTrans_List
+      tableselected={tableselected}
+      data={transpertable}
+      setshowtranslistpertable={setshowtranslistpertable}
+      dateFrom={dateFrom}
+    />
+  )}
+</AnimatePresence>
 
       <div className="relative z-10 max-w-7xl mx-auto flex flex-col min-h-[90vh]">
         <nav className="mb-8 flex justify-between items-center">

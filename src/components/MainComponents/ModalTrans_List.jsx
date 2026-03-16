@@ -109,6 +109,7 @@ const ModalTrans_List = ({
     }
   };
 
+
   const onOpenDiscountModal = (item, e) => {
     e.stopPropagation();
     setDiscountTransaction(item);
@@ -291,14 +292,19 @@ const ModalTrans_List = ({
 
       <AnimatePresence>
         {showDiscountModal && discountTransaction && (
-          <ModalDiscountTransaction
-            isOpen={showDiscountModal}
-            onClose={() => setShowDiscountModal(false)}
-            transaction={discountTransaction}
-            dateFrom={dateFrom}
-            apiHost={apiHost}
-            isDark={isDark}
-          />
+      <ModalDiscountTransaction
+        isOpen={showDiscountModal}
+        onClose={() => setShowDiscountModal(false)}
+        transaction={discountTransaction}
+        apiHost={apiHost}
+        isDark={isDark}
+        dateFrom={dateFrom}
+        billingNo={
+          discountTransaction?.billing_no ||
+          discountTransaction?.billingNo ||
+          ""
+        }
+      />
         )}
       </AnimatePresence>
 
