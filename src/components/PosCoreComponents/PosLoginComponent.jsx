@@ -13,7 +13,7 @@ import ModalAttemp from "../Modals/ModalAttemp";
 import useZustandLoginCred from "../../context/useZustandLoginCred";
 import useLoginAttempts from "../../context/useLoginAttempts ";
 
-const RIGHT_IMAGE = "/login-visual.png";
+const RIGHT_IMAGE = ".//login-visual.png";
 
 const PosLoginComponent = () => {
   const navigate = useNavigate();
@@ -268,6 +268,7 @@ const PosLoginComponent = () => {
           message="Authentication successful!"
           setIsModalOpen={setIsSuccessModalOpen}
           resetForm={resetForm}
+          button="Accept"
         />
       )}
 
@@ -276,6 +277,7 @@ const PosLoginComponent = () => {
           setIsModalOpen={setModalAttemp}
           header="Maximum Attempts Reached"
           message="You have reached the maximum login attempts."
+          button="Accept"
         />
       )}
     </>

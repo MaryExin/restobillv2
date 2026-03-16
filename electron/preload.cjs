@@ -5,5 +5,6 @@ contextBridge.exposeInMainWorld("appConfig", {
 });
 
 contextBridge.exposeInMainWorld("electronAPI", {
-  printReceipt: () => ipcRenderer.invoke("print-receipt"),
+  printReceipt: (html) => ipcRenderer.invoke("print-receipt", html),
+  quitApp: () => ipcRenderer.send("close-app"), // Critical for exiting fullscreen
 });

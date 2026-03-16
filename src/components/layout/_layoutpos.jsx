@@ -35,7 +35,7 @@ import PosQuickActionTile from "../MainComponents/Common/PosQuickActionTile";
 import useZustandLoginCred from "../../context/useZustandLoginCred";
 import useApiHost from "../../hooks/useApiHost";
 
-const POS_HOME_BG = "/pos-home-bg.png";
+const POS_HOME_BG = ".//pos-home-bg.png";
 const HEADER_HEIGHT = 96;
 const FOOTER_HEIGHT = 118;
 
@@ -175,34 +175,35 @@ useEffect(() => {
 
   const menuOptions = useMemo(
     () => [
-      {
-        id: "ordering",
-        title: "Ordering",
-        description: "Manage and create customer orders quickly and smoothly.",
-        image: Ordering,
-        path: "/ordering",
-        icon: <FaUtensils className="text-[26px]" />,
-        badge: "Operations",
-      },
-      {
-        id: "billing",
-        title: "Billing",
-        description:
-          "Process payments, print billing, and finalize transactions.",
-        image: Billing,
-        path: "/printbilling",
-        icon: <FaWallet className="text-[26px]" />,
-        badge: "Cashier",
-      },
-      {
-        id: "payment",
-        title: "Payment",
-        description: "Receive customer payments and complete checkout.",
-        image: Billing,
-        path: "/payments",
-        icon: <FaReceipt className="text-[26px]" />,
-        badge: "Checkout",
-      },
+      // {
+      //   id: "ordering",
+      //   title: "Ordering",
+      //   description: "Manage and create customer orders quickly and smoothly.",
+      //   image: Ordering,
+      //   path: "/ordering",
+      //   icon: <FaUtensils className="text-[26px]" />,
+      //   badge: "Operations",
+      // },
+      // {
+      //   id: "billing",
+      //   title: "Billing",
+      //   description:
+      //     "Process payments, print billing, and finalize transactions.",
+      //   image: Billing,
+      //   path: "/printbilling",
+      //   icon: <FaWallet className="text-[26px]" />,
+      //   badge: "Cashier",
+      // },
+// {
+//   id: "payment",
+//   title: "Payment",
+//   description: "Receive customer payments and complete checkout.",
+//   image: Billing,
+//   path: "/payments",
+//   color: "blue", // Changed from "green"
+//   icon: <FaReceipt className="text-[26px]" />,
+//   badge: "Checkout",
+// },
       {
         id: "salesdashboard",
         title: "Sales Dashboard",
@@ -212,15 +213,15 @@ useEffect(() => {
         icon: <FaChartPie className="text-[26px]" />,
         badge: "Restricted",
       },
-      {
-        id: "transactionrecords",
-        title: "Transaction Records",
-        description: "Review past transactions and trace billing history.",
-        image: Billing,
-        path: "/transactionrecords",
-        icon: <FaHistory className="text-[26px]" />,
-        badge: "Records",
-      },
+      // {
+      //   id: "transactionrecords",
+      //   title: "Transaction Records",
+      //   description: "Review past transactions and trace billing history.",
+      //   image: Billing,
+      //   path: "/transactionrecords",
+      //   icon: <FaHistory className="text-[26px]" />,
+      //   badge: "Records",
+      // },
     ],
     [],
   );
@@ -250,40 +251,41 @@ useEffect(() => {
         disabled={isClosed}
         onClick={() => !isClosed && navigate("/ordering")}
       />
+      
 
-      <PosQuickActionTile
-        label="Orders"
-        icon={<FaClipboardList className="text-[28px] sm:text-[30px]" />}
-        color="orange"
-        disabled={isClosed}
-        onClick={() => !isClosed && navigate("/ordering")}
-      />
 
-      <PosQuickActionTile
+      {/* <PosQuickActionTile
         label="Trans. Records"
         icon={<FaHistory className="text-[28px] sm:text-[30px]" />}
         color="orange"
         disabled={isClosed}
         onClick={() => !isClosed && navigate("/transactionrecords")}
-      />
+      /> */}
 
       <SwitchUser />
 
       <PosQuickActionTile
         label="POS Reading"
         icon={<FaFileAlt className="text-[28px] sm:text-[30px]" />}
-        color="slate"
+        color="indigo"
         disabled={isClosed}
         onClick={() => !isClosed && setIsPosReadingOpen(true)}
       />
-
+      
       <PosQuickActionTile
-        label="Reports"
-        icon={<FaFileAlt className="text-[28px] sm:text-[30px]" />}
-        color="indigo"
-        onClick={() => setIsReportsOpen(true)}
+        label="Billing"
+        icon={<FaReceipt className="text-[28px] sm:text-[30px]" />}
+        color="violet"
+        disabled={isClosed}
+        onClick={() => !isClosed && navigate("/printbilling")}
       />
 
+            <PosQuickActionTile
+        label="Payment"
+        icon={<FaReceipt className="text-[28px] sm:text-[30px]" />}
+        color="green"
+        onClick={() => navigate("/payments")}
+      />
       {menuOptions.map((item) => {
         const disabled =
           item.id !== "salesdashboard" &&
@@ -318,8 +320,12 @@ useEffect(() => {
             disabled={disabled}
             onClick={() => !disabled && handleCardClick(item)}
           />
+          
         );
+        
       })}
+
+
     </>
   );
 

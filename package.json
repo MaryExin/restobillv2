@@ -4,15 +4,15 @@
   "homepage": ".",
   "version": "0.0.1",
   "description": "RCI desktop app",
-  "author": "Lenard",
+  "author": "Lightem",
   "type": "module",
   "main": "electron/main.cjs",
-"scripts": {
-  "dev": "vite",
-  "build": "vite build",
-  "electron": "electron .",
-  "dist": "npm run build && electron-builder"
-},
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "electron": "electron .",
+    "dist": "npm run build && electron-builder"
+  },
   "dependencies": {
     "@emotion/react": "^11.11.0",
     "@emotion/styled": "^11.11.0",
@@ -75,7 +75,7 @@
     "@vitejs/plugin-react-swc": "^3.0.0",
     "autoprefixer": "^10.4.14",
     "concurrently": "^9.2.1",
-    "electron": "^40.8.0",
+    "electron": "^40.8.2",
     "electron-builder": "^26.8.1",
     "eslint": "^8.38.0",
     "eslint-plugin-react": "^7.32.2",
@@ -86,19 +86,27 @@
     "vite": "^4.3.2",
     "wait-on": "^9.0.4"
   },
-  
 "build": {
   "appId": "com.lenard.restobill",
   "productName": "RestoBill",
-  "directories": { "output": "release" },
+  "directories": {
+    "output": "release"
+  },
   "files": [
     "dist/**/*",
     "electron/**/*",
     "package.json"
   ],
-  "extraResources": [
-    { "from": "public/ip.txt", "to": "ip.txt" }
-  ],
-  "win": { "target": "nsis" }
+"extraResources": [
+  { 
+    "from": "public", 
+    "to": "images",
+    "filter": ["**/*"] 
+  },
+  { "from": "public/ip.txt", "to": "ip.txt" }
+],
+  "win": {
+    "target": "nsis"
+  }
 }
 }
