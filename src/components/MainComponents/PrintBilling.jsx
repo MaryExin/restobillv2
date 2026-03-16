@@ -68,8 +68,7 @@ const PrintBilling = () => {
       .then((data) => {
         if (!isMounted) return;
 
-        const backendDate =
-          data?.selectedDate || data?.shiftDate || "";
+        const backendDate = data?.selectedDate || data?.shiftDate || "";
 
         setDateFrom(backendDate);
         setCurrentPage(1);
@@ -96,8 +95,10 @@ const PrintBilling = () => {
       .then((data) => {
         const safeData = Array.isArray(data) ? data : [];
         const sorted = [...safeData].sort((a, b) => {
-          const numA = parseInt(String(a.table_number || "").replace(/^\D+/g, "")) || 0;
-          const numB = parseInt(String(b.table_number || "").replace(/^\D+/g, "")) || 0;
+          const numA =
+            parseInt(String(a.table_number || "").replace(/^\D+/g, "")) || 0;
+          const numB =
+            parseInt(String(b.table_number || "").replace(/^\D+/g, "")) || 0;
           return numA - numB;
         });
         setOriginalTableList(sorted);
@@ -187,6 +188,7 @@ const PrintBilling = () => {
             tableselected={tableselected}
             data={transpertable}
             setshowtranslistpertable={setshowtranslistpertable}
+            dateFrom={dateFrom}
           />
         )}
       </AnimatePresence>
@@ -223,10 +225,7 @@ const PrintBilling = () => {
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <div
-            className="relative group"
-            onClick={handleCalendarClick}
-          >
+          <div className="relative group" onClick={handleCalendarClick}>
             <FaCalendarAlt className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none z-20" />
             <input
               ref={dateInputRef}
@@ -313,7 +312,9 @@ const PrintBilling = () => {
                     </span>
                     <div
                       className={`absolute top-4 right-4 w-3 h-3 rounded-full ${
-                        isPending ? "bg-amber-500 animate-pulse" : "bg-emerald-500"
+                        isPending
+                          ? "bg-amber-500 animate-pulse"
+                          : "bg-emerald-500"
                       }`}
                     />
                     <span

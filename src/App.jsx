@@ -18,8 +18,16 @@ const App = () => {
         <Route exact path="/ordering" element={<ViewOrdering />} />
         <Route exact path="/printbilling" element={<PrintBilling />} />
         <Route exact path="/salesdashboard" element={<SalesDashboard />} />
-        <Route exact path="/transactionrecords" element={<TransactionRecords />} />
-        <Route exact path="/poscoreselectbusunit" element={<PosSelectBusunit />} />
+        <Route
+          exact
+          path="/transactionrecords"
+          element={<TransactionRecords />}
+        />
+        <Route
+          exact
+          path="/poscoreselectbusunit"
+          element={<PosSelectBusunit />}
+        />
         <Route exact path="/poscorehomescreen" element={<PosHomeScreen />} />
         <Route
           exact

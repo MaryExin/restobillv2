@@ -1,1 +1,1 @@
-http://Localhost
+http://localhost
