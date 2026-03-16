@@ -20,47 +20,14 @@ protocol.registerSchemesAsPrivileged([
 let win;
 
 function createWindow() {
-  win = new BrowserWindow({
-    fullscreen: true,
-    frame: false,
-    autoHideMenuBar: true,
+  const win = new BrowserWindow({
+    width: 1280,
+    height: 800,
+    autoHideMenuBar: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
-      contextIsolation: true,
-      nodeIntegration: false,
-      // Temporarily set to false if it STILL doesn't work to test, but keep true for security
-      webSecurity: true 
+      contextIsolation: true
     }
-  });
-
-  // 3. The Improved Protocol Handler
-  protocol.registerFileProtocol('asset', (request, callback) => {
-    // Remove 'asset://'
-    let filePath = request.url.replace(/^asset:\/\//, '');
-    
-    // Decode the URL (handles spaces or special characters)
-    filePath = decodeURIComponent(filePath);
-    
-    // Remove leading slashes that might be added by React/Vite
-    if (filePath.startsWith('/')) {
-      filePath = filePath.substring(1);
-    }
-
-    let fullPath;
-    if (app.isPackaged) {
-      // Looks in: [YourApp]/resources/images/login-visual.png
-      fullPath = path.join(process.resourcesPath, 'images', filePath);
-    } else {
-      // Looks in: [YourProject]/public/login-visual.png
-      fullPath = path.join(app.getAppPath(), 'public', filePath);
-    }
-
-    const normalizedPath = path.normalize(fullPath);
-
-    // Final verification log (Visible in terminal/cmd)
-    console.log(`[Asset Protocol] Loading: ${normalizedPath}`);
-    
-    callback({ path: normalizedPath });
   });
 
   win.loadFile(path.join(__dirname, "..", "dist", "index.html"));

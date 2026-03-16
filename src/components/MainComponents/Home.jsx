@@ -35,15 +35,15 @@ const Home = () => {
       icon: <FaReceipt className="text-2xl mb-4" />,
       color: isDark ? "from-indigo-600/80" : "from-indigo-500/70",
     },
-    {
-      id: "payments",
-      title: "Payment & Collections",
-      description: "Process payment and collections",
-      image: Billing,
-      path: "/payments",
-      icon: <FaCoins className="text-2xl mb-4" />,
-      color: isDark ? "from-indigo-600/80" : "from-indigo-500/70",
-    },
+    // {
+    //   id: "payments",
+    //   title: "Payment & Collections",
+    //   description: "Process payment and collections",
+    //   image: Billing,
+    //   path: "/payments",
+    //   icon: <FaCoins className="text-2xl mb-4" />,
+    //   color: isDark ? "from-indigo-600/80" : "from-indigo-500/70",
+    // },
     {
       id: "salesdashboard",
       title: "Sales Dashboard",
@@ -53,7 +53,7 @@ const Home = () => {
       icon: <FaChartPie className="text-2xl mb-4" />,
       color: isDark ? "from-indigo-600/80" : "from-indigo-500/70",
     },
-     {
+    {
       id: "transactionrecords",
       title: "Transaction Records",
       description: "Transaction Records",
