@@ -71,7 +71,7 @@ const ModalTrans_List = ({
 
       return () => clearTimeout(timer);
     }
-  }, [selectedTransaction, detailedproduct, handlePrint]);
+  }, [selectedTransaction, detailedproduct]);
 
   const onTransactionClick = async (item) => {
     if (!apiHost) return;
@@ -225,7 +225,6 @@ const ModalTrans_List = ({
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: index * 0.05 }}
-                      onClick={() => onTransactionClick(item)}
                       className={`group flex items-center justify-between p-4 rounded-2xl transition-all cursor-pointer ${
                         isDark
                           ? "bg-slate-800/40 border border-white/5 hover:border-blue-500/50 hover:bg-slate-800"
@@ -257,7 +256,10 @@ const ModalTrans_List = ({
                               <FiPercent size={18} />
                             </button>
 
-                            <div className="p-3 bg-blue-500/10 text-blue-500 rounded-xl group-hover:bg-blue-500 group-hover:text-white transition-all">
+                            <div
+                              onClick={() => onTransactionClick(item)}
+                              className="p-3 bg-blue-500/10 text-blue-500 rounded-xl group-hover:bg-blue-500 group-hover:text-white transition-all"
+                            >
                               <FiPrinter size={18} />
                             </div>
                           </>
