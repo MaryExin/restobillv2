@@ -885,11 +885,16 @@ const onBillingTransactionClick = async (item) => {
     }, 150);
   };
 
-  const onOpenDiscountModal = (item, e) => {
-    e.stopPropagation();
-    setDiscountTransaction(item);
-    setShowDiscountModal(true);
-  };
+const onOpenDiscountModal = (item, e) => {
+  e.stopPropagation();
+
+  setDiscountTransaction({
+    ...item,
+    billing_no: item?.billing_no || item?.billingNo || "",
+  });
+
+  setShowDiscountModal(true);
+};
 
   const requestSaveOnly = () => {
     setShowSaveConfirmModal(true);
@@ -2244,6 +2249,11 @@ const onBillingTransactionClick = async (item) => {
             transaction={discountTransaction}
             apiHost={apiHost}
             isDark={isDark}
+            billingNo={
+              discountTransaction?.billing_no ||
+              discountTransaction?.billingNo ||
+              ""
+            }
           />
         )}
       </AnimatePresence>
