@@ -18,6 +18,8 @@ const peso = (value) =>
     maximumFractionDigits: 2,
   });
 
+const signedNegativePeso = (value) => `- ${peso(value)}`;
+
 const PrintableDiscountReceipt = React.forwardRef(
   (
     { transaction, dateFrom, discountType, computed, items, isManualDiscount },
@@ -32,235 +34,426 @@ const PrintableDiscountReceipt = React.forwardRef(
           minHeight: "100vh",
           background: "#ffffff",
           color: "#000000",
-          padding: "16px",
-          fontFamily: "monospace",
-          fontSize: "12px",
+          padding: "14px 12px",
+          fontFamily: "Arial, Helvetica, sans-serif",
+          fontSize: "11px",
+          lineHeight: 1.25,
           WebkitPrintColorAdjust: "exact",
           printColorAdjust: "exact",
         }}
       >
-        <div style={{ textAlign: "center", marginBottom: "16px" }}>
-          <h2
-            style={{
-              fontSize: "18px",
-              fontWeight: "bold",
-              textTransform: "uppercase",
-              textDecoration: "underline",
-              margin: 0,
-            }}
+        <div style={{ textAlign: "center" }}>
+          <div
+            style={{ fontWeight: "900", fontSize: "15px", lineHeight: 1.15 }}
           >
-            Discount Summary
-          </h2>
-          <p style={{ fontWeight: "bold", fontSize: "14px", margin: "4px 0" }}>
-            Transaction: {transaction?.transaction_id || "-"}
-          </p>
-          <p style={{ margin: 0 }}>{dateFrom || "-"}</p>
+            {String("CRABS N CRACK SEAFOOD HOUSE").toUpperCase()}
+          </div>
+          <div
+            style={{ fontWeight: "700", fontSize: "12px", marginTop: "2px" }}
+          >
+            AND SHAKING CRABS - STA. MARIA
+          </div>
+          <div style={{ fontWeight: "700", fontSize: "12px" }}>
+            ARU FOOD CORP.
+          </div>
+
+          {/* <div style={{ marginTop: "8px", fontSize: "10px" }}>
+              BYPASS ROAD TABING BAKOD P. STA MARIA
+            </div>
+            <div style={{ fontSize: "10px" }}>BULACAN</div>
+            <div style={{ fontSize: "10px" }}>VAT REG TIN: 634-742-586-00012</div>
+            <div style={{ fontSize: "10px" }}>MIN:</div>
+            <div style={{ fontSize: "10px" }}>S/N:</div> */}
+        </div>
+
+        <div
+          style={{
+            borderTop: "1px solid #000",
+            margin: "10px 0 8px",
+          }}
+        />
+
+        <div
+          style={{
+            textAlign: "center",
+            fontWeight: "900",
+            fontSize: "14px",
+            marginBottom: "8px",
+          }}
+        >
+          BILLING
+        </div>
+
+        <table
+          style={{
+            width: "100%",
+            fontSize: "10px",
+            borderCollapse: "collapse",
+          }}
+        >
+          <tbody>
+            <tr>
+              <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                Trans. No.:
+              </td>
+              <td style={{ textAlign: "right", padding: "1px 0" }}>
+                {transaction?.transaction_id || "-"}
+              </td>
+            </tr>
+            <tr>
+              <td style={{ fontWeight: "700", padding: "1px 0" }}>INV#:</td>
+              <td style={{ textAlign: "right", padding: "1px 0" }}>
+                {transaction?.invoice_no || "-"}
+              </td>
+            </tr>
+            <tr>
+              <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                Trans. Date:
+              </td>
+              <td style={{ textAlign: "right", padding: "1px 0" }}>
+                {transaction?.transaction_date || dateFrom || "-"}
+              </td>
+            </tr>
+            <tr>
+              <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                Trans. Time:
+              </td>
+              <td style={{ textAlign: "right", padding: "1px 0" }}>
+                {transaction?.transaction_time || "-"}
+              </td>
+            </tr>
+            <tr>
+              <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                Terminal No.:
+              </td>
+              <td style={{ textAlign: "right", padding: "1px 0" }}>
+                {transaction?.terminal_number || "-"}
+              </td>
+            </tr>
+            <tr>
+              <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                Order Type:
+              </td>
+              <td style={{ textAlign: "right", padding: "1px 0" }}>
+                {transaction?.order_type || "-"}
+              </td>
+            </tr>
+            <tr>
+              <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                Ref./Tag #:
+              </td>
+              <td style={{ textAlign: "right", padding: "1px 0" }}>
+                {transaction?.table_number || "-"}
+              </td>
+            </tr>
+            <tr>
+              <td style={{ fontWeight: "700", padding: "1px 0" }}>Cashier:</td>
+              <td style={{ textAlign: "right", padding: "1px 0" }}>
+                {transaction?.cashier || "-"}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div
+          style={{
+            borderTop: "1px solid #000",
+            margin: "10px 0 6px",
+          }}
+        />
+
+        <table
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            fontSize: "10px",
+          }}
+        >
+          <thead>
+            <tr>
+              <th style={{ textAlign: "left", paddingBottom: "4px" }}>Item</th>
+              <th style={{ textAlign: "center", paddingBottom: "4px" }}>Qty</th>
+              <th style={{ textAlign: "right", paddingBottom: "4px" }}>Amt</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item, index) => {
+              const qty = Number(item.sales_quantity || 0);
+              const price = Number(item.selling_price || 0);
+              const lineTotal = qty * price;
+
+              return (
+                <tr key={item.ID || index}>
+                  <td style={{ padding: "2px 0", verticalAlign: "top" }}>
+                    •{" "}
+                    {String(
+                      item.item_name || item.product_id || "-",
+                    ).toUpperCase()}
+                  </td>
+                  <td
+                    style={{
+                      textAlign: "center",
+                      padding: "2px 0",
+                      verticalAlign: "top",
+                    }}
+                  >
+                    {qty} {item.unit_of_measure || ""}
+                  </td>
+                  <td
+                    style={{
+                      textAlign: "right",
+                      padding: "2px 0",
+                      verticalAlign: "top",
+                    }}
+                  >
+                    {peso(lineTotal)}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        <div
+          style={{
+            borderTop: "1px solid #000",
+            margin: "10px 0 6px",
+          }}
+        />
+
+        <table
+          style={{
+            width: "100%",
+            fontSize: "10px",
+            borderCollapse: "collapse",
+          }}
+        >
+          <tbody>
+            <tr>
+              <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                TOTAL SALES:
+              </td>
+              <td style={{ textAlign: "right", padding: "1px 0" }}>
+                {peso(computed?.grossTotal)}
+              </td>
+            </tr>
+
+            {discountType !== "No Discount" &&
+            Number(computed?.computedDiscount || 0) > 0 ? (
+              <tr>
+                <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                  {String(discountType || "DISCOUNT").toUpperCase()}:
+                </td>
+                <td style={{ textAlign: "right", padding: "1px 0" }}>
+                  {signedNegativePeso(computed?.computedDiscount)}
+                </td>
+              </tr>
+            ) : null}
+
+            {Number(computed?.vatExemption || 0) > 0 ? (
+              <tr>
+                <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                  VAT EXEMPTION:
+                </td>
+                <td style={{ textAlign: "right", padding: "1px 0" }}>
+                  {signedNegativePeso(computed?.vatExemption)}
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+
+        <div
+          style={{
+            borderTop: "1px solid #000",
+            margin: "8px 0 6px",
+          }}
+        />
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "baseline",
+            fontWeight: "900",
+            fontSize: "14px",
+            marginBottom: "8px",
+          }}
+        >
+          <span>AMOUNT DUE:</span>
+          <span>{peso(computed?.netAfterDiscount)}</span>
+        </div>
+
+        <div
+          style={{
+            borderTop: "1px solid #000",
+            margin: "8px 0 6px",
+          }}
+        />
+
+        <table
+          style={{
+            width: "100%",
+            fontSize: "10px",
+            borderCollapse: "collapse",
+          }}
+        >
+          <tbody>
+            <tr>
+              <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                VATABLE SALES:
+              </td>
+              <td style={{ textAlign: "right", padding: "1px 0" }}>
+                {peso(computed?.vatableSales)}
+              </td>
+            </tr>
+            <tr>
+              <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                VAT AMOUNT:
+              </td>
+              <td style={{ textAlign: "right", padding: "1px 0" }}>
+                {peso(computed?.vatableSalesVat)}
+              </td>
+            </tr>
+            <tr>
+              <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                VAT EXEMPT SALES:
+              </td>
+              <td style={{ textAlign: "right", padding: "1px 0" }}>
+                {peso(computed?.vatExemptSales)}
+              </td>
+            </tr>
+            <tr>
+              <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                ZERO RATED SALES:
+              </td>
+              <td style={{ textAlign: "right", padding: "1px 0" }}>
+                {peso(computed?.vatZeroRatedSales)}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div
+          style={{
+            borderTop: "1px solid #000",
+            margin: "10px 0 8px",
+          }}
+        />
+
+        <table
+          style={{
+            width: "100%",
+            fontSize: "10px",
+            borderCollapse: "collapse",
+          }}
+        >
+          <tbody>
+            <tr>
+              <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                Discount Type:
+              </td>
+              <td style={{ textAlign: "right", padding: "1px 0" }}>
+                {discountType || "No Discount"}
+              </td>
+            </tr>
+
+            {!isManualDiscount && (
+              <>
+                <tr>
+                  <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                    Total Customers:
+                  </td>
+                  <td style={{ textAlign: "right", padding: "1px 0" }}>
+                    {computed?.safeCustomerCount ?? 0}
+                  </td>
+                </tr>
+                <tr>
+                  <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                    Qualified Customers:
+                  </td>
+                  <td style={{ textAlign: "right", padding: "1px 0" }}>
+                    {computed?.safeQualifiedCount ?? 0}
+                  </td>
+                </tr>
+                <tr>
+                  <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                    Qualified Ratio:
+                  </td>
+                  <td style={{ textAlign: "right", padding: "1px 0" }}>
+                    {computed?.safeQualifiedCount ?? 0}/
+                    {computed?.safeCustomerCount ?? 0}
+                  </td>
+                </tr>
+              </>
+            )}
+
+            <tr>
+              <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                Discountable Gross:
+              </td>
+              <td style={{ textAlign: "right", padding: "1px 0" }}>
+                {peso(computed?.discountableGross)}
+              </td>
+            </tr>
+            <tr>
+              <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                Discountable Base:
+              </td>
+              <td style={{ textAlign: "right", padding: "1px 0" }}>
+                {peso(computed?.discountableBase)}
+              </td>
+            </tr>
+
+            {!isManualDiscount && (
+              <tr>
+                <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                  Prorated Base:
+                </td>
+                <td style={{ textAlign: "right", padding: "1px 0" }}>
+                  {peso(computed?.proratedBase)}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+
+        <div style={{ marginTop: "12px", fontSize: "10px" }}>
+          <div style={{ fontWeight: "700" }}>Customer Signature:</div>
           <div
             style={{
-              borderBottom: "1px dashed #000",
-              margin: "10px 0",
+              borderBottom: "1px solid #000",
+              height: "18px",
+              marginTop: "3px",
             }}
           />
         </div>
 
-        <div style={{ marginBottom: "12px" }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              marginBottom: "4px",
-            }}
-          >
-            <span>Discount Type</span>
-            <span style={{ fontWeight: "bold", textAlign: "right" }}>
-              {discountType}
-            </span>
-          </div>
-
-          {!isManualDiscount && (
-            <>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  marginBottom: "4px",
-                }}
-              >
-                <span>Total Customers</span>
-                <span>{computed.safeCustomerCount}</span>
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  marginBottom: "4px",
-                }}
-              >
-                <span>Qualified Customers</span>
-                <span>{computed.safeQualifiedCount}</span>
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  marginBottom: "4px",
-                }}
-              >
-                <span>Qualified Ratio</span>
-                <span>
-                  {computed.safeQualifiedCount}/{computed.safeCustomerCount}
-                </span>
-              </div>
-            </>
-          )}
-        </div>
-
         <div
           style={{
-            borderTop: "1px dashed #000",
-            borderBottom: "1px dashed #000",
-            padding: "8px 0",
-            marginBottom: "12px",
+            borderTop: "1px solid #000",
+            margin: "10px 0 8px",
           }}
+        />
+
+        <div style={{ textAlign: "center", fontSize: "10px" }}>
+          <div style={{ fontWeight: "700" }}>Thank you</div>
+          <div style={{ fontWeight: "700" }}>Please come again.</div>
+        </div>
+
+        {/* <div
+          style={{ marginTop: "10px", textAlign: "center", fontSize: "10px" }}
         >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              marginBottom: "4px",
-            }}
-          >
-            <span>Discountable Gross</span>
-            <span>₱{peso(computed.discountableGross)}</span>
+          <div style={{ fontWeight: "700" }}>
+            SUPPLIER: LIGHTEM SOLUTIONS INCORPORATED
           </div>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              marginBottom: "4px",
-            }}
-          >
-            <span>Discountable Base</span>
-            <span>₱{peso(computed.discountableBase)}</span>
-          </div>
-
-          {!isManualDiscount && (
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                marginBottom: "4px",
-              }}
-            >
-              <span>Prorated Base</span>
-              <span>₱{peso(computed.proratedBase)}</span>
-            </div>
-          )}
-
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              marginBottom: "4px",
-              fontWeight: "bold",
-            }}
-          >
-            <span>{discountType}</span>
-            <span>₱{peso(computed.computedDiscount)}</span>
-          </div>
-        </div>
-
-        <div
-          style={{
-            borderTop: "2px solid #000",
-            paddingTop: "8px",
-            marginBottom: "14px",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              marginBottom: "4px",
-            }}
-          >
-            <span>Gross Total</span>
-            <span>₱{peso(computed.grossTotal)}</span>
-          </div>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              fontWeight: "900",
-              fontSize: "13px",
-            }}
-          >
-            <span>NET AFTER DISCOUNT</span>
-            <span>₱{peso(computed.netAfterDiscount)}</span>
-          </div>
-        </div>
-
-        <div style={{ marginBottom: "12px" }}>
-          <p
-            style={{
-              fontWeight: "bold",
-              textTransform: "uppercase",
-              fontSize: "10px",
-              marginBottom: "8px",
-            }}
-          >
-            Ordered Items
-          </p>
-
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ borderBottom: "1px solid #000", fontSize: "10px" }}>
-                <th style={{ textAlign: "left", padding: "4px 0" }}>Item</th>
-                <th style={{ textAlign: "center", padding: "4px 0" }}>Qty</th>
-                <th style={{ textAlign: "right", padding: "4px 0" }}>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item, index) => {
-                const qty = Number(item.sales_quantity || 0);
-                const price = Number(item.selling_price || 0);
-                const lineTotal = qty * price;
-
-                return (
-                  <tr key={item.ID || index}>
-                    <td style={{ padding: "5px 0", verticalAlign: "top" }}>
-                      <div style={{ fontWeight: "bold" }}>
-                        {item.item_name || item.product_id}
-                      </div>
-                      <div style={{ fontSize: "9px" }}>
-                        Disc: {item.isDiscountable || "No"} | VAT:{" "}
-                        {item.vatable || "No"}
-                      </div>
-                    </td>
-                    <td
-                      style={{
-                        textAlign: "center",
-                        padding: "5px 0",
-                        verticalAlign: "top",
-                      }}
-                    >
-                      {qty}
-                    </td>
-                    <td
-                      style={{
-                        textAlign: "right",
-                        padding: "5px 0",
-                        verticalAlign: "top",
-                      }}
-                    >
-                      ₱{peso(lineTotal)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+          <div>1187, PARULAN, PLARIDEL</div>
+          <div>BULACAN, PHILIPPINES</div>
+          <div>TIN: 626717559-000</div>
+          <div>BIR ACC#: 25A6267175592023091853</div>
+          <div>DATE ISSUED: 12/04/2023</div>
+          <div>PTU: FP02204-067-0432508-00003</div>
+        </div> */}
       </div>
     );
   },
@@ -280,10 +473,6 @@ const OrderedItemsSummaryModal = ({
   const modalClass = isDark
     ? "bg-slate-900 border border-white/10 text-white"
     : "bg-white border border-slate-200 text-slate-900";
-
-  const cardClass = isDark
-    ? "bg-slate-950/40 border border-white/5"
-    : "bg-slate-50 border border-slate-200";
 
   return (
     <AnimatePresence>
@@ -531,12 +720,6 @@ const ModalDiscountTransaction = ({
   const [errorMessage, setErrorMessage] = useState("");
   const [showItemsModal, setShowItemsModal] = useState(false);
 
-  const safeCustomerCount = Math.max(Number(customerCount) || 1, 1);
-  const safeQualifiedCount = Math.max(
-    Math.min(Number(qualifiedCount) || 0, safeCustomerCount),
-    0,
-  );
-
   useEffect(() => {
     if (!isOpen || !apiHost || !transaction?.transaction_id) return;
 
@@ -574,14 +757,28 @@ const ModalDiscountTransaction = ({
       0,
     );
 
+    const qualifiedRatio =
+      safeCustomerCount > 0 ? safeQualifiedCount / safeCustomerCount : 0;
+
+    const notQualifiedRatio =
+      safeCustomerCount > 0
+        ? (safeCustomerCount - safeQualifiedCount) / safeCustomerCount
+        : 0;
+
     let discountableGross = 0;
     let discountableBase = 0;
+    let rawVatableGross = 0;
+    let vatableSales = 0;
+    let vatableSalesVat = 0;
+    let vatExemptSales = 0;
+    const vatZeroRatedSales = 0;
 
     items.forEach((item) => {
       const isDiscountable =
         String(item.isDiscountable || "")
           .trim()
           .toLowerCase() === "yes";
+
       const isVatable =
         String(item.vatable || "")
           .trim()
@@ -594,8 +791,30 @@ const ModalDiscountTransaction = ({
       if (isDiscountable) {
         discountableGross += lineTotal;
         discountableBase += isVatable ? lineTotal / 1.12 : lineTotal;
+
+        if (isVatable) {
+          // qualified portion goes to VAT EXEMPT SALES
+          vatExemptSales += lineTotal * qualifiedRatio;
+
+          // not qualified portion stays VATABLE
+          rawVatableGross += lineTotal * notQualifiedRatio;
+        } else {
+          // all non-vatable discountable items are VAT EXEMPT SALES
+          vatExemptSales += lineTotal;
+        }
+      } else {
+        if (isVatable) {
+          // non-discountable + vatable items are fully VATABLE
+          rawVatableGross += lineTotal;
+        } else {
+          // non-discountable + non-vatable items are VAT EXEMPT SALES
+          vatExemptSales += lineTotal;
+        }
       }
     });
+
+    vatableSales = rawVatableGross / 1.12;
+    vatableSalesVat = vatableSales * 0.12;
 
     const proratedBase =
       safeCustomerCount > 0
@@ -603,14 +822,17 @@ const ModalDiscountTransaction = ({
         : 0;
 
     let computedDiscount = 0;
+    let vatExemption = 0;
 
     if (
       discountType === "Senior Citizen Discount" ||
       discountType === "PWD Discount"
     ) {
       computedDiscount = proratedBase * 0.2;
+      vatExemption = proratedBase * 0.12;
     } else {
       computedDiscount = Number(manualDiscount || 0);
+      vatExemption = 0;
     }
 
     const grossTotal = items.reduce((sum, item) => {
@@ -630,7 +852,7 @@ const ModalDiscountTransaction = ({
           .toLowerCase() === "yes",
     ).length;
 
-    const netAfterDiscount = grossTotal - computedDiscount;
+    const netAfterDiscount = Math.max(grossTotal - computedDiscount, 0);
 
     return {
       discountableGross,
@@ -643,12 +865,17 @@ const ModalDiscountTransaction = ({
       netAfterDiscount,
       safeCustomerCount,
       safeQualifiedCount,
+      vatableSales,
+      vatableSalesVat,
+      vatExemptSales,
+      vatZeroRatedSales,
+      vatExemption,
     };
   }, [items, discountType, customerCount, qualifiedCount, manualDiscount]);
 
   const handlePrint = useReactToPrint({
     content: () => printRef.current,
-    documentTitle: `${transaction?.transaction_id || "discount"}-discount`,
+    documentTitle: `${transaction?.transaction_id || "billing"}-billing`,
     pageStyle: `
       @media print {
         @page {
@@ -662,7 +889,7 @@ const ModalDiscountTransaction = ({
           padding: 0 !important;
           background: #ffffff !important;
           color: #000000 !important;
-          font-family: monospace !important;
+          font-family: Arial, Helvetica, sans-serif !important;
           -webkit-print-color-adjust: exact !important;
           print-color-adjust: exact !important;
         }
@@ -1005,7 +1232,7 @@ const ModalDiscountTransaction = ({
                   className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white transition-all hover:bg-blue-500"
                 >
                   <FiPrinter size={14} />
-                  Print Discount
+                  Print Billing
                 </button>
               </div>
             </div>
