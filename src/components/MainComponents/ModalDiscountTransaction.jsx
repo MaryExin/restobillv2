@@ -101,9 +101,9 @@ const PrintableDiscountReceipt = React.forwardRef(
               </td>
             </tr>
             <tr>
-              <td style={{ fontWeight: "700", padding: "1px 0" }}>INV#:</td>
+              <td style={{ fontWeight: "700", padding: "1px 0" }}>Billing No.:</td>
               <td style={{ textAlign: "right", padding: "1px 0" }}>
-                {transaction?.invoice_no || "-"}
+                {transaction?.billing_no || transaction?.billingNo || "-"}
               </td>
             </tr>
             <tr>
@@ -708,6 +708,7 @@ const ModalDiscountTransaction = ({
   dateFrom,
   apiHost,
   isDark,
+  billingNo,
 }) => {
   const printRef = useRef(null);
 
