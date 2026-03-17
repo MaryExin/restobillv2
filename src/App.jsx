@@ -5,6 +5,7 @@ import PrintBilling from "./components/MainComponents/PrintBilling";
 import SalesDashboard from "./components/Dashboards/SalesDashboard";
 import TransactionRecords from "./components/Dashboards/TransactionRecords";
 import GlobalThemeToggle from "./components/common/GlobalThemeToggle";
+import PosReadingModal from "./components/MainComponents/PosReadingModal";
 import PosLogin from "./pages/PosCore/PosLogin";
 import PosSelectBusunit from "./pages/PosCore/PosSelectBusunit";
 import PosHomeScreen from "./pages/PosCore/PosHomeScreen";
@@ -23,6 +24,7 @@ const App = () => {
           path="/transactionrecords"
           element={<TransactionRecords />}
         />
+        <Route exact path="/posreading" element={<PosReadingModal />} />
         <Route
           exact
           path="/poscoreselectbusunit"

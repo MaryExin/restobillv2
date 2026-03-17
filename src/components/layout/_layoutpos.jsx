@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -22,7 +22,7 @@ import { IoMdClose } from "react-icons/io";
 
 import OpenNewDay from "../PosCoreComponents/Actions/OpenNewDay";
 import SwitchUser from "../PosCoreComponents/Actions/SwitchUser";
-import PosReading from "../PosCoreComponents/Actions/PosReading";
+import PosReadingModal from "../MainComponents/PosReadingModal";
 import PosReports from "../PosCoreComponents/PosReports";
 import ModalYesNoReusable from "../Modals/ModalYesNoReusable";
 
@@ -58,16 +58,12 @@ const LayoutPos = ({ children }) => {
   const [dashboardPassword, setDashboardPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
 
-useEffect(() => {
-
-  const fetchShiftData = async () => {
-
+  const fetchShiftData = useCallback(async () => {
     if (!userId) return;
 
     setIsLoading(true);
 
     try {
-
       const response = await fetch(
         `${apiHost}/api/get_shift_details.php?user_id=${userId}`
       );
@@ -75,28 +71,24 @@ useEffect(() => {
       const result = await response.json();
 
       console.log("LayoutPos shift refresh:", result);
-
       setDateSelection(result);
-
     } catch (error) {
-
       console.error("Error fetching shift details:", error);
-
     } finally {
-
       setIsLoading(false);
-
     }
+  }, [userId, apiHost]);
 
-  };
+  useEffect(() => {
+    fetchShiftData();
+    window.refreshLayoutShift = fetchShiftData;
 
-  // initial load
-  fetchShiftData();
-
-  // expose refresh function globally
-  window.refreshLayoutShift = fetchShiftData;
-
-}, [userId, apiHost]);
+    return () => {
+      if (window.refreshLayoutShift === fetchShiftData) {
+        delete window.refreshLayoutShift;
+      }
+    };
+  }, [fetchShiftData]);
 
   const branchInfo = useMemo(() => {
     return {
@@ -112,6 +104,18 @@ useEffect(() => {
       openedBy: dateselection?.opened_by_name || "N/A",
       closedDate: dateselection?.Closing_DateTime || "N/A",
       closedBy: dateselection?.closed_by_name || "N/A",
+      categoryCode:
+        dateselection?.Category_Code ||
+        localStorage.getItem("posBusinessCategoryCode") ||
+        "",
+      unitCode:
+        dateselection?.Unit_Code ||
+        localStorage.getItem("posBusinessUnitCode") ||
+        "",
+      corpName:
+        dateselection?.Corp_Name ||
+        localStorage.getItem("posCorpName") ||
+        "N/A",
     };
   }, [dateselection]);
 
@@ -223,7 +227,7 @@ useEffect(() => {
       //   badge: "Records",
       // },
     ],
-    [],
+    []
   );
 
   const quickActions = (
@@ -242,7 +246,7 @@ useEffect(() => {
         onClick={() => {}}
       />
 
-      <OpenNewDay />
+      <OpenNewDay  />
 
       <PosQuickActionTile
         label="New Transaction"
@@ -269,7 +273,7 @@ useEffect(() => {
         icon={<FaFileAlt className="text-[28px] sm:text-[30px]" />}
         color="indigo"
         disabled={isClosed}
-        onClick={() => !isClosed && setIsPosReadingOpen(true)}
+        onClick={() => setIsPosReadingOpen(true)}
       />
       
       <PosQuickActionTile
@@ -347,11 +351,17 @@ useEffect(() => {
         />
       )}
 
-      <PosReading
-        isOpen={isPosReadingOpen}
+      <PosReadingModal
+        open={isPosReadingOpen}
         onClose={() => setIsPosReadingOpen(false)}
-        onXReadingSubmit={() => setIsPosReadingOpen(false)}
-        onZReadingSubmit={() => setIsPosReadingOpen(false)}
+        onZReadingPrinted={fetchShiftData}
+        selectedCashier="All Cashiers"
+        categoryCode={branchInfo.categoryCode}
+        unitCode={branchInfo.unitCode}
+        terminalNumber={branchInfo.terminalNo}
+        corpName={branchInfo.corpName}
+        xEndpoint="/api/generate_x_reading_pdf.php"
+        zEndpoint="/api/generate_z_reading_data.php"
       />
 
       <PosReports
