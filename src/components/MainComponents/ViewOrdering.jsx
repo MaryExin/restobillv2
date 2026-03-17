@@ -70,10 +70,7 @@ const ViewOrdering = () => {
       .then((data) => {
         if (!isMounted) return;
 
-        const backendDate =
-          data?.selectedDate ||
-          data?.shiftDate ||
-          "";
+        const backendDate = data?.selectedDate || data?.shiftDate || "";
 
         setSelectedDate(backendDate);
         setCurrentPage(1);
@@ -94,7 +91,9 @@ const ViewOrdering = () => {
     if (!apiHost || !selectedDate) return;
 
     const loadTables = () => {
-      fetch(`${apiHost}/api/table_list.php?date=${selectedDate}&onlyPending=true`)
+      fetch(
+        `${apiHost}/api/table_list.php?date=${selectedDate}&onlyPending=true`,
+      )
         .then((res) => res.json())
         .then((data) => {
           setOriginalTableList(
@@ -482,11 +481,18 @@ const ViewOrdering = () => {
                     >
                       Custom Number
                     </label>
+
                     <input
                       type="text"
                       placeholder="e.g. 01/02/02"
                       value={customTableNumber}
-                      onChange={(e) => setCustomTableNumber(e.target.value)}
+                      onChange={(e) => {
+                        const sanitized = e.target.value.replace(
+                          /[^a-zA-Z0-9&,/\s-]/g,
+                          "",
+                        );
+                        setCustomTableNumber(sanitized);
+                      }}
                       className={`w-full rounded-2xl px-5 py-4 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${
                         isDark
                           ? "bg-slate-900/50 border border-slate-800 text-white focus:border-blue-500/40"

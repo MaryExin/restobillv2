@@ -30,11 +30,11 @@ const PrintableDiscountReceipt = React.forwardRef(
         ref={ref}
         className="print-root"
         style={{
-          width: "80mm",
+          width: "56mm",
           minHeight: "100vh",
           background: "#ffffff",
           color: "#000000",
-          padding: "14px 12px",
+          padding: "14px 10px",
           fontFamily: "Arial, Helvetica, sans-serif",
           fontSize: "11px",
           lineHeight: 1.25,
@@ -731,68 +731,70 @@ const ModalDiscountTransaction = ({
   );
 
   const saveBillingBeforePrint = async () => {
-  if (!apiHost || !transaction?.transaction_id) {
-    throw new Error("Missing transaction data.");
-  }
+    if (!apiHost || !transaction?.transaction_id) {
+      throw new Error("Missing transaction data.");
+    }
 
-  const payload = {
-    transaction_id: transaction.transaction_id,
-    printTitle: "BILLING",
-    transStatus: transaction?.remarks || "Pending for Payment",
+    const payload = {
+      transaction_id: transaction.transaction_id,
+      printTitle: "BILLING",
+      transStatus: transaction?.remarks || "Pending for Payment",
 
-    category_code:
-      transaction?.Category_Code || transaction?.category_code || "Crab & Crack",
-    unit_code:
-      transaction?.Unit_Code || transaction?.unit_code || "BU-247001cd32f1",
+      category_code:
+        transaction?.Category_Code ||
+        transaction?.category_code ||
+        "Crab & Crack",
+      unit_code:
+        transaction?.Unit_Code || transaction?.unit_code || "BU-247001cd32f1",
 
-    customer_exclusive_id: transaction?.customer_exclusive_id || "",
-    customer_head_count: Number(customerCount || 1),
-    customer_count_for_discount: isManualDiscount
-      ? 0
-      : Number(qualifiedCount || 0),
-    discount_type: discountType || "",
+      customer_exclusive_id: transaction?.customer_exclusive_id || "",
+      customer_head_count: Number(customerCount || 1),
+      customer_count_for_discount: isManualDiscount
+        ? 0
+        : Number(qualifiedCount || 0),
+      discount_type: discountType || "",
 
-    TotalSales: Number(computed?.grossTotal || 0),
-    Discount: Number(computed?.computedDiscount || 0),
-    OtherCharges: Number(transaction?.OtherCharges || 0),
-    TotalAmountDue: Number(computed?.netAfterDiscount || 0),
+      TotalSales: Number(computed?.grossTotal || 0),
+      Discount: Number(computed?.computedDiscount || 0),
+      OtherCharges: Number(transaction?.OtherCharges || 0),
+      TotalAmountDue: Number(computed?.netAfterDiscount || 0),
 
-    VATableSales: Number(computed?.vatableSales || 0),
-    VATableSales_VAT: Number(computed?.vatableSalesVat || 0),
-    VATExemptSales: Number(computed?.vatExemptSales || 0),
-    VATExemptSales_VAT: Number(computed?.vatExemption || 0),
-    VATZeroRatedSales: Number(computed?.vatZeroRatedSales || 0),
+      VATableSales: Number(computed?.vatableSales || 0),
+      VATableSales_VAT: Number(computed?.vatableSalesVat || 0),
+      VATExemptSales: Number(computed?.vatExemptSales || 0),
+      VATExemptSales_VAT: Number(computed?.vatExemption || 0),
+      VATZeroRatedSales: Number(computed?.vatZeroRatedSales || 0),
 
-    payment_amount: Number(transaction?.payment_amount || 0),
-    payment_method: transaction?.payment_method || "Cash",
-    change_amount: Number(transaction?.change_amount || 0),
-    cashier: transaction?.cashier || "System",
+      payment_amount: Number(transaction?.payment_amount || 0),
+      payment_method: transaction?.payment_method || "Cash",
+      change_amount: Number(transaction?.change_amount || 0),
+      cashier: transaction?.cashier || "System",
 
-    cart_items: (items || []).map((item) => ({
-      databaseID: item.ID || item.id || item.databaseID,
-      selling_price: Number(item.selling_price || 0),
-    })),
+      cart_items: (items || []).map((item) => ({
+        databaseID: item.ID || item.id || item.databaseID,
+        selling_price: Number(item.selling_price || 0),
+      })),
+    };
+
+    const response = await fetch(`${apiHost}/api/billing.php`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || result.status !== "success") {
+      throw new Error(result.message || "Failed to save billing.");
+    }
+
+    setLatestBillingNo(result.billing_no || "");
+    setLatestInvoiceNo(result.invoice_no || "");
+
+    return result;
   };
-
-  const response = await fetch(`${apiHost}/api/billing.php`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-
-  const result = await response.json();
-
-  if (!response.ok || result.status !== "success") {
-    throw new Error(result.message || "Failed to save billing.");
-  }
-
-  setLatestBillingNo(result.billing_no || "");
-  setLatestInvoiceNo(result.invoice_no || "");
-
-  return result;
-};
   useEffect(() => {
     if (!isOpen || !apiHost || !transaction?.transaction_id) return;
 
@@ -983,12 +985,12 @@ const ModalDiscountTransaction = ({
   const handlePrint = useReactToPrint({
     content: () => printRef.current,
     documentTitle: `${
-  latestBillingNo ||
-  billingNo ||
-  transaction?.billing_no ||
-  transaction?.transaction_id ||
-  "billing"
-}-billing`,
+      latestBillingNo ||
+      billingNo ||
+      transaction?.billing_no ||
+      transaction?.transaction_id ||
+      "billing"
+    }-billing`,
     pageStyle: `
       @media print {
         @page {
@@ -1385,26 +1387,27 @@ const ModalDiscountTransaction = ({
                   Cancel
                 </button>
 
-              <button
-                onClick={async () => {
-                  
-                  try {
-                    await saveBillingBeforePrint();
+                <button
+                  onClick={async () => {
+                    try {
+                      await saveBillingBeforePrint();
 
-                    setTimeout(() => {
-                     if (!isPrintDisabled) handlePrint?.();
-                    }, 150);
-                  } catch (error) {
-                    console.error(error);
-                    alert(error.message || "Failed to save billing before print.");
-                  }
-                }}
-                disabled={isPrintDisabled}
-                className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white transition-all hover:bg-blue-500"
-              >
-                <FiPrinter size={14} />
-                Print Billing
-              </button>
+                      setTimeout(() => {
+                        if (!isPrintDisabled) handlePrint?.();
+                      }, 150);
+                    } catch (error) {
+                      console.error(error);
+                      alert(
+                        error.message || "Failed to save billing before print.",
+                      );
+                    }
+                  }}
+                  disabled={isPrintDisabled}
+                  className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white transition-all hover:bg-blue-500"
+                >
+                  <FiPrinter size={14} />
+                  Print Billing
+                </button>
               </div>
             </div>
           </motion.div>
@@ -1422,25 +1425,25 @@ const ModalDiscountTransaction = ({
       />
 
       <div style={{ display: "none" }}>
-      <PrintableDiscountReceipt
-        ref={printRef}
-        transaction={{
-          ...transaction,
-          billing_no:
-            latestBillingNo ||
-            billingNo ||
-            transaction?.billing_no ||
-            transaction?.billingNo ||
-            "",
-          invoice_no: latestInvoiceNo || transaction?.invoice_no || "",
-        }}
-        dateFrom={dateFrom}
-        discountType={discountType}
-        computed={computed}
-        items={items}
-        isManualDiscount={isManualDiscount}
-        billingNo={latestBillingNo || billingNo || ""}
-      />
+        <PrintableDiscountReceipt
+          ref={printRef}
+          transaction={{
+            ...transaction,
+            billing_no:
+              latestBillingNo ||
+              billingNo ||
+              transaction?.billing_no ||
+              transaction?.billingNo ||
+              "",
+            invoice_no: latestInvoiceNo || transaction?.invoice_no || "",
+          }}
+          dateFrom={dateFrom}
+          discountType={discountType}
+          computed={computed}
+          items={items}
+          isManualDiscount={isManualDiscount}
+          billingNo={latestBillingNo || billingNo || ""}
+        />
       </div>
     </>
   );
