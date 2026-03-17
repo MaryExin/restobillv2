@@ -177,6 +177,7 @@ function FilterModal({
                 }`}
               >
                 <option value="">All</option>
+                <option value="Paid">Paid</option>
                 <option value="Active">Active</option>
                 <option value="Voided">Voided</option>
                 <option value="Refunded">Refunded</option>
@@ -376,36 +377,50 @@ function QuickFilterButton({ active, label, icon: Icon, onClick, isDark }) {
   );
 }
 
+const normalizeText = (value) =>
+  String(value ?? "")
+    .trim()
+    .toLowerCase();
+
+const toDateOnlyValue = (value) => {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return String(value).slice(0, 10);
+  }
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 export default function TransactionRecords({ onClose }) {
   const apiHost = useApiHost();
   const apiBase = useMemo(() => (apiHost ? `${apiHost}/api` : ""), [apiHost]);
   const { theme } = useTheme();
   const isDark = theme === "dark";
-
-  const today = new Date().toISOString().slice(0, 10);
+  const navigate = useNavigate();
 
   const [search, setSearch] = useState("");
   const [showFilter, setShowFilter] = useState(false);
-  const [quickStatus, setQuickStatus] = useState("active");
-  const navigate = useNavigate();
+  const [quickStatus, setQuickStatus] = useState("all");
+
+  const [selectedDate, setSelectedDate] = useState("");
+  const [isDateLoading, setIsDateLoading] = useState(false);
 
   const [filters, setFilters] = useState({
-    dateFrom: today,
-    dateTo: today,
-    recordStatus: "Active",
+    dateFrom: "",
+    dateTo: "",
+    recordStatus: "",
   });
 
   const [appliedFilters, setAppliedFilters] = useState({
-    dateFrom: today,
-    dateTo: today,
-    recordStatus: "Active",
+    dateFrom: "",
+    dateTo: "",
+    recordStatus: "",
   });
 
-  const [rows, setRows] = useState([]);
-  const [summary, setSummary] = useState({
-    totalTransactions: 0,
-    totalSales: 0,
-  });
+  const [allRows, setAllRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
@@ -430,87 +445,172 @@ export default function TransactionRecords({ onClose }) {
     remarks: row.remarks ?? "",
     status: row.status ?? "",
     cashier: row.cashier ?? "",
+    billing_no: row.billing_no ?? "",
+    order_slip_no: row.order_slip_no ?? "",
+    void_id: row.void_id ?? "",
+    refund_id: row.refund_id ?? "",
   });
 
-  const fetchTransactionRecords = useCallback(
-    async (overrideFilters = null, overrideSearch = null) => {
-      if (!apiBase) return;
+  useEffect(() => {
+    if (!apiHost) return;
 
-      setLoading(true);
-      setErr("");
+    let isMounted = true;
+    setIsDateLoading(true);
 
-      try {
-        const activeFilters = overrideFilters || appliedFilters;
-        const activeSearch = overrideSearch !== null ? overrideSearch : search;
+    fetch(`${apiHost}/api/get_open_shift_date.php`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({}),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!isMounted) return;
 
-        const params = new URLSearchParams({
-          dateFrom: activeFilters.dateFrom || "",
-          dateTo: activeFilters.dateTo || "",
-          search: activeSearch || "",
-          recordStatus: activeFilters.recordStatus || "All",
-        });
+        const backendDate = data?.selectedDate || data?.shiftDate || "";
 
-        const res = await fetch(
-          `${apiBase}/read_transaction_records.php?${params.toString()}`,
-        );
+        setSelectedDate(backendDate);
 
-        if (!res.ok) {
-          throw new Error("Failed to fetch transaction records");
-        }
+        setFilters((prev) => ({
+          ...prev,
+          dateFrom: backendDate || "",
+          dateTo: backendDate || "",
+        }));
 
-        const data = await res.json();
+        setAppliedFilters((prev) => ({
+          ...prev,
+          dateFrom: backendDate || "",
+          dateTo: backendDate || "",
+        }));
 
-        if (data?.success === false) {
-          throw new Error(
-            data?.message || "Failed to load transaction records",
-          );
-        }
+        setIsDateLoading(false);
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setSelectedDate("");
+        setIsDateLoading(false);
+      });
 
-        const normalizedRows = Array.isArray(data?.data)
-          ? data.data.map(normalizeRow)
-          : [];
+    return () => {
+      isMounted = false;
+    };
+  }, [apiHost]);
 
-        setRows(normalizedRows);
-        setSummary({
-          totalTransactions: Number(
-            data?.totalTransactions ?? normalizedRows.length ?? 0,
-          ),
-          totalSales: Number(data?.totalSales ?? 0),
-        });
-      } catch (e) {
-        setRows([]);
-        setSummary({
-          totalTransactions: 0,
-          totalSales: 0,
-        });
-        setErr(e?.message || "Fetch error");
-      } finally {
-        setLoading(false);
+  const fetchTransactionRecords = useCallback(async () => {
+    if (!apiBase) return;
+
+    setLoading(true);
+    setErr("");
+
+    try {
+      const res = await fetch(`${apiBase}/read_transaction_records.php`);
+
+      if (!res.ok) {
+        throw new Error("Failed to fetch transaction records");
       }
-    },
-    [apiBase, appliedFilters, search],
-  );
+
+      const data = await res.json();
+
+      if (data?.success === false) {
+        throw new Error(data?.message || "Failed to load transaction records");
+      }
+
+      const normalizedRows = Array.isArray(data?.data)
+        ? data.data.map(normalizeRow)
+        : [];
+
+      setAllRows(normalizedRows);
+    } catch (e) {
+      setAllRows([]);
+      setErr(e?.message || "Fetch error");
+    } finally {
+      setLoading(false);
+    }
+  }, [apiBase]);
 
   useEffect(() => {
     fetchTransactionRecords();
   }, [fetchTransactionRecords]);
 
-  const handleRefresh = () => {
-    const reset = {
-      dateFrom: today,
-      dateTo: today,
-      recordStatus: "Active",
-    };
+  const filteredRows = useMemo(() => {
+    const searchValue = normalizeText(search);
+    const from = appliedFilters.dateFrom || "";
+    const to = appliedFilters.dateTo || "";
+    const status = normalizeText(appliedFilters.recordStatus);
 
+    return allRows.filter((row) => {
+      const rowDate = toDateOnlyValue(row.transaction_date);
+      const rowStatus = normalizeText(row.status);
+      const rowRemarks = normalizeText(row.remarks);
+
+      const matchesDateFrom = !from || rowDate >= from;
+      const matchesDateTo = !to || rowDate <= to;
+
+      const matchesStatus =
+        !status || rowStatus === status || rowRemarks === status;
+
+      const haystack = [
+        row.transaction_id,
+        row.invoice_no,
+        row.transaction_date,
+        row.transaction_time,
+        row.transaction_type,
+        row.table_number,
+        row.payment_method,
+        row.payment_reference,
+        row.cashier,
+        row.remarks,
+        row.status,
+        row.billing_no,
+        row.order_slip_no,
+        row.void_id,
+        row.refund_id,
+      ]
+        .map((item) => String(item ?? ""))
+        .join(" ")
+        .toLowerCase();
+
+      const matchesSearch = !searchValue || haystack.includes(searchValue);
+
+      return matchesDateFrom && matchesDateTo && matchesStatus && matchesSearch;
+    });
+  }, [allRows, appliedFilters, search]);
+
+  const summary = useMemo(() => {
+    const totalTransactions = filteredRows.length;
+    const totalSales = filteredRows.reduce(
+      (sum, row) => sum + Number(row.total_amount_due || 0),
+      0,
+    );
+
+    return {
+      totalTransactions,
+      totalSales,
+    };
+  }, [filteredRows]);
+
+  const handleRefresh = () => {
     setSearch("");
-    setQuickStatus("active");
-    setFilters(reset);
-    setAppliedFilters(reset);
-    fetchTransactionRecords(reset, "");
+    setQuickStatus("all");
+
+    setFilters({
+      dateFrom: selectedDate || "",
+      dateTo: selectedDate || "",
+      recordStatus: "",
+    });
+
+    setAppliedFilters({
+      dateFrom: selectedDate || "",
+      dateTo: selectedDate || "",
+      recordStatus: "",
+    });
+
+    fetchTransactionRecords();
   };
 
   const handleSearchNow = () => {
-    fetchTransactionRecords(appliedFilters, search);
+    setAppliedFilters((prev) => ({ ...prev }));
   };
 
   const handleApplyFilter = () => {
@@ -519,6 +619,7 @@ export default function TransactionRecords({ onClose }) {
     setShowFilter(false);
 
     if (
+      nextFilters.recordStatus === "Paid" ||
       nextFilters.recordStatus === "Active" ||
       nextFilters.recordStatus === "Voided" ||
       nextFilters.recordStatus === "Refunded"
@@ -527,14 +628,13 @@ export default function TransactionRecords({ onClose }) {
     } else {
       setQuickStatus("all");
     }
-
-    fetchTransactionRecords(nextFilters, search);
   };
 
   const handleQuickStatus = (value) => {
     setQuickStatus(value);
 
     let statusValue = "";
+    if (value === "paid") statusValue = "Paid";
     if (value === "active") statusValue = "Active";
     if (value === "voided") statusValue = "Voided";
     if (value === "refunded") statusValue = "Refunded";
@@ -547,7 +647,6 @@ export default function TransactionRecords({ onClose }) {
 
     setFilters(nextFilters);
     setAppliedFilters(nextFilters);
-    fetchTransactionRecords(nextFilters, search);
   };
 
   const getRowClassName = (row) => {
@@ -564,11 +663,11 @@ export default function TransactionRecords({ onClose }) {
 
   const listData = useMemo(
     () => ({
-      rows,
+      rows: filteredRows,
       getRowClassName,
       isDark,
     }),
-    [rows, isDark],
+    [filteredRows, isDark],
   );
 
   return (
@@ -600,9 +699,9 @@ export default function TransactionRecords({ onClose }) {
         onApply={handleApplyFilter}
         onClear={() =>
           setFilters({
-            dateFrom: today,
-            dateTo: today,
-            recordStatus: "Active",
+            dateFrom: selectedDate || "",
+            dateTo: selectedDate || "",
+            recordStatus: "",
           })
         }
         isDark={isDark}
@@ -611,7 +710,7 @@ export default function TransactionRecords({ onClose }) {
       <div className="relative z-10 mx-auto max-w-[1700px] p-4 sm:p-6 lg:p-8">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <button
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/poscorehomescreen")}
             className={`inline-flex items-center gap-3 rounded-2xl border px-5 py-3 font-semibold transition ${
               isDark
                 ? "border-white/5 bg-white/[0.03] text-slate-300 hover:text-white"
@@ -695,7 +794,11 @@ export default function TransactionRecords({ onClose }) {
                   <input
                     type="text"
                     readOnly
-                    value={appliedFilters.dateFrom || ""}
+                    value={
+                      isDateLoading
+                        ? "Loading..."
+                        : appliedFilters.dateFrom || ""
+                    }
                     className={`w-full rounded-2xl py-4 pl-12 pr-4 outline-none ${
                       isDark
                         ? "border border-slate-800 bg-slate-950 text-white"
@@ -709,7 +812,9 @@ export default function TransactionRecords({ onClose }) {
                   <input
                     type="text"
                     readOnly
-                    value={appliedFilters.dateTo || ""}
+                    value={
+                      isDateLoading ? "Loading..." : appliedFilters.dateTo || ""
+                    }
                     className={`w-full rounded-2xl py-4 pl-12 pr-4 outline-none ${
                       isDark
                         ? "border border-slate-800 bg-slate-950 text-white"
@@ -740,37 +845,6 @@ export default function TransactionRecords({ onClose }) {
               </div>
             </div>
 
-            {/* <div className="flex flex-wrap gap-3">
-              <button
-                onClick={handleSearchNow}
-                className="rounded-full bg-blue-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-blue-500"
-              >
-                Search
-              </button>
-
-              {[
-                { label: "All", value: "all", icon: FaLayerGroup },
-                { label: "Active", value: "active", icon: FaCheckCircle },
-                { label: "Voided", value: "voided", icon: FaClock },
-                { label: "Refunded", value: "refunded", icon: FaClock },
-              ].map((item) => (
-                <button
-                  key={item.value}
-                  onClick={() => handleQuickStatus(item.value)}
-                  className={`flex items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-bold transition ${
-                    quickStatus === item.value
-                      ? "border-blue-500 bg-blue-600 text-white"
-                      : isDark
-                        ? "border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700"
-                        : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
-                  }`}
-                >
-                  <item.icon size={13} />
-                  {item.label}
-                </button>
-              ))}
-            </div> */}
-
             <div
               className={`overflow-hidden rounded-[30px] border ${
                 isDark
@@ -790,7 +864,7 @@ export default function TransactionRecords({ onClose }) {
                 <div className="flex h-[420px] items-center justify-center px-6 text-center text-lg font-semibold text-red-500">
                   {err}
                 </div>
-              ) : rows.length === 0 ? (
+              ) : filteredRows.length === 0 ? (
                 <div
                   className={`flex h-[420px] items-center justify-center text-2xl font-black ${
                     isDark ? "text-slate-500" : "text-slate-400"
@@ -804,7 +878,7 @@ export default function TransactionRecords({ onClose }) {
                     <HeaderRow isDark={isDark} />
                     <List
                       height={LIST_HEIGHT}
-                      itemCount={rows.length}
+                      itemCount={filteredRows.length}
                       itemSize={ROW_HEIGHT}
                       width={TABLE_MIN_WIDTH}
                       itemData={listData}
@@ -842,6 +916,13 @@ export default function TransactionRecords({ onClose }) {
                   label="All Records"
                   icon={FaLayerGroup}
                   onClick={() => handleQuickStatus("all")}
+                  isDark={isDark}
+                />
+                <QuickFilterButton
+                  active={quickStatus === "paid"}
+                  label="Paid"
+                  icon={FaCheckCircle}
+                  onClick={() => handleQuickStatus("paid")}
                   isDark={isDark}
                 />
                 <QuickFilterButton
