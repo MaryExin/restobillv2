@@ -360,6 +360,7 @@ const LayoutPos = ({ children }) => {
         unitCode={branchInfo.unitCode}
         terminalNumber={branchInfo.terminalNo}
         corpName={branchInfo.corpName}
+        shiftingDate={dateselection?.Opening_DateTime?.split(" ")[0]}
         xEndpoint="/api/generate_x_reading_pdf.php"
         zEndpoint="/api/generate_z_reading_data.php"
       />
