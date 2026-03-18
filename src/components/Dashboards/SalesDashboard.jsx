@@ -1,13 +1,20 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 "use client";
 
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, {
+  useEffect,
+  useMemo,
+  useState,
+  useCallback,
+  useRef,
+} from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { LinearProgress } from "@mui/material";
 import useApiHost from "../../hooks/useApiHost";
 import {
   FiFilter,
   FiDownload,
+  FiPrinter,
   FiSun,
   FiMoon,
   FiBarChart2,
@@ -21,7 +28,6 @@ import {
   FiChevronUp,
   FiChevronDown,
 } from "react-icons/fi";
-
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -37,6 +43,7 @@ import { Bar as ChartJSBar, Line as ChartJSLine } from "react-chartjs-2";
 import { useNavigate } from "react-router-dom";
 import { FaArrowLeft } from "react-icons/fa";
 import { FixedSizeList as List } from "react-window";
+import { useReactToPrint } from "react-to-print";
 import { useTheme } from "../../context/ThemeContext";
 
 ChartJS.register(
@@ -78,7 +85,7 @@ const firstDayOfMonthISO = (dateStr) => {
 
 const hourLabel12 = (h) => {
   const H = Number(h) || 0;
-  const hr12 = ((H + 11) % 12) + 1; // 0->12, 13->1
+  const hr12 = ((H + 11) % 12) + 1;
   const ampm = H < 12 ? "AM" : "PM";
   return `${String(hr12).padStart(2, "0")}:00 ${ampm}`;
 };
@@ -104,8 +111,9 @@ const cmp = (a, b, dir = "asc") => {
   const mult = dir === "asc" ? 1 : -1;
   const A = a ?? "";
   const B = b ?? "";
-  if (isProbablyNumber(A) && isProbablyNumber(B))
+  if (isProbablyNumber(A) && isProbablyNumber(B)) {
     return (toNum(A) - toNum(B)) * mult;
+  }
   return (
     String(A).localeCompare(String(B), undefined, {
       numeric: true,
@@ -130,8 +138,7 @@ const DARK = {
   pillBtn:
     "rounded-full bg-slate-900/50 border border-white/5 text-slate-400 hover:text-white transition-all",
   input:
-    "h-12 w-full rounded-[2rem] bg-slate-900/30 border border-slate-800 hover:border-slate-700 " +
-    "px-4 text-white outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500/40 transition-all backdrop-blur-sm",
+    "h-12 w-full rounded-[2rem] bg-slate-900/30 border border-slate-800 hover:border-slate-700 px-4 text-white outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500/40 transition-all backdrop-blur-sm",
   miniLabel: "text-[10px] font-black uppercase tracking-[0.3em] text-slate-500",
   title: "text-white font-black tracking-tight",
   sub: "text-slate-500 font-medium",
@@ -145,8 +152,7 @@ const WHITE = {
   glowBg:
     "relative overflow-hidden bg-white/65 backdrop-blur-xl border border-slate-200/80 rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.12)]",
   softBlobBg:
-    "fixed inset-0 pointer-events-none " +
-    "[background:radial-gradient(600px_circle_at_20%_10%,rgba(59,130,246,0.12),transparent_55%),radial-gradient(500px_circle_at_85%_25%,rgba(14,165,233,0.10),transparent_50%),radial-gradient(700px_circle_at_55%_90%,rgba(99,102,241,0.10),transparent_55%)]",
+    "fixed inset-0 pointer-events-none [background:radial-gradient(600px_circle_at_20%_10%,rgba(59,130,246,0.12),transparent_55%),radial-gradient(500px_circle_at_85%_25%,rgba(14,165,233,0.10),transparent_50%),radial-gradient(700px_circle_at_55%_90%,rgba(99,102,241,0.10),transparent_55%)]",
   nav: "sticky top-0 z-40 bg-white/70 backdrop-blur-xl border-b border-slate-200/70 px-4 py-4",
   pillBtn:
     "rounded-full bg-white/70 border border-slate-200/70 text-slate-700 hover:text-slate-900 transition-all",
@@ -177,6 +183,7 @@ const Chip = ({ on, children, onClick, t, icon }) => {
     t === DARK
       ? "border-blue-500/40 bg-blue-500/10 text-blue-200 hover:bg-blue-500/15"
       : "border-amber-300/70 bg-amber-50 text-amber-800 hover:bg-amber-100";
+
   return (
     <button
       type="button"
@@ -199,7 +206,138 @@ const SortIcon = ({ dir }) => {
 };
 
 /* -------------------------
-   VirtualTable (react-window)
+   Print receipt
+------------------------- */
+const ReportPrintReceipt = React.forwardRef(
+  (
+    {
+      reportTitle,
+      dateFrom,
+      dateTo,
+      includeVoided,
+      voidOnly,
+      rows,
+      totals,
+      printedAt,
+    },
+    ref,
+  ) => {
+    return (
+      <div
+        ref={ref}
+        className="print-root"
+        style={{
+          width: "80mm",
+          minHeight: "100vh",
+          background: "#ffffff",
+          backgroundColor: "#ffffff",
+          color: "#000000",
+          padding: "16px",
+          fontFamily: "monospace",
+          fontSize: "12px",
+          WebkitPrintColorAdjust: "exact",
+          printColorAdjust: "exact",
+        }}
+      >
+        <div className="text-center mb-4">
+          <h2 className="text-xl font-bold uppercase underline">
+            {reportTitle}
+          </h2>
+          <p className="font-bold text-sm">
+            {dateFrom} to {dateTo}
+          </p>
+          <p>{printedAt}</p>
+          <p className="text-[10px] font-bold">
+            {voidOnly
+              ? "VOID ONLY"
+              : includeVoided
+                ? "ACTIVE + VOID"
+                : "ACTIVE ONLY"}
+          </p>
+          <div className="border-b border-dashed border-black my-2" />
+        </div>
+
+        <table className="w-full mb-4">
+          <thead>
+            <tr className="border-b border-black text-[10px]">
+              <th className="text-left py-1">Item</th>
+              <th className="text-center py-1">Qty</th>
+              <th className="text-right py-1">Value</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {rows.length === 0 ? (
+              <tr>
+                <td
+                  colSpan="3"
+                  className="text-center py-4 italic text-gray-500"
+                >
+                  No data
+                </td>
+              </tr>
+            ) : (
+              rows.map((item, index) => (
+                <tr
+                  key={`${item.label}-${index}`}
+                  className="border-b border-gray-100"
+                >
+                  <td className="py-2 leading-tight">
+                    <div className="font-bold uppercase">{item.label}</div>
+                    {item.subLabel ? (
+                      <div className="text-[9px] text-black italic mt-1">
+                        {item.subLabel}
+                      </div>
+                    ) : null}
+                    {item.code ? (
+                      <div className="text-[9px] text-gray-400">
+                        {item.code}
+                      </div>
+                    ) : null}
+                  </td>
+                  <td className="text-center align-top pt-2">{item.qty}</td>
+                  <td className="text-right align-top pt-2">{item.value}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+
+        <div className="border-t-2 border-black pt-2 mb-4">
+          {totals.map((t, index) => (
+            <div
+              key={`${t.label}-${index}`}
+              className={`flex justify-between ${
+                t.strong ? "font-black text-sm" : "font-bold text-[11px]"
+              }`}
+            >
+              <span>{t.label}</span>
+              <span>{t.value}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-3 mb-2 text-center font-bold">
+          <div className="border-y border-dashed border-black py-1">
+            <p className="text-[22px] font-black uppercase tracking-widest">
+              Report Copy
+            </p>
+          </div>
+        </div>
+
+        <div className="text-center mt-8 text-[9px] italic opacity-70">
+          <p>Generated from Sales Dashboard</p>
+          <p>Please keep this copy for reference.</p>
+        </div>
+      </div>
+    );
+  },
+);
+
+ReportPrintReceipt.displayName = "ReportPrintReceipt";
+
+/* -------------------------
+   VirtualTable
 ------------------------- */
 const VirtualTable = ({
   t,
@@ -328,40 +466,25 @@ const VirtualTable = ({
 
 const SalesDashboard = () => {
   const navigate = useNavigate();
-
-  // Theme
   const { theme, toggleTheme } = useTheme();
   const T = theme === "dark" ? DARK : WHITE;
 
   const apiHost = useApiHost();
-
-  // API host from ip.txt
-  // const [apiHost, setApiHost] = useState("");
-  // useEffect(() => {
-  //   fetch("/ip.txt")
-  //     .then((res) => res.text())
-  //     .then((data) => setApiHost((data || "").trim()))
-  //     .catch(() => setApiHost("http://localhost"));
-  // }, []);
   const apiBase = useMemo(() => (apiHost ? `${apiHost}/api` : ""), [apiHost]);
 
-  // Applied filters
   const todayISO = dayISO(new Date());
   const [dateFrom, setDateFrom] = useState(todayISO);
   const [dateTo, setDateTo] = useState(todayISO);
   const [includeVoided, setIncludeVoided] = useState(false);
   const [voidOnly, setVoidOnly] = useState(false);
 
-  // Draft filters (modal)
   const [draftDateFrom, setDraftDateFrom] = useState(todayISO);
   const [draftDateTo, setDraftDateTo] = useState(todayISO);
   const [draftIncludeVoided, setDraftIncludeVoided] = useState(false);
   const [draftVoidOnly, setDraftVoidOnly] = useState(false);
 
-  // Modal state
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
-  // Keep draft in sync when open
   useEffect(() => {
     if (isFilterOpen) {
       setDraftDateFrom(dateFrom);
@@ -383,10 +506,10 @@ const SalesDashboard = () => {
     setIsFilterOpen(false);
   }, [applyFilters]);
 
-  // Reports chips
   const [enabledReports, setEnabledReports] = useState(
     () => new Set(REPORTS.map((r) => r.id)),
   );
+
   const toggleReport = (id) => {
     setEnabledReports((prev) => {
       const next = new Set(prev);
@@ -397,15 +520,13 @@ const SalesDashboard = () => {
     });
   };
 
-  const [viewMode, setViewMode] = useState("table"); // cards | table
+  const [viewMode, setViewMode] = useState("table");
   const [topNProducts, setTopNProducts] = useState(50);
 
-  // Data
   const [loading, setLoading] = useState(false);
   const [payload, setPayload] = useState(null);
   const [err, setErr] = useState("");
 
-  // Daily graph range: month-start → selected FROM
   const graphDateFrom = useMemo(() => firstDayOfMonthISO(dateFrom), [dateFrom]);
   const graphDateTo = useMemo(() => dateFrom, [dateFrom]);
 
@@ -468,7 +589,6 @@ const SalesDashboard = () => {
   );
   const kpi = payload?.kpi || {};
 
-  // Default sort Product Name ASC
   const perProduct = useMemo(() => {
     const arr = [...perProductAll];
     arr.sort((a, b) => cmp(a?.["Product Name"], b?.["Product Name"], "asc"));
@@ -481,7 +601,6 @@ const SalesDashboard = () => {
     return arr;
   }, [hourlyPerProductAll]);
 
-  // Charts
   const dailyChart = useMemo(() => {
     const labels = dailyGraph.map((r) => r["Date"]);
     const gross = dailyGraph.map((r) => Number(r["Gross Sales"] || 0));
@@ -566,7 +685,6 @@ const SalesDashboard = () => {
     return acc;
   }, [hourly]);
 
-  // ✅ Top 3 peak hours
   const peakHoursTop3 = useMemo(() => {
     const ranked = hourlyTotals
       .map((value, h) => ({
@@ -654,26 +772,186 @@ const SalesDashboard = () => {
       });
 
       const url = `${apiBase}/export_report.php?${qs.toString()}`;
-
       const res = await fetch(url);
       const blob = await res.blob();
-
       const filename = `${report}_${dateFrom}_${dateTo}.csv`;
 
       const link = document.createElement("a");
       link.href = window.URL.createObjectURL(blob);
       link.download = filename;
-
       document.body.appendChild(link);
       link.click();
-
       document.body.removeChild(link);
-    } catch (err) {
-      console.error("Export failed:", err);
+    } catch (error) {
+      console.error("Export failed:", error);
     }
   };
 
-  // Columns (hour labels 12-hour)
+  /* -------------------------
+     Print helpers
+  ------------------------- */
+  const printRef = useRef(null);
+  const [printPayload, setPrintPayload] = useState({
+    reportTitle: "",
+    rows: [],
+    totals: [],
+  });
+
+  const handlePrintReport = useReactToPrint({
+    content: () => printRef.current,
+    documentTitle: `${printPayload.reportTitle || "report"}-${dateFrom}-${dateTo}`,
+    pageStyle: `
+      @media print {
+        @page {
+          size: 80mm auto;
+          margin: 0;
+        }
+
+        html, body {
+          margin: 0 !important;
+          padding: 0 !important;
+          background: #ffffff !important;
+          color: #000000 !important;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+          font-family: monospace !important;
+        }
+
+        .print-root {
+          width: 80mm !important;
+          min-height: auto !important;
+        }
+      }
+    `,
+  });
+
+  const openPrint = useCallback(
+    (reportTitle, rows, totals) => {
+      setPrintPayload({
+        reportTitle,
+        rows,
+        totals,
+      });
+
+      setTimeout(() => {
+        handlePrintReport?.();
+      }, 60);
+    },
+    [handlePrintReport],
+  );
+
+  /* -------------------------
+     Table rows
+  ------------------------- */
+  const hourlyRows = useMemo(() => {
+    return hourly.map((r) => {
+      const o = { ...r };
+      const hrs = r?.hours || [];
+      for (let h = 0; h < 24; h++) o[`H${h}`] = Number(hrs[h] || 0);
+      return o;
+    });
+  }, [hourly]);
+
+  const hourlyPerProductRows = useMemo(() => {
+    return hourlyPerProduct.map((r) => {
+      const o = { ...r };
+      const hrs = r?.hours || [];
+      for (let h = 0; h < 24; h++) o[`H${h}`] = Number(hrs[h] || 0);
+      return o;
+    });
+  }, [hourlyPerProduct]);
+
+  /* -------------------------
+     Print callbacks
+  ------------------------- */
+  const printDailyReport = useCallback(() => {
+    const rows = dailyTable.map((r) => ({
+      label: r["Date"] || "-",
+      subLabel: `Gross: ${peso0(r["Gross Sales"])} | Net: ${peso0(r["Net Sales"])}`,
+      qty: "-",
+      value: peso0(r["Net Sales"] || 0),
+    }));
+
+    const totals = [
+      { label: "Gross Sales", value: peso0(kpi.gross_sales) },
+      { label: "Net Sales", value: peso0(kpi.net_sales), strong: true },
+      { label: "Discounts", value: peso0(kpi.discount_total) },
+      { label: "Transactions", value: num0(kpi.txn_count) },
+    ];
+
+    openPrint("Daily Sales Report", rows, totals);
+  }, [dailyTable, kpi, openPrint]);
+
+  const printHourlyReport = useCallback(() => {
+    const rows = Array.from({ length: 24 }, (_, h) => ({
+      label: hourLabel12(h),
+      subLabel: "Hourly sales total",
+      qty: "-",
+      value: peso0(hourlyTotals[h] || 0),
+    }));
+
+    const totals = [
+      { label: "Peak Hour", value: peakHoursTop3?.[0]?.label || "-" },
+      { label: "Peak Sales", value: peso0(peakHoursTop3?.[0]?.value || 0) },
+      { label: "Transactions", value: num0(kpi.txn_count) },
+      { label: "Net Sales", value: peso0(kpi.net_sales), strong: true },
+    ];
+
+    openPrint("Hourly Sales Report", rows, totals);
+  }, [hourlyTotals, peakHoursTop3, kpi, openPrint]);
+
+  const printPerProductReport = useCallback(() => {
+    const rows = perProduct.map((r) => ({
+      label: r["Product Name"] || "-",
+      subLabel: r["Item Type"] || "",
+      code: r["Code"] || "",
+      qty: num0(r["Total Qty Sold"] || 0),
+      value: peso0(r["Gross Sales"] || 0),
+    }));
+
+    const totals = [
+      { label: "Products Shown", value: num0(perProduct.length) },
+      {
+        label: "Gross Sales",
+        value: peso0(
+          perProduct.reduce((sum, r) => sum + Number(r["Gross Sales"] || 0), 0),
+        ),
+        strong: true,
+      },
+    ];
+
+    openPrint("Sales Per Product", rows, totals);
+  }, [perProduct, openPrint]);
+
+  const printHourlyPerProductReport = useCallback(() => {
+    const rows = hourlyPerProductRows.map((r) => ({
+      label: r["Product Name"] || "-",
+      subLabel: r["Category"] || "",
+      code: r["Code"] || "",
+      qty: num0(r["TOTAL"] || 0),
+      value: num0(r["TOTAL"] || 0),
+    }));
+
+    const totals = [
+      { label: "Products", value: num0(hourlyPerProductRows.length) },
+      {
+        label: "Total Qty",
+        value: num0(
+          hourlyPerProductRows.reduce(
+            (sum, r) => sum + Number(r["TOTAL"] || 0),
+            0,
+          ),
+        ),
+        strong: true,
+      },
+    ];
+
+    openPrint("Hourly Per Product", rows, totals);
+  }, [hourlyPerProductRows, openPrint]);
+
+  /* -------------------------
+     Table columns
+  ------------------------- */
   const hourlyColumns = useMemo(() => {
     const hours = Array.from({ length: 24 }, (_, h) => ({
       key: `H${h}`,
@@ -697,15 +975,6 @@ const SalesDashboard = () => {
       ...hours,
     ];
   }, []);
-
-  const hourlyRows = useMemo(() => {
-    return hourly.map((r) => {
-      const o = { ...r };
-      const hrs = r?.hours || [];
-      for (let h = 0; h < 24; h++) o[`H${h}`] = Number(hrs[h] || 0);
-      return o;
-    });
-  }, [hourly]);
 
   const hourlyPerProductColumns = useMemo(() => {
     const hours = Array.from({ length: 24 }, (_, h) => ({
@@ -738,15 +1007,6 @@ const SalesDashboard = () => {
       },
     ];
   }, []);
-
-  const hourlyPerProductRows = useMemo(() => {
-    return hourlyPerProduct.map((r) => {
-      const o = { ...r };
-      const hrs = r?.hours || [];
-      for (let h = 0; h < 24; h++) o[`H${h}`] = Number(hrs[h] || 0);
-      return o;
-    });
-  }, [hourlyPerProduct]);
 
   const dailyColumns = useMemo(
     () => [
@@ -1027,7 +1287,9 @@ const SalesDashboard = () => {
         </div>
         <div className="text-right">
           <div
-            className={`text-xs font-extrabold ${theme === "dark" ? "text-slate-400" : "text-slate-600"}`}
+            className={`text-xs font-extrabold ${
+              theme === "dark" ? "text-slate-400" : "text-slate-600"
+            }`}
           >
             {label}
           </div>
@@ -1035,14 +1297,15 @@ const SalesDashboard = () => {
         </div>
       </div>
       <div
-        className={`mt-4 text-3xl font-black ${theme === "dark" ? "text-white" : "text-slate-900"}`}
+        className={`mt-4 text-3xl font-black ${
+          theme === "dark" ? "text-white" : "text-slate-900"
+        }`}
       >
         {value}
       </div>
     </motion.div>
   );
 
-  // ✅ Filter sheet that will NOT close/reopen while using the native date picker
   const FilterSheet = () => (
     <AnimatePresence>
       {isFilterOpen && (
@@ -1051,7 +1314,6 @@ const SalesDashboard = () => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          // ✅ close ONLY when user clicks outside the panel
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) closeWithApply();
           }}
@@ -1068,14 +1330,15 @@ const SalesDashboard = () => {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 18, opacity: 0 }}
             transition={{ type: "spring", stiffness: 260, damping: 26 }}
-            // ✅ stop inside clicks from bubbling to wrapper
             onMouseDown={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
               <div>
                 <div className={T.miniLabel}>Filters</div>
                 <div
-                  className={`text-xs mt-1 ${theme === "dark" ? "text-slate-400" : "text-slate-600"}`}
+                  className={`text-xs mt-1 ${
+                    theme === "dark" ? "text-slate-400" : "text-slate-600"
+                  }`}
                 >
                   Make changes then click <b>Apply</b>. Closing will also apply.
                 </div>
@@ -1111,7 +1374,9 @@ const SalesDashboard = () => {
                       }}
                     />
                     <div
-                      className={`text-[11px] mt-1 ${theme === "dark" ? "text-slate-500" : "text-slate-600"}`}
+                      className={`text-[11px] mt-1 ${
+                        theme === "dark" ? "text-slate-500" : "text-slate-600"
+                      }`}
                     >
                       Daily graph will use month start → this From date.
                     </div>
@@ -1130,7 +1395,9 @@ const SalesDashboard = () => {
                       }}
                     />
                     <div
-                      className={`text-[11px] mt-1 ${theme === "dark" ? "text-slate-500" : "text-slate-600"}`}
+                      className={`text-[11px] mt-1 ${
+                        theme === "dark" ? "text-slate-500" : "text-slate-600"
+                      }`}
                     >
                       Tables/export use From → To exactly.
                     </div>
@@ -1165,9 +1432,11 @@ const SalesDashboard = () => {
 
                 <div className="mt-4 flex items-center justify-between gap-2">
                   <div
-                    className={`text-xs ${theme === "dark" ? "text-slate-500" : "text-slate-600"}`}
+                    className={`text-xs ${
+                      theme === "dark" ? "text-slate-500" : "text-slate-600"
+                    }`}
                   >
-                    Tip: Set From and To to the same day (usual), then Apply.
+                    Tip: Set From and To to the same day, then Apply.
                   </div>
 
                   <button
@@ -1185,6 +1454,43 @@ const SalesDashboard = () => {
               </div>
 
               <div className={`${T.glowBg} p-4`}>
+                <div className={T.miniLabel}>Prints</div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Chip
+                    t={T}
+                    on={false}
+                    onClick={printDailyReport}
+                    icon={<FiPrinter />}
+                  >
+                    Daily Print
+                  </Chip>
+                  <Chip
+                    t={T}
+                    on={false}
+                    onClick={printHourlyReport}
+                    icon={<FiPrinter />}
+                  >
+                    Hourly Print
+                  </Chip>
+                  <Chip
+                    t={T}
+                    on={false}
+                    onClick={printPerProductReport}
+                    icon={<FiPrinter />}
+                  >
+                    Per Product Print
+                  </Chip>
+                  <Chip
+                    t={T}
+                    on={false}
+                    onClick={printHourlyPerProductReport}
+                    icon={<FiPrinter />}
+                  >
+                    Hourly/Product Print
+                  </Chip>
+                </div>
+              </div>
+              <div className={`${T.glowBg} p-4`}>
                 <div className={T.miniLabel}>Exports</div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Chip
@@ -1195,6 +1501,7 @@ const SalesDashboard = () => {
                   >
                     Daily CSV
                   </Chip>
+
                   <Chip
                     t={T}
                     on={false}
@@ -1232,12 +1539,13 @@ const SalesDashboard = () => {
     <div className={T.page}>
       <div className={T.softBlobBg} />
 
-      {/* Sticky nav */}
       <div className={T.nav}>
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div
-              className={`h-2 w-2 rounded-full ${theme === "dark" ? "bg-green-500" : "bg-emerald-500"} animate-pulse`}
+              className={`h-2 w-2 rounded-full ${
+                theme === "dark" ? "bg-green-500" : "bg-emerald-500"
+              } animate-pulse`}
             />
             <div className={T.miniLabel}>Live Reports</div>
           </div>
@@ -1267,19 +1575,22 @@ const SalesDashboard = () => {
         {err ? (
           <div className={`${T.glowBg} p-5 mt-4`}>
             <div
-              className={`text-sm font-extrabold ${theme === "dark" ? "text-rose-300" : "text-rose-600"}`}
+              className={`text-sm font-extrabold ${
+                theme === "dark" ? "text-rose-300" : "text-rose-600"
+              }`}
             >
               {err}
             </div>
             <div
-              className={`text-xs mt-2 ${theme === "dark" ? "text-slate-500" : "text-slate-600"}`}
+              className={`text-xs mt-2 ${
+                theme === "dark" ? "text-slate-500" : "text-slate-600"
+              }`}
             >
               Check <b>/ip.txt</b> and <b>/api/reports_dashboard.php</b>.
             </div>
           </div>
         ) : null}
 
-        {/* KPI row */}
         <section className="mt-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
           <KpiCard
             icon={
@@ -1335,7 +1646,6 @@ const SalesDashboard = () => {
           />
         </section>
 
-        {/* DAILY */}
         {enabledReports.has("daily") && (
           <section className={`${T.glowBg} p-5 mt-4`}>
             <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -1346,21 +1656,33 @@ const SalesDashboard = () => {
                   }
                 />
                 <div
-                  className={`text-sm font-extrabold ${theme === "dark" ? "text-white" : "text-slate-900"}`}
+                  className={`text-sm font-extrabold ${
+                    theme === "dark" ? "text-white" : "text-slate-900"
+                  }`}
                 >
                   Daily Sales Report
                 </div>
                 <span className={T.miniLabel}>Graph: month start → FROM</span>
               </div>
 
-              <button
-                type="button"
-                onClick={() => exportReport("daily")}
-                className={T.pillBtn + " h-10 px-4 flex items-center gap-2"}
-              >
-                <FiDownload />
-                <span className="text-xs font-extrabold">Export</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => exportReport("daily")}
+                  className={T.pillBtn + " h-10 px-4 flex items-center gap-2"}
+                >
+                  <FiDownload />
+                  <span className="text-xs font-extrabold">Export</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={printDailyReport}
+                  className={T.pillBtn + " h-10 px-4 flex items-center gap-2"}
+                >
+                  <FiPrinter />
+                  <span className="text-xs font-extrabold">Print</span>
+                </button>
+              </div>
             </div>
 
             <div className="mt-4" style={{ height: 320 }}>
@@ -1384,7 +1706,6 @@ const SalesDashboard = () => {
           </section>
         )}
 
-        {/* HOURLY */}
         {enabledReports.has("hourly") && (
           <section className={`${T.glowBg} p-5 mt-4`}>
             <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -1395,7 +1716,9 @@ const SalesDashboard = () => {
                   }
                 />
                 <div
-                  className={`text-sm font-extrabold ${theme === "dark" ? "text-white" : "text-slate-900"}`}
+                  className={`text-sm font-extrabold ${
+                    theme === "dark" ? "text-white" : "text-slate-900"
+                  }`}
                 >
                   Hourly Sales
                 </div>
@@ -1404,14 +1727,24 @@ const SalesDashboard = () => {
                 </span>
               </div>
 
-              <button
-                type="button"
-                onClick={() => exportReport("hourly")}
-                className={T.pillBtn + " h-10 px-4 flex items-center gap-2"}
-              >
-                <FiDownload />
-                <span className="text-xs font-extrabold">Export</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => exportReport("hourly")}
+                  className={T.pillBtn + " h-10 px-4 flex items-center gap-2"}
+                >
+                  <FiDownload />
+                  <span className="text-xs font-extrabold">Export</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={printHourlyReport}
+                  className={T.pillBtn + " h-10 px-4 flex items-center gap-2"}
+                >
+                  <FiPrinter />
+                  <span className="text-xs font-extrabold">Print</span>
+                </button>
+              </div>
             </div>
 
             <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -1430,7 +1763,6 @@ const SalesDashboard = () => {
                 </div>
               </div>
 
-              {/* ✅ TOP 3 peak hours */}
               <div
                 className={`${
                   theme === "dark"
@@ -1461,14 +1793,18 @@ const SalesDashboard = () => {
                           {i + 1}
                         </div>
                         <div
-                          className={`text-sm font-extrabold ${theme === "dark" ? "text-white" : "text-slate-900"}`}
+                          className={`text-sm font-extrabold ${
+                            theme === "dark" ? "text-white" : "text-slate-900"
+                          }`}
                         >
                           {p.label}
                         </div>
                       </div>
 
                       <div
-                        className={`text-sm font-black ${theme === "dark" ? "text-slate-200" : "text-slate-900"}`}
+                        className={`text-sm font-black ${
+                          theme === "dark" ? "text-slate-200" : "text-slate-900"
+                        }`}
                       >
                         {peso0(p.value)}
                       </div>
@@ -1495,7 +1831,6 @@ const SalesDashboard = () => {
           </section>
         )}
 
-        {/* SALES / PRODUCT */}
         {enabledReports.has("perproduct") && (
           <section className={`${T.glowBg} p-5 mt-4`}>
             <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -1506,7 +1841,9 @@ const SalesDashboard = () => {
                   }
                 />
                 <div
-                  className={`text-sm font-extrabold ${theme === "dark" ? "text-white" : "text-slate-900"}`}
+                  className={`text-sm font-extrabold ${
+                    theme === "dark" ? "text-white" : "text-slate-900"
+                  }`}
                 >
                   Sales / Product
                 </div>
@@ -1543,6 +1880,14 @@ const SalesDashboard = () => {
                   <FiDownload />
                   <span className="text-xs font-extrabold">Export</span>
                 </button>
+                <button
+                  type="button"
+                  onClick={printPerProductReport}
+                  className={T.pillBtn + " h-10 px-4 flex items-center gap-2"}
+                >
+                  <FiPrinter />
+                  <span className="text-xs font-extrabold">Print</span>
+                </button>
               </div>
             </div>
 
@@ -1569,7 +1914,9 @@ const SalesDashboard = () => {
               >
                 <div className={T.miniLabel}>Notes</div>
                 <div
-                  className={`mt-3 text-xs ${theme === "dark" ? "text-slate-400" : "text-slate-600"} space-y-2`}
+                  className={`mt-3 text-xs ${
+                    theme === "dark" ? "text-slate-400" : "text-slate-600"
+                  } space-y-2`}
                 >
                   <div>
                     • Table defaults to <b>Product Name ASC</b>.
@@ -1599,7 +1946,6 @@ const SalesDashboard = () => {
           </section>
         )}
 
-        {/* HOURLY / PRODUCT */}
         {enabledReports.has("hourlyperproduct") && (
           <section className={`${T.glowBg} p-5 mt-4`}>
             <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -1610,7 +1956,9 @@ const SalesDashboard = () => {
                   }
                 />
                 <div
-                  className={`text-sm font-extrabold ${theme === "dark" ? "text-white" : "text-slate-900"}`}
+                  className={`text-sm font-extrabold ${
+                    theme === "dark" ? "text-white" : "text-slate-900"
+                  }`}
                 >
                   Hourly / Product (Qty)
                 </div>
@@ -1619,14 +1967,24 @@ const SalesDashboard = () => {
                 </span>
               </div>
 
-              <button
-                type="button"
-                onClick={() => exportReport("hourlyperproduct")}
-                className={T.pillBtn + " h-10 px-4 flex items-center gap-2"}
-              >
-                <FiDownload />
-                <span className="text-xs font-extrabold">Export</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => exportReport("hourlyperproduct")}
+                  className={T.pillBtn + " h-10 px-4 flex items-center gap-2"}
+                >
+                  <FiDownload />
+                  <span className="text-xs font-extrabold">Export</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={printHourlyPerProductReport}
+                  className={T.pillBtn + " h-10 px-4 flex items-center gap-2"}
+                >
+                  <FiPrinter />
+                  <span className="text-xs font-extrabold">Print</span>
+                </button>
+              </div>
             </div>
 
             {viewMode === "table" && (
@@ -1646,17 +2004,14 @@ const SalesDashboard = () => {
           </section>
         )}
 
-        {/* Floating mobile actions */}
         <div className="fixed bottom-4 right-4 z-[9998] flex flex-col gap-2 lg:hidden">
           <motion.button
             type="button"
             onClick={() => setIsFilterOpen(true)}
-            className="rounded-full px-4 py-3 text-xs font-extrabold text-white shadow-2xl flex items-center gap-2 "
+            className="rounded-full px-4 py-3 text-xs font-extrabold text-white shadow-2xl flex items-center gap-2"
             style={{
               background:
-                theme === "dark"
-                  ? "linear-gradient(135deg, rgba(59,130,246,1) 0%, rgba(99,102,241,1) 100%)"
-                  : "linear-gradient(135deg, rgba(59,130,246,1) 0%, rgba(99,102,241,1) 100%)",
+                "linear-gradient(135deg, rgba(59,130,246,1) 0%, rgba(99,102,241,1) 100%)",
             }}
             whileTap={{ scale: 0.98 }}
           >
@@ -1670,16 +2025,42 @@ const SalesDashboard = () => {
             className="rounded-full px-4 py-3 text-xs font-extrabold text-white shadow-2xl flex items-center gap-2"
             style={{
               background:
-                theme === "dark"
-                  ? "linear-gradient(135deg, rgba(34,197,94,1) 0%, rgba(16,185,129,1) 100%)"
-                  : "linear-gradient(135deg, rgba(34,197,94,1) 0%, rgba(16,185,129,1) 100%)",
+                "linear-gradient(135deg, rgba(34,197,94,1) 0%, rgba(16,185,129,1) 100%)",
             }}
             whileTap={{ scale: 0.98 }}
           >
             <FiDownload />
             Daily CSV
           </motion.button>
+
+          <motion.button
+            type="button"
+            onClick={printDailyReport}
+            className="rounded-full px-4 py-3 text-xs font-extrabold text-white shadow-2xl flex items-center gap-2"
+            style={{
+              background:
+                "linear-gradient(135deg, rgba(234,179,8,1) 0%, rgba(245,158,11,1) 100%)",
+            }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <FiPrinter />
+            Daily Print
+          </motion.button>
         </div>
+      </div>
+
+      <div style={{ display: "none" }}>
+        <ReportPrintReceipt
+          ref={printRef}
+          reportTitle={printPayload.reportTitle}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          includeVoided={includeVoided}
+          voidOnly={voidOnly}
+          rows={printPayload.rows}
+          totals={printPayload.totals}
+          printedAt={new Date().toLocaleString("en-PH")}
+        />
       </div>
     </div>
   );
