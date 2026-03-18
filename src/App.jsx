@@ -31,11 +31,7 @@ const App = () => {
           element={<PosSelectBusunit />}
         />
         <Route exact path="/poscorehomescreen" element={<PosHomeScreen />} />
-        <Route
-          exact
-          path="/transactionrecords"
-          element={<TransactionRecords />}
-        />
+        <Route exact path="/ " element={<TransactionRecords />} />
         <Route exact path="/payments" element={<PosPayment />} />
       </Routes>
       <GlobalThemeToggle />
