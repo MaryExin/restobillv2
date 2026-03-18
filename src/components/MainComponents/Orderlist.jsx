@@ -182,19 +182,19 @@ const Orderlist = ({
     },
   });
 
-const handleBillingPrint = useReactToPrint({
-  content: () => billingPrintRef.current,
-  documentTitle: billingSelectedTransaction?.billing_no
-    ? `billing-${billingSelectedTransaction.billing_no}`
-    : billingSelectedTransaction?.transaction_id
-      ? `billing-${billingSelectedTransaction.transaction_id}`
-      : `billing-${tableselected}`,
-  pageStyle: printPageStyle,
-  onAfterPrint: () => {
-    setBillingSelectedTransaction(null);
-    setBillingDetailedProduct([]);
-  },
-});
+  const handleBillingPrint = useReactToPrint({
+    content: () => billingPrintRef.current,
+    documentTitle: billingSelectedTransaction?.billing_no
+      ? `billing-${billingSelectedTransaction.billing_no}`
+      : billingSelectedTransaction?.transaction_id
+        ? `billing-${billingSelectedTransaction.transaction_id}`
+        : `billing-${tableselected}`,
+    pageStyle: printPageStyle,
+    onAfterPrint: () => {
+      setBillingSelectedTransaction(null);
+      setBillingDetailedProduct([]);
+    },
+  });
 
   const getCategoryIcon = (name) => {
     const lower = (name || "").toLowerCase();
@@ -660,103 +660,107 @@ const handleBillingPrint = useReactToPrint({
   };
 
   const saveBillingToServer = async (transaction, detailedItems) => {
-  if (!apiHost || !transaction?.transaction_id) {
-    throw new Error("Missing transaction data.");
-  }
-
-  const payload = {
-    transaction_id: transaction.transaction_id,
-    printTitle: "BILLING", // change to "RECEIPT" if needed
-    transStatus: "Pending for Payment", // or "Settled" if receipt/payment final
-    category_code: transaction.Category_Code || transaction.category_code || "Crab & Crack",
-    unit_code: transaction.Unit_Code || transaction.unit_code || "BU-247001cd32f1",
-
-    TotalSales: Number(transaction.TotalSales || 0),
-    Discount: Number(transaction.Discount || 0),
-    OtherCharges: Number(transaction.OtherCharges || 0),
-    TotalAmountDue: Number(transaction.TotalAmountDue || 0),
-    payment_amount: Number(transaction.payment_amount || 0),
-    change_amount: Number(transaction.change_amount || 0),
-
-    customer_exclusive_id: transaction.customer_exclusive_id || "",
-    customer_head_count: Number(transaction.customer_head_count || 1),
-    customer_count_for_discount: Number(
-      transaction.customer_count_for_discount || 0,
-    ),
-    discount_type: transaction.discount_type || "",
-    VATableSales: Number(transaction.VATableSales || 0),
-    VATableSales_VAT: Number(transaction.VATableSales_VAT || 0),
-    VATExemptSales: Number(transaction.VATExemptSales || 0),
-    VATExemptSales_VAT: Number(transaction.VATExemptSales_VAT || 0),
-    VATZeroRatedSales: Number(transaction.VATZeroRatedSales || 0),
-    payment_method: transaction.payment_method || "Cash",
-    cashier: transaction.cashier || "System",
-
-    cart_items: (detailedItems || []).map((item) => ({
-      databaseID: item.ID || item.id || item.databaseID,
-      selling_price: Number(item.selling_price || 0),
-    })),
-  };
-
-  const response = await fetch(`${apiHost}/api/billing.php`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-
-  const result = await response.json();
-
-  if (!response.ok || result.status !== "success") {
-    throw new Error(result.message || "Failed to save billing.");
-  }
-
-  return result;
-};
-
-const onBillingTransactionClick = async (item) => {
-  if (!apiHost) return;
-  if (billingTab !== "pending") return;
-
-  const txId = item?.transaction_id || transactionId;
-  if (!txId) return;
-
-  try {
-    // 1. fetch detailed items first
-    const detailRes = await fetch(
-      `${apiHost}/api/bill_trans_per_table.php?transaction_id=${encodeURIComponent(txId)}`,
-    );
-
-    if (!detailRes.ok) {
-      throw new Error("Failed to fetch transaction details");
+    if (!apiHost || !transaction?.transaction_id) {
+      throw new Error("Missing transaction data.");
     }
 
-    const detailData = await detailRes.json();
-    const detailedItems = Array.isArray(detailData) ? detailData : [];
+    const payload = {
+      transaction_id: transaction.transaction_id,
+      printTitle: "BILLING", // change to "RECEIPT" if needed
+      transStatus: "Pending for Payment", // or "Settled" if receipt/payment final
+      category_code:
+        transaction.Category_Code ||
+        transaction.category_code ||
+        "Crab & Crack",
+      unit_code:
+        transaction.Unit_Code || transaction.unit_code || "BU-247001cd32f1",
 
-    // 2. save/update billing in billing.php
-    const billingResult = await saveBillingToServer(item, detailedItems);
+      TotalSales: Number(transaction.TotalSales || 0),
+      Discount: Number(transaction.Discount || 0),
+      OtherCharges: Number(transaction.OtherCharges || 0),
+      TotalAmountDue: Number(transaction.TotalAmountDue || 0),
+      payment_amount: Number(transaction.payment_amount || 0),
+      change_amount: Number(transaction.change_amount || 0),
 
-    // 3. update state for printing
-    setBillingDetailedProduct(detailedItems);
-    setBillingSelectedTransaction({
-      ...item,
-      billing_no: billingResult.billing_no,
-      invoice_no: billingResult.invoice_no,
+      customer_exclusive_id: transaction.customer_exclusive_id || "",
+      customer_head_count: Number(transaction.customer_head_count || 1),
+      customer_count_for_discount: Number(
+        transaction.customer_count_for_discount || 0,
+      ),
+      discount_type: transaction.discount_type || "",
+      VATableSales: Number(transaction.VATableSales || 0),
+      VATableSales_VAT: Number(transaction.VATableSales_VAT || 0),
+      VATExemptSales: Number(transaction.VATExemptSales || 0),
+      VATExemptSales_VAT: Number(transaction.VATExemptSales_VAT || 0),
+      VATZeroRatedSales: Number(transaction.VATZeroRatedSales || 0),
+      payment_method: transaction.payment_method || "Cash",
+      cashier: transaction.cashier || "System",
+
+      cart_items: (detailedItems || []).map((item) => ({
+        databaseID: item.ID || item.id || item.databaseID,
+        selling_price: Number(item.selling_price || 0),
+      })),
+    };
+
+    const response = await fetch(`${apiHost}/api/billing.php`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
     });
 
-    // 4. trigger print
-    setTimeout(() => {
-      if (billingPrintRef.current) {
-        handleBillingPrint();
+    const result = await response.json();
+
+    if (!response.ok || result.status !== "success") {
+      throw new Error(result.message || "Failed to save billing.");
+    }
+
+    return result;
+  };
+
+  const onBillingTransactionClick = async (item) => {
+    if (!apiHost) return;
+    if (billingTab !== "pending") return;
+
+    const txId = item?.transaction_id || transactionId;
+    if (!txId) return;
+
+    try {
+      // 1. fetch detailed items first
+      const detailRes = await fetch(
+        `${apiHost}/api/bill_trans_per_table.php?transaction_id=${encodeURIComponent(txId)}`,
+      );
+
+      if (!detailRes.ok) {
+        throw new Error("Failed to fetch transaction details");
       }
-    }, 200);
-  } catch (error) {
-    console.error("Billing transaction click error:", error);
-    alert(error.message || "Failed to process billing.");
-  }
-};
+
+      const detailData = await detailRes.json();
+      const detailedItems = Array.isArray(detailData) ? detailData : [];
+
+      // 2. save/update billing in billing.php
+      const billingResult = await saveBillingToServer(item, detailedItems);
+
+      // 3. update state for printing
+      setBillingDetailedProduct(detailedItems);
+      setBillingSelectedTransaction({
+        ...item,
+        billing_no: billingResult.billing_no,
+        invoice_no: billingResult.invoice_no,
+      });
+
+      // 4. trigger print
+      setTimeout(() => {
+        if (billingPrintRef.current) {
+          handleBillingPrint();
+        }
+      }, 200);
+    } catch (error) {
+      console.error("Billing transaction click error:", error);
+      alert(error.message || "Failed to process billing.");
+    }
+  };
 
   const saveOrderToServer = async () => {
     if (productcart.items.length === 0) {
@@ -885,16 +889,16 @@ const onBillingTransactionClick = async (item) => {
     }, 150);
   };
 
-const onOpenDiscountModal = (item, e) => {
-  e.stopPropagation();
+  const onOpenDiscountModal = (item, e) => {
+    e.stopPropagation();
 
-  setDiscountTransaction({
-    ...item,
-    billing_no: item?.billing_no || item?.billingNo || "",
-  });
+    setDiscountTransaction({
+      ...item,
+      billing_no: item?.billing_no || item?.billingNo || "",
+    });
 
-  setShowDiscountModal(true);
-};
+    setShowDiscountModal(true);
+  };
 
   const requestSaveOnly = () => {
     setShowSaveConfirmModal(true);
@@ -1105,61 +1109,61 @@ const onOpenDiscountModal = (item, e) => {
               </div>
 
               <div className="flex-1 overflow-y-auto p-4 pt-0">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {filteredProducts.map((p, i) => (
                     <motion.button
                       key={i}
-                      whileHover={{ y: -5 }}
+                      whileHover={{ y: -6, scale: 1.01 }}
+                      whileTap={{ scale: 0.98 }}
                       onClick={() => addToCart(p)}
-                      className={`rounded-2xl text-left transition-all group overflow-hidden flex flex-col ${
+                      className={`group relative overflow-hidden rounded-[28px] border text-left transition-all duration-300 ${
                         isDark
-                          ? "bg-slate-800/40 border border-white/5 hover:border-blue-500/30"
-                          : "bg-white border border-slate-200 hover:border-blue-400/40 shadow-sm"
+                          ? "border-white/10 bg-slate-900/85 hover:border-blue-400/40"
+                          : "border-slate-200 bg-white hover:border-blue-400/50 hover:shadow-[0_18px_50px_rgba(15,23,42,0.10)]"
                       }`}
                     >
                       <div
-                        className={`h-40 w-full relative ${
-                          isDark ? "bg-slate-800" : "bg-slate-100"
+                        className={`absolute inset-x-0 top-0 h-1 ${
+                          isDark
+                            ? "bg-gradient-to-r from-cyan-500/0 via-blue-400/70 to-blue-500/0"
+                            : "bg-gradient-to-r from-blue-500/0 via-blue-500/70 to-blue-500/0"
                         }`}
-                      >
-                        {p.image_url ? (
-                          <img
-                            src={p.image_url}
-                            alt={p.item_name}
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                          />
-                        ) : (
-                          <div
-                            className={`w-full h-full flex flex-col items-center justify-center gap-2 ${
-                              isDark ? "text-slate-600" : "text-slate-400"
+                      />
+
+                      <div className="relative flex min-h-[145px] flex-col justify-between p-5">
+                        <div className="flex items-start justify-between gap-3">
+                          <h4
+                            className={`max-w-[calc(100%-56px)] text-[15px] font-black leading-snug break-words ${
+                              isDark ? "text-white" : "text-slate-900"
                             }`}
                           >
-                            <FaUtensils size={32} />
+                            {p.item_name}
+                          </h4>
+
+                          <div
+                            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition-all ${
+                              isDark
+                                ? "bg-slate-800 text-blue-400 group-hover:bg-blue-500 group-hover:text-white"
+                                : "bg-slate-100 text-blue-600 group-hover:bg-blue-500 group-hover:text-white"
+                            }`}
+                          >
+                            <FaPlus size={13} />
                           </div>
-                        )}
-
-                        <div className="absolute top-3 right-3 bg-blue-600 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <FaPlus size={12} className="text-white" />
                         </div>
-                      </div>
 
-                      <div
-                        className={`p-4 flex-1 transition-colors ${
-                          isDark ? "bg-white/5" : "bg-white"
-                        }`}
-                      >
-                        <h4
-                          className={`font-bold text-sm mb-1 ${
-                            isDark ? "text-white" : "text-slate-900"
-                          }`}
-                        >
-                          {p.item_name}
-                        </h4>
-
-                        <div className="flex justify-between items-center">
-                          <p className="text-blue-500 font-black text-lg">
-                            ₱{Number(p.selling_price || 0).toLocaleString()}
-                          </p>
+                        <div className="flex justify-end">
+                          <div className="text-right">
+                            <div
+                              className={`mb-1 text-[10px] font-bold uppercase tracking-[0.2em] ${
+                                isDark ? "text-slate-500" : "text-slate-400"
+                              }`}
+                            >
+                              Price
+                            </div>
+                            <div className="text-[22px] font-black text-blue-500">
+                              ₱{Number(p.selling_price || 0).toLocaleString()}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </motion.button>

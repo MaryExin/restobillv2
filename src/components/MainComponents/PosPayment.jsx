@@ -1,4 +1,11 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+} from "react";
+import { FixedSizeList as List } from "react-window";
 import { AnimatePresence, motion } from "framer-motion";
 import { useReactToPrint } from "react-to-print";
 import {
@@ -8,28 +15,28 @@ import {
   FiTag,
   FiUsers,
   FiCreditCard,
-  FiDollarSign,
   FiFileText,
   FiPlus,
   FiTrash2,
   FiRefreshCw,
   FiShoppingCart,
   FiPrinter,
+  FiDatabase,
+  FiBarChart2,
 } from "react-icons/fi";
+import { FaMoneyBill, FaArrowLeft } from "react-icons/fa";
 import { useTheme } from "../../context/ThemeContext";
 import useApiHost from "../../hooks/useApiHost";
 import PosPaymentReceipt from "./PosPaymentReceipt";
-import { FaMoneyBill } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 
 const peso = (value) =>
-  Number(value || 0).toLocaleString("en-PH", {
+  `₱ ${Number(value || 0).toLocaleString("en-PH", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  });
+  })}`;
 
 const negativePeso = (value) => `- ${peso(value)}`;
-
 const toNum = (value) => Number(value || 0);
 
 const yesNoToBool = (value) =>
@@ -37,9 +44,29 @@ const yesNoToBool = (value) =>
     .trim()
     .toLowerCase() === "yes";
 
+const normalizeText = (value) =>
+  String(value ?? "")
+    .trim()
+    .toLowerCase();
+
 const buildImagePath = (name) => {
   const safe = encodeURIComponent(String(name || "").trim());
   return `/${safe}.png`;
+};
+
+const safeReadJson = async (response, label) => {
+  const text = await response.text();
+
+  if (!text || !text.trim()) {
+    throw new Error(`${label} returned an empty response.`);
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    console.error(`${label} invalid JSON:`, text);
+    throw new Error(`${label} returned invalid JSON.`);
+  }
 };
 
 const emptyCustomerInfo = {
@@ -68,6 +95,36 @@ const createEmptyOtherChargeRow = () => ({
   reference: "",
 });
 
+const PENDING_COLUMN_TEMPLATE =
+  "110px 200px 120px 140px 200px 170px 170px 200px";
+
+const PENDING_TABLE_MIN_WIDTH = 1310;
+const PENDING_ROW_HEIGHT = 76;
+const PENDING_LIST_HEIGHT = 560;
+
+const ListOuter = React.forwardRef(({ style, ...props }, ref) => (
+  <div
+    ref={ref}
+    {...props}
+    style={{
+      ...style,
+      overflowX: "hidden",
+      overflowY: "auto",
+    }}
+  />
+));
+
+const ListInner = React.forwardRef(({ style, ...props }, ref) => (
+  <div
+    ref={ref}
+    {...props}
+    style={{
+      ...style,
+      width: "100%",
+    }}
+  />
+));
+
 const ModalShell = ({
   isOpen,
   onClose,
@@ -81,36 +138,36 @@ const ModalShell = ({
   return (
     <AnimatePresence>
       <motion.div
-        className={`fixed inset-0 ${zIndex} flex items-center justify-center p-2 md:p-4 backdrop-blur-md ${
-          isDark ? "bg-slate-950/80" : "bg-slate-200/70"
+        className={`fixed inset-0 ${zIndex} flex items-center justify-center p-3 md:p-5 backdrop-blur-md ${
+          isDark ? "bg-slate-950/80" : "bg-slate-900/20"
         }`}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
       >
         <motion.div
-          initial={{ scale: 0.985, opacity: 0, y: 10 }}
+          initial={{ scale: 0.97, opacity: 0, y: 14 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
-          exit={{ scale: 0.985, opacity: 0, y: 10 }}
-          transition={{ duration: 0.16 }}
-          className={`relative flex w-full ${maxWidth} max-h-[calc(100vh-1rem)] md:max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-[1rem] shadow-2xl ${
+          exit={{ scale: 0.97, opacity: 0, y: 14 }}
+          transition={{ duration: 0.18 }}
+          className={`relative flex w-full ${maxWidth} max-h-[calc(100vh-1.5rem)] flex-col overflow-hidden rounded-[30px] border shadow-[0_30px_100px_rgba(15,23,42,0.35)] ${
             isDark
-              ? "bg-slate-900 border border-white/10 text-white"
-              : "bg-white border border-slate-200 text-slate-900"
+              ? "border-white/10 bg-[#0f172a] text-white"
+              : "border-slate-200 bg-white text-slate-900"
           }`}
         >
-          {onClose && (
+          {onClose ? (
             <button
               onClick={onClose}
-              className={`absolute right-3 top-3 z-20 rounded-full p-1.5 transition-all ${
+              className={`absolute right-4 top-4 z-20 flex h-11 w-11 items-center justify-center rounded-2xl transition ${
                 isDark
-                  ? "bg-slate-800 text-slate-400 hover:bg-red-500/20 hover:text-red-400"
+                  ? "bg-slate-800 text-slate-300 hover:bg-red-500/15 hover:text-red-400"
                   : "bg-slate-100 text-slate-500 hover:bg-red-100 hover:text-red-500"
               }`}
             >
-              <FiX size={14} />
+              <FiX size={18} />
             </button>
-          )}
+          ) : null}
           {children}
         </motion.div>
       </motion.div>
@@ -120,10 +177,10 @@ const ModalShell = ({
 
 const SectionCard = ({ isDark, children, className = "" }) => (
   <div
-    className={`rounded-[1rem] p-3 ${className} ${
+    className={`rounded-[24px] border p-4 ${className} ${
       isDark
-        ? "bg-slate-950/40 border border-white/5"
-        : "bg-slate-50 border border-slate-200"
+        ? "border-white/5 bg-white/[0.03]"
+        : "border-slate-200 bg-white shadow-sm"
     }`}
   >
     {children}
@@ -142,39 +199,63 @@ const ActionTile = ({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-[0.95rem] border p-3 text-left transition-all ${
+      className={`rounded-[18px] border px-3 py-3 text-left transition ${
         active
-          ? "border-blue-600 bg-blue-600 text-white"
+          ? "border-blue-500 bg-blue-600 text-white"
           : isDark
-            ? "border-white/5 bg-slate-900/70 text-slate-200 hover:bg-slate-900"
-            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+            ? "border-slate-800 bg-slate-950 text-slate-300 hover:border-slate-700 hover:text-white"
+            : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-white"
       }`}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
         <div
-          className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
             active
               ? "bg-white/15 text-white"
               : isDark
-                ? "bg-slate-800 text-blue-500"
-                : "bg-slate-100 text-blue-500"
+                ? "bg-slate-800 text-slate-300"
+                : "bg-slate-100 text-slate-700"
           }`}
         >
           {icon}
         </div>
+
         <div className="min-w-0">
-          <p className="text-sm font-black leading-tight">{title}</p>
-          <p
-            className={`mt-0.5 text-[10px] ${active ? "text-blue-100" : "text-slate-500"}`}
+          <div className="text-sm font-bold leading-tight">{title}</div>
+          <div
+            className={`mt-0.5 text-[10px] leading-tight ${
+              active ? "text-blue-100" : "text-slate-500"
+            }`}
           >
             {subtitle}
-          </p>
+          </div>
         </div>
       </div>
     </button>
   );
 };
+const InfoPill = ({ isDark, children }) => (
+  <span
+    className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-bold ${
+      isDark ? "bg-slate-800 text-slate-200" : "bg-slate-100 text-slate-700"
+    }`}
+  >
+    {children}
+  </span>
+);
 
+const SummaryRow = ({ label, value, isDark, valueClassName = "" }) => (
+  <div
+    className={`flex items-center justify-between gap-3 rounded-2xl px-3 py-2.5 ${
+      isDark ? "bg-slate-950/80" : "bg-slate-50"
+    }`}
+  >
+    <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
+      {label}
+    </span>
+    <span className={`text-sm font-black ${valueClassName}`}>{value}</span>
+  </div>
+);
 const YesNoModal = ({
   isOpen,
   onClose,
@@ -191,12 +272,12 @@ const YesNoModal = ({
       isOpen={isOpen}
       onClose={busy ? undefined : onClose}
       isDark={isDark}
-      maxWidth="max-w-[520px]"
+      maxWidth="max-w-[560px]"
       zIndex="z-[100003]"
     >
-      <div className="p-5 md:p-6">
-        <div className="mb-3">
-          <h2 className="text-xl font-black">{title}</h2>
+      <div className="p-6">
+        <div className="mb-4">
+          <h2 className="text-2xl font-black">{title}</h2>
           <p className="mt-2 text-sm text-slate-500">{message}</p>
         </div>
 
@@ -205,12 +286,12 @@ const YesNoModal = ({
             type="button"
             onClick={onClose}
             disabled={busy}
-            className={`rounded-full px-4 py-3 text-sm font-black transition-all ${
+            className={`rounded-2xl px-4 py-3 text-sm font-black transition ${
               busy
                 ? "cursor-not-allowed bg-slate-300 text-slate-500"
                 : isDark
-                  ? "bg-slate-800 text-slate-200 hover:text-white"
-                  : "bg-slate-200 text-slate-700 hover:text-slate-900"
+                  ? "border border-slate-700 bg-slate-800 text-slate-200 hover:text-white"
+                  : "border border-slate-200 bg-slate-100 text-slate-700 hover:text-slate-900"
             }`}
           >
             {noText}
@@ -220,10 +301,10 @@ const YesNoModal = ({
             type="button"
             onClick={onYes}
             disabled={busy}
-            className={`rounded-full px-4 py-3 text-sm font-black text-white shadow-lg transition-all ${
+            className={`rounded-2xl px-4 py-3 text-sm font-black text-white transition ${
               busy
                 ? "cursor-not-allowed bg-slate-400"
-                : "bg-blue-600 hover:opacity-95"
+                : "bg-blue-600 hover:bg-blue-500"
             }`}
           >
             {busy ? "Processing..." : yesText}
@@ -250,9 +331,9 @@ const SuccessModal = ({
       maxWidth="max-w-[560px]"
       zIndex="z-[100003]"
     >
-      <div className="p-5 md:p-6">
-        <div className="mb-3">
-          <h2 className="text-xl font-black text-emerald-500">{title}</h2>
+      <div className="p-6">
+        <div className="mb-4">
+          <h2 className="text-2xl font-black text-emerald-500">{title}</h2>
           <p className="mt-2 text-sm text-slate-500">{message}</p>
         </div>
 
@@ -260,10 +341,10 @@ const SuccessModal = ({
           <button
             type="button"
             onClick={onClose}
-            className={`rounded-full px-6 py-3 text-sm font-black transition-all ${
+            className={`rounded-2xl px-6 py-3 text-sm font-black transition ${
               isDark
-                ? "bg-slate-800 text-slate-200 hover:text-white"
-                : "bg-slate-200 text-slate-700 hover:text-slate-900"
+                ? "border border-slate-700 bg-slate-800 text-slate-200 hover:text-white"
+                : "border border-slate-200 bg-slate-100 text-slate-700 hover:text-slate-900"
             }`}
           >
             Continue
@@ -272,9 +353,9 @@ const SuccessModal = ({
           <button
             type="button"
             onClick={onPrint}
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-blue-600 px-6 py-3 text-sm font-black text-white shadow-lg transition-all hover:opacity-95"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-6 py-3 text-sm font-black text-white transition hover:bg-blue-500"
           >
-            <FiPrinter size={14} />
+            <FiPrinter size={15} />
             Print Receipt
           </button>
         </div>
@@ -282,6 +363,145 @@ const SuccessModal = ({
     </ModalShell>
   );
 };
+
+function PendingHeaderRow({ isDark }) {
+  const headers = [
+    "Action",
+    "Transaction ID",
+    "Table",
+    "Order Type",
+    "Transaction Date",
+    "Total Sales",
+    "Cashier",
+    "Remarks",
+  ];
+
+  return (
+    <div
+      className={`grid border-b ${
+        isDark
+          ? "border-white/5 bg-slate-950/70 text-slate-300"
+          : "border-slate-200 bg-slate-50 text-slate-700"
+      }`}
+      style={{ gridTemplateColumns: PENDING_COLUMN_TEMPLATE }}
+    >
+      {headers.map((header) => (
+        <div
+          key={header}
+          className="px-5 py-4 text-[12px] font-black uppercase tracking-[0.16em]"
+        >
+          {header}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PendingTransactionRow({ index, style, data }) {
+  const row = data.rows[index];
+  const isDark = data.isDark;
+  const onOpen = data.onOpen;
+
+  const remarksText = row.remarks || "Pending for Payment";
+  const isPending = normalizeText(remarksText).includes("pending");
+
+  return (
+    <div style={style}>
+      <div
+        className={`grid border-b transition ${
+          isDark
+            ? "border-white/5 hover:bg-white/[0.03]"
+            : "border-slate-100 hover:bg-slate-50"
+        }`}
+        style={{ gridTemplateColumns: PENDING_COLUMN_TEMPLATE }}
+      >
+        <div className="flex items-center px-5 py-4">
+          <button
+            type="button"
+            onClick={() => onOpen(row)}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white transition hover:bg-blue-500"
+            title="Open Payment"
+          >
+            <FiEye size={17} />
+          </button>
+        </div>
+
+        <div className="px-5 py-4">
+          <div className="font-black">{row.transaction_id || "-"}</div>
+          <div className="mt-1 text-xs text-slate-500">
+            {row.invoice_no ? `Invoice # ${row.invoice_no}` : "No invoice yet"}
+          </div>
+        </div>
+
+        <div className="px-5 py-4 whitespace-nowrap">
+          {row.table_number || "-"}
+        </div>
+
+        <div className="px-5 py-4 whitespace-nowrap">
+          {row.order_type || "-"}
+        </div>
+
+        <div className="px-5 py-4 whitespace-nowrap">
+          {row.transaction_date || "-"}
+        </div>
+
+        <div className="px-5 py-4 text-right whitespace-nowrap font-black">
+          {peso(row.TotalSales)}
+        </div>
+
+        <div className="px-5 py-4 whitespace-nowrap">{row.cashier || "-"}</div>
+
+        <div className="flex items-center px-5 py-4">
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-bold ${
+              isPending
+                ? "bg-green-500/10 text-green-500"
+                : isDark
+                  ? "bg-slate-500/10 text-slate-300"
+                  : "bg-slate-900/10 text-slate-700"
+            }`}
+          >
+            {remarksText}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatCard({ title, value, icon: Icon, isDark }) {
+  return (
+    <div
+      className={`rounded-[24px] border p-5 ${
+        isDark
+          ? "border-white/5 bg-white/[0.03]"
+          : "border-slate-200 bg-white shadow-sm"
+      }`}
+    >
+      <div className="mb-3 flex items-center justify-between">
+        <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+          {title}
+        </div>
+        <div
+          className={`flex h-10 w-10 items-center justify-center rounded-2xl ${
+            isDark
+              ? "bg-slate-800 text-slate-300"
+              : "bg-slate-100 text-slate-600"
+          }`}
+        >
+          <Icon size={18} />
+        </div>
+      </div>
+      <div
+        className={`text-2xl font-black ${
+          isDark ? "text-white" : "text-slate-900"
+        }`}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
 
 const PaymentMethodPickerModal = ({
   isOpen,
@@ -299,21 +519,22 @@ const PaymentMethodPickerModal = ({
       zIndex="z-[100002]"
     >
       <div
-        className={`px-4 py-4 ${
+        className={`px-5 py-5 ${
           isDark
-            ? "border-b border-white/5 bg-blue-500/90"
-            : "border-b border-slate-200 bg-blue-500"
+            ? "border-b border-white/5 bg-white/[0.03]"
+            : "border-b border-slate-200 bg-slate-50"
         }`}
       >
-        <h2 className="text-center text-xl font-black text-white">
-          Choose Payment Method
-        </h2>
+        <h2 className="text-2xl font-black">Choose Payment Method</h2>
+        <p className="mt-1 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+          Available payment channels
+        </p>
       </div>
 
-      <div className="p-4 md:p-6">
+      <div className="p-5 md:p-6">
         {methods.length === 0 ? (
           <div
-            className={`flex min-h-[220px] items-center justify-center rounded-xl border border-dashed ${
+            className={`flex min-h-[220px] items-center justify-center rounded-2xl border border-dashed ${
               isDark ? "border-white/10" : "border-slate-300"
             }`}
           >
@@ -328,10 +549,10 @@ const PaymentMethodPickerModal = ({
                 key={method.mop_id || method.seq || method.mop}
                 type="button"
                 onClick={() => onPick(method)}
-                className={`rounded-[1rem] border p-3 shadow-sm transition-all ${
+                className={`rounded-[22px] border p-4 transition ${
                   isDark
-                    ? "border-white/5 bg-slate-900/60 hover:bg-slate-900"
-                    : "border-slate-200 bg-white hover:bg-slate-50"
+                    ? "border-white/5 bg-slate-950 hover:border-slate-700"
+                    : "border-slate-200 bg-white hover:border-slate-300"
                 }`}
               >
                 <div className="flex min-h-[112px] flex-col items-center justify-center gap-2">
@@ -355,7 +576,7 @@ const PaymentMethodPickerModal = ({
         <div className="mt-6 flex justify-center">
           <button
             onClick={onClose}
-            className="rounded-full bg-blue-600 px-10 py-3 text-sm font-black text-white shadow-lg transition-all hover:opacity-95"
+            className="rounded-2xl bg-blue-600 px-10 py-3 text-sm font-black text-white transition hover:bg-blue-500"
           >
             Close
           </button>
@@ -374,11 +595,12 @@ const OtherChargesModal = ({
   setRows,
 }) => {
   const inputClass = isDark
-    ? "bg-slate-900/70 border border-slate-800 text-white placeholder:text-slate-500"
+    ? "bg-slate-950 border border-slate-800 text-white placeholder:text-slate-500"
     : "bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400";
 
   const addRow = () =>
     setRows((prev) => [...prev, createEmptyOtherChargeRow()]);
+
   const removeRow = (index) =>
     setRows((prev) => prev.filter((_, i) => i !== index));
 
@@ -392,35 +614,36 @@ const OtherChargesModal = ({
       isOpen={isOpen}
       onClose={onClose}
       isDark={isDark}
-      maxWidth="max-w-[860px]"
+      maxWidth="max-w-[900px]"
       zIndex="z-[100002]"
     >
       <div
-        className={`px-4 py-4 ${
+        className={`px-5 py-5 ${
           isDark
-            ? "border-b border-white/5 bg-blue-500/90"
-            : "border-b border-slate-200 bg-blue-500"
+            ? "border-b border-white/5 bg-white/[0.03]"
+            : "border-b border-slate-200 bg-slate-50"
         }`}
       >
-        <h2 className="text-center text-xl font-black text-white">
-          Other Charges
-        </h2>
+        <h2 className="text-2xl font-black">Other Charges</h2>
+        <p className="mt-1 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+          Add fees and extra charges
+        </p>
       </div>
 
-      <div className="space-y-4 p-4 md:p-6">
+      <div className="space-y-4 p-5 md:p-6">
         {rows.map((row, index) => (
           <div
             key={index}
-            className={`grid gap-3 rounded-[1rem] p-3 ${
+            className={`grid gap-3 rounded-[22px] border p-4 ${
               isDark
-                ? "bg-slate-950/40 border border-white/5"
-                : "bg-slate-50 border border-slate-200"
+                ? "border-white/5 bg-white/[0.03]"
+                : "border-slate-200 bg-slate-50"
             } md:grid-cols-[60px_minmax(0,1.2fr)_180px_minmax(0,1fr)]`}
           >
             <button
               type="button"
               onClick={() => removeRow(index)}
-              className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600 text-white transition-all hover:bg-blue-500"
+              className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white transition hover:bg-blue-500"
             >
               <FiTrash2 size={16} />
             </button>
@@ -428,7 +651,7 @@ const OtherChargesModal = ({
             <select
               value={row.particulars}
               onChange={(e) => updateRow(index, "particulars", e.target.value)}
-              className={`h-11 rounded-xl px-3 text-sm outline-none ${inputClass}`}
+              className={`h-11 rounded-2xl px-3 text-sm outline-none ${inputClass}`}
             >
               <option value="">Select charge</option>
               {options.map((option) => (
@@ -448,7 +671,7 @@ const OtherChargesModal = ({
               value={row.amount}
               onChange={(e) => updateRow(index, "amount", e.target.value)}
               placeholder="0.00"
-              className={`h-11 rounded-xl px-3 text-sm outline-none ${inputClass}`}
+              className={`h-11 rounded-2xl px-3 text-sm outline-none ${inputClass}`}
             />
 
             <input
@@ -456,7 +679,7 @@ const OtherChargesModal = ({
               value={row.reference}
               onChange={(e) => updateRow(index, "reference", e.target.value)}
               placeholder="Reference"
-              className={`h-11 rounded-xl px-3 text-sm outline-none ${inputClass}`}
+              className={`h-11 rounded-2xl px-3 text-sm outline-none ${inputClass}`}
             />
           </div>
         ))}
@@ -465,10 +688,10 @@ const OtherChargesModal = ({
           <button
             type="button"
             onClick={addRow}
-            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all ${
+            className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold transition ${
               isDark
-                ? "bg-slate-800 text-slate-200 hover:text-white"
-                : "bg-slate-200 text-slate-700 hover:text-slate-900"
+                ? "border border-slate-700 bg-slate-800 text-slate-200 hover:text-white"
+                : "border border-slate-200 bg-white text-slate-700 hover:text-slate-900"
             }`}
           >
             <FiPlus size={14} />
@@ -477,7 +700,7 @@ const OtherChargesModal = ({
 
           <button
             onClick={onClose}
-            className="rounded-full bg-blue-600 px-10 py-3 text-sm font-black text-white shadow-lg transition-all hover:opacity-95"
+            className="rounded-2xl bg-blue-600 px-10 py-3 text-sm font-black text-white transition hover:bg-blue-500"
           >
             Continue
           </button>
@@ -499,7 +722,7 @@ const CustomerInfoModal = ({
   setCustomerCards,
 }) => {
   const inputClass = isDark
-    ? "bg-slate-900/70 border border-slate-800 text-white placeholder:text-slate-500"
+    ? "bg-slate-950 border border-slate-800 text-white placeholder:text-slate-500"
     : "bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400";
 
   const safeQualifiedCount = Math.max(Number(qualifiedCount) || 0, 0);
@@ -524,11 +747,11 @@ const CustomerInfoModal = ({
       maxWidth="max-w-[1000px]"
       zIndex="z-[100002]"
     >
-      <div className="p-4 md:p-6">
-        <div className="mb-4 flex items-start justify-between gap-4">
+      <div className="p-5 md:p-6">
+        <div className="mb-5 flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
             <div
-              className={`flex h-12 w-12 items-center justify-center rounded-xl ${
+              className={`flex h-12 w-12 items-center justify-center rounded-2xl ${
                 isDark
                   ? "bg-slate-800 text-slate-300"
                   : "bg-slate-100 text-slate-600"
@@ -543,20 +766,14 @@ const CustomerInfoModal = ({
               </p>
             </div>
           </div>
-
-          <div
-            className={`hidden h-16 w-16 items-center justify-center rounded-full md:flex ${
-              isDark
-                ? "bg-cyan-500/15 text-cyan-400"
-                : "bg-cyan-50 text-cyan-600"
-            }`}
-          >
-            <FiUsers size={28} />
-          </div>
         </div>
 
         <div
-          className={`mb-4 rounded-[1rem] p-4 ${isDark ? "bg-slate-950/40 border border-white/5" : "bg-slate-50 border border-slate-200"}`}
+          className={`mb-4 rounded-[24px] border p-4 ${
+            isDark
+              ? "border-white/5 bg-white/[0.03]"
+              : "border-slate-200 bg-slate-50"
+          }`}
         >
           <div className="grid gap-3 md:grid-cols-[1fr_180px]">
             <div className="space-y-3">
@@ -567,7 +784,7 @@ const CustomerInfoModal = ({
                   min="1"
                   value={customerCount}
                   onChange={(e) => setCustomerCount(e.target.value)}
-                  className={`h-11 rounded-xl px-3 text-sm outline-none ${inputClass}`}
+                  className={`h-11 rounded-2xl px-3 text-sm outline-none ${inputClass}`}
                 />
               </div>
 
@@ -581,7 +798,7 @@ const CustomerInfoModal = ({
                   max={customerCount || 1}
                   value={qualifiedCount}
                   onChange={(e) => setQualifiedCount(e.target.value)}
-                  className={`h-11 rounded-xl px-3 text-sm outline-none ${inputClass}`}
+                  className={`h-11 rounded-2xl px-3 text-sm outline-none ${inputClass}`}
                 />
               </div>
             </div>
@@ -590,8 +807,8 @@ const CustomerInfoModal = ({
               <div
                 className={`flex h-24 w-24 items-center justify-center rounded-full ${
                   isDark
-                    ? "bg-cyan-500/15 text-cyan-400"
-                    : "bg-cyan-50 text-cyan-600"
+                    ? "bg-blue-500/10 text-blue-400"
+                    : "bg-blue-50 text-blue-600"
                 }`}
               >
                 <FiUsers size={40} />
@@ -603,10 +820,10 @@ const CustomerInfoModal = ({
         <div className="max-h-[55vh] space-y-4 overflow-y-auto pr-1">
           {safeQualifiedCount === 0 ? (
             <div
-              className={`rounded-[1rem] p-5 text-center text-sm italic ${
+              className={`rounded-[24px] border p-5 text-center text-sm italic ${
                 isDark
-                  ? "bg-slate-950/40 border border-white/5 text-slate-400"
-                  : "bg-slate-50 border border-slate-200 text-slate-500"
+                  ? "border-white/5 bg-white/[0.03] text-slate-400"
+                  : "border-slate-200 bg-slate-50 text-slate-500"
               }`}
             >
               No discount customer cards yet. Increase the qualified count to
@@ -618,7 +835,11 @@ const CustomerInfoModal = ({
               .map((customerInfo, index) => (
                 <div
                   key={index}
-                  className={`rounded-[1rem] p-4 ${isDark ? "bg-slate-950/40 border border-white/5" : "bg-slate-50 border border-slate-200"}`}
+                  className={`rounded-[24px] border p-4 ${
+                    isDark
+                      ? "border-white/5 bg-white/[0.03]"
+                      : "border-slate-200 bg-slate-50"
+                  }`}
                 >
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div>
@@ -633,7 +854,7 @@ const CustomerInfoModal = ({
                     <button
                       type="button"
                       onClick={() => clearCard(index)}
-                      className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600 text-white transition-all hover:bg-blue-500"
+                      className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white transition hover:bg-blue-500"
                     >
                       <FiTrash2 size={16} />
                     </button>
@@ -651,7 +872,7 @@ const CustomerInfoModal = ({
                         )
                       }
                       placeholder="Exclusive Customer ID / Customer ID"
-                      className={`h-11 rounded-xl px-3 text-sm outline-none ${inputClass}`}
+                      className={`h-11 rounded-2xl px-3 text-sm outline-none ${inputClass}`}
                     />
                     <input
                       type="text"
@@ -660,7 +881,7 @@ const CustomerInfoModal = ({
                         updateCard(index, "customer_name", e.target.value)
                       }
                       placeholder="Name"
-                      className={`h-11 rounded-xl px-3 text-sm outline-none ${inputClass}`}
+                      className={`h-11 rounded-2xl px-3 text-sm outline-none ${inputClass}`}
                     />
                     <input
                       type="text"
@@ -669,14 +890,14 @@ const CustomerInfoModal = ({
                         updateCard(index, "customer_id_no", e.target.value)
                       }
                       placeholder="ID"
-                      className={`h-11 rounded-xl px-3 text-sm outline-none ${inputClass}`}
+                      className={`h-11 rounded-2xl px-3 text-sm outline-none ${inputClass}`}
                     />
                     <input
                       type="text"
                       value={customerInfo.tin}
                       onChange={(e) => updateCard(index, "tin", e.target.value)}
                       placeholder="TIN"
-                      className={`h-11 rounded-xl px-3 text-sm outline-none ${inputClass}`}
+                      className={`h-11 rounded-2xl px-3 text-sm outline-none ${inputClass}`}
                     />
                     <input
                       type="text"
@@ -685,7 +906,7 @@ const CustomerInfoModal = ({
                         updateCard(index, "other_info_01", e.target.value)
                       }
                       placeholder="Other Info 01"
-                      className={`h-11 rounded-xl px-3 text-sm outline-none ${inputClass}`}
+                      className={`h-11 rounded-2xl px-3 text-sm outline-none ${inputClass}`}
                     />
                     <input
                       type="text"
@@ -694,7 +915,7 @@ const CustomerInfoModal = ({
                         updateCard(index, "other_info_02", e.target.value)
                       }
                       placeholder="Other Info 02"
-                      className={`h-11 rounded-xl px-3 text-sm outline-none ${inputClass}`}
+                      className={`h-11 rounded-2xl px-3 text-sm outline-none ${inputClass}`}
                     />
                     <input
                       type="text"
@@ -703,7 +924,7 @@ const CustomerInfoModal = ({
                         updateCard(index, "other_info_03", e.target.value)
                       }
                       placeholder="Other Info 03"
-                      className={`h-11 rounded-xl px-3 text-sm outline-none ${inputClass}`}
+                      className={`h-11 rounded-2xl px-3 text-sm outline-none ${inputClass}`}
                     />
                   </div>
                 </div>
@@ -714,7 +935,7 @@ const CustomerInfoModal = ({
         <div className="mt-5 flex justify-center">
           <button
             onClick={onClose}
-            className="rounded-full bg-blue-600 px-10 py-3 text-sm font-black text-white shadow-lg transition-all hover:opacity-95"
+            className="rounded-2xl bg-blue-600 px-10 py-3 text-sm font-black text-white transition hover:bg-blue-500"
           >
             Continue
           </button>
@@ -739,7 +960,7 @@ const DiscountSetupModal = ({
   computed,
 }) => {
   const inputClass = isDark
-    ? "bg-slate-900/70 border border-slate-800 text-white placeholder:text-slate-500"
+    ? "bg-slate-950 border border-slate-800 text-white placeholder:text-slate-500"
     : "bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400";
 
   const isManualDiscount = discountType === "Manual Discount";
@@ -749,43 +970,39 @@ const DiscountSetupModal = ({
       isOpen={isOpen}
       onClose={onClose}
       isDark={isDark}
-      maxWidth="max-w-[820px]"
+      maxWidth="max-w-[860px]"
       zIndex="z-[100002]"
     >
       <div
-        className={`relative px-4 py-3 ${
+        className={`px-5 py-5 ${
           isDark
-            ? "border-b border-white/5 bg-white/5"
+            ? "border-b border-white/5 bg-white/[0.03]"
             : "border-b border-slate-200 bg-slate-50"
         }`}
       >
-        <div className="pr-8">
-          <div className="flex items-center gap-2.5">
-            <div
-              className={`flex h-8 w-8 items-center justify-center rounded-lg ${
-                isDark
-                  ? "bg-blue-500/15 text-blue-400"
-                  : "bg-blue-50 text-blue-600"
-              }`}
-            >
-              <FiTag size={15} />
-            </div>
-            <div>
-              <h2 className="text-base font-black tracking-tight">
-                Discount Setup
-              </h2>
-              <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
-                Same logic as discount_page
-              </p>
-            </div>
+        <div className="flex items-center gap-3">
+          <div
+            className={`flex h-10 w-10 items-center justify-center rounded-2xl ${
+              isDark
+                ? "bg-slate-800 text-slate-300"
+                : "bg-slate-100 text-slate-700"
+            }`}
+          >
+            <FiTag size={18} />
+          </div>
+          <div>
+            <h2 className="text-2xl font-black">Discount Setup</h2>
+            <p className="mt-1 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+              Configure discount rules and computation
+            </p>
           </div>
         </div>
       </div>
 
-      <div className="space-y-3 p-4">
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+      <div className="space-y-4 p-5">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <SectionCard isDark={isDark}>
-            <div className="mb-2 flex items-center gap-2">
+            <div className="mb-3 flex items-center gap-2">
               <FiFileText size={14} className="text-slate-500" />
               <h3 className="text-sm font-black">Discount Type</h3>
             </div>
@@ -815,17 +1032,17 @@ const DiscountSetupModal = ({
                     key={type.label}
                     type="button"
                     onClick={() => setDiscountType(type.label)}
-                    className={`w-full rounded-lg border px-3 py-2.5 text-left transition-all ${
+                    className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
                       active
-                        ? "border-blue-600 bg-blue-600 text-white"
+                        ? "border-blue-500 bg-blue-600 text-white"
                         : isDark
-                          ? "border-white/5 bg-slate-900/70 text-slate-300 hover:bg-slate-900"
-                          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                          ? "border-slate-800 bg-slate-950 text-slate-300 hover:border-slate-700"
+                          : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
                     }`}
                   >
                     <div className="text-sm font-bold">{type.label}</div>
                     <div
-                      className={`mt-0.5 text-[10px] ${
+                      className={`mt-1 text-[11px] ${
                         active ? "text-blue-100" : "text-slate-500"
                       }`}
                     >
@@ -837,13 +1054,13 @@ const DiscountSetupModal = ({
             </div>
 
             <div
-              className={`rounded-[0.9rem] p-3 mt-4 ${
+              className={`mt-4 rounded-[22px] border p-4 ${
                 isDark
-                  ? "bg-slate-900/70 border border-white/5"
-                  : "bg-white border border-slate-200"
+                  ? "border-white/5 bg-slate-950"
+                  : "border-slate-200 bg-slate-50"
               }`}
             >
-              <div className="mb-2 flex items-center gap-2">
+              <div className="mb-3 flex items-center gap-2">
                 {isManualDiscount ? (
                   <FiTag size={14} className="text-slate-500" />
                 ) : (
@@ -856,7 +1073,7 @@ const DiscountSetupModal = ({
 
               {isManualDiscount ? (
                 <div>
-                  <label className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
+                  <label className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
                     Discount Amount
                   </label>
                   <input
@@ -865,14 +1082,14 @@ const DiscountSetupModal = ({
                     step="0.01"
                     value={manualDiscount}
                     onChange={(e) => setManualDiscount(e.target.value)}
-                    className={`w-full rounded-lg px-3 py-2 text-sm outline-none ${inputClass}`}
+                    className={`w-full rounded-2xl px-3 py-3 text-sm outline-none ${inputClass}`}
                     placeholder="0.00"
                   />
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
+                    <label className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
                       Total Customers
                     </label>
                     <input
@@ -880,12 +1097,12 @@ const DiscountSetupModal = ({
                       min="1"
                       value={customerCount}
                       onChange={(e) => setCustomerCount(e.target.value)}
-                      className={`w-full rounded-lg px-3 py-2 text-sm outline-none ${inputClass}`}
+                      className={`w-full rounded-2xl px-3 py-3 text-sm outline-none ${inputClass}`}
                     />
                   </div>
 
                   <div>
-                    <label className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
+                    <label className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
                       Qualified
                     </label>
                     <input
@@ -894,7 +1111,7 @@ const DiscountSetupModal = ({
                       max={customerCount || 1}
                       value={qualifiedCount}
                       onChange={(e) => setQualifiedCount(e.target.value)}
-                      className={`w-full rounded-lg px-3 py-2 text-sm outline-none ${inputClass}`}
+                      className={`w-full rounded-2xl px-3 py-3 text-sm outline-none ${inputClass}`}
                     />
                   </div>
                 </div>
@@ -903,7 +1120,7 @@ const DiscountSetupModal = ({
           </SectionCard>
 
           <SectionCard isDark={isDark}>
-            <div className="mb-2 flex items-center gap-2">
+            <div className="mb-3 flex items-center gap-2">
               <FiTag size={14} className="text-slate-500" />
               <h3 className="text-sm font-black">Computation Summary</h3>
             </div>
@@ -912,18 +1129,18 @@ const DiscountSetupModal = ({
               <div className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
                 <span className="text-slate-500">Discountable Gross</span>
                 <span className="font-semibold">
-                  ₱ {peso(computed.discountableGross)}
+                  {peso(computed.discountableGross)}
                 </span>
               </div>
 
               <div className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
                 <span className="text-slate-500">Discountable Base</span>
                 <span className="font-semibold">
-                  ₱ {peso(computed.discountableBase)}
+                  {peso(computed.discountableBase)}
                 </span>
               </div>
 
-              {!isManualDiscount && discountType !== "No Discount" && (
+              {!isManualDiscount && discountType !== "No Discount" ? (
                 <>
                   <div className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
                     <span className="text-slate-500">Ratio</span>
@@ -936,7 +1153,7 @@ const DiscountSetupModal = ({
                   <div className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
                     <span className="text-slate-500">Prorated Base</span>
                     <span className="font-semibold">
-                      ₱ {peso(computed.proratedBase)}
+                      {peso(computed.proratedBase)}
                     </span>
                   </div>
 
@@ -947,9 +1164,9 @@ const DiscountSetupModal = ({
                     </span>
                   </div>
                 </>
-              )}
+              ) : null}
 
-              <div className="flex items-center justify-between gap-2 rounded-lg bg-emerald-500/10 px-3 py-2">
+              <div className="flex items-center justify-between gap-2 rounded-2xl bg-emerald-500/10 px-3 py-3">
                 <span className="text-[12px] font-bold">{discountType}</span>
                 <span className="text-[13px] font-black text-red-500">
                   {negativePeso(computed.discount)}
@@ -962,7 +1179,7 @@ const DiscountSetupModal = ({
         <div className="flex justify-end">
           <button
             onClick={onClose}
-            className="rounded-full bg-blue-600 px-10 py-3 text-sm font-black text-white shadow-lg transition-all hover:opacity-95"
+            className="rounded-2xl bg-blue-600 px-10 py-3 text-sm font-black text-white transition hover:bg-blue-500"
           >
             Continue
           </button>
@@ -982,7 +1199,7 @@ const InputPaymentsModal = ({
   onAddPaymentMethod,
 }) => {
   const inputClass = isDark
-    ? "bg-slate-900/70 border border-slate-800 text-white placeholder:text-slate-500"
+    ? "bg-slate-950 border border-slate-800 text-white placeholder:text-slate-500"
     : "bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400";
 
   const totalPaid = payments.reduce(
@@ -1004,44 +1221,45 @@ const InputPaymentsModal = ({
       isOpen={isOpen}
       onClose={onClose}
       isDark={isDark}
-      maxWidth="max-w-[860px]"
+      maxWidth="max-w-[880px]"
       zIndex="z-[100001]"
     >
       <div
-        className={`px-4 py-4 ${
+        className={`px-5 py-5 ${
           isDark
-            ? "border-b border-white/5 bg-blue-500/90"
-            : "border-b border-slate-200 bg-blue-500"
+            ? "border-b border-white/5 bg-white/[0.03]"
+            : "border-b border-slate-200 bg-slate-50"
         }`}
       >
-        <h2 className="text-center text-xl font-black text-white">
-          Input Payments
-        </h2>
+        <h2 className="text-2xl font-black">Input Payments</h2>
+        <p className="mt-1 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+          Allocate payment amounts and references
+        </p>
       </div>
 
-      <div className="space-y-4 p-4 md:p-6">
+      <div className="space-y-4 p-5 md:p-6">
         <div className="grid gap-3 md:grid-cols-2 md:items-center">
           <div className="text-2xl font-black text-slate-700 dark:text-slate-200">
-            TOTAL AMOUNT DUE:
+            TOTAL AMOUNT DUE
           </div>
-          <div className="text-right text-3xl font-black text-green-600">
+          <div className="text-right text-3xl font-black text-emerald-500">
             {peso(totalAmountDue)}
           </div>
         </div>
 
         <div
-          className={`rounded-[1rem] border p-3 ${
+          className={`rounded-[24px] border p-4 ${
             isDark
-              ? "border-cyan-500/20 bg-slate-950/40"
-              : "border-cyan-200 bg-cyan-50/30"
+              ? "border-white/5 bg-white/[0.03]"
+              : "border-slate-200 bg-slate-50"
           }`}
         >
-          <div className="mb-2 flex items-center justify-between gap-3">
+          <div className="mb-3 flex items-center justify-between gap-3">
             <p className="text-sm font-bold text-slate-500">Payments</p>
             <button
               type="button"
               onClick={onAddPaymentMethod}
-              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-500"
+              className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-xs font-bold text-white transition hover:bg-blue-500"
             >
               <FiPlus size={14} />
               Add Payment Method
@@ -1051,7 +1269,7 @@ const InputPaymentsModal = ({
           <div className="space-y-3">
             {payments.length === 0 ? (
               <div
-                className={`flex min-h-[120px] items-center justify-center rounded-xl border border-dashed ${
+                className={`flex min-h-[120px] items-center justify-center rounded-2xl border border-dashed ${
                   isDark ? "border-white/10" : "border-slate-300"
                 }`}
               >
@@ -1063,21 +1281,21 @@ const InputPaymentsModal = ({
               payments.map((row, index) => (
                 <div
                   key={`${row.payment_method}-${index}`}
-                  className={`grid gap-3 rounded-[1rem] p-3 ${
+                  className={`grid gap-3 rounded-[22px] border p-4 ${
                     isDark
-                      ? "bg-slate-900/60 border border-white/5"
-                      : "bg-white border border-slate-200"
-                  } md:grid-cols-[60px_140px_minmax(0,1fr)]`}
+                      ? "border-white/5 bg-slate-950"
+                      : "border-slate-200 bg-white"
+                  } md:grid-cols-[60px_150px_minmax(0,1fr)]`}
                 >
                   <button
                     type="button"
                     onClick={() => removeRow(index)}
-                    className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600 text-white transition-all hover:bg-blue-500"
+                    className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white transition hover:bg-blue-500"
                   >
                     <FiTrash2 size={16} />
                   </button>
 
-                  <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-white/5 dark:bg-slate-950/50">
+                  <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 dark:border-white/5 dark:bg-slate-900">
                     <img
                       src={buildImagePath(row.payment_method)}
                       alt={row.payment_method}
@@ -1103,7 +1321,7 @@ const InputPaymentsModal = ({
                         updateRow(index, "payment_amount", e.target.value)
                       }
                       placeholder="0.00"
-                      className={`h-11 rounded-xl px-3 text-sm outline-none ${inputClass}`}
+                      className={`h-11 rounded-2xl px-3 text-sm outline-none ${inputClass}`}
                     />
                     <input
                       type="text"
@@ -1112,7 +1330,7 @@ const InputPaymentsModal = ({
                         updateRow(index, "payment_reference", e.target.value)
                       }
                       placeholder="Reference"
-                      className={`h-11 rounded-xl px-3 text-sm outline-none ${inputClass}`}
+                      className={`h-11 rounded-2xl px-3 text-sm outline-none ${inputClass}`}
                     />
                   </div>
                 </div>
@@ -1120,25 +1338,33 @@ const InputPaymentsModal = ({
             )}
           </div>
 
-          <div className="mt-4 grid gap-2 md:grid-cols-2">
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
             <div
-              className={`rounded-xl p-3 ${isDark ? "bg-slate-900/60" : "bg-white border border-slate-200"}`}
+              className={`rounded-2xl border p-4 ${
+                isDark
+                  ? "border-white/5 bg-slate-950"
+                  : "border-slate-200 bg-white"
+              }`}
             >
               <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
                 Total Paid
               </p>
               <p className="mt-1 text-lg font-black text-blue-500">
-                ₱ {peso(totalPaid)}
+                {peso(totalPaid)}
               </p>
             </div>
             <div
-              className={`rounded-xl p-3 ${isDark ? "bg-slate-900/60" : "bg-white border border-slate-200"}`}
+              className={`rounded-2xl border p-4 ${
+                isDark
+                  ? "border-white/5 bg-slate-950"
+                  : "border-slate-200 bg-white"
+              }`}
             >
               <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
                 Remaining
               </p>
               <p className="mt-1 text-lg font-black text-blue-500">
-                ₱ {peso(remaining)}
+                {peso(remaining)}
               </p>
             </div>
           </div>
@@ -1147,7 +1373,7 @@ const InputPaymentsModal = ({
         <div className="flex justify-center">
           <button
             onClick={onClose}
-            className="rounded-full bg-blue-600 px-10 py-3 text-sm font-black text-white shadow-lg transition-all hover:opacity-95"
+            className="rounded-2xl bg-blue-600 px-10 py-3 text-sm font-black text-white transition hover:bg-blue-500"
           >
             Continue
           </button>
@@ -1576,10 +1802,6 @@ const TransactionPaymentModal = ({
     }
   };
 
-  const containerClass = isDark
-    ? "bg-slate-900 border border-white/10 text-white"
-    : "bg-white border border-slate-200 text-slate-900";
-
   if (!isOpen) return null;
 
   return (
@@ -1588,57 +1810,132 @@ const TransactionPaymentModal = ({
         isOpen={isOpen}
         onClose={onClose}
         isDark={isDark}
-        maxWidth="max-w-[1250px]"
+        maxWidth="max-w-[1120px]"
       >
         <div
-          className={`flex min-h-0 w-full flex-1 flex-col ${containerClass}`}
+          className={`border-b px-4 py-4 ${
+            isDark
+              ? "border-white/5 bg-white/[0.02]"
+              : "border-slate-200 bg-slate-50/80"
+          }`}
         >
-          <div className="min-h-0 overflow-y-auto p-3 md:p-4">
-            <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-              <SectionCard isDark={isDark} className="min-h-[580px]">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <FiShoppingCart size={22} className="text-slate-500" />
-                    <div>
-                      <h2 className="text-2xl font-black text-slate-700 dark:text-slate-200">
-                        Transaction Details
-                      </h2>
-                      <p className="text-xs text-slate-500">
-                        Transaction ID: {transaction?.transaction_id || "-"}
-                      </p>
-                    </div>
-                  </div>
+          <div className="pr-12">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-blue-500">
+                  Payment Review
+                </p>
+                <h2 className="mt-1 text-xl font-black">
+                  Transaction {transaction?.transaction_id || "-"}
+                </h2>
 
-                  <div className="text-right">
-                    <p className="text-2xl font-black">
-                      {transaction?.transaction_id || "-"}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <InfoPill isDark={isDark}>
+                    Table: {transaction?.table_number || "-"}
+                  </InfoPill>
+                  <InfoPill isDark={isDark}>
+                    Type: {transaction?.order_type || "-"}
+                  </InfoPill>
+                  <InfoPill isDark={isDark}>
+                    {transaction?.remarks || "Pending for Payment"}
+                  </InfoPill>
+                </div>
+              </div>
+
+              <div className="text-right">
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">
+                  Amount Due
+                </p>
+                <p className="mt-1 text-3xl font-black text-emerald-500">
+                  {peso(computed.totalAmountDue)}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="min-h-0 overflow-y-auto p-4">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="space-y-4">
+              <SectionCard isDark={isDark}>
+                <div className="mb-3">
+                  <h3 className="text-sm font-black">Quick Actions</h3>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Open only the section you need.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <ActionTile
+                    isDark={isDark}
+                    icon={<FaMoneyBill size={16} />}
+                    title="Other Charges"
+                    subtitle="Add fees"
+                    onClick={() => setShowOtherChargesModal(true)}
+                  />
+                  <ActionTile
+                    isDark={isDark}
+                    icon={<FiTag size={16} />}
+                    title="Discount"
+                    subtitle="Senior / PWD / Manual"
+                    onClick={() => setShowDiscountModal(true)}
+                    active={discountType !== "No Discount"}
+                  />
+                  <ActionTile
+                    isDark={isDark}
+                    icon={<FiUsers size={16} />}
+                    title="Customer Info"
+                    subtitle="Head count and IDs"
+                    onClick={() => setShowCustomerInfoModal(true)}
+                    active={
+                      computed.safeQualifiedCount > 0 ||
+                      customerIdsForPosting.length > 0
+                    }
+                  />
+                  <ActionTile
+                    isDark={isDark}
+                    icon={<FiCreditCard size={16} />}
+                    title="Payments"
+                    subtitle="Input payment"
+                    onClick={() => setShowPaymentMethodsModal(true)}
+                    active={payments.length > 0}
+                  />
+                </div>
+              </SectionCard>
+
+              <SectionCard isDark={isDark}>
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-black">Ordered Items</h3>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Compact item list for quick review.
                     </p>
-                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
-                      Trans. ID
-                    </p>
+                  </div>
+                  <div className="text-xs font-bold text-slate-500">
+                    {items.length} item(s)
                   </div>
                 </div>
 
                 {isLoadingItems ? (
-                  <div className="flex min-h-[420px] items-center justify-center rounded-xl border border-dashed border-slate-300/30">
+                  <div className="flex min-h-[280px] items-center justify-center rounded-[18px] border border-dashed border-slate-300/30">
                     <p className="text-sm italic text-slate-500">
                       Loading transaction items...
                     </p>
                   </div>
                 ) : errorMessage ? (
-                  <div className="flex min-h-[420px] items-center justify-center rounded-xl border border-dashed border-red-300/30">
+                  <div className="flex min-h-[280px] items-center justify-center rounded-[18px] border border-dashed border-red-300/30">
                     <p className="text-sm italic text-red-500">
                       {errorMessage}
                     </p>
                   </div>
                 ) : items.length === 0 ? (
-                  <div className="flex min-h-[420px] items-center justify-center rounded-xl border border-dashed border-slate-300/30">
+                  <div className="flex min-h-[280px] items-center justify-center rounded-[18px] border border-dashed border-slate-300/30">
                     <p className="text-sm italic text-slate-500">
                       No ordered items found.
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-2 max-h-[490px] overflow-y-auto pr-1">
+                  <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
                     {items.map((item, index) => {
                       const qty = toNum(item.sales_quantity);
                       const price = toNum(item.selling_price);
@@ -1648,30 +1945,14 @@ const TransactionPaymentModal = ({
                       return (
                         <div
                           key={item.ID || index}
-                          className={`grid gap-3 rounded-[0.95rem] p-3 ${
+                          className={`grid gap-3 rounded-[18px] border p-3 ${
                             isDark
-                              ? "bg-slate-900/60 border border-white/5"
-                              : "bg-white border border-slate-200"
-                          } md:grid-cols-[56px_minmax(0,1fr)_70px_90px_110px]`}
+                              ? "border-white/5 bg-slate-950"
+                              : "border-slate-200 bg-white"
+                          } md:grid-cols-[minmax(0,1fr)_56px_95px_110px]`}
                         >
-                          <div className="flex items-center justify-center">
-                            <div
-                              className={`flex h-11 w-11 items-center justify-center rounded-xl ${
-                                isDark
-                                  ? "bg-slate-800 text-blue-400"
-                                  : "bg-blue-50 text-blue-600"
-                              }`}
-                            >
-                              <FiShoppingCart size={18} />
-                            </div>
-                          </div>
-
                           <div className="min-w-0">
-                            <div className="grid grid-cols-2 gap-2 text-[11px] uppercase tracking-[0.12em] text-cyan-500">
-                              <span>Code:</span>
-                              <span>SKU:</span>
-                            </div>
-                            <p className="mt-1 truncate text-base font-semibold">
+                            <p className="truncate text-sm font-bold">
                               {item.item_name || item.product_id}
                             </p>
                             <p className="mt-1 text-[11px] text-slate-500">
@@ -1685,7 +1966,7 @@ const TransactionPaymentModal = ({
                             </p>
                           </div>
 
-                          <div className="flex items-center justify-center text-lg font-black">
+                          <div className="flex items-center justify-center text-sm font-black">
                             {qty}
                           </div>
 
@@ -1693,17 +1974,8 @@ const TransactionPaymentModal = ({
                             {peso(price)}
                           </div>
 
-                          <div className="flex flex-col items-end justify-center">
-                            <span
-                              className={`text-[11px] ${isDiscountable ? "text-violet-500" : "text-slate-500"}`}
-                            >
-                              {isDiscountable
-                                ? "Discountable"
-                                : "Non-Discountable"}
-                            </span>
-                            <span className="text-xl font-black">
-                              {peso(lineTotal)}
-                            </span>
+                          <div className="flex items-center justify-end text-sm font-black">
+                            {peso(lineTotal)}
                           </div>
                         </div>
                       );
@@ -1711,232 +1983,134 @@ const TransactionPaymentModal = ({
                   </div>
                 )}
               </SectionCard>
+            </div>
 
-              <SectionCard isDark={isDark} className="min-h-[580px]">
-                <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-                  <ActionTile
+            <div className="space-y-4">
+              <SectionCard isDark={isDark}>
+                <div className="mb-3">
+                  <h3 className="text-sm font-black">Payment Summary</h3>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Main totals at a glance.
+                  </p>
+                </div>
+
+                <div
+                  className={`mb-3 rounded-[20px] border p-4 ${
+                    isDark
+                      ? "border-emerald-500/20 bg-emerald-500/10"
+                      : "border-emerald-200 bg-emerald-50"
+                  }`}
+                >
+                  <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">
+                    Total Amount Due
+                  </div>
+                  <div className="mt-1 text-3xl font-black text-emerald-500">
+                    {peso(computed.totalAmountDue)}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <SummaryRow
+                    label="Total Sales"
+                    value={peso(computed.grossTotal)}
                     isDark={isDark}
-                    icon={<FaMoneyBill size={18} />}
-                    title="Other Charges"
-                    subtitle="Add shipping or fees"
-                    onClick={() => setShowOtherChargesModal(true)}
                   />
-                  <ActionTile
+                  <SummaryRow
+                    label="Discount"
+                    value={negativePeso(computed.discount)}
                     isDark={isDark}
-                    icon={<FiTag size={18} />}
-                    title="Discount"
-                    subtitle="Senior / PWD / Manual"
-                    onClick={() => setShowDiscountModal(true)}
-                    active={discountType !== "No Discount"}
+                    valueClassName="text-red-500"
                   />
-                  <ActionTile
+                  <SummaryRow
+                    label="VAT Exemption"
+                    value={negativePeso(computed.vatExemption)}
                     isDark={isDark}
-                    icon={<FiUsers size={18} />}
-                    title="Customer Info"
-                    subtitle="Counts and reference"
-                    onClick={() => setShowCustomerInfoModal(true)}
-                    active={
-                      computed.safeQualifiedCount > 0 ||
-                      customerIdsForPosting.length > 0
-                    }
+                    valueClassName="text-red-500"
                   />
-                  <ActionTile
+                  <SummaryRow
+                    label="Other Charges"
+                    value={peso(computed.otherChargesTotal)}
                     isDark={isDark}
-                    icon={<FiCreditCard size={18} />}
-                    title="Payments"
-                    subtitle="Choose and input"
-                    onClick={() => setShowPaymentMethodsModal(true)}
-                    active={payments.length > 0}
                   />
-                </div>
-
-                <div className="mt-5 space-y-3">
-                  <div className="grid grid-cols-[1fr_200px] items-center gap-3">
-                    <span className="text-lg font-black text-slate-700 dark:text-slate-200">
-                      TOTAL SALES
-                    </span>
-                    <div
-                      className={`rounded-xl px-4 py-3 text-right text-2xl font-black ${
-                        isDark
-                          ? "bg-slate-900/70 border border-white/5"
-                          : "bg-white border border-slate-200"
-                      }`}
-                    >
-                      {peso(computed.grossTotal)}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-[1fr_200px] items-center gap-3">
-                    <span className="text-lg font-black text-slate-700 dark:text-slate-200">
-                      Discountable Sales
-                    </span>
-                    <div
-                      className={`rounded-xl px-4 py-3 text-right text-2xl font-black ${
-                        isDark
-                          ? "bg-slate-900/70 border border-white/5"
-                          : "bg-white border border-slate-200"
-                      }`}
-                    >
-                      {peso(computed.discountableGross)}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-[1fr_200px] items-center gap-3">
-                    <span className="text-lg font-black text-slate-700 dark:text-slate-200">
-                      Discount
-                    </span>
-                    <div
-                      className={`rounded-xl px-4 py-3 text-right text-2xl font-black text-red-500 ${
-                        isDark
-                          ? "bg-slate-900/70 border border-white/5"
-                          : "bg-white border border-slate-200"
-                      }`}
-                    >
-                      {negativePeso(computed.discount)}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-[1fr_200px] items-center gap-3">
-                    <span className="text-lg font-black text-slate-700 dark:text-slate-200">
-                      VAT Exemption
-                    </span>
-                    <div
-                      className={`rounded-xl px-4 py-3 text-right text-2xl font-black text-red-500 ${
-                        isDark
-                          ? "bg-slate-900/70 border border-white/5"
-                          : "bg-white border border-slate-200"
-                      }`}
-                    >
-                      {negativePeso(computed.vatExemption)}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-[1fr_200px] items-center gap-3">
-                    <span className="text-lg font-black text-slate-700 dark:text-slate-200">
-                      Other Charges
-                    </span>
-                    <div
-                      className={`rounded-xl px-4 py-3 text-right text-2xl font-black ${
-                        isDark
-                          ? "bg-slate-900/70 border border-white/5"
-                          : "bg-white border border-slate-200"
-                      }`}
-                    >
-                      {peso(computed.otherChargesTotal)}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 border-t border-slate-300/20 pt-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-[34px] font-black tracking-tight text-slate-700 dark:text-slate-200">
-                      TOTAL AMOUNT DUE:
-                    </span>
-                    <span className="text-[44px] font-black text-green-600">
-                      {peso(computed.totalAmountDue)}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="mt-4 space-y-3">
-                  {[
-                    ["Payment Amount", computed.totalPaid],
-                    ["Change Amount", computed.changeAmount],
-                  ].map(([label, value]) => (
-                    <div
-                      key={label}
-                      className="grid grid-cols-[1fr_200px] items-center gap-3"
-                    >
-                      <span className="text-lg font-black text-slate-700 dark:text-slate-200">
-                        {label}
-                      </span>
-                      <div
-                        className={`rounded-xl px-4 py-3 text-right text-2xl font-black ${
-                          isDark
-                            ? "bg-slate-900/70 border border-white/5"
-                            : "bg-white border border-slate-200"
-                        }`}
-                      >
-                        {peso(value)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
-                  <div
-                    className={`rounded-xl p-3 ${isDark ? "bg-slate-900/60" : "bg-white border border-slate-200"}`}
-                  >
-                    <div className="grid grid-cols-2 gap-2">
-                      <span className="font-bold text-slate-500">
-                        VATable Sales
-                      </span>
-                      <span className="text-right font-black">
-                        {peso(computed.vatableSales)}
-                      </span>
-                      <span className="font-bold text-slate-500">
-                        VAT-Exempt Sales
-                      </span>
-                      <span className="text-right font-black">
-                        {peso(computed.vatExemptSales)}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div
-                    className={`rounded-xl p-3 ${isDark ? "bg-slate-900/60" : "bg-white border border-slate-200"}`}
-                  >
-                    <div className="grid grid-cols-2 gap-2">
-                      <span className="font-bold text-slate-500">VAT</span>
-                      <span className="text-right font-black">
-                        {peso(computed.vatableSalesVat)}
-                      </span>
-                      <span className="font-bold text-slate-500">
-                        Zero Rated
-                      </span>
-                      <span className="text-right font-black">
-                        {peso(computed.vatZeroRatedSales)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {errorMessage ? (
-                  <div className="mt-4 rounded-xl bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-500">
-                    {errorMessage}
-                  </div>
-                ) : null}
-
-                {!canSave && payments.length > 0 ? (
-                  <div className="mt-4 rounded-xl bg-blue-500/10 px-4 py-3 text-sm font-semibold text-blue-500">
-                    {computed.safeQualifiedCount > 0 &&
-                    customerIdsForPosting.length < computed.safeQualifiedCount
-                      ? "Complete all customer IDs for every qualified discount customer."
-                      : "Total paid must be at least equal to total amount due."}
-                  </div>
-                ) : null}
-
-                <div className="mt-5 grid grid-cols-2 gap-3">
-                  <button
-                    onClick={onClose}
-                    className="rounded-full bg-blue-600 px-4 py-4 text-sm font-black text-white shadow-lg transition-all hover:opacity-95"
-                  >
-                    Close
-                  </button>
-
-                  <button
-                    onClick={() => setShowConfirmSaveModal(true)}
-                    disabled={!canSave || isSubmitting}
-                    className={`rounded-full px-4 py-4 text-sm font-black text-white shadow-lg transition-all ${
-                      !canSave || isSubmitting
-                        ? "cursor-not-allowed bg-slate-400"
-                        : "bg-blue-600 hover:opacity-95"
-                    }`}
-                  >
-                    {isSubmitting ? "Saving..." : "Save Payment"}
-                  </button>
+                  <SummaryRow
+                    label="Payment Received"
+                    value={peso(computed.totalPaid)}
+                    isDark={isDark}
+                  />
+                  <SummaryRow
+                    label="Change"
+                    value={peso(computed.changeAmount)}
+                    isDark={isDark}
+                  />
                 </div>
               </SectionCard>
+
+              <SectionCard isDark={isDark}>
+                <div className="mb-3">
+                  <h3 className="text-sm font-black">Current Setup</h3>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Quick reference before saving.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <SummaryRow
+                    label="Discount Type"
+                    value={discountType}
+                    isDark={isDark}
+                  />
+                  <SummaryRow
+                    label="Qualified Customers"
+                    value={`${computed.safeQualifiedCount}/${computed.safeCustomerCount}`}
+                    isDark={isDark}
+                  />
+                  <SummaryRow
+                    label="Payment Method"
+                    value={groupedPaymentMethodText || "No payment yet"}
+                    isDark={isDark}
+                  />
+                </div>
+              </SectionCard>
+
+              {errorMessage ? (
+                <div className="rounded-2xl bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-500">
+                  {errorMessage}
+                </div>
+              ) : null}
+
+              {!canSave && payments.length > 0 ? (
+                <div className="rounded-2xl bg-blue-500/10 px-4 py-3 text-sm font-semibold text-blue-500">
+                  {computed.safeQualifiedCount > 0 &&
+                  customerIdsForPosting.length < computed.safeQualifiedCount
+                    ? "Complete all customer IDs for every qualified discount customer."
+                    : "Total paid must be at least equal to total amount due."}
+                </div>
+              ) : null}
+
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={onClose}
+                  className={`rounded-2xl px-4 py-3 text-sm font-black transition ${
+                    isDark
+                      ? "border border-slate-700 bg-slate-800 text-slate-200 hover:text-white"
+                      : "border border-slate-200 bg-slate-100 text-slate-700 hover:text-slate-900"
+                  }`}
+                >
+                  Close
+                </button>
+
+                <button
+                  onClick={() => setShowConfirmSaveModal(true)}
+                  disabled={!canSave || isSubmitting}
+                  className={`rounded-2xl px-4 py-3 text-sm font-black text-white transition ${
+                    !canSave || isSubmitting
+                      ? "cursor-not-allowed bg-slate-400"
+                      : "bg-blue-600 hover:bg-blue-500"
+                  }`}
+                >
+                  {isSubmitting ? "Saving..." : "Save Payment"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -2036,9 +2210,15 @@ const TransactionPaymentModal = ({
   );
 };
 
-const PosPayment = () => {
+export default function PosPayment() {
   const apiHost = useApiHost();
-  const { isDark } = useTheme();
+  const themeContext = useTheme();
+  const isDark =
+    typeof themeContext?.isDark === "boolean"
+      ? themeContext.isDark
+      : themeContext?.theme === "dark";
+
+  const navigate = useNavigate();
 
   const [transactions, setTransactions] = useState([]);
   const [modeOfPayments, setModeOfPayments] = useState([]);
@@ -2048,96 +2228,72 @@ const PosPayment = () => {
   const [search, setSearch] = useState("");
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-
   const [errorMessage, setErrorMessage] = useState("");
 
-  const navigate = useNavigate();
+  const fetchAll = useCallback(async () => {
+    if (!apiHost) return;
 
-const safeReadJson = async (response, label) => {
-  const text = await response.text();
+    setIsLoading(true);
+    setErrorMessage("");
 
-  if (!text || !text.trim()) {
-    throw new Error(`${label} returned an empty response.`);
-  }
+    try {
+      const [pendingRes, mopRes, chargesRes] = await Promise.all([
+        fetch(`${apiHost}/api/pos_payment_read_pending.php`),
+        fetch(`${apiHost}/api/pos_payment_read_mode_of_payment.php`),
+        fetch(`${apiHost}/api/pos_payment_read_other_charges.php`),
+      ]);
 
-  try {
-    return JSON.parse(text);
-  } catch (error) {
-    console.error(`${label} invalid JSON:`, text);
-    throw new Error(`${label} returned invalid JSON.`);
-  }
-};
+      const [pendingData, mopData, chargesData] = await Promise.all([
+        safeReadJson(pendingRes, "Pending transactions API"),
+        safeReadJson(mopRes, "Mode of payment API"),
+        safeReadJson(chargesRes, "Other charges API"),
+      ]);
 
-const fetchAll = async () => {
-  setIsLoading(true);
-  setErrorMessage("");
+      if (!pendingRes.ok || !pendingData?.success) {
+        throw new Error(
+          pendingData?.message || "Failed to load pending transactions.",
+        );
+      }
 
-  try {
-    const [pendingRes, mopRes, chargesRes] = await Promise.all([
-      fetch(`${apiHost}/api/pos_payment_read_pending.php`),
-      fetch(`${apiHost}/api/pos_payment_read_mode_of_payment.php`),
-      fetch(`${apiHost}/api/pos_payment_read_other_charges.php`),
-    ]);
+      if (!mopRes.ok || !mopData?.success) {
+        throw new Error(mopData?.message || "Failed to load mode of payments.");
+      }
 
-    const [pendingData, mopData, chargesData] = await Promise.all([
-      safeReadJson(pendingRes, "Pending transactions API"),
-      safeReadJson(mopRes, "Mode of payment API"),
-      safeReadJson(chargesRes, "Other charges API"),
-    ]);
+      if (!chargesRes.ok || !chargesData?.success) {
+        throw new Error(
+          chargesData?.message || "Failed to load other charges.",
+        );
+      }
 
-    if (!pendingRes.ok || !pendingData?.success) {
-      throw new Error(
-        pendingData?.message || "Failed to load pending transactions."
+      setTransactions(
+        Array.isArray(pendingData?.transactions)
+          ? pendingData.transactions
+          : [],
       );
-    }
 
-    if (!mopRes.ok || !mopData?.success) {
-      throw new Error(
-        mopData?.message || "Failed to load mode of payments."
+      setModeOfPayments(Array.isArray(mopData?.modes) ? mopData.modes : []);
+
+      setChargeOptions(
+        Array.isArray(chargesData?.charges) ? chargesData.charges : [],
       );
+    } catch (error) {
+      console.error(error);
+      setErrorMessage(error.message || "Failed to load data.");
+    } finally {
+      setIsLoading(false);
     }
-
-    if (!chargesRes.ok || !chargesData?.success) {
-      throw new Error(
-        chargesData?.message || "Failed to load other charges."
-      );
-    }
-
-    setTransactions(
-      Array.isArray(pendingData?.transactions)
-        ? pendingData.transactions
-        : []
-    );
-
-    setModeOfPayments(
-      Array.isArray(mopData?.modes)
-        ? mopData.modes
-        : []
-    );
-
-    setChargeOptions(
-      Array.isArray(chargesData?.charges)
-        ? chargesData.charges
-        : []
-    );
-  } catch (error) {
-    console.error(error);
-    setErrorMessage(error.message || "Failed to load data.");
-  } finally {
-    setIsLoading(false);
-  }
-};
+  }, [apiHost]);
 
   useEffect(() => {
     fetchAll();
-  }, [apiHost]);
+  }, [fetchAll]);
 
   const filteredTransactions = useMemo(() => {
-    const key = search.trim().toLowerCase();
-    if (!key) return transactions;
+    const searchValue = normalizeText(search);
+    if (!searchValue) return transactions;
 
     return transactions.filter((row) => {
-      const hay = [
+      const haystack = [
         row.transaction_id,
         row.table_number,
         row.order_type,
@@ -2145,167 +2301,231 @@ const fetchAll = async () => {
         row.Unit_Code,
         row.cashier,
         row.transaction_date,
+        row.remarks,
+        row.invoice_no,
       ]
         .join(" ")
         .toLowerCase();
 
-      return hay.includes(key);
+      return haystack.includes(searchValue);
     });
   }, [transactions, search]);
 
-  const totalSales = filteredTransactions.reduce(
-    (sum, row) => sum + toNum(row.TotalSales),
-    0,
+  const summary = useMemo(() => {
+    const totalTransactions = filteredTransactions.length;
+    const totalSales = filteredTransactions.reduce(
+      (sum, row) => sum + toNum(row.TotalSales),
+      0,
+    );
+
+    return {
+      totalTransactions,
+      totalSales,
+      totalMethods: modeOfPayments.length,
+      totalCharges: chargeOptions.length,
+    };
+  }, [filteredTransactions, modeOfPayments, chargeOptions]);
+
+  const listData = useMemo(
+    () => ({
+      rows: filteredTransactions,
+      isDark,
+      onOpen: (row) => {
+        setSelectedTransaction(row);
+        setIsPaymentModalOpen(true);
+      },
+    }),
+    [filteredTransactions, isDark],
   );
 
   return (
     <>
-      <div className="max-h-screen p-3 md:p-4">
-        <div
-          className={`rounded-[1.25rem] shadow-xl ${
-            isDark
-              ? "border border-white/10 bg-slate-900 text-white"
-              : "border border-slate-200 bg-white text-slate-900"
-          }`}
-        >
-          <div className="rounded-t-[1.25rem] px-4 py-4 text-white">
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <h1 className="text-3xl font-black">Pending for Payment</h1>
+      <div
+        className={
+          isDark
+            ? "min-h-screen bg-[#020617] text-slate-200"
+            : "min-h-screen bg-slate-100 text-slate-900"
+        }
+      >
+        <div className="pointer-events-none fixed inset-0 overflow-hidden">
+          <div
+            className={`absolute -left-20 top-0 h-72 w-72 rounded-full blur-[120px] ${
+              isDark ? "bg-blue-600/10" : "bg-blue-500/15"
+            }`}
+          />
+          <div
+            className={`absolute right-0 top-20 h-80 w-80 rounded-full blur-[140px] ${
+              isDark ? "bg-cyan-500/10" : "bg-sky-400/15"
+            }`}
+          />
+        </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={fetchAll}
-                  className="inline-flex h-11 items-center justify-center rounded-xl bg-white/15 px-4 text-sm font-bold text-white hover:bg-white/20"
-                >
-                  <FiRefreshCw size={16} />
-                </button>
+        <div className="relative z-10 mx-auto max-w-[1700px] p-4 sm:p-6 lg:p-8">
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+            <button
+              onClick={() => navigate("/poscorehomescreen")}
+              className={`inline-flex items-center gap-3 rounded-2xl border px-5 py-3 font-semibold transition ${
+                isDark
+                  ? "border-white/5 bg-white/[0.03] text-slate-300 hover:text-white"
+                  : "border-slate-200 bg-white text-slate-700 hover:text-slate-900 shadow-sm"
+              }`}
+            >
+              <FaArrowLeft size={14} />
+              Back
+            </button>
 
-                <div className="relative">
-                  <FiSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search"
-                    className="h-11 w-[260px] rounded-full border  bg-white/95 pl-10 pr-4 text-sm text-slate-800 outline-none placeholder:text-slate-400"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => navigate("/poscorehomescreen")}
-                  className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-black shadow-sm backdrop-blur transition-all ${
-                    isDark
-                      ? "border border-white/10 bg-slate-900/60 text-slate-200 hover:bg-slate-800/80 hover:text-white"
-                      : "border border-slate-200 bg-white/90 text-slate-700 hover:bg-slate-50 hover:text-slate-900"
-                  }`}
-                >
-                  Back
-                </button>
-              </div>
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.22em] text-blue-500">
+              <FiTag />
+              Payment Center
             </div>
           </div>
 
-          <div className="p-4">
-            {errorMessage ? (
-              <div className="mb-4 rounded-xl bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-500">
-                {errorMessage}
-              </div>
-            ) : null}
-
-            <div
-              className={`overflow-hidden rounded-[1rem] border ${
-                isDark ? "border-white/5" : "border-slate-200"
+          <div className="mb-6">
+            <h1
+              className={`text-3xl font-black sm:text-4xl ${
+                isDark ? "text-white" : "text-slate-900"
               }`}
             >
-              <div
-                className={`grid grid-cols-[90px_170px_120px_120px_160px_160px_160px] gap-3 px-4 py-3 text-xs font-black uppercase tracking-[0.14em] ${
-                  isDark
-                    ? "bg-slate-900/80 text-slate-400"
-                    : "bg-slate-100 text-slate-500"
-                }`}
-              >
-                <div>Action</div>
-                <div>Transaction ID</div>
-                <div>Table</div>
-                <div>Type</div>
-                <div>Date</div>
-                <div>Total Sales</div>
-                <div>Remarks</div>
-              </div>
+              Pending for Payment
+            </h1>
+            <p className="mt-2 text-sm text-slate-500">
+              Review billed transactions, open payment posting, and manage
+              pending sales.
+            </p>
+          </div>
 
-              <div className="max-h-[520px] overflow-y-auto">
-                {isLoading ? (
-                  <div className="flex min-h-[220px] items-center justify-center">
-                    <p className="text-sm italic text-slate-500">
-                      Loading pending transactions...
-                    </p>
-                  </div>
-                ) : filteredTransactions.length === 0 ? (
-                  <div className="flex min-h-[220px] items-center justify-center">
-                    <p className="text-sm italic text-slate-500">
-                      No pending-for-payment transactions found.
-                    </p>
-                  </div>
-                ) : (
-                  filteredTransactions.map((row, index) => (
-                    <div
-                      key={row.ID || row.transaction_id || index}
-                      className={`grid grid-cols-[90px_170px_120px_120px_160px_160px_160px] items-center gap-3 px-4 py-3 text-sm ${
-                        isDark
-                          ? "border-t border-white/5 bg-slate-900/30"
-                          : "border-t border-slate-200 bg-white"
-                      }`}
-                    >
-                      <div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedTransaction(row);
-                            setIsPaymentModalOpen(true);
-                          }}
-                          className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white transition-all hover:bg-blue-500"
-                          title="Open Payment"
-                        >
-                          <FiEye size={16} />
-                        </button>
-                      </div>
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <StatCard
+                title="Pending Transactions"
+                value={summary.totalTransactions}
+                icon={FiDatabase}
+                isDark={isDark}
+              />
+              <StatCard
+                title="Payment Methods"
+                value={summary.totalMethods}
+                icon={FiCreditCard}
+                isDark={isDark}
+              />
+              <StatCard
+                title="Charge Options"
+                value={summary.totalCharges}
+                icon={FaMoneyBill}
+                isDark={isDark}
+              />
+            </div>
 
-                      <div className="font-black">{row.transaction_id}</div>
-                      <div>{row.table_number || "-"}</div>
-                      <div>{row.order_type || "-"}</div>
-                      <div>{row.transaction_date || "-"}</div>
-                      <div className="font-black">₱ {peso(row.TotalSales)}</div>
-                      <div>
-                        <span className="rounded-full bg-red-500/10 px-3 py-1 text-xs font-bold text-red-500">
-                          {row.remarks || "Pending for Payment"}
-                        </span>
-                      </div>
-                    </div>
-                  ))
-                )}
+            <div
+              className={`rounded-[28px] border p-4 sm:p-5 ${
+                isDark
+                  ? "border-white/5 bg-white/[0.03]"
+                  : "border-slate-200 bg-white shadow-sm"
+              }`}
+            >
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_150px]">
+                <div className="relative">
+                  <FiSearch className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <input
+                    type="text"
+                    placeholder="Search transaction, table, cashier, remarks..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className={`w-full rounded-2xl py-4 pl-12 pr-4 outline-none transition ${
+                      isDark
+                        ? "border border-slate-800 bg-slate-950 text-white focus:border-blue-500"
+                        : "border border-slate-200 bg-slate-50 text-slate-900 focus:border-blue-400"
+                    }`}
+                  />
+                </div>
+
+                <button
+                  onClick={fetchAll}
+                  className="flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-4 font-semibold text-white transition hover:bg-blue-500"
+                >
+                  <FiRefreshCw size={16} />
+                  Refresh
+                </button>
               </div>
             </div>
 
-            <div className="mt-4 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-6 text-sm font-semibold">
-                <div className="flex items-center gap-2">
-                  <span className="h-4 w-4 rounded-full bg-black" />
-                  Paid Transactions
+            <div
+              className={`overflow-hidden rounded-[30px] border ${
+                isDark
+                  ? "border-white/5 bg-white/[0.03]"
+                  : "border-slate-200 bg-white shadow-sm"
+              }`}
+            >
+              {errorMessage ? (
+                <div className="flex h-[420px] items-center justify-center px-6 text-center text-lg font-semibold text-red-500">
+                  {errorMessage}
                 </div>
-                <div className="flex items-center gap-2 text-green-600">
-                  <span className="h-4 w-4 rounded-full bg-green-600" />
-                  Pending for Payment
+              ) : isLoading ? (
+                <div
+                  className={`flex h-[420px] items-center justify-center text-lg font-semibold ${
+                    isDark ? "text-slate-400" : "text-slate-500"
+                  }`}
+                >
+                  Loading pending transactions...
                 </div>
+              ) : filteredTransactions.length === 0 ? (
+                <div
+                  className={`flex h-[420px] items-center justify-center text-2xl font-black ${
+                    isDark ? "text-slate-500" : "text-slate-400"
+                  }`}
+                >
+                  No data
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <div style={{ minWidth: PENDING_TABLE_MIN_WIDTH }}>
+                    <PendingHeaderRow isDark={isDark} />
+                    <List
+                      height={PENDING_LIST_HEIGHT}
+                      itemCount={filteredTransactions.length}
+                      itemSize={PENDING_ROW_HEIGHT}
+                      width={PENDING_TABLE_MIN_WIDTH}
+                      itemData={listData}
+                      overscanCount={8}
+                      outerElementType={ListOuter}
+                      innerElementType={ListInner}
+                    >
+                      {PendingTransactionRow}
+                    </List>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div
+              className={`rounded-[28px] border p-5 ${
+                isDark
+                  ? "border-white/5 bg-white/[0.03]"
+                  : "border-slate-200 bg-white shadow-sm"
+              }`}
+            >
+              <div
+                className={`mb-4 text-sm font-black uppercase tracking-[0.18em] ${
+                  isDark ? "text-white" : "text-slate-900"
+                }`}
+              >
+                Legend
               </div>
 
-              <div className="text-right">
-                <p className="text-lg font-black">
-                  Total Transactions: {filteredTransactions.length}
-                </p>
-                <p className="text-4xl font-black text-blue-700 dark:text-blue-400">
-                  Total Sales ₱ {peso(totalSales)}
-                </p>
+              <div className="flex flex-wrap gap-6 text-sm">
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`h-3.5 w-3.5 rounded-full ${
+                      isDark ? "bg-slate-300" : "bg-slate-900"
+                    }`}
+                  />
+                  <span className="text-slate-500">Paid Transactions</span>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <span className="h-3.5 w-3.5 rounded-full bg-green-500" />
+                  <span className="text-slate-500">Pending for Payment</span>
+                </div>
               </div>
             </div>
           </div>
@@ -2327,6 +2547,4 @@ const fetchAll = async () => {
       />
     </>
   );
-};
-
-export default PosPayment;
+}
