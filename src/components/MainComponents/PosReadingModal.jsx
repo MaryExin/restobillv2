@@ -15,6 +15,7 @@ export default function PosReadingModal({
   unitCode = "",
   terminalNumber = "",
   corpName = "",
+  shiftingDate = "",
   xEndpoint = "/api/generate_x_reading_pdf.php",
   zEndpoint = "/api/generate_z_reading_data.php",
 }) {
@@ -31,21 +32,26 @@ export default function PosReadingModal({
     verifyAmount: "",
   });
   const [isPrinting, setIsPrinting] = useState(false);
+  const [isCheckingBlockers, setIsCheckingBlockers] = useState(false);
 
   const parsedCashDrawer = useMemo(
     () => Number(values.cashDrawerAmount || 0),
-    [values.cashDrawerAmount]
+    [values.cashDrawerAmount],
   );
 
   const parsedVerifyAmount = useMemo(
     () => Number(values.verifyAmount || 0),
-    [values.verifyAmount]
+    [values.verifyAmount],
   );
 
   const amountDifference = useMemo(
     () => parsedCashDrawer - parsedVerifyAmount,
-    [parsedCashDrawer, parsedVerifyAmount]
+    [parsedCashDrawer, parsedVerifyAmount],
   );
+
+  const normalizedShiftDate = useMemo(() => {
+    return String(shiftingDate || "").split(" ")[0];
+  }, [shiftingDate]);
 
   const resetForm = () => {
     setValues({
@@ -59,14 +65,65 @@ export default function PosReadingModal({
   };
 
   const handleCloseAll = () => {
+    if (isPrinting || isCheckingBlockers) return;
     setActiveType(null);
     resetForm();
     onClose();
   };
 
-  const handleOpenReading = (type) => {
-    setActiveType(type);
-    resetForm();
+  const checkReadingBlockers = async () => {
+    if (!normalizedShiftDate) {
+      throw new Error("Shift date is missing.");
+    }
+
+    const response = await fetch(
+      `${apiHost}/api/check_posreading_blockers.php`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          transaction_date: normalizedShiftDate,
+          category_code: categoryCode || "",
+          unit_code: unitCode || "",
+          terminal_number: terminalNumber || "1",
+        }),
+      },
+    );
+
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || "Failed to validate transactions.");
+    }
+
+    return result;
+  };
+
+  const handleOpenReading = async (type) => {
+    try {
+      setIsCheckingBlockers(true);
+
+      const result = await checkReadingBlockers();
+
+      if (result.blocked) {
+        alert(
+          `You cannot proceed with POS Reading yet.\n\n` +
+            `There are ${result.totalTransactions} transaction(s) with remarks ` +
+            `"Pending for Payment" or "Billed" for ${result.transactionDate}.`,
+        );
+        return;
+      }
+
+      setActiveType(type);
+      resetForm();
+    } catch (error) {
+      console.error(error);
+      alert(error.message || "Unable to validate transactions.");
+    } finally {
+      setIsCheckingBlockers(false);
+    }
   };
 
   const handleChange = (name, value) => {
@@ -352,6 +409,7 @@ export default function PosReadingModal({
           unitCode,
           terminalNumber: terminalNumber || "1",
           corpName,
+          shiftingDate: normalizedShiftDate,
           machineNumber: "10000000001",
           serialNumber: "20000000001",
           ptuNumber: "00000000-000-0000000-00000",
@@ -418,6 +476,22 @@ export default function PosReadingModal({
 
             try {
               await onZReadingPrinted();
+
+              if (window.refreshOpenNewDayShift) {
+                await window.refreshOpenNewDayShift();
+              }
+
+              if (window.refreshShiftPanel) {
+                await window.refreshShiftPanel();
+              }
+
+              if (window.refreshLayoutShift) {
+                await window.refreshLayoutShift();
+              }
+
+              if (window.refreshSwitchUserShift) {
+                await window.refreshSwitchUserShift();
+              }
             } catch (refreshError) {
               console.error("Shift refresh error:", refreshError);
             }
@@ -456,7 +530,8 @@ export default function PosReadingModal({
           <button
             type="button"
             onClick={handleCloseAll}
-            className="absolute right-4 top-4 inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/80 text-zinc-600 shadow-sm transition hover:scale-105 hover:text-zinc-900"
+            disabled={isPrinting || isCheckingBlockers}
+            className="absolute right-4 top-4 inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/80 text-zinc-600 shadow-sm transition hover:scale-105 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <FiX size={20} />
           </button>
@@ -471,20 +546,31 @@ export default function PosReadingModal({
                 title="X-Reading"
                 iconClassName="bg-sky-100 text-sky-600"
                 onClick={() => handleOpenReading("x")}
+                disabled={isPrinting || isCheckingBlockers}
               />
 
               <ReadingCard
                 title="Z-Reading"
                 iconClassName="bg-orange-100 text-orange-500"
                 onClick={() => handleOpenReading("z")}
+                disabled={isPrinting || isCheckingBlockers}
               />
+            </div>
+
+            <div className="mt-4 text-center text-sm text-zinc-500">
+              {isCheckingBlockers
+                ? "Checking pending transactions..."
+                : normalizedShiftDate
+                  ? `Shift Date: ${normalizedShiftDate}`
+                  : "No shift date found."}
             </div>
 
             <div className="mt-16 flex justify-center">
               <button
                 type="button"
                 onClick={handleCloseAll}
-                className="min-w-[290px] rounded-full bg-gradient-to-r from-pink-400 via-[#c5a9d9] to-cyan-400 px-10 py-4 text-2xl font-extrabold text-white shadow-[0_10px_30px_rgba(56,189,248,0.25)] transition hover:scale-[1.02] active:scale-[0.99]"
+                disabled={isPrinting || isCheckingBlockers}
+                className="min-w-[290px] rounded-full bg-gradient-to-r from-pink-400 via-[#c5a9d9] to-cyan-400 px-10 py-4 text-2xl font-extrabold text-white shadow-[0_10px_30px_rgba(56,189,248,0.25)] transition hover:scale-[1.02] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-70"
               >
                 Cancel
               </button>
@@ -514,17 +600,20 @@ export default function PosReadingModal({
                         {activeType === "x" ? "X-Reading" : "Z-Reading"}
                       </h3>
                       <p className="mt-2 text-sm text-zinc-500">
-                        Enter the cash drawer amount and verify it before printing.
+                        Enter the cash drawer amount and verify it before
+                        printing.
                       </p>
                     </div>
 
                     <button
                       type="button"
                       onClick={() => {
+                        if (isPrinting) return;
                         setActiveType(null);
                         resetForm();
                       }}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100 text-zinc-500 transition hover:bg-zinc-200 hover:text-zinc-800"
+                      disabled={isPrinting}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100 text-zinc-500 transition hover:bg-zinc-200 hover:text-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <FiX size={18} />
                     </button>
@@ -553,10 +642,15 @@ export default function PosReadingModal({
                       <span>Difference</span>
                       <span
                         className={`font-semibold ${
-                          amountDifference === 0 ? "text-emerald-600" : "text-rose-600"
+                          amountDifference === 0
+                            ? "text-emerald-600"
+                            : "text-rose-600"
                         }`}
                       >
-                        ₱ {Number.isFinite(amountDifference) ? amountDifference.toFixed(2) : "0.00"}
+                        ₱{" "}
+                        {Number.isFinite(amountDifference)
+                          ? amountDifference.toFixed(2)
+                          : "0.00"}
                       </span>
                     </div>
                   </div>
@@ -565,10 +659,12 @@ export default function PosReadingModal({
                     <button
                       type="button"
                       onClick={() => {
+                        if (isPrinting) return;
                         setActiveType(null);
                         resetForm();
                       }}
-                      className="rounded-2xl border border-zinc-200 px-5 py-3 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50"
+                      disabled={isPrinting}
+                      className="rounded-2xl border border-zinc-200 px-5 py-3 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       Back
                     </button>
@@ -593,14 +689,17 @@ export default function PosReadingModal({
   );
 }
 
-function ReadingCard({ title, onClick, iconClassName = "" }) {
+function ReadingCard({ title, onClick, iconClassName = "", disabled = false }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="group flex min-h-[124px] w-full items-center rounded-[20px] bg-white px-6 py-6 text-left shadow-[0_8px_20px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_30px_rgba(15,23,42,0.12)]"
+      disabled={disabled}
+      className="group flex min-h-[124px] w-full items-center rounded-[20px] bg-white px-6 py-6 text-left shadow-[0_8px_20px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_30px_rgba(15,23,42,0.12)] disabled:cursor-not-allowed disabled:opacity-60"
     >
-      <div className={`inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ${iconClassName}`}>
+      <div
+        className={`inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ${iconClassName}`}
+      >
         <FaCashRegister size={24} />
       </div>
 

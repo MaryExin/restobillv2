@@ -15,7 +15,7 @@ const App = () => {
   return (
     <HashRouter>
       <Routes>
-        <Route exact path="/" element={<HomePage />} />
+        <Route exact path="/" element={<PosLogin />} />
         <Route exact path="/ordering" element={<ViewOrdering />} />
         <Route exact path="/printbilling" element={<PrintBilling />} />
         <Route exact path="/salesdashboard" element={<SalesDashboard />} />
