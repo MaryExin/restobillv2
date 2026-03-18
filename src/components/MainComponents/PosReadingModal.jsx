@@ -276,114 +276,118 @@ export default function PosReadingModal({
   };
 
   const buildZPrintHtml = (data) => {
+    const vatExemptionValue =
+      data.vatExemption ?? data.lessVatExemption ?? data.vatExemptVat ?? 0;
+
     return `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8" />
-          <title>Z Reading</title>
-          ${commonPrintStyles}
-        </head>
-        <body>
-          <div class="receipt">
-            <div class="center">
-              <div class="title">${data.corpName || ""}</div>
-              <div class="subtitle">${data.businessUnitName || ""}</div>
-              <div class="subtitle">${data.businessUnitAddress || ""}</div>
-              <div class="subtitle">${data.tinLabel || ""}</div>
-              <div class="subtitle">MIN: ${data.machineNumber || ""}</div>
-              <div class="subtitle">S/N: ${data.serialNumber || ""}</div>
-              <div class="subtitle">PTU No: ${data.ptuNumber || ""}</div>
-              <div class="subtitle">PTU Date Issued: ${data.ptuDateIssued || ""}</div>
-              <div class="title" style="margin-top:8px;">Z-READING</div>
-            </div>
-
-            <div class="line"></div>
-            <table>
-              <tr><td class="label">Date Issued</td><td class="value">${data.reportDate || ""}</td></tr>
-              <tr><td class="label">Time</td><td class="value">${data.reportTime || ""}</td></tr>
-              <tr><td class="label">Beg SI No.</td><td class="value">${data.begSI || ""}</td></tr>
-              <tr><td class="label">End SI No.</td><td class="value">${data.endSI || ""}</td></tr>
-              <tr><td class="label">Beg Void No.</td><td class="value">${data.begVoid || ""}</td></tr>
-              <tr><td class="label">End Void No.</td><td class="value">${data.endVoid || ""}</td></tr>
-              <tr><td class="label">Beg Return No.</td><td class="value">${data.begReturn || ""}</td></tr>
-              <tr><td class="label">End Return No.</td><td class="value">${data.endReturn || ""}</td></tr>
-              <tr><td class="label">Reset Counter No.</td><td class="value">${data.resetCounterNo || 0}</td></tr>
-              <tr><td class="label">Z Counter No.</td><td class="value">${data.zCounterNo || 0}</td></tr>
-            </table>
-
-            <div class="line"></div>
-            <table>
-              <tr><td class="label">Present Accum. Sales</td><td class="value">${money(data.presentAccumulatedSales)}</td></tr>
-              <tr><td class="label">Previous Accum. Sales</td><td class="value">${money(data.previousAccumulatedSales)}</td></tr>
-              <tr><td class="label">Sales for the Day</td><td class="value">${money(data.salesForTheDay)}</td></tr>
-            </table>
-
-            <div class="line"></div>
-            <div class="strong">BREAKDOWN OF SALES</div>
-            <table>
-              <tr><td class="label">VATable Sales</td><td class="value">${money(data.vatableSales)}</td></tr>
-              <tr><td class="label">VAT Amount</td><td class="value">${money(data.vatAmount)}</td></tr>
-              <tr><td class="label">VAT-Exempt Sales</td><td class="value">${money(data.vatExemptSales)}</td></tr>
-              <tr><td class="label">VAT Exempt VAT</td><td class="value">${money(data.vatExemptVat)}</td></tr>
-              <tr><td class="label">Zero-Rated Sales</td><td class="value">${money(data.zeroRatedSales)}</td></tr>
-              <tr><td class="label">Other Charges</td><td class="value">${money(data.otherCharges)}</td></tr>
-            </table>
-
-            <div class="line"></div>
-            <table>
-              <tr><td class="label">Gross Amount</td><td class="value">${money(data.grossAmount)}</td></tr>
-              <tr><td class="label">Less Discount</td><td class="value">${money(data.lessDiscount)}</td></tr>
-              <tr><td class="label">Less Return</td><td class="value">${money(data.lessReturn)}</td></tr>
-              <tr><td class="label">Less Void</td><td class="value">${money(data.lessVoid)}</td></tr>
-              <tr><td class="label">Less VAT Adjustment</td><td class="value">${money(data.lessVatAdjustment)}</td></tr>
-              <tr><td class="label strong">Net Amount</td><td class="value strong">${money(data.netAmount)}</td></tr>
-            </table>
-
-            <div class="line"></div>
-            <div class="strong">DISCOUNT SUMMARY</div>
-            <table>
-              <tr><td class="label">SC Disc</td><td class="value">${money(data.scDisc)}</td></tr>
-              <tr><td class="label">PWD Disc</td><td class="value">${money(data.pwdDisc)}</td></tr>
-              <tr><td class="label">NAAC Disc</td><td class="value">${money(data.naacDisc)}</td></tr>
-              <tr><td class="label">Solo Parent Disc</td><td class="value">${money(data.soloParentDisc)}</td></tr>
-              <tr><td class="label">Other Disc</td><td class="value">${money(data.otherDisc)}</td></tr>
-            </table>
-
-            <div class="line"></div>
-            <div class="strong">SALES ADJUSTMENT</div>
-            <table>
-              <tr><td class="label">Void</td><td class="value">${money(data.salesAdjustmentVoid)}</td></tr>
-              <tr><td class="label">Return</td><td class="value">${money(data.salesAdjustmentReturn)}</td></tr>
-            </table>
-
-            <div class="line"></div>
-            <div class="strong">VAT ADJUSTMENT</div>
-            <table>
-              <tr><td class="label">SC Trans VAT Adj</td><td class="value">${money(data.scTransVatAdj)}</td></tr>
-              <tr><td class="label">PWD Trans VAT Adj</td><td class="value">${money(data.pwdTransVatAdj)}</td></tr>
-              <tr><td class="label">Reg Disc Trans VAT Adj</td><td class="value">${money(data.regDiscTransVatAdj)}</td></tr>
-              <tr><td class="label">Zero Rated Trans VAT Adj</td><td class="value">${money(data.zeroRatedTransVatAdj)}</td></tr>
-              <tr><td class="label">VAT on Return</td><td class="value">${money(data.vatOnReturn)}</td></tr>
-              <tr><td class="label">Other VAT Adjustments</td><td class="value">${money(data.otherVatAdjustments)}</td></tr>
-            </table>
-
-            <div class="line"></div>
-            <div class="strong">TRANSACTION SUMMARY</div>
-            <table>
-              <tr><td class="label">Cash In Drawer</td><td class="value">${money(data.cashInDrawer)}</td></tr>
-              <tr><td class="label">Cheque</td><td class="value">${money(data.cheque)}</td></tr>
-              <tr><td class="label">Credit Card</td><td class="value">${money(data.creditCard)}</td></tr>
-              <tr><td class="label">Other Payments</td><td class="value">${money(data.otherPayments)}</td></tr>
-              <tr><td class="label">Opening Fund</td><td class="value">${money(data.openingFund)}</td></tr>
-              <tr><td class="label">Less Withdrawal</td><td class="value">${money(data.lessWithdrawal)}</td></tr>
-              <tr><td class="label">Payments Received</td><td class="value">${money(data.paymentsReceived)}</td></tr>
-              <tr><td class="label strong">Short / Over</td><td class="value strong">${money(data.shortOver)}</td></tr>
-            </table>
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Z Reading</title>
+        ${commonPrintStyles}
+      </head>
+      <body>
+        <div class="receipt">
+          <div class="center">
+            <div class="title">${data.corpName || ""}</div>
+            <div class="subtitle">${data.businessUnitName || ""}</div>
+            <div class="subtitle">${data.businessUnitAddress || ""}</div>
+            <div class="subtitle">${data.tinLabel || ""}</div>
+            <div class="subtitle">MIN: ${data.machineNumber || ""}</div>
+            <div class="subtitle">S/N: ${data.serialNumber || ""}</div>
+            <div class="subtitle">PTU No: ${data.ptuNumber || ""}</div>
+            <div class="subtitle">PTU Date Issued: ${data.ptuDateIssued || ""}</div>
+            <div class="title" style="margin-top:8px;">Z-READING</div>
           </div>
-        </body>
-      </html>
-    `;
+
+          <div class="line"></div>
+          <table>
+            <tr><td class="label">Date Issued</td><td class="value">${data.reportDate || ""}</td></tr>
+            <tr><td class="label">Time</td><td class="value">${data.reportTime || ""}</td></tr>
+            <tr><td class="label">Beg SI No.</td><td class="value">${data.begSI || ""}</td></tr>
+            <tr><td class="label">End SI No.</td><td class="value">${data.endSI || ""}</td></tr>
+            <tr><td class="label">Beg Void No.</td><td class="value">${data.begVoid || ""}</td></tr>
+            <tr><td class="label">End Void No.</td><td class="value">${data.endVoid || ""}</td></tr>
+            <tr><td class="label">Beg Return No.</td><td class="value">${data.begReturn || ""}</td></tr>
+            <tr><td class="label">End Return No.</td><td class="value">${data.endReturn || ""}</td></tr>
+            <tr><td class="label">Reset Counter No.</td><td class="value">${data.resetCounterNo || 0}</td></tr>
+            <tr><td class="label">Z Counter No.</td><td class="value">${data.zCounterNo || 0}</td></tr>
+          </table>
+
+          <div class="line"></div>
+          <table>
+            <tr><td class="label">Present Accum. Sales</td><td class="value">${money(data.presentAccumulatedSales)}</td></tr>
+            <tr><td class="label">Previous Accum. Sales</td><td class="value">${money(data.previousAccumulatedSales)}</td></tr>
+            <tr><td class="label">Sales for the Day</td><td class="value">${money(data.salesForTheDay)}</td></tr>
+          </table>
+
+          <div class="line"></div>
+          <div class="strong">BREAKDOWN OF SALES</div>
+          <table>
+            <tr><td class="label">VATABLE SALES</td><td class="value">${money(data.vatableSales)}</td></tr>
+            <tr><td class="label">VAT AMOUNT</td><td class="value">${money(data.vatAmount)}</td></tr>
+            <tr><td class="label">VAT-EXEMPT SALES</td><td class="value">${money(data.vatExemptSales)}</td></tr>
+            <tr><td class="label">VAT EXEMPTION</td><td class="value">${money(vatExemptionValue)}</td></tr>
+            <tr><td class="label">ZERO RATED SALES</td><td class="value">${money(data.zeroRatedSales)}</td></tr>
+            <tr><td class="label">OTHER CHARGES</td><td class="value">${money(data.otherCharges)}</td></tr>
+          </table>
+
+          <div class="line"></div>
+          <table>
+            <tr><td class="label">Gross Amount:</td><td class="value">${money(data.grossAmount)}</td></tr>
+            <tr><td class="label">Discount:</td><td class="value">${money(data.lessDiscount)}</td></tr>
+            <tr><td class="label">VAT Exemption:</td><td class="value">${money(vatExemptionValue)}</td></tr>
+            <tr><td class="label">Refund:</td><td class="value">${money(data.lessReturn)}</td></tr>
+            <tr><td class="label">Void:</td><td class="value">${money(data.lessVoid)}</td></tr>
+            <tr><td class="label">VAT Adjustment:</td><td class="value">${money(data.lessVatAdjustment)}</td></tr>
+            <tr><td class="label strong">Net Amount:</td><td class="value strong">${money(data.netAmount)}</td></tr>
+          </table>
+
+          <div class="line"></div>
+          <div class="strong">DISCOUNT SUMMARY</div>
+          <table>
+            <tr><td class="label">SC Disc</td><td class="value">${money(data.scDisc)}</td></tr>
+            <tr><td class="label">PWD Disc</td><td class="value">${money(data.pwdDisc)}</td></tr>
+            <tr><td class="label">NAAC Disc</td><td class="value">${money(data.naacDisc)}</td></tr>
+            <tr><td class="label">Solo Parent Disc</td><td class="value">${money(data.soloParentDisc)}</td></tr>
+            <tr><td class="label">Other Disc</td><td class="value">${money(data.otherDisc)}</td></tr>
+          </table>
+
+          <div class="line"></div>
+          <div class="strong">SALES ADJUSTMENT</div>
+          <table>
+            <tr><td class="label">Void</td><td class="value">${money(data.salesAdjustmentVoid)}</td></tr>
+            <tr><td class="label">Return</td><td class="value">${money(data.salesAdjustmentReturn)}</td></tr>
+          </table>
+
+          <div class="line"></div>
+          <div class="strong">VAT ADJUSTMENT</div>
+          <table>
+            <tr><td class="label">SC Trans VAT Adj</td><td class="value">${money(data.scTransVatAdj)}</td></tr>
+            <tr><td class="label">PWD Trans VAT Adj</td><td class="value">${money(data.pwdTransVatAdj)}</td></tr>
+            <tr><td class="label">Reg Disc Trans VAT Adj</td><td class="value">${money(data.regDiscTransVatAdj)}</td></tr>
+            <tr><td class="label">Zero Rated Trans VAT Adj</td><td class="value">${money(data.zeroRatedTransVatAdj)}</td></tr>
+            <tr><td class="label">VAT on Return</td><td class="value">${money(data.vatOnReturn)}</td></tr>
+            <tr><td class="label">Other VAT Adjustments</td><td class="value">${money(data.otherVatAdjustments)}</td></tr>
+          </table>
+
+          <div class="line"></div>
+          <div class="strong">TRANSACTION SUMMARY</div>
+          <table>
+            <tr><td class="label">Cash In Drawer</td><td class="value">${money(data.cashInDrawer)}</td></tr>
+            <tr><td class="label">Cheque</td><td class="value">${money(data.cheque)}</td></tr>
+            <tr><td class="label">Credit Card</td><td class="value">${money(data.creditCard)}</td></tr>
+            <tr><td class="label">Other Payments</td><td class="value">${money(data.otherPayments)}</td></tr>
+            <tr><td class="label">Opening Fund</td><td class="value">${money(data.openingFund)}</td></tr>
+            <tr><td class="label">Less Withdrawal</td><td class="value">${money(data.lessWithdrawal)}</td></tr>
+            <tr><td class="label">Payments Received</td><td class="value">${money(data.paymentsReceived)}</td></tr>
+            <tr><td class="label strong">Short / Over</td><td class="value strong">${money(data.shortOver)}</td></tr>
+          </table>
+        </div>
+      </body>
+    </html>
+  `;
   };
 
   const handlePrint = async () => {
@@ -433,6 +437,11 @@ export default function PosReadingModal({
         ptuDateIssued: result.data?.ptuDateIssued || "01/01/2023",
         summaryCashInDrawer: Number(values.cashDrawerAmount || 0),
         cashInDrawer: Number(values.cashDrawerAmount || 0),
+        vatExemption:
+          result.data?.vatExemption ??
+          result.data?.lessVatExemption ??
+          result.data?.vatExemptVat ??
+          0,
       };
 
       const printHtml = isZReading
