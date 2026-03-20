@@ -196,7 +196,7 @@ const PrintBilling = () => {
       <div className="relative z-10 max-w-7xl mx-auto flex flex-col min-h-[90vh]">
         <nav className="mb-8 flex justify-between items-center">
           <button
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/poscorehomescreen")}
             className={`flex items-center gap-3 mt-2 px-10 py-6 rounded-full transition-all ${
               isDark
                 ? "bg-slate-900/50 border border-white/5 text-slate-400 hover:text-white"
