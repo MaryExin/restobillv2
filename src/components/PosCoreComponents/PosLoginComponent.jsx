@@ -210,7 +210,7 @@ const PosLoginComponent = () => {
                       type="button"
                       onClick={handleOpenConfirm}
                       disabled={isDisabled || isSubmitting}
-                      className="mx-auto flex h-[52px] w-[190px] items-center justify-center rounded-full bg-teal-600 px-6 text-[18px] font-semibold text-white shadow-[0_14px_28px_rgba(13,148,136,0.30)] transition hover:bg-teal-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+                      className="mx-auto flex h-[52px] w-[190px] items-center justify-center rounded-full bg-teal-600 px-6 text-[18px] font-semibold text-gray-100 shadow-[0_14px_28px_rgba(13,148,136,0.30)] transition hover:bg-teal-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {!apiHost ? (
                         "Resolving..."

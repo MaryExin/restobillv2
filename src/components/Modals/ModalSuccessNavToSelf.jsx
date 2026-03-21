@@ -3,74 +3,75 @@ import ReactDOM from "react-dom";
 import { motion } from "framer-motion";
 import { FaCheckCircle } from "react-icons/fa";
 import useZustandAPIEndpoint from "../../context/useZustandAPIEndpoint";
+import { useTheme } from "../../context/ThemeContext";
 
 const ModalSuccessNavToSelf = ({
-  header,
-  message,
-  button,
+  header = "Saved Successfully",
+  message = "Your changes have been saved.",
+  button = "OK",
   setIsModalOpen,
   resetForm,
   dataTour,
   dataTourBtn,
 }) => {
   const { endpoint, setEndPoint } = useZustandAPIEndpoint();
+  const { theme } = useTheme();
+
+  const isDark = theme === "dark";
 
   const modalContent = (
     <motion.div
-      className="fixed inset-0 z-[9999] grid place-items-center bg-black/40 p-4"
+      className={`fixed inset-0 z-[340] flex items-center justify-center p-4 ${
+        isDark ? "bg-black/70" : "bg-slate-900/40"
+      }`}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
     >
       <motion.div
-        className="relative w-full max-w-md overflow-hidden rounded-2xl border-t-8 border-colorBrand bg-white shadow-2xl"
-        initial={{ y: 50, scale: 0.8 }}
-        animate={{ y: 0, scale: 1 }}
-        exit={{ y: 50, scale: 0.8 }}
-        transition={{ type: "spring", stiffness: 300, damping: 25 }}
         data-tour={dataTour}
+        className={`w-full max-w-sm rounded-3xl border p-8 text-center shadow-2xl transition-colors ${
+          isDark
+            ? "border-white/10 bg-slate-900"
+            : "border-slate-200 bg-white"
+        }`}
+        initial={{ scale: 0.95, y: 10 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: 10 }}
+        transition={{ type: "spring", stiffness: 260, damping: 22 }}
       >
-        <div className="flex flex-col items-center p-6 text-center">
-          <motion.div
-            className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-colorBrandLighter"
-            initial={{ rotate: -180, scale: 0 }}
-            animate={{ rotate: 0, scale: 1 }}
-            transition={{ type: "spring", stiffness: 200, damping: 15 }}
-          >
-            <FaCheckCircle className="h-12 w-12 text-colorBrand" />
-          </motion.div>
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-blue-500/10 text-blue-400">
+          <FaCheckCircle size={24} />
+        </div>
 
-          <motion.h2
-            className="mb-2 text-2xl font-bold text-gray-800"
-            initial={{ y: -20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.2 }}
-          >
-            {header}
-          </motion.h2>
+        <h3
+          className={`mb-2 text-xl font-black ${
+            isDark ? "text-white" : "text-slate-900"
+          }`}
+        >
+          {header}
+        </h3>
 
-          <motion.p
-            className="mb-6 px-4 text-center text-gray-600"
-            initial={{ y: -10, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.3 }}
-          >
-            {message}
-          </motion.p>
+        <p
+          className={`mb-6 text-sm ${
+            isDark ? "text-slate-400" : "text-slate-500"
+          }`}
+        >
+          {message}
+        </p>
 
-          <div data-tour={dataTourBtn}>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="rounded-full bg-gradient-to-br from-colorBrand to-colorBrandTertiary px-8 py-3 text-white shadow-lg focus:outline-none"
-              onClick={() => {
-                setIsModalOpen(false);
-                resetForm && resetForm();
-              }}
-            >
-              {button}
-            </motion.button>
-          </div>
+        <div data-tour={dataTourBtn}>
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => {
+              setIsModalOpen(false);
+              resetForm && resetForm();
+            }}
+            className="w-full rounded-2xl bg-blue-600 py-3 font-bold text-white transition hover:bg-blue-500"
+          >
+            {button}
+          </motion.button>
         </div>
       </motion.div>
     </motion.div>
