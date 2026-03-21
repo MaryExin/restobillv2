@@ -240,11 +240,11 @@ const LayoutPos = ({ children }) => {
       />
 
       <PosQuickActionTile
-  label="Product List"
-  icon={<FaBoxOpen className="text-[28px] sm:text-[30px]" />}
-  color="violet"
-  onClick={() => navigate("/productlist")} // Dapat pareho ito sa path sa App.js
-/>
+        label="Product List"
+        icon={<FaBoxOpen className="text-[28px] sm:text-[30px]" />}
+        color="violet"
+        onClick={() => navigate("/productlist")} // Dapat pareho ito sa path sa App.js
+      />
 
       <OpenNewDay />
 
@@ -279,20 +279,13 @@ const LayoutPos = ({ children }) => {
       /> */}
 
       <SwitchUser />
-        
+
       <PosQuickActionTile
         label="POS Reading"
         icon={<FaFileAlt className="text-[28px] sm:text-[30px]" />}
         color="indigo"
         disabled={isClosed}
         onClick={() => setIsPosReadingOpen(true)}
-      />
-
-            <PosQuickActionTile
-        label="Payment"
-        icon={<FaReceipt className="text-[28px] sm:text-[30px]" />}
-        color="green"
-        onClick={() => navigate("/payments")}
       />
 
       {/* --- POS REPORTS  --- */}
@@ -302,7 +295,7 @@ const LayoutPos = ({ children }) => {
         color="indigo"
         onClick={() => setIsReportsOpen(true)}
       />
-      
+
       {menuOptions.map((item) => {
         const disabled =
           item.id !== "salesdashboard" &&
