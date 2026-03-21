@@ -4,12 +4,12 @@ import { useReactToPrint } from "react-to-print";
 import {
   FiX,
   FiPrinter,
-  FiPercent,
   FiUsers,
   FiFileText,
   FiTag,
   FiPackage,
   FiEye,
+  FiAlertTriangle,
 } from "react-icons/fi";
 
 const peso = (value) =>
@@ -20,11 +20,71 @@ const peso = (value) =>
 
 const signedNegativePeso = (value) => `- ${peso(value)}`;
 
+const toNum = (value) => Number(value || 0);
+
+const yesNoToBool = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase() === "yes";
+
+const DISCOUNT_META = [
+  {
+    key: "senior",
+    label: "Senior Citizen Discount",
+    shortLabel: "Senior",
+    color: "emerald",
+    needsAmount: false,
+    hasVatExemption: true,
+  },
+  {
+    key: "pwd",
+    label: "PWD Discount",
+    shortLabel: "PWD",
+    color: "violet",
+    needsAmount: false,
+    hasVatExemption: true,
+  },
+  {
+    key: "manual",
+    label: "Manual Discount",
+    shortLabel: "Manual",
+    color: "amber",
+    needsAmount: true,
+    hasVatExemption: false,
+  },
+];
+
+const buildInitialDiscountState = () => ({
+  senior: { qualifiedCount: 0, manualAmount: "" },
+  pwd: { qualifiedCount: 0, manualAmount: "" },
+  manual: { qualifiedCount: 0, manualAmount: "" },
+});
+
+const handleSelectAllOnFocus = (e) => {
+  requestAnimationFrame(() => {
+    try {
+      e.target.select();
+    } catch (error) {
+      console.error(error);
+    }
+  });
+};
+
 const PrintableDiscountReceipt = React.forwardRef(
-  (
-    { transaction, dateFrom, discountType, computed, items, isManualDiscount },
-    ref,
-  ) => {
+  ({ transaction, dateFrom, computed, items }, ref) => {
+    const activeBreakdown = Array.isArray(computed?.discountBreakdown)
+      ? computed.discountBreakdown.filter(
+          (entry) =>
+            Number(entry?.qualifiedCount || 0) > 0 ||
+            Number(entry?.discountAmount || 0) > 0,
+        )
+      : [];
+
+    const totalQualifiedAll = Number(computed?.totalQualifiedAll || 0);
+    const statutoryQualifiedCount = Number(
+      computed?.statutoryQualifiedCount || 0,
+    );
+
     return (
       <div
         ref={ref}
@@ -56,22 +116,9 @@ const PrintableDiscountReceipt = React.forwardRef(
           <div style={{ fontWeight: "700", fontSize: "12px" }}>
             ARU FOOD CORP.
           </div>
-
-          {/* <div style={{ marginTop: "8px", fontSize: "10px" }}>
-              BYPASS ROAD TABING BAKOD P. STA MARIA
-            </div>
-            <div style={{ fontSize: "10px" }}>BULACAN</div>
-            <div style={{ fontSize: "10px" }}>VAT REG TIN: 634-742-586-00012</div>
-            <div style={{ fontSize: "10px" }}>MIN:</div>
-            <div style={{ fontSize: "10px" }}>S/N:</div> */}
         </div>
 
-        <div
-          style={{
-            borderTop: "1px solid #000",
-            margin: "10px 0 8px",
-          }}
-        />
+        <div style={{ borderTop: "1px solid #000", margin: "10px 0 8px" }} />
 
         <div
           style={{
@@ -106,6 +153,14 @@ const PrintableDiscountReceipt = React.forwardRef(
               </td>
               <td style={{ textAlign: "right", padding: "1px 0" }}>
                 {transaction?.billing_no || transaction?.billingNo || "-"}
+              </td>
+            </tr>
+            <tr>
+              <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                Invoice No.:
+              </td>
+              <td style={{ textAlign: "right", padding: "1px 0" }}>
+                {transaction?.invoice_no || transaction?.invoiceNo || "-"}
               </td>
             </tr>
             <tr>
@@ -157,12 +212,7 @@ const PrintableDiscountReceipt = React.forwardRef(
           </tbody>
         </table>
 
-        <div
-          style={{
-            borderTop: "1px solid #000",
-            margin: "10px 0 6px",
-          }}
-        />
+        <div style={{ borderTop: "1px solid #000", margin: "10px 0 6px" }} />
 
         <table
           style={{
@@ -216,12 +266,7 @@ const PrintableDiscountReceipt = React.forwardRef(
           </tbody>
         </table>
 
-        <div
-          style={{
-            borderTop: "1px solid #000",
-            margin: "10px 0 6px",
-          }}
-        />
+        <div style={{ borderTop: "1px solid #000", margin: "10px 0 6px" }} />
 
         <table
           style={{
@@ -240,37 +285,33 @@ const PrintableDiscountReceipt = React.forwardRef(
               </td>
             </tr>
 
-            {discountType !== "No Discount" &&
-            Number(computed?.computedDiscount || 0) > 0 ? (
-              <tr>
-                <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                  {String(discountType || "DISCOUNT").toUpperCase()}:
-                </td>
-                <td style={{ textAlign: "right", padding: "1px 0" }}>
-                  {signedNegativePeso(computed?.computedDiscount)}
-                </td>
-              </tr>
-            ) : null}
+            {activeBreakdown.map((entry) =>
+              Number(entry?.discountAmount || 0) > 0 ? (
+                <tr key={`disc-${entry.key}`}>
+                  <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                    {String(entry?.label || "DISCOUNT").toUpperCase()}:
+                  </td>
+                  <td style={{ textAlign: "right", padding: "1px 0" }}>
+                    {signedNegativePeso(entry?.discountAmount)}
+                  </td>
+                </tr>
+              ) : null,
+            )}
 
-            {Number(computed?.vatExemption || 0) > 0 ? (
+            {Number(computed?.totalVatExemption || 0) > 0 ? (
               <tr>
                 <td style={{ fontWeight: "700", padding: "1px 0" }}>
                   VAT EXEMPTION:
                 </td>
                 <td style={{ textAlign: "right", padding: "1px 0" }}>
-                  {signedNegativePeso(computed?.vatExemption)}
+                  {signedNegativePeso(computed?.totalVatExemption)}
                 </td>
               </tr>
             ) : null}
           </tbody>
         </table>
 
-        <div
-          style={{
-            borderTop: "1px solid #000",
-            margin: "8px 0 6px",
-          }}
-        />
+        <div style={{ borderTop: "1px solid #000", margin: "8px 0 6px" }} />
 
         <div
           style={{
@@ -286,12 +327,7 @@ const PrintableDiscountReceipt = React.forwardRef(
           <span>{peso(computed?.netAfterDiscount)}</span>
         </div>
 
-        <div
-          style={{
-            borderTop: "1px solid #000",
-            margin: "8px 0 6px",
-          }}
-        />
+        <div style={{ borderTop: "1px solid #000", margin: "8px 0 6px" }} />
 
         <table
           style={{
@@ -336,12 +372,7 @@ const PrintableDiscountReceipt = React.forwardRef(
           </tbody>
         </table>
 
-        <div
-          style={{
-            borderTop: "1px solid #000",
-            margin: "10px 0 8px",
-          }}
-        />
+        <div style={{ borderTop: "1px solid #000", margin: "10px 0 8px" }} />
 
         <table
           style={{
@@ -353,42 +384,49 @@ const PrintableDiscountReceipt = React.forwardRef(
           <tbody>
             <tr>
               <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                Discount Type:
+                Total Customers:
               </td>
               <td style={{ textAlign: "right", padding: "1px 0" }}>
-                {discountType || "No Discount"}
+                {computed?.safeCustomerCount ?? 0}
+              </td>
+            </tr>
+            <tr>
+              <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                Total Qualified:
+              </td>
+              <td style={{ textAlign: "right", padding: "1px 0" }}>
+                {totalQualifiedAll}
+              </td>
+            </tr>
+            <tr>
+              <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                Statutory Qualified:
+              </td>
+              <td style={{ textAlign: "right", padding: "1px 0" }}>
+                {statutoryQualifiedCount}
               </td>
             </tr>
 
-            {!isManualDiscount && (
-              <>
+            {activeBreakdown.map((entry) => (
+              <React.Fragment key={`print-breakdown-${entry.key}`}>
                 <tr>
                   <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                    Total Customers:
+                    {entry.label} Count:
                   </td>
                   <td style={{ textAlign: "right", padding: "1px 0" }}>
-                    {computed?.safeCustomerCount ?? 0}
+                    {entry.qualifiedCount}
                   </td>
                 </tr>
                 <tr>
                   <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                    Qualified Customers:
+                    {entry.label} Amount:
                   </td>
                   <td style={{ textAlign: "right", padding: "1px 0" }}>
-                    {computed?.safeQualifiedCount ?? 0}
+                    {peso(entry.discountAmount)}
                   </td>
                 </tr>
-                <tr>
-                  <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                    Qualified Ratio:
-                  </td>
-                  <td style={{ textAlign: "right", padding: "1px 0" }}>
-                    {computed?.safeQualifiedCount ?? 0}/
-                    {computed?.safeCustomerCount ?? 0}
-                  </td>
-                </tr>
-              </>
-            )}
+              </React.Fragment>
+            ))}
 
             <tr>
               <td style={{ fontWeight: "700", padding: "1px 0" }}>
@@ -406,17 +444,6 @@ const PrintableDiscountReceipt = React.forwardRef(
                 {peso(computed?.discountableBase)}
               </td>
             </tr>
-
-            {!isManualDiscount && (
-              <tr>
-                <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                  Prorated Base:
-                </td>
-                <td style={{ textAlign: "right", padding: "1px 0" }}>
-                  {peso(computed?.proratedBase)}
-                </td>
-              </tr>
-            )}
           </tbody>
         </table>
 
@@ -431,30 +458,11 @@ const PrintableDiscountReceipt = React.forwardRef(
           />
         </div>
 
-        <div
-          style={{
-            borderTop: "1px solid #000",
-            margin: "10px 0 8px",
-          }}
-        />
+        <div style={{ borderTop: "1px solid #000", margin: "10px 0 8px" }} />
 
         <div style={{ textAlign: "center", fontSize: "10px" }}>
           <div style={{ fontWeight: "700" }}>THIS DOCUMENT IS NOT VALID FOR CLAIM OF INPUT TAX</div>
         </div>
-
-        {/* <div
-          style={{ marginTop: "10px", textAlign: "center", fontSize: "10px" }}
-        >
-          <div style={{ fontWeight: "700" }}>
-            SUPPLIER: LIGHTEM SOLUTIONS INCORPORATED
-          </div>
-          <div>1187, PARULAN, PLARIDEL</div>
-          <div>BULACAN, PHILIPPINES</div>
-          <div>TIN: 626717559-000</div>
-          <div>BIR ACC#: 25A6267175592023091853</div>
-          <div>DATE ISSUED: 12/04/2023</div>
-          <div>PTU: FP02204-067-0432508-00003</div>
-        </div> */}
       </div>
     );
   },
@@ -619,15 +627,8 @@ const OrderedItemsSummaryModal = ({
                     const price = Number(item.selling_price || 0);
                     const lineTotal = qty * price;
 
-                    const isDiscountable =
-                      String(item.isDiscountable || "")
-                        .trim()
-                        .toLowerCase() === "yes";
-
-                    const isVatable =
-                      String(item.vatable || "")
-                        .trim()
-                        .toLowerCase() === "yes";
+                    const isDiscountable = yesNoToBool(item.isDiscountable);
+                    const isVatable = yesNoToBool(item.vatable);
 
                     return (
                       <div
@@ -702,6 +703,95 @@ const OrderedItemsSummaryModal = ({
   );
 };
 
+const DiscountEntryCard = ({
+  meta,
+  values,
+  isDark,
+  inputClass,
+  cardClass,
+  onChangeCount,
+  onChangeManualAmount,
+}) => {
+  const accentClass =
+    meta.color === "emerald"
+      ? "text-emerald-500"
+      : meta.color === "violet"
+        ? "text-violet-500"
+        : "text-amber-500";
+
+  return (
+    <div className={`rounded-[0.95rem] p-3 ${cardClass}`}>
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <h4 className="text-sm font-black">{meta.label}</h4>
+          <p className={`text-[11px] ${accentClass}`}>
+            {meta.needsAmount
+              ? "Enter count and direct amount."
+              : "20% statutory discount per qualified share."}
+          </p>
+        </div>
+        <div
+          className={`rounded-full px-2.5 py-1 text-[10px] font-black ${
+            isDark
+              ? "bg-slate-900/80 text-slate-300"
+              : "bg-white text-slate-600"
+          }`}
+        >
+          {meta.shortLabel}
+        </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div>
+          <label className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
+            Qualified Count
+          </label>
+          <input
+            type="number"
+            min="0"
+            value={values.qualifiedCount}
+            onChange={(e) => onChangeCount(meta.key, e.target.value)}
+            onFocus={handleSelectAllOnFocus}
+            className={`w-full rounded-lg px-3 py-2 text-sm outline-none ${inputClass}`}
+            placeholder="0"
+          />
+        </div>
+
+        {meta.needsAmount ? (
+          <div>
+            <label className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
+              Manual Amount
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={values.manualAmount}
+              onChange={(e) => onChangeManualAmount(meta.key, e.target.value)}
+              onFocus={handleSelectAllOnFocus}
+              className={`w-full rounded-lg px-3 py-2 text-sm outline-none ${inputClass}`}
+              placeholder="0.00"
+            />
+          </div>
+        ) : (
+          <div
+            className={`rounded-lg px-3 py-2 text-sm ${
+              isDark
+                ? "bg-slate-900/60 border border-white/5 text-slate-300"
+                : "bg-white border border-slate-200 text-slate-600"
+            }`}
+          >
+            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
+              Rule
+            </p>
+            <p className="mt-1 font-semibold">20% of prorated base</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const ModalDiscountTransaction = ({
   isOpen,
   onClose,
@@ -715,10 +805,8 @@ const ModalDiscountTransaction = ({
 
   const [items, setItems] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [discountType, setDiscountType] = useState("Senior Citizen Discount");
   const [customerCount, setCustomerCount] = useState(1);
-  const [qualifiedCount, setQualifiedCount] = useState(1);
-  const [manualDiscount, setManualDiscount] = useState("");
+  const [discountState, setDiscountState] = useState(buildInitialDiscountState);
   const [errorMessage, setErrorMessage] = useState("");
   const [showItemsModal, setShowItemsModal] = useState(false);
   const [qualifiedPrompt, setQualifiedPrompt] = useState("");
@@ -728,11 +816,415 @@ const ModalDiscountTransaction = ({
   const [latestInvoiceNo, setLatestInvoiceNo] = useState(
     transaction?.invoice_no || "",
   );
+  const [existingDiscountLoaded, setExistingDiscountLoaded] = useState(false);
+  const [hadExistingDiscountBreakdown, setHadExistingDiscountBreakdown] =
+    useState(false);
+  const [initialLoadedSignature, setInitialLoadedSignature] = useState("");
+  const [showOverrideWarning, setShowOverrideWarning] = useState(false);
+
+  const handleChangeCount = (key, value) => {
+    setDiscountState((prev) => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        qualifiedCount: value,
+      },
+    }));
+  };
+
+  const handleChangeManualAmount = (key, value) => {
+    setDiscountState((prev) => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        manualAmount: value,
+      },
+    }));
+  };
+
+  const resetForm = () => {
+    setCustomerCount(1);
+    setQualifiedPrompt("");
+    setDiscountState(buildInitialDiscountState());
+    setExistingDiscountLoaded(false);
+    setHadExistingDiscountBreakdown(false);
+    setInitialLoadedSignature("");
+    setShowOverrideWarning(false);
+  };
+
+  useEffect(() => {
+    if (!isOpen || !apiHost || !transaction?.transaction_id) return;
+
+    setIsLoading(true);
+    setErrorMessage("");
+
+    fetch(`${apiHost}/api/transaction_discount_items.php`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        transaction_id: transaction.transaction_id,
+      }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        const nextItems = Array.isArray(data?.items) ? data.items : [];
+        const txn = data?.transaction_summary || {};
+        const discountCounts = data?.discount_counts || {
+          senior: 0,
+          pwd: 0,
+          manual: 0,
+        };
+        const discountRows = Array.isArray(data?.discount_rows)
+          ? data.discount_rows
+          : [];
+
+        setItems(nextItems);
+
+        const nextCustomerCount = Math.max(
+          Number(
+            txn.customer_head_count || transaction?.customer_head_count || 1,
+          ),
+          1,
+        );
+
+        const nextDiscountState = {
+          senior: {
+            qualifiedCount: Number(discountCounts.senior || 0),
+            manualAmount: "",
+          },
+          pwd: {
+            qualifiedCount: Number(discountCounts.pwd || 0),
+            manualAmount: "",
+          },
+          manual: {
+            qualifiedCount: Number(discountCounts.manual || 0),
+            manualAmount: discountRows
+              .filter((row) =>
+                String(row.discount_type || "")
+                  .toLowerCase()
+                  .includes("manual"),
+              )
+              .reduce((sum, row) => sum + Number(row.discount_amount || 0), 0),
+          },
+        };
+
+        setCustomerCount(nextCustomerCount);
+        setDiscountState(nextDiscountState);
+
+        const hasExistingBreakdown = discountRows.length > 0;
+        setExistingDiscountLoaded(true);
+        setHadExistingDiscountBreakdown(hasExistingBreakdown);
+
+        const signature = JSON.stringify({
+          customerCount: nextCustomerCount,
+          discountState: nextDiscountState,
+        });
+        setInitialLoadedSignature(signature);
+        setShowOverrideWarning(false);
+
+        setLatestBillingNo(
+          billingNo ||
+            txn?.billing_no ||
+            transaction?.billing_no ||
+            transaction?.billingNo ||
+            "",
+        );
+        setLatestInvoiceNo(txn?.invoice_no || transaction?.invoice_no || "");
+
+        setIsLoading(false);
+      })
+      .catch((error) => {
+        console.error(error);
+        setErrorMessage("Failed to load transaction items.");
+        setItems([]);
+        setExistingDiscountLoaded(false);
+        setHadExistingDiscountBreakdown(false);
+        setInitialLoadedSignature("");
+        setShowOverrideWarning(false);
+        setIsLoading(false);
+      });
+  }, [isOpen, apiHost, transaction, billingNo]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      resetForm();
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!existingDiscountLoaded || !hadExistingDiscountBreakdown) return;
+
+    const currentSignature = JSON.stringify({
+      customerCount: Math.max(Number(customerCount || 0), 1),
+      discountState: {
+        senior: {
+          qualifiedCount: Number(discountState?.senior?.qualifiedCount || 0),
+          manualAmount: "",
+        },
+        pwd: {
+          qualifiedCount: Number(discountState?.pwd?.qualifiedCount || 0),
+          manualAmount: "",
+        },
+        manual: {
+          qualifiedCount: Number(discountState?.manual?.qualifiedCount || 0),
+          manualAmount: Number(discountState?.manual?.manualAmount || 0),
+        },
+      },
+    });
+
+    setShowOverrideWarning(currentSignature !== initialLoadedSignature);
+  }, [
+    customerCount,
+    discountState,
+    existingDiscountLoaded,
+    hadExistingDiscountBreakdown,
+    initialLoadedSignature,
+  ]);
+
+  const computed = useMemo(() => {
+    const safeCustomerCount = Math.max(Number(customerCount) || 1, 1);
+
+    const rawSeniorCount = Math.max(
+      Math.floor(Number(discountState?.senior?.qualifiedCount || 0)),
+      0,
+    );
+    const rawPwdCount = Math.max(
+      Math.floor(Number(discountState?.pwd?.qualifiedCount || 0)),
+      0,
+    );
+    const rawManualCount = Math.max(
+      Math.floor(Number(discountState?.manual?.qualifiedCount || 0)),
+      0,
+    );
+    const manualAmount = Math.max(
+      Number(discountState?.manual?.manualAmount || 0),
+      0,
+    );
+
+    const totalQualifiedAll = rawSeniorCount + rawPwdCount + rawManualCount;
+    const statutoryQualifiedCount = rawSeniorCount + rawPwdCount;
+
+    const statutoryQualifiedRatio =
+      safeCustomerCount > 0
+        ? Math.min(statutoryQualifiedCount, safeCustomerCount) /
+          safeCustomerCount
+        : 0;
+
+    const notQualifiedRatio =
+      safeCustomerCount > 0 ? 1 - statutoryQualifiedRatio : 0;
+
+    let discountableGross = 0;
+    let discountableBase = 0;
+    let rawVatableGross = 0;
+    let vatableSales = 0;
+    let vatableSalesVat = 0;
+    let vatExemptSales = 0;
+    const vatZeroRatedSales = 0;
+
+    items.forEach((item) => {
+      const isDiscountable = yesNoToBool(item.isDiscountable);
+      const isVatable = yesNoToBool(item.vatable);
+      const qty = Number(item.sales_quantity || 0);
+      const price = Number(item.selling_price || 0);
+      const lineTotal = qty * price;
+
+      if (isDiscountable) {
+        discountableGross += lineTotal;
+        discountableBase += isVatable ? lineTotal / 1.12 : lineTotal;
+
+        if (isVatable) {
+          vatExemptSales += lineTotal * statutoryQualifiedRatio;
+          rawVatableGross += lineTotal * notQualifiedRatio;
+        } else {
+          vatExemptSales += lineTotal;
+        }
+      } else {
+        if (isVatable) {
+          rawVatableGross += lineTotal;
+        } else {
+          vatExemptSales += lineTotal;
+        }
+      }
+    });
+
+    vatableSales = rawVatableGross / 1.12;
+    vatableSalesVat = vatableSales * 0.12;
+
+    const seniorProratedBase =
+      safeCustomerCount > 0
+        ? discountableBase * (rawSeniorCount / safeCustomerCount)
+        : 0;
+
+    const pwdProratedBase =
+      safeCustomerCount > 0
+        ? discountableBase * (rawPwdCount / safeCustomerCount)
+        : 0;
+
+    const seniorDiscountAmount = seniorProratedBase * 0.2;
+    const seniorVatExemption = seniorProratedBase * 0.12;
+
+    const pwdDiscountAmount = pwdProratedBase * 0.2;
+    const pwdVatExemption = pwdProratedBase * 0.12;
+
+    const manualDiscountAmount = manualAmount;
+    const manualVatExemption = 0;
+
+    const discountBreakdown = [
+      {
+        key: "senior",
+        label: "Senior Citizen Discount",
+        shortLabel: "Senior",
+        qualifiedCount: rawSeniorCount,
+        proratedBase: seniorProratedBase,
+        discountAmount: seniorDiscountAmount,
+        vatExemption: seniorVatExemption,
+      },
+      {
+        key: "pwd",
+        label: "PWD Discount",
+        shortLabel: "PWD",
+        qualifiedCount: rawPwdCount,
+        proratedBase: pwdProratedBase,
+        discountAmount: pwdDiscountAmount,
+        vatExemption: pwdVatExemption,
+      },
+      {
+        key: "manual",
+        label: "Manual Discount",
+        shortLabel: "Manual",
+        qualifiedCount: rawManualCount,
+        proratedBase: 0,
+        discountAmount: manualDiscountAmount,
+        vatExemption: manualVatExemption,
+      },
+    ];
+
+    const totalDiscount = discountBreakdown.reduce(
+      (sum, entry) => sum + Number(entry.discountAmount || 0),
+      0,
+    );
+
+    const totalVatExemption = discountBreakdown.reduce(
+      (sum, entry) => sum + Number(entry.vatExemption || 0),
+      0,
+    );
+
+    const grossTotal = items.reduce((sum, item) => {
+      return (
+        sum + Number(item.sales_quantity || 0) * Number(item.selling_price || 0)
+      );
+    }, 0);
+
+    const totalQuantity = items.reduce((sum, item) => {
+      return sum + Number(item.sales_quantity || 0);
+    }, 0);
+
+    const discountableItemsCount = items.filter((item) =>
+      yesNoToBool(item.isDiscountable),
+    ).length;
+
+    const netAfterDiscount = Math.max(
+      grossTotal - totalDiscount - totalVatExemption,
+      0,
+    );
+
+    const discountTypeSummary = discountBreakdown
+      .filter(
+        (entry) =>
+          Number(entry.qualifiedCount || 0) > 0 ||
+          Number(entry.discountAmount || 0) > 0,
+      )
+      .map((entry) => entry.label)
+      .join(", ");
+
+    return {
+      discountableGross,
+      discountableBase,
+      grossTotal,
+      totalQuantity,
+      discountableItemsCount,
+      netAfterDiscount,
+      safeCustomerCount,
+      vatableSales,
+      vatableSalesVat,
+      vatExemptSales,
+      vatZeroRatedSales,
+      totalDiscount,
+      totalVatExemption,
+      totalQualifiedAll,
+      statutoryQualifiedCount,
+      statutoryQualifiedRatio,
+      discountBreakdown,
+      discountTypeSummary,
+    };
+  }, [items, customerCount, discountState]);
+
+  const validateQualifiedCounts = (nextTotal, nextState = discountState) => {
+    const totalNum = Math.max(Number(nextTotal || 0), 0);
+    const seniorNum = Math.max(
+      Math.floor(Number(nextState?.senior?.qualifiedCount || 0)),
+      0,
+    );
+    const pwdNum = Math.max(
+      Math.floor(Number(nextState?.pwd?.qualifiedCount || 0)),
+      0,
+    );
+    const manualNum = Math.max(
+      Math.floor(Number(nextState?.manual?.qualifiedCount || 0)),
+      0,
+    );
+
+    const totalQualified = seniorNum + pwdNum + manualNum;
+
+    if (totalNum > 0 && totalQualified > totalNum) {
+      setQualifiedPrompt(
+        "Total qualified across Senior, PWD, and Manual should not be more than total customers.",
+      );
+      return false;
+    }
+
+    if (manualNum > 0 && Number(nextState?.manual?.manualAmount || 0) <= 0) {
+      setQualifiedPrompt(
+        "Manual Discount amount is required when Manual qualified count is greater than zero.",
+      );
+      return false;
+    }
+
+    setQualifiedPrompt("");
+    return true;
+  };
+
+  useEffect(() => {
+    validateQualifiedCounts(customerCount, discountState);
+  }, [customerCount, discountState]);
+
+  const isPrintDisabled = Boolean(qualifiedPrompt);
 
   const saveBillingBeforePrint = async () => {
     if (!apiHost || !transaction?.transaction_id) {
       throw new Error("Missing transaction data.");
     }
+
+    if (!validateQualifiedCounts(customerCount, discountState)) {
+      throw new Error("Please fix the discount validation first.");
+    }
+
+    const discountBreakdownPayload = computed.discountBreakdown
+      .filter(
+        (entry) =>
+          Number(entry.qualifiedCount || 0) > 0 ||
+          Number(entry.discountAmount || 0) > 0,
+      )
+      .map((entry) => ({
+        key: entry.key,
+        discount_type: entry.label,
+        qualified_count: Number(entry.qualifiedCount || 0),
+        discount_amount: Number(entry.discountAmount || 0),
+        vat_exemption: Number(entry.vatExemption || 0),
+        prorated_base: Number(entry.proratedBase || 0),
+      }));
 
     const payload = {
       transaction_id: transaction.transaction_id,
@@ -748,26 +1240,26 @@ const ModalDiscountTransaction = ({
 
       customer_exclusive_id: transaction?.customer_exclusive_id || "",
       customer_head_count: Number(customerCount || 1),
-      customer_count_for_discount: isManualDiscount
-        ? 0
-        : Number(qualifiedCount || 0),
-      discount_type: discountType || "",
+      customer_count_for_discount: Number(computed?.totalQualifiedAll || 0),
+      discount_type: computed?.discountTypeSummary || "",
 
       TotalSales: Number(computed?.grossTotal || 0),
-      Discount: Number(computed?.computedDiscount || 0),
+      Discount: Number(computed?.totalDiscount || 0),
       OtherCharges: Number(transaction?.OtherCharges || 0),
       TotalAmountDue: Number(computed?.netAfterDiscount || 0),
 
       VATableSales: Number(computed?.vatableSales || 0),
       VATableSales_VAT: Number(computed?.vatableSalesVat || 0),
       VATExemptSales: Number(computed?.vatExemptSales || 0),
-      VATExemptSales_VAT: Number(computed?.vatExemption || 0),
+      VATExemptSales_VAT: Number(computed?.totalVatExemption || 0),
       VATZeroRatedSales: Number(computed?.vatZeroRatedSales || 0),
 
       payment_amount: Number(transaction?.payment_amount || 0),
       payment_method: transaction?.payment_method || "Cash",
       change_amount: Number(transaction?.change_amount || 0),
       cashier: transaction?.cashier || "System",
+
+      discount_breakdown: discountBreakdownPayload,
 
       cart_items: (items || []).map((item) => ({
         databaseID: item.ID || item.id || item.databaseID,
@@ -794,192 +1286,6 @@ const ModalDiscountTransaction = ({
 
     return result;
   };
-  useEffect(() => {
-    if (!isOpen || !apiHost || !transaction?.transaction_id) return;
-
-    setIsLoading(true);
-    setErrorMessage("");
-
-    fetch(`${apiHost}/api/transaction_discount_items.php`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        transaction_id: transaction.transaction_id,
-      }),
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        setItems(Array.isArray(data?.items) ? data.items : []);
-        setIsLoading(false);
-      })
-      .catch((error) => {
-        console.error(error);
-        setErrorMessage("Failed to load transaction items.");
-        setItems([]);
-        setIsLoading(false);
-      });
-  }, [isOpen, apiHost, transaction]);
-
-  useEffect(() => {
-    if (!isOpen) {
-      setCustomerCount(1);
-      setQualifiedCount(1);
-      setQualifiedPrompt("");
-      setManualDiscount("");
-      setDiscountType("Senior Citizen Discount");
-    }
-  }, [isOpen]);
-
-  const isManualDiscount = discountType === "Manual Discount";
-
-  const validateQualifiedCounts = (nextTotal, nextQualified) => {
-    if (isManualDiscount) {
-      setQualifiedPrompt("");
-      return;
-    }
-
-    const totalNum = Number(nextTotal || 0);
-    const qualifiedNum = Number(nextQualified || 0);
-
-    if (totalNum > 0 && qualifiedNum > totalNum) {
-      setCustomerCount(1);
-      setQualifiedCount(1);
-      setQualifiedPrompt("Qualified should not be more than total customers.");
-      return;
-    }
-
-    setQualifiedPrompt("");
-  };
-
-  const isPrintDisabled = !isManualDiscount && Boolean(qualifiedPrompt);
-
-  const computed = useMemo(() => {
-    const safeCustomerCount = Math.max(Number(customerCount) || 1, 1);
-    const safeQualifiedCount = Math.max(
-      Math.min(Number(qualifiedCount) || 0, safeCustomerCount),
-      0,
-    );
-
-    const qualifiedRatio =
-      safeCustomerCount > 0 ? safeQualifiedCount / safeCustomerCount : 0;
-
-    const notQualifiedRatio =
-      safeCustomerCount > 0
-        ? (safeCustomerCount - safeQualifiedCount) / safeCustomerCount
-        : 0;
-
-    let discountableGross = 0;
-    let discountableBase = 0;
-    let rawVatableGross = 0;
-    let vatableSales = 0;
-    let vatableSalesVat = 0;
-    let vatExemptSales = 0;
-    const vatZeroRatedSales = 0;
-
-    items.forEach((item) => {
-      const isDiscountable =
-        String(item.isDiscountable || "")
-          .trim()
-          .toLowerCase() === "yes";
-
-      const isVatable =
-        String(item.vatable || "")
-          .trim()
-          .toLowerCase() === "yes";
-
-      const qty = Number(item.sales_quantity || 0);
-      const price = Number(item.selling_price || 0);
-      const lineTotal = qty * price;
-
-      if (isDiscountable) {
-        discountableGross += lineTotal;
-        discountableBase += isVatable ? lineTotal / 1.12 : lineTotal;
-
-        if (isVatable) {
-          // qualified portion goes to VAT EXEMPT SALES
-          vatExemptSales += lineTotal * qualifiedRatio;
-
-          // not qualified portion stays VATABLE
-          rawVatableGross += lineTotal * notQualifiedRatio;
-        } else {
-          // all non-vatable discountable items are VAT EXEMPT SALES
-          vatExemptSales += lineTotal;
-        }
-      } else {
-        if (isVatable) {
-          // non-discountable + vatable items are fully VATABLE
-          rawVatableGross += lineTotal;
-        } else {
-          // non-discountable + non-vatable items are VAT EXEMPT SALES
-          vatExemptSales += lineTotal;
-        }
-      }
-    });
-
-    vatableSales = rawVatableGross / 1.12;
-    vatableSalesVat = vatableSales * 0.12;
-
-    const proratedBase =
-      safeCustomerCount > 0
-        ? discountableBase * (safeQualifiedCount / safeCustomerCount)
-        : 0;
-
-    let computedDiscount = 0;
-    let vatExemption = 0;
-
-    if (
-      discountType === "Senior Citizen Discount" ||
-      discountType === "PWD Discount"
-    ) {
-      computedDiscount = proratedBase * 0.2;
-      vatExemption = proratedBase * 0.12;
-    } else {
-      computedDiscount = Number(manualDiscount || 0);
-      vatExemption = 0;
-    }
-
-    const grossTotal = items.reduce((sum, item) => {
-      return (
-        sum + Number(item.sales_quantity || 0) * Number(item.selling_price || 0)
-      );
-    }, 0);
-
-    const totalQuantity = items.reduce((sum, item) => {
-      return sum + Number(item.sales_quantity || 0);
-    }, 0);
-
-    const discountableItemsCount = items.filter(
-      (item) =>
-        String(item.isDiscountable || "")
-          .trim()
-          .toLowerCase() === "yes",
-    ).length;
-
-    const netAfterDiscount = Math.max(
-      grossTotal - computedDiscount - vatExemption,
-      0,
-    );
-
-    return {
-      discountableGross,
-      discountableBase,
-      proratedBase,
-      computedDiscount,
-      grossTotal,
-      totalQuantity,
-      discountableItemsCount,
-      netAfterDiscount,
-      safeCustomerCount,
-      safeQualifiedCount,
-      vatableSales,
-      vatableSalesVat,
-      vatExemptSales,
-      vatZeroRatedSales,
-      vatExemption,
-    };
-  }, [items, discountType, customerCount, qualifiedCount, manualDiscount]);
 
   const handlePrint = useReactToPrint({
     content: () => printRef.current,
@@ -1024,6 +1330,10 @@ const ModalDiscountTransaction = ({
     ? "bg-slate-950/40 border border-white/5"
     : "bg-slate-50 border border-slate-200";
 
+  const innerCardClass = isDark
+    ? "bg-slate-900/70 border border-white/5"
+    : "bg-white border border-slate-200";
+
   const inputClass = isDark
     ? "bg-slate-900/70 border border-slate-800 text-white placeholder:text-slate-500"
     : "bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400";
@@ -1046,7 +1356,7 @@ const ModalDiscountTransaction = ({
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.985, opacity: 0, y: 10 }}
             transition={{ duration: 0.16 }}
-            className={`w-full max-w-[820px] overflow-hidden rounded-[1rem] shadow-2xl ${containerClass}`}
+            className={`w-full max-w-[980px] max-h-[calc(100vh-1rem)] sm:max-h-[calc(100vh-2rem)] overflow-hidden rounded-[1rem] shadow-2xl flex flex-col ${containerClass}`}
           >
             <div
               className={`relative px-4 py-3 ${
@@ -1066,7 +1376,7 @@ const ModalDiscountTransaction = ({
                 <FiX size={14} />
               </button>
 
-              <div className="pr-8">
+              <div className="pr-8 ">
                 <div className="flex items-center gap-2.5">
                   <div
                     className={`flex h-8 w-8 items-center justify-center rounded-lg ${
@@ -1091,7 +1401,43 @@ const ModalDiscountTransaction = ({
               </div>
             </div>
 
-            <div className="p-3 space-y-3">
+            <div className="space-y-3 p-3 overflow-y-auto flex-1 min-h-0">
+              {hadExistingDiscountBreakdown ? (
+                <div
+                  className={`rounded-[1rem] border px-3 py-3 ${
+                    showOverrideWarning
+                      ? isDark
+                        ? "border-amber-400/40 bg-amber-500/10"
+                        : "border-amber-300 bg-amber-50"
+                      : isDark
+                        ? "border-blue-400/30 bg-blue-500/10"
+                        : "border-blue-200 bg-blue-50"
+                  }`}
+                >
+                  <div className="flex items-start gap-2.5">
+                    <div
+                      className={`mt-0.5 ${
+                        showOverrideWarning ? "text-amber-500" : "text-blue-500"
+                      }`}
+                    >
+                      <FiAlertTriangle size={16} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-black">
+                        {showOverrideWarning
+                          ? "Editing will override previous billing discount breakdown"
+                          : "Previous billing discount breakdown loaded"}
+                      </p>
+                      <p className="mt-1 text-[12px] text-slate-500">
+                        {showOverrideWarning
+                          ? "This transaction already has an active discount breakdown. Printing billing again with your changes will replace the previous active breakdown for this transaction."
+                          : "This modal loaded the existing active discount breakdown from billing for this transaction. You may review it or edit it if needed."}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
               <div className={`rounded-[1rem] p-3 ${cardClass}`}>
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
@@ -1117,67 +1463,15 @@ const ModalDiscountTransaction = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.2fr_0.9fr]">
                 <div className={`rounded-[1rem] p-3 ${cardClass}`}>
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="mb-3 flex items-center gap-2">
                     <FiFileText size={14} className="text-slate-500" />
                     <h3 className="text-sm font-black">Discount Setup</h3>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-2">
-                    {[
-                      {
-                        label: "Senior Citizen Discount",
-                        description: "20% prorated discountable base",
-                      },
-                      {
-                        label: "PWD Discount",
-                        description: "20% prorated discountable base",
-                      },
-                      {
-                        label: "Manual Discount",
-                        description: "Direct amount entry",
-                      },
-                    ].map((type) => {
-                      const active = discountType === type.label;
-
-                      return (
-                        <button
-                          key={type.label}
-                          type="button"
-                          onClick={() => {
-                            setDiscountType(type.label);
-                            setQualifiedPrompt("");
-                            setCustomerCount(1);
-                            setQualifiedCount(1);
-                          }}
-                          className={`w-full rounded-lg border px-3 py-2.5 text-left transition-all ${
-                            active
-                              ? "border-blue-600 bg-blue-600 text-white"
-                              : isDark
-                                ? "border-white/5 bg-slate-900/70 text-slate-300 hover:bg-slate-900"
-                                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                          }`}
-                        >
-                          <div className="text-sm font-bold">{type.label}</div>
-                          <div
-                            className={`mt-0.5 text-[10px] ${
-                              active ? "text-blue-100" : "text-slate-500"
-                            }`}
-                          >
-                            {type.description}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-
                   <div
-                    className={`rounded-[0.9rem] p-3 mt-4 ${
-                      isDark
-                        ? "bg-slate-900/70 border border-white/5"
-                        : "bg-white border border-slate-200"
-                    }`}
+                    className={`rounded-[0.95rem] p-3 mb-3 ${innerCardClass}`}
                   >
                     <div className="flex items-center gap-2 mb-2">
                       {isManualDiscount ? (
@@ -1192,117 +1486,62 @@ const ModalDiscountTransaction = ({
                       </h3>
                     </div>
 
-                    {isManualDiscount ? (
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                       <div>
                         <label className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
-                          Discount Amount
+                          Total Customers
                         </label>
                         <input
                           type="number"
-                          min="0"
-                          step="0.01"
-                          value={manualDiscount}
-                          onChange={(e) => setManualDiscount(e.target.value)}
+                          min="1"
+                          value={customerCount}
+                          onChange={(e) => setCustomerCount(e.target.value)}
+                          onFocus={handleSelectAllOnFocus}
+                          onBlur={() => {
+                            const normalized =
+                              customerCount === "" || Number(customerCount) < 1
+                                ? 1
+                                : Number(customerCount);
+                            setCustomerCount(normalized);
+                          }}
                           className={`w-full rounded-lg px-3 py-2 text-sm outline-none ${inputClass}`}
-                          placeholder="0.00"
                         />
                       </div>
-                    ) : (
-                      <>
-                        <div className="grid grid-cols-2 gap-2.5">
-                          <div>
-                            <label className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
-                              Total Customers
-                            </label>
-                            <input
-                              type="number"
-                              min="1"
-                              value={customerCount}
-                              onFocus={() => {
-                                if (customerCount === 1) setCustomerCount("");
-                              }}
-                              onChange={(e) => {
-                                const nextValue = e.target.value;
-                                setCustomerCount(nextValue);
-                                if (qualifiedPrompt) {
-                                  validateQualifiedCounts(
-                                    nextValue,
-                                    qualifiedCount,
-                                  );
-                                }
-                              }}
-                              onBlur={() => {
-                                const normalized =
-                                  customerCount === "" ||
-                                  Number(customerCount) < 1
-                                    ? 1
-                                    : Number(customerCount);
-                                setCustomerCount(normalized);
-                                validateQualifiedCounts(
-                                  normalized,
-                                  qualifiedCount,
-                                );
-                              }}
-                              className={`w-full rounded-lg px-3 py-2 text-sm outline-none ${
-                                qualifiedPrompt
-                                  ? isDark
-                                    ? "bg-slate-900/70 border border-red-500 text-white placeholder:text-slate-500"
-                                    : "bg-white border border-red-500 text-slate-900 placeholder:text-slate-400"
-                                  : inputClass
-                              }`}
-                            />
-                          </div>
 
-                          <div>
-                            <label className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
-                              Qualified
-                            </label>
-                            <input
-                              type="number"
-                              min="0"
-                              max={customerCount || 1}
-                              value={qualifiedCount}
-                              onFocus={() => {
-                                if (qualifiedCount === 1) setQualifiedCount("");
-                              }}
-                              onChange={(e) => {
-                                const nextValue = e.target.value;
-                                setQualifiedCount(nextValue);
-                                if (qualifiedPrompt) {
-                                  validateQualifiedCounts(
-                                    customerCount,
-                                    nextValue,
-                                  );
-                                }
-                              }}
-                              onBlur={() => {
-                                const normalized =
-                                  qualifiedCount === "" ||
-                                  Number(qualifiedCount) < 0
-                                    ? 1
-                                    : Number(qualifiedCount);
-                                setQualifiedCount(normalized);
-                                validateQualifiedCounts(
-                                  customerCount,
-                                  normalized,
-                                );
-                              }}
-                              className={`w-full rounded-lg px-3 py-2 text-sm outline-none ${
-                                qualifiedPrompt
-                                  ? isDark
-                                    ? "bg-slate-900/70 border border-red-500 text-white placeholder:text-slate-500"
-                                    : "bg-white border border-red-500 text-slate-900 placeholder:text-slate-400"
-                                  : inputClass
-                              }`}
-                            />
-                          </div>
-                        </div>
-
-                        <p className="mt-2 text-xs font-semibold text-red-500 min-h-[18px]">
-                          {qualifiedPrompt}
+                      <div
+                        className={`rounded-lg px-3 py-2 ${
+                          isDark
+                            ? "bg-slate-900/60 border border-white/5 text-slate-300"
+                            : "bg-white border border-slate-200 text-slate-600"
+                        }`}
+                      >
+                        <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
+                          Total Qualified
                         </p>
-                      </>
-                    )}
+                        <p className="mt-1 text-lg font-black">
+                          {computed.totalQualifiedAll}
+                        </p>
+                      </div>
+                    </div>
+
+                    <p className="mt-2 text-xs font-semibold text-red-500 min-h-[18px]">
+                      {qualifiedPrompt}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3">
+                    {DISCOUNT_META.map((meta) => (
+                      <DiscountEntryCard
+                        key={meta.key}
+                        meta={meta}
+                        values={discountState[meta.key]}
+                        isDark={isDark}
+                        inputClass={inputClass}
+                        cardClass={innerCardClass}
+                        onChangeCount={handleChangeCount}
+                        onChangeManualAmount={handleChangeManualAmount}
+                      />
+                    ))}
                   </div>
                 </div>
 
@@ -1342,16 +1581,62 @@ const ModalDiscountTransaction = ({
                           <span className="font-semibold">
                             ₱ {peso(computed.proratedBase)}
                           </span>
+                    <div className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
+                      <span className="text-slate-500">
+                        Statutory Qualified
+                      </span>
+                      <span className="font-semibold">
+                        {computed.statutoryQualifiedCount} /{" "}
+                        {computed.safeCustomerCount}
+                      </span>
+                    </div>
+
+                    {computed.discountBreakdown.map((entry) => {
+                      const hasValue =
+                        Number(entry.qualifiedCount || 0) > 0 ||
+                        Number(entry.discountAmount || 0) > 0;
+
+                      if (!hasValue) return null;
+
+                      return (
+                        <div
+                          key={`summary-${entry.key}`}
+                          className="rounded-lg bg-emerald-500/10 px-3 py-2"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[12px] font-bold">
+                              {entry.label}
+                            </span>
+                            <span className="text-[13px] font-black text-emerald-500">
+                              ₱ {peso(entry.discountAmount)}
+                            </span>
+                          </div>
+                          <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-slate-500">
+                            <span>Count: {entry.qualifiedCount}</span>
+                            <span>
+                              VAT Exempt: ₱ {peso(entry.vatExemption)}
+                            </span>
+                          </div>
                         </div>
-                      </>
-                    )}
+                      );
+                    })}
 
                     <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-emerald-500/10">
                       <span className="text-[12px] font-bold">
                         {discountType}
+                    <div className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
+                      <span className="text-slate-500">Total Discount</span>
+                      <span className="font-semibold text-emerald-500">
+                        ₱ {peso(computed.totalDiscount)}
                       </span>
-                      <span className="text-[13px] font-black text-emerald-500">
-                        ₱ {peso(computed.computedDiscount)}
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
+                      <span className="text-slate-500">
+                        Total VAT Exemption
+                      </span>
+                      <span className="font-semibold text-violet-500">
+                        ₱ {peso(computed.totalVatExemption)}
                       </span>
                     </div>
 
@@ -1402,7 +1687,11 @@ const ModalDiscountTransaction = ({
                     }
                   }}
                   disabled={isPrintDisabled}
-                  className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white transition-all hover:bg-blue-500"
+                  className={`flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-bold text-white transition-all ${
+                    isPrintDisabled
+                      ? "bg-slate-400 cursor-not-allowed"
+                      : "bg-blue-600 hover:bg-blue-500"
+                  }`}
                 >
                   <FiPrinter size={14} />
                   Print Billing
@@ -1437,11 +1726,8 @@ const ModalDiscountTransaction = ({
             invoice_no: latestInvoiceNo || transaction?.invoice_no || "",
           }}
           dateFrom={dateFrom}
-          discountType={discountType}
           computed={computed}
           items={items}
-          isManualDiscount={isManualDiscount}
-          billingNo={latestBillingNo || billingNo || ""}
         />
       </div>
     </>

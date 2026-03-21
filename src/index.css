@@ -186,17 +186,17 @@ footer {
   --app-surface-strong: rgba(2, 6, 23, 0.82);
   --app-border: rgba(255, 255, 255, 0.08);
   --app-muted-text: #94a3b8;
-  --color-darkerPrimary: #0E0F14;
-  --color-darkPrimary: #15161D;
+  --color-darkerPrimary: #0e0f14;
+  --color-darkPrimary: #15161d;
   --color-medPrimary: #212229;
-  --color-softPrimary: #1C2D6E;
-  --color-softerPrimary: #E6ECFA;
-  --color-brandPrimary: #093FB4;
-  --color-brandSecondary: #345FD1;
-  --color-brandTertiary: #A0BDF7;
-  --color-lighter: #DDE7FC;
-  --color-light: #C6D8F6;
-  --color-redaccent: #FF5252;
+  --color-softPrimary: #1c2d6e;
+  --color-softerPrimary: #e6ecfa;
+  --color-brandPrimary: #093fb4;
+  --color-brandSecondary: #345fd1;
+  --color-brandTertiary: #a0bdf7;
+  --color-lighter: #dde7fc;
+  --color-light: #c6d8f6;
+  --color-redaccent: #ff5252;
 }
 
 html,
@@ -210,7 +210,9 @@ body,
 body {
   background-color: var(--app-bg);
   color: var(--app-text);
-  transition: background-color 0.25s ease, color 0.25s ease;
+  transition:
+    background-color 0.25s ease,
+    color 0.25s ease;
 }
 
 [data-theme="light"] body {

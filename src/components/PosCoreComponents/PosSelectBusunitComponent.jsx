@@ -1615,7 +1615,7 @@ const PosSelectBusunitComponent = () => {
                         setaddedit("Close");
                         setYesNoModalOpen(true);
                       }}
-                      className="h-12 rounded-full px-4 text-sm sm:text-base font-bold text-white transition hover:scale-[0.99] active:scale-[0.98]"
+                      className="h-12 rounded-full px-4 text-sm sm:text-base font-bold text-gray-100 transition hover:scale-[0.99] active:scale-[0.98]"
                       style={{
                         background: `linear-gradient(180deg, ${COLORS.brandSecondary} 0%, ${COLORS.brand} 100%)`,
                       }}
@@ -1629,7 +1629,7 @@ const PosSelectBusunitComponent = () => {
                         setaddedit("Select");
                         setYesNoModalOpen(true);
                       }}
-                      className="h-12 rounded-full px-4 text-sm sm:text-base font-bold text-white transition hover:scale-[0.99] active:scale-[0.98]"
+                      className="h-12 rounded-full px-4 text-sm sm:text-base font-bold text-gray-100 transition hover:scale-[0.99] active:scale-[0.98]"
                       style={{
                         background: `linear-gradient(180deg, ${COLORS.brand} 0%, ${COLORS.brandSecondary} 100%)`,
                         boxShadow: `0 14px 28px color-mix(in srgb, ${COLORS.brand} 34%, transparent)`,
@@ -1782,7 +1782,7 @@ const PosSelectBusunitComponent = () => {
                           }}
                         >
                           <div
-                            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl text-white"
+                            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl text-gray-100"
                             style={{
                               background: `linear-gradient(180deg, ${COLORS.brand} 0%, ${COLORS.brandSecondary} 100%)`,
                             }}
@@ -1808,7 +1808,7 @@ const PosSelectBusunitComponent = () => {
       </div>
 
       {/* Floating manage/read button */}
-      <div className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))] z-[9998]">
+      {/* <div className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))] z-[9998]">
         <motion.button
           type="button"
           onClick={() => {
@@ -1836,7 +1836,7 @@ const PosSelectBusunitComponent = () => {
             <span className="text-xs font-semibold theme-muted">Open →</span>
           </span>
         </motion.button>
-      </div>
+      </div> */}
     </div>
   );
 };

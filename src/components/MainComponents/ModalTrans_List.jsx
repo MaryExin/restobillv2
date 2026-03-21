@@ -109,7 +109,6 @@ const ModalTrans_List = ({
     }
   };
 
-
   const onOpenDiscountModal = (item, e) => {
     e.stopPropagation();
     setDiscountTransaction(item);
@@ -256,13 +255,6 @@ const ModalTrans_List = ({
                             >
                               <FiPercent size={18} />
                             </button>
-
-                            <div
-                              onClick={() => onTransactionClick(item)}
-                              className="p-3 bg-blue-500/10 text-blue-500 rounded-xl group-hover:bg-blue-500 group-hover:text-white transition-all"
-                            >
-                              <FiPrinter size={18} />
-                            </div>
                           </>
                         )}
                       </div>
@@ -292,19 +284,19 @@ const ModalTrans_List = ({
 
       <AnimatePresence>
         {showDiscountModal && discountTransaction && (
-      <ModalDiscountTransaction
-        isOpen={showDiscountModal}
-        onClose={() => setShowDiscountModal(false)}
-        transaction={discountTransaction}
-        apiHost={apiHost}
-        isDark={isDark}
-        dateFrom={dateFrom}
-        billingNo={
-          discountTransaction?.billing_no ||
-          discountTransaction?.billingNo ||
-          ""
-        }
-      />
+          <ModalDiscountTransaction
+            isOpen={showDiscountModal}
+            onClose={() => setShowDiscountModal(false)}
+            transaction={discountTransaction}
+            apiHost={apiHost}
+            isDark={isDark}
+            dateFrom={dateFrom}
+            billingNo={
+              discountTransaction?.billing_no ||
+              discountTransaction?.billingNo ||
+              ""
+            }
+          />
         )}
       </AnimatePresence>
 

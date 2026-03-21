@@ -1844,7 +1844,7 @@ const Orderlist = ({
                   : "bg-white border border-slate-200"
               }`}
             >
-              <div className="mx-auto mb-4 w-14 h-14 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+              <div className="mx-auto mb-4 w-14 h-14 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center">
                 <FaCheckCircle size={24} />
               </div>
 
@@ -1866,7 +1866,7 @@ const Orderlist = ({
 
               <button
                 onClick={() => setShowSaveSuccessModal(false)}
-                className="w-full py-3 rounded-2xl bg-emerald-600 text-white font-bold hover:bg-emerald-500"
+                className="w-full py-3 rounded-2xl bg-blue-600 text-white font-bold hover:bg-blue-500"
               >
                 OK
               </button>
@@ -2407,10 +2407,6 @@ const Orderlist = ({
                               >
                                 <FiPercent size={18} />
                               </button>
-
-                              <div className="p-3 bg-blue-500/10 text-blue-500 rounded-xl group-hover:bg-blue-500 group-hover:text-white transition-all">
-                                <FiPrinter size={18} />
-                              </div>
                             </>
                           )}
                         </div>

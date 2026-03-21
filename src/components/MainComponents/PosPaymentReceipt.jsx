@@ -17,17 +17,24 @@ const PosPaymentReceipt = React.forwardRef(
       payments = [],
       otherCharges = [],
       customerCards = [],
-      discountType = "No Discount",
+      isDuplicateCopy = false,
     },
     ref,
   ) => {
-    const primaryCustomer = customerCards?.[0] || {};
     const paymentLabel =
       payments.length > 0
         ? [
             ...new Set(payments.map((p) => p.payment_method).filter(Boolean)),
           ].join(", ")
         : transaction?.payment_method || "Cash";
+
+    const activeBreakdown = Array.isArray(computed?.discountBreakdown)
+      ? computed.discountBreakdown.filter(
+          (entry) =>
+            Number(entry?.qualifiedCount || 0) > 0 ||
+            Number(entry?.discountAmount || 0) > 0,
+        )
+      : [];
 
     return (
       <div
@@ -70,23 +77,31 @@ const PosPaymentReceipt = React.forwardRef(
           <div style={{ fontSize: "10px" }}>S/N:</div>
         </div>
 
-        <div
-          style={{
-            borderTop: "1px solid #000",
-            margin: "10px 0 8px",
-          }}
-        />
+        <div style={{ borderTop: "1px solid #000", margin: "10px 0 8px" }} />
 
         <div
           style={{
             textAlign: "center",
             fontWeight: "900",
             fontSize: "14px",
-            marginBottom: "8px",
+            marginBottom: "4px",
           }}
         >
           INVOICE
         </div>
+
+        {isDuplicateCopy ? (
+          <div
+            style={{
+              textAlign: "center",
+              fontWeight: "900",
+              fontSize: "11px",
+              marginBottom: "8px",
+            }}
+          >
+            DUPLICATE INVOICE COPY
+          </div>
+        ) : null}
 
         <table
           style={{
@@ -159,12 +174,7 @@ const PosPaymentReceipt = React.forwardRef(
           </tbody>
         </table>
 
-        <div
-          style={{
-            borderTop: "1px solid #000",
-            margin: "10px 0 6px",
-          }}
-        />
+        <div style={{ borderTop: "1px solid #000", margin: "10px 0 6px" }} />
 
         <table
           style={{
@@ -218,12 +228,7 @@ const PosPaymentReceipt = React.forwardRef(
           </tbody>
         </table>
 
-        <div
-          style={{
-            borderTop: "1px solid #000",
-            margin: "10px 0 6px",
-          }}
-        />
+        <div style={{ borderTop: "1px solid #000", margin: "10px 0 6px" }} />
 
         <table
           style={{
@@ -242,25 +247,26 @@ const PosPaymentReceipt = React.forwardRef(
               </td>
             </tr>
 
-            {discountType !== "No Discount" &&
-            Number(computed?.discount || 0) > 0 ? (
-              <tr>
-                <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                  {String(discountType || "DISCOUNT").toUpperCase()}:
-                </td>
-                <td style={{ textAlign: "right", padding: "1px 0" }}>
-                  {signedNegativePeso(computed?.discount)}
-                </td>
-              </tr>
-            ) : null}
+            {activeBreakdown.map((entry) =>
+              Number(entry?.discountAmount || 0) > 0 ? (
+                <tr key={entry.key}>
+                  <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                    {String(entry?.label || "DISCOUNT").toUpperCase()}:
+                  </td>
+                  <td style={{ textAlign: "right", padding: "1px 0" }}>
+                    {signedNegativePeso(entry?.discountAmount)}
+                  </td>
+                </tr>
+              ) : null,
+            )}
 
-            {Number(computed?.vatExemption || 0) > 0 ? (
+            {Number(computed?.totalVatExemption || 0) > 0 ? (
               <tr>
                 <td style={{ fontWeight: "700", padding: "1px 0" }}>
                   VAT EXEMPTION:
                 </td>
                 <td style={{ textAlign: "right", padding: "1px 0" }}>
-                  {signedNegativePeso(computed?.vatExemption)}
+                  {signedNegativePeso(computed?.totalVatExemption)}
                 </td>
               </tr>
             ) : null}
@@ -278,12 +284,7 @@ const PosPaymentReceipt = React.forwardRef(
           </tbody>
         </table>
 
-        <div
-          style={{
-            borderTop: "1px solid #000",
-            margin: "8px 0 6px",
-          }}
-        />
+        <div style={{ borderTop: "1px solid #000", margin: "8px 0 6px" }} />
 
         <div
           style={{
@@ -324,12 +325,7 @@ const PosPaymentReceipt = React.forwardRef(
           </tbody>
         </table>
 
-        <div
-          style={{
-            borderTop: "1px solid #000",
-            margin: "8px 0 6px",
-          }}
-        />
+        <div style={{ borderTop: "1px solid #000", margin: "8px 0 6px" }} />
 
         <table
           style={{
@@ -374,51 +370,80 @@ const PosPaymentReceipt = React.forwardRef(
           </tbody>
         </table>
 
-        <div
-          style={{
-            borderTop: "1px solid #000",
-            margin: "10px 0 8px",
-          }}
-        />
+        {customerCards.length > 0 ? (
+          <>
+            <div
+              style={{ borderTop: "1px solid #000", margin: "10px 0 8px" }}
+            />
 
-        <table
-          style={{
-            width: "100%",
-            fontSize: "10px",
-            borderCollapse: "collapse",
-          }}
-        >
-          <tbody>
-            <tr>
-              <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                Customer Name:
-              </td>
-              <td style={{ padding: "1px 0" }}>
-                {primaryCustomer.customer_name || ""}
-              </td>
-            </tr>
-            <tr>
-              <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                Customer ID:
-              </td>
-              <td style={{ padding: "1px 0" }}>
-                {primaryCustomer.customer_exclusive_id ||
-                  primaryCustomer.customer_id_no ||
-                  ""}
-              </td>
-            </tr>
-            <tr>
-              <td style={{ fontWeight: "700", padding: "1px 0" }}>TIN:</td>
-              <td style={{ padding: "1px 0" }}>{primaryCustomer.tin || ""}</td>
-            </tr>
-            <tr>
-              <td style={{ fontWeight: "700", padding: "1px 0" }}>Address:</td>
-              <td style={{ padding: "1px 0" }}>
-                {primaryCustomer.other_info_01 || ""}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+            <div
+              style={{
+                fontSize: "10px",
+                fontWeight: "700",
+                marginBottom: "4px",
+              }}
+            >
+              DISCOUNT CUSTOMER DETAILS
+            </div>
+
+            {customerCards.map((card, index) => (
+              <table
+                key={index}
+                style={{
+                  width: "100%",
+                  fontSize: "10px",
+                  borderCollapse: "collapse",
+                  marginBottom: "6px",
+                }}
+              >
+                <tbody>
+                  <tr>
+                    <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                      Customer #{index + 1}:
+                    </td>
+                    <td style={{ padding: "1px 0" }}>
+                      {card.customer_name || ""}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style={{ fontWeight: "700", padding: "1px 0" }}>ID:</td>
+                    <td style={{ padding: "1px 0" }}>
+                      {card.customer_exclusive_id || ""}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                      Birthdate:
+                    </td>
+                    <td style={{ padding: "1px 0" }}>
+                      {card.date_of_birth || ""}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                      Gender:
+                    </td>
+                    <td style={{ padding: "1px 0" }}>{card.gender || ""}</td>
+                  </tr>
+                  <tr>
+                    <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                      TIN:
+                    </td>
+                    <td style={{ padding: "1px 0" }}>{card.tin || ""}</td>
+                  </tr>
+                  <tr>
+                    <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                      Contact:
+                    </td>
+                    <td style={{ padding: "1px 0" }}>
+                      {card.contact_no || ""}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            ))}
+          </>
+        ) : null}
 
         <div style={{ marginTop: "12px", fontSize: "10px" }}>
           <div style={{ fontWeight: "700" }}>Customer Signature:</div>
@@ -431,12 +456,7 @@ const PosPaymentReceipt = React.forwardRef(
           />
         </div>
 
-        <div
-          style={{
-            borderTop: "1px solid #000",
-            margin: "10px 0 8px",
-          }}
-        />
+        <div style={{ borderTop: "1px solid #000", margin: "10px 0 8px" }} />
 
         <div style={{ textAlign: "center", fontSize: "10px" }}>
           <div style={{ fontWeight: "700" }}>Thank you</div>

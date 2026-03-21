@@ -7,28 +7,21 @@ import React, {
 } from "react";
 import { FixedSizeList as List } from "react-window";
 import { AnimatePresence, motion } from "framer-motion";
-import { useReactToPrint } from "react-to-print";
 import {
   FiX,
   FiSearch,
   FiEye,
   FiTag,
-  FiUsers,
   FiCreditCard,
-  FiFileText,
-  FiPlus,
-  FiTrash2,
   FiRefreshCw,
-  FiShoppingCart,
   FiPrinter,
   FiDatabase,
-  FiBarChart2,
 } from "react-icons/fi";
 import { FaMoneyBill, FaArrowLeft } from "react-icons/fa";
 import { useTheme } from "../../context/ThemeContext";
 import useApiHost from "../../hooks/useApiHost";
-import PosPaymentReceipt from "./PosPaymentReceipt";
 import { useNavigate } from "react-router-dom";
+import TransactionPaymentModal from "./TransactionPaymentModal";
 
 const peso = (value) =>
   `₱ ${Number(value || 0).toLocaleString("en-PH", {
@@ -36,23 +29,12 @@ const peso = (value) =>
     maximumFractionDigits: 2,
   })}`;
 
-const negativePeso = (value) => `- ${peso(value)}`;
 const toNum = (value) => Number(value || 0);
-
-const yesNoToBool = (value) =>
-  String(value || "")
-    .trim()
-    .toLowerCase() === "yes";
 
 const normalizeText = (value) =>
   String(value ?? "")
     .trim()
     .toLowerCase();
-
-const buildImagePath = (name) => {
-  const safe = encodeURIComponent(String(name || "").trim());
-  return `/${safe}.png`;
-};
 
 const safeReadJson = async (response, label) => {
   const text = await response.text();
@@ -69,38 +51,10 @@ const safeReadJson = async (response, label) => {
   }
 };
 
-const emptyCustomerInfo = {
-  customer_exclusive_id: "",
-  customer_name: "",
-  customer_id_no: "",
-  tin: "",
-  other_info_01: "",
-  other_info_02: "",
-  other_info_03: "",
-};
-
-const createEmptyCustomerCard = () => ({
-  ...emptyCustomerInfo,
-});
-
-const createEmptyPaymentRow = () => ({
-  payment_method: "",
-  payment_amount: "",
-  payment_reference: "",
-});
-
-const createEmptyOtherChargeRow = () => ({
-  particulars: "",
-  amount: "",
-  reference: "",
-});
-
-const PENDING_COLUMN_TEMPLATE =
-  "110px 200px 120px 140px 200px 170px 170px 200px";
-
-const PENDING_TABLE_MIN_WIDTH = 1310;
-const PENDING_ROW_HEIGHT = 76;
-const PENDING_LIST_HEIGHT = 560;
+const TABLE_COLUMN_TEMPLATE = "120px 200px 120px 140px 180px 170px 170px 190px";
+const TABLE_MIN_WIDTH = 1290;
+const ROW_HEIGHT = 76;
+const LIST_HEIGHT = 560;
 
 const ListOuter = React.forwardRef(({ style, ...props }, ref) => (
   <div
@@ -196,91 +150,76 @@ const ActionTile = ({
   onClick,
   active = false,
 }) => {
+function StatCard({ title, value, icon: Icon, isDark, tone = "blue" }) {
+  const toneClasses = {
+    blue: isDark ? "bg-blue-500/10 text-blue-300" : "bg-blue-50 text-blue-600",
+    green: isDark
+      ? "bg-emerald-500/10 text-emerald-300"
+      : "bg-emerald-50 text-emerald-600",
+    yellow: isDark
+      ? "bg-amber-500/10 text-amber-300"
+      : "bg-amber-50 text-amber-600",
+    slate: isDark
+      ? "bg-slate-800 text-slate-300"
+      : "bg-slate-100 text-slate-600",
+  };
+
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-[18px] border px-3 py-3 text-left transition ${
-        active
-          ? "border-blue-500 bg-blue-600 text-white"
-          : isDark
-            ? "border-slate-800 bg-slate-950 text-slate-300 hover:border-slate-700 hover:text-white"
-            : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-white"
+    <div
+      className={`rounded-[24px] border p-5 ${
+        isDark
+          ? "border-white/5 bg-white/[0.03]"
+          : "border-slate-200 bg-white shadow-sm"
       }`}
     >
-      <div className="flex items-center gap-3">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+          {title}
+        </div>
         <div
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
-            active
-              ? "bg-white/15 text-white"
-              : isDark
-                ? "bg-slate-800 text-slate-300"
-                : "bg-slate-100 text-slate-700"
+          className={`flex h-10 w-10 items-center justify-center rounded-2xl ${
+            toneClasses[tone]
           }`}
         >
-          {icon}
-        </div>
-
-        <div className="min-w-0">
-          <div className="text-sm font-bold leading-tight">{title}</div>
-          <div
-            className={`mt-0.5 text-[10px] leading-tight ${
-              active ? "text-blue-100" : "text-slate-500"
-            }`}
-          >
-            {subtitle}
-          </div>
+          <Icon size={18} />
         </div>
       </div>
-    </button>
-  );
-};
-const InfoPill = ({ isDark, children }) => (
-  <span
-    className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-bold ${
-      isDark ? "bg-slate-800 text-slate-200" : "bg-slate-100 text-slate-700"
-    }`}
-  >
-    {children}
-  </span>
-);
 
-const SummaryRow = ({ label, value, isDark, valueClassName = "" }) => (
-  <div
-    className={`flex items-center justify-between gap-3 rounded-2xl px-3 py-2.5 ${
-      isDark ? "bg-slate-950/80" : "bg-slate-50"
-    }`}
-  >
-    <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
-      {label}
-    </span>
-    <span className={`text-sm font-black ${valueClassName}`}>{value}</span>
-  </div>
-);
-const YesNoModal = ({
-  isOpen,
-  onClose,
-  onYes,
-  isDark,
-  title = "Confirm Action",
-  message = "Are you sure?",
-  yesText = "Yes",
-  noText = "No",
-  busy = false,
-}) => {
+      <div
+        className={`text-2xl font-black ${
+          isDark ? "text-white" : "text-slate-900"
+        }`}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function SummaryPanel({ isDark, viewMode, summary }) {
   return (
-    <ModalShell
-      isOpen={isOpen}
-      onClose={busy ? undefined : onClose}
-      isDark={isDark}
-      maxWidth="max-w-[560px]"
-      zIndex="z-[100003]"
+    <div
+      className={`rounded-[28px] border p-5 lg:sticky lg:top-6 ${
+        isDark
+          ? "border-white/5 bg-white/[0.03]"
+          : "border-slate-200 bg-white shadow-sm"
+      }`}
     >
-      <div className="p-6">
-        <div className="mb-4">
-          <h2 className="text-2xl font-black">{title}</h2>
-          <p className="mt-2 text-sm text-slate-500">{message}</p>
+      <div className="mb-5">
+        <div className="text-xs font-bold uppercase tracking-[0.2em] text-blue-500">
+          Summary
         </div>
+        <h2
+          className={`mt-2 text-2xl font-black ${
+            isDark ? "text-white" : "text-slate-900"
+          }`}
+        >
+          {viewMode === "paid" ? "Paid Overview" : "Pending Overview"}
+        </h2>
+        <p className="mt-2 text-sm text-slate-500">
+          Quick totals and payment setup information.
+        </p>
+      </div>
 
         <div className="grid grid-cols-2 gap-3 mt-6">
           <button
@@ -297,45 +236,55 @@ const YesNoModal = ({
           >
             {noText}
           </button>
+      <div className="space-y-4">
+        <StatCard
+          title={
+            viewMode === "paid" ? "Paid Transactions" : "Pending Transactions"
+          }
+          value={summary.totalTransactions}
+          icon={FiDatabase}
+          isDark={isDark}
+          tone={viewMode === "paid" ? "green" : "yellow"}
+        />
 
-          <button
-            type="button"
-            onClick={onYes}
-            disabled={busy}
-            className={`rounded-2xl px-4 py-3 text-sm font-black text-white transition ${
-              busy
-                ? "cursor-not-allowed bg-slate-400"
-                : "bg-blue-600 hover:bg-blue-500"
-            }`}
-          >
-            {busy ? "Processing..." : yesText}
-          </button>
-        </div>
+        <StatCard
+          title={viewMode === "paid" ? "Paid Amount" : "Pending Sales"}
+          value={peso(summary.totalSales)}
+          icon={FaMoneyBill}
+          isDark={isDark}
+          tone={viewMode === "paid" ? "green" : "yellow"}
+        />
+
+        <StatCard
+          title="Payment Methods"
+          value={summary.totalMethods}
+          icon={FiCreditCard}
+          isDark={isDark}
+          tone="blue"
+        />
+
+        <StatCard
+          title="Charge Options"
+          value={summary.totalCharges}
+          icon={FaMoneyBill}
+          isDark={isDark}
+          tone="slate"
+        />
       </div>
-    </ModalShell>
-  );
-};
 
-const SuccessModal = ({
-  isOpen,
-  onClose,
-  onPrint,
-  isDark,
-  title = "Success",
-  message = "Saved successfully.",
-}) => {
-  return (
-    <ModalShell
-      isOpen={isOpen}
-      onClose={onClose}
-      isDark={isDark}
-      maxWidth="max-w-[560px]"
-      zIndex="z-[100003]"
-    >
-      <div className="p-6">
-        <div className="mb-4">
-          <h2 className="text-2xl font-black text-emerald-500">{title}</h2>
-          <p className="mt-2 text-sm text-slate-500">{message}</p>
+      <div
+        className={`mt-5 rounded-[22px] border p-4 ${
+          isDark
+            ? "border-white/5 bg-slate-950/50"
+            : "border-slate-200 bg-slate-50"
+        }`}
+      >
+        <div
+          className={`mb-3 text-xs font-black uppercase tracking-[0.18em] ${
+            isDark ? "text-white" : "text-slate-900"
+          }`}
+        >
+          Legend
         </div>
 
         <div className="grid grid-cols-2 gap-3 mt-6">
@@ -359,20 +308,30 @@ const SuccessModal = ({
             <FiPrinter size={15} />
             Print Receipt
           </button>
+        <div className="space-y-3 text-sm">
+          <div className="flex items-center gap-3">
+            <span className="h-3.5 w-3.5 rounded-full bg-emerald-500" />
+            <span className="text-slate-500">Paid Transactions</span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className="h-3.5 w-3.5 rounded-full bg-amber-500" />
+            <span className="text-slate-500">Pending for Payment</span>
+          </div>
         </div>
       </div>
-    </ModalShell>
+    </div>
   );
-};
+}
 
-function PendingHeaderRow({ isDark }) {
+function HeaderRow({ isDark, mode }) {
   const headers = [
-    "Action",
+    mode === "paid" ? "Action / Print" : "Action",
     "Transaction ID",
     "Table",
     "Order Type",
     "Transaction Date",
-    "Total Sales",
+    mode === "paid" ? "Amount Due / Paid" : "Total Sales",
     "Cashier",
     "Remarks",
   ];
@@ -384,7 +343,7 @@ function PendingHeaderRow({ isDark }) {
           ? "border-white/5 bg-slate-950/70 text-slate-300"
           : "border-slate-200 bg-slate-50 text-slate-700"
       }`}
-      style={{ gridTemplateColumns: PENDING_COLUMN_TEMPLATE }}
+      style={{ gridTemplateColumns: TABLE_COLUMN_TEMPLATE }}
     >
       {headers.map((header) => (
         <div
@@ -398,13 +357,18 @@ function PendingHeaderRow({ isDark }) {
   );
 }
 
-function PendingTransactionRow({ index, style, data }) {
+function TransactionRow({ index, style, data }) {
   const row = data.rows[index];
   const isDark = data.isDark;
   const onOpen = data.onOpen;
+  const mode = data.mode;
 
-  const remarksText = row.remarks || "Pending for Payment";
-  const isPending = normalizeText(remarksText).includes("pending");
+  const remarksText =
+    row.remarks || (mode === "paid" ? "Paid" : "Pending for Payment");
+
+  const normalizedRemarks = normalizeText(remarksText);
+  const isPaid = normalizedRemarks.includes("paid");
+  const isPending = normalizedRemarks.includes("pending");
 
   return (
     <div style={style}>
@@ -414,16 +378,18 @@ function PendingTransactionRow({ index, style, data }) {
             ? "border-white/5 hover:bg-white/[0.03]"
             : "border-slate-100 hover:bg-slate-50"
         }`}
-        style={{ gridTemplateColumns: PENDING_COLUMN_TEMPLATE }}
+        style={{ gridTemplateColumns: TABLE_COLUMN_TEMPLATE }}
       >
-        <div className="flex items-center px-5 py-4">
+        <div className="flex items-center gap-2 px-5 py-4">
           <button
             type="button"
             onClick={() => onOpen(row)}
-            className="inline-flex items-center justify-center text-white transition bg-blue-600 h-11 w-11 rounded-2xl hover:bg-blue-500"
-            title="Open Payment"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white transition hover:bg-blue-500"
+            title={
+              mode === "paid" ? "Review / Print Duplicate" : "Open Payment"
+            }
           >
-            <FiEye size={17} />
+            {mode === "paid" ? <FiPrinter size={17} /> : <FiEye size={17} />}
           </button>
         </div>
 
@@ -434,32 +400,38 @@ function PendingTransactionRow({ index, style, data }) {
           </div>
         </div>
 
-        <div className="px-5 py-4 whitespace-nowrap">
+        <div className="whitespace-nowrap px-5 py-4">
           {row.table_number || "-"}
         </div>
 
-        <div className="px-5 py-4 whitespace-nowrap">
+        <div className="whitespace-nowrap px-5 py-4">
           {row.order_type || "-"}
         </div>
 
-        <div className="px-5 py-4 whitespace-nowrap">
+        <div className="whitespace-nowrap px-5 py-4">
           {row.transaction_date || "-"}
         </div>
 
         <div className="px-5 py-4 font-black text-right whitespace-nowrap">
           {peso(row.TotalSales)}
+        <div className="whitespace-nowrap px-5 py-4 text-right font-black">
+          {mode === "paid"
+            ? peso(row.TotalAmountDue || row.payment_amount || 0)
+            : peso(row.TotalSales)}
         </div>
 
-        <div className="px-5 py-4 whitespace-nowrap">{row.cashier || "-"}</div>
+        <div className="whitespace-nowrap px-5 py-4">{row.cashier || "-"}</div>
 
         <div className="flex items-center px-5 py-4">
           <span
             className={`rounded-full px-3 py-1 text-xs font-bold ${
-              isPending
-                ? "bg-green-500/10 text-green-500"
-                : isDark
-                  ? "bg-slate-500/10 text-slate-300"
-                  : "bg-slate-900/10 text-slate-700"
+              isPaid
+                ? "bg-emerald-500/10 text-emerald-500"
+                : isPending
+                  ? "bg-amber-500/10 text-amber-500"
+                  : isDark
+                    ? "bg-slate-500/10 text-slate-300"
+                    : "bg-slate-900/10 text-slate-700"
             }`}
           >
             {remarksText}
@@ -586,50 +558,51 @@ const PaymentMethodPickerModal = ({
     </ModalShell>
   );
 };
+export default function PosPayment() {
+  const apiHost = useApiHost();
+  const themeContext = useTheme();
+  const isDark =
+    typeof themeContext?.isDark === "boolean"
+      ? themeContext.isDark
+      : themeContext?.theme === "dark";
 
-const OtherChargesModal = ({
-  isOpen,
-  onClose,
-  isDark,
-  options,
-  rows,
-  setRows,
-}) => {
-  const inputClass = isDark
-    ? "bg-slate-950 border border-slate-800 text-white placeholder:text-slate-500"
-    : "bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400";
+  const navigate = useNavigate();
 
-  const addRow = () =>
-    setRows((prev) => [...prev, createEmptyOtherChargeRow()]);
+  const [viewMode, setViewMode] = useState("pending");
+  const [pendingTransactions, setPendingTransactions] = useState([]);
+  const [paidTransactions, setPaidTransactions] = useState([]);
+  const [modeOfPayments, setModeOfPayments] = useState([]);
+  const [chargeOptions, setChargeOptions] = useState([]);
 
-  const removeRow = (index) =>
-    setRows((prev) => prev.filter((_, i) => i !== index));
+  const [isLoading, setIsLoading] = useState(false);
+  const [search, setSearch] = useState("");
+  const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  const updateRow = (index, field, value) =>
-    setRows((prev) =>
-      prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)),
-    );
+  const fetchAll = useCallback(async () => {
+    if (!apiHost) return;
 
-  return (
-    <ModalShell
-      isOpen={isOpen}
-      onClose={onClose}
-      isDark={isDark}
-      maxWidth="max-w-[900px]"
-      zIndex="z-[100002]"
-    >
-      <div
-        className={`px-5 py-5 ${
-          isDark
-            ? "border-b border-white/5 bg-white/[0.03]"
-            : "border-b border-slate-200 bg-slate-50"
-        }`}
-      >
-        <h2 className="text-2xl font-black">Other Charges</h2>
-        <p className="mt-1 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
-          Add fees and extra charges
-        </p>
-      </div>
+    setIsLoading(true);
+    setErrorMessage("");
+
+    try {
+      const [pendingRes, paidRes, mopRes, chargesRes] =
+        await Promise.allSettled([
+          fetch(`${apiHost}/api/pos_payment_read_pending.php`),
+          fetch(`${apiHost}/api/pos_payment_read_paid.php`),
+          fetch(`${apiHost}/api/pos_payment_read_mode_of_payment.php`),
+          fetch(`${apiHost}/api/pos_payment_read_other_charges.php`),
+        ]);
+
+      if (pendingRes.status !== "fulfilled") {
+        throw new Error("Failed to load pending transactions.");
+      }
+
+      const pendingData = await safeReadJson(
+        pendingRes.value,
+        "Pending transactions API",
+      );
 
       <div className="p-5 space-y-4 md:p-6">
         {rows.map((row, index) => (
@@ -648,56 +621,50 @@ const OtherChargesModal = ({
             >
               <FiTrash2 size={16} />
             </button>
+      if (!pendingRes.value.ok || !pendingData?.success) {
+        throw new Error(
+          pendingData?.message || "Failed to load pending transactions.",
+        );
+      }
 
-            <select
-              value={row.particulars}
-              onChange={(e) => updateRow(index, "particulars", e.target.value)}
-              className={`h-11 rounded-2xl px-3 text-sm outline-none ${inputClass}`}
-            >
-              <option value="">Select charge</option>
-              {options.map((option) => (
-                <option
-                  key={option.ID || option.particulars}
-                  value={option.particulars}
-                >
-                  {option.particulars}
-                </option>
-              ))}
-            </select>
+      setPendingTransactions(
+        Array.isArray(pendingData?.transactions)
+          ? pendingData.transactions
+          : [],
+      );
 
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={row.amount}
-              onChange={(e) => updateRow(index, "amount", e.target.value)}
-              placeholder="0.00"
-              className={`h-11 rounded-2xl px-3 text-sm outline-none ${inputClass}`}
-            />
+      if (paidRes.status === "fulfilled") {
+        try {
+          const paidData = await safeReadJson(
+            paidRes.value,
+            "Paid transactions API",
+          );
+          if (paidRes.value.ok && paidData?.success) {
+            setPaidTransactions(
+              Array.isArray(paidData?.transactions)
+                ? paidData.transactions
+                : [],
+            );
+          } else {
+            setPaidTransactions([]);
+          }
+        } catch (error) {
+          console.error(error);
+          setPaidTransactions([]);
+        }
+      } else {
+        setPaidTransactions([]);
+      }
 
-            <input
-              type="text"
-              value={row.reference}
-              onChange={(e) => updateRow(index, "reference", e.target.value)}
-              placeholder="Reference"
-              className={`h-11 rounded-2xl px-3 text-sm outline-none ${inputClass}`}
-            />
-          </div>
-        ))}
-
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={addRow}
-            className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold transition ${
-              isDark
-                ? "border border-slate-700 bg-slate-800 text-slate-200 hover:text-white"
-                : "border border-slate-200 bg-white text-slate-700 hover:text-slate-900"
-            }`}
-          >
-            <FiPlus size={14} />
-            Add charge
-          </button>
+      if (mopRes.status === "fulfilled") {
+        const mopData = await safeReadJson(mopRes.value, "Mode of payment API");
+        if (!mopRes.value.ok || !mopData?.success) {
+          throw new Error(
+            mopData?.message || "Failed to load mode of payments.",
+          );
+        }
+        setModeOfPayments(Array.isArray(mopData?.modes) ? mopData.modes : []);
+      }
 
           <button
             onClick={onClose}
@@ -710,29 +677,40 @@ const OtherChargesModal = ({
     </ModalShell>
   );
 };
+      if (chargesRes.status === "fulfilled") {
+        const chargesData = await safeReadJson(
+          chargesRes.value,
+          "Other charges API",
+        );
+        if (!chargesRes.value.ok || !chargesData?.success) {
+          throw new Error(
+            chargesData?.message || "Failed to load other charges.",
+          );
+        }
+        setChargeOptions(
+          Array.isArray(chargesData?.charges) ? chargesData.charges : [],
+        );
+      }
+    } catch (error) {
+      console.error(error);
+      setErrorMessage(error.message || "Failed to load data.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [apiHost]);
 
-const CustomerInfoModal = ({
-  isOpen,
-  onClose,
-  isDark,
-  customerCount,
-  setCustomerCount,
-  qualifiedCount,
-  setQualifiedCount,
-  customerCards,
-  setCustomerCards,
-}) => {
-  const inputClass = isDark
-    ? "bg-slate-950 border border-slate-800 text-white placeholder:text-slate-500"
-    : "bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400";
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
 
-  const safeQualifiedCount = Math.max(Number(qualifiedCount) || 0, 0);
+  const sourceTransactions = useMemo(
+    () => (viewMode === "paid" ? paidTransactions : pendingTransactions),
+    [viewMode, paidTransactions, pendingTransactions],
+  );
 
-  const updateCard = (index, field, value) => {
-    setCustomerCards((prev) =>
-      prev.map((card, i) => (i === index ? { ...card, [field]: value } : card)),
-    );
-  };
+  const filteredTransactions = useMemo(() => {
+    const searchValue = normalizeText(search);
+    if (!searchValue) return sourceTransactions;
 
   const clearCard = (index) => {
     setCustomerCards((prev) =>
@@ -2294,6 +2272,7 @@ export default function PosPayment() {
     if (!searchValue) return transactions;
 
     return transactions.filter((row) => {
+    return sourceTransactions.filter((row) => {
       const haystack = [
         row.transaction_id,
         row.table_number,
@@ -2310,33 +2289,33 @@ export default function PosPayment() {
 
       return haystack.includes(searchValue);
     });
-  }, [transactions, search]);
+  }, [sourceTransactions, search]);
 
   const summary = useMemo(() => {
-    const totalTransactions = filteredTransactions.length;
-    const totalSales = filteredTransactions.reduce(
-      (sum, row) => sum + toNum(row.TotalSales),
-      0,
-    );
-
     return {
-      totalTransactions,
-      totalSales,
+      totalTransactions: filteredTransactions.length,
+      totalSales: filteredTransactions.reduce(
+        (sum, row) =>
+          sum +
+          toNum(viewMode === "paid" ? row.TotalAmountDue : row.TotalSales),
+        0,
+      ),
       totalMethods: modeOfPayments.length,
       totalCharges: chargeOptions.length,
     };
-  }, [filteredTransactions, modeOfPayments, chargeOptions]);
+  }, [filteredTransactions, modeOfPayments, chargeOptions, viewMode]);
 
   const listData = useMemo(
     () => ({
       rows: filteredTransactions,
       isDark,
+      mode: viewMode,
       onOpen: (row) => {
         setSelectedTransaction(row);
         setIsPaymentModalOpen(true);
       },
     }),
-    [filteredTransactions, isDark],
+    [filteredTransactions, isDark, viewMode],
   );
 
   return (
@@ -2387,35 +2366,40 @@ export default function PosPayment() {
                 isDark ? "text-white" : "text-slate-900"
               }`}
             >
-              Pending for Payment
+              {viewMode === "paid"
+                ? "Paid Transactions"
+                : "Pending for Payment"}
             </h1>
             <p className="mt-2 text-sm text-slate-500">
-              Review billed transactions, open payment posting, and manage
-              pending sales.
+              Review billed transactions, open payment posting, and reprint
+              duplicate invoice copies.
             </p>
           </div>
 
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <StatCard
-                title="Pending Transactions"
-                value={summary.totalTransactions}
-                icon={FiDatabase}
-                isDark={isDark}
-              />
-              <StatCard
-                title="Payment Methods"
-                value={summary.totalMethods}
-                icon={FiCreditCard}
-                isDark={isDark}
-              />
-              <StatCard
-                title="Charge Options"
-                value={summary.totalCharges}
-                icon={FaMoneyBill}
-                isDark={isDark}
-              />
-            </div>
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="space-y-6">
+              <div
+                className={`rounded-[28px] border p-4 sm:p-5 ${
+                  isDark
+                    ? "border-white/5 bg-white/[0.03]"
+                    : "border-slate-200 bg-white shadow-sm"
+                }`}
+              >
+                <div className="flex flex-col items-start gap-4">
+                  <div className="flex flex-wrap justify-start gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setViewMode("pending")}
+                      className={`rounded-2xl px-4 py-3 text-sm font-black transition ${
+                        viewMode === "pending"
+                          ? "bg-amber-500 text-gray-100"
+                          : isDark
+                            ? "border border-slate-700 bg-slate-900 text-slate-300"
+                            : "border border-slate-200 bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      Pending
+                    </button>
 
             <div
               className={`rounded-[28px] border p-4 sm:p-5 ${
@@ -2449,86 +2433,102 @@ export default function PosPayment() {
                 </button>
               </div>
             </div>
-
-            <div
-              className={`overflow-hidden rounded-[30px] border ${
-                isDark
-                  ? "border-white/5 bg-white/[0.03]"
-                  : "border-slate-200 bg-white shadow-sm"
-              }`}
-            >
-              {errorMessage ? (
-                <div className="flex h-[420px] items-center justify-center px-6 text-center text-lg font-semibold text-red-500">
-                  {errorMessage}
-                </div>
-              ) : isLoading ? (
-                <div
-                  className={`flex h-[420px] items-center justify-center text-lg font-semibold ${
-                    isDark ? "text-slate-400" : "text-slate-500"
-                  }`}
-                >
-                  Loading pending transactions...
-                </div>
-              ) : filteredTransactions.length === 0 ? (
-                <div
-                  className={`flex h-[420px] items-center justify-center text-2xl font-black ${
-                    isDark ? "text-slate-500" : "text-slate-400"
-                  }`}
-                >
-                  No data
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <div style={{ minWidth: PENDING_TABLE_MIN_WIDTH }}>
-                    <PendingHeaderRow isDark={isDark} />
-                    <List
-                      height={PENDING_LIST_HEIGHT}
-                      itemCount={filteredTransactions.length}
-                      itemSize={PENDING_ROW_HEIGHT}
-                      width={PENDING_TABLE_MIN_WIDTH}
-                      itemData={listData}
-                      overscanCount={8}
-                      outerElementType={ListOuter}
-                      innerElementType={ListInner}
+                    <button
+                      type="button"
+                      onClick={() => setViewMode("paid")}
+                      className={`rounded-2xl px-4 py-3 text-sm font-black transition ${
+                        viewMode === "paid"
+                          ? "bg-emerald-600 text-gray-100"
+                          : isDark
+                            ? "border border-slate-700 bg-slate-900 text-slate-300"
+                            : "border border-slate-200 bg-slate-50 text-slate-700"
+                      }`}
                     >
-                      {PendingTransactionRow}
-                    </List>
+                      Paid
+                    </button>
+                  </div>
+
+                  <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-[1fr_150px]">
+                    <div className="relative">
+                      <FiSearch className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+                      <input
+                        type="text"
+                        placeholder="Search transaction, table, cashier, remarks..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className={`w-full rounded-2xl py-4 pl-12 pr-4 outline-none transition ${
+                          isDark
+                            ? "border border-slate-800 bg-slate-950 text-white focus:border-blue-500"
+                            : "border border-slate-200 bg-slate-50 text-slate-900 focus:border-blue-400"
+                        }`}
+                      />
+                    </div>
+
+                    <button
+                      onClick={fetchAll}
+                      className="flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-4 font-semibold text-white transition hover:bg-blue-500"
+                    >
+                      <FiRefreshCw size={16} />
+                      Refresh
+                    </button>
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
 
-            <div
-              className={`rounded-[28px] border p-5 ${
-                isDark
-                  ? "border-white/5 bg-white/[0.03]"
-                  : "border-slate-200 bg-white shadow-sm"
-              }`}
-            >
               <div
-                className={`mb-4 text-sm font-black uppercase tracking-[0.18em] ${
-                  isDark ? "text-white" : "text-slate-900"
+                className={`overflow-hidden rounded-[30px] border ${
+                  isDark
+                    ? "border-white/5 bg-white/[0.03]"
+                    : "border-slate-200 bg-white shadow-sm"
                 }`}
               >
-                Legend
-              </div>
-
-              <div className="flex flex-wrap gap-6 text-sm">
-                <div className="flex items-center gap-3">
-                  <span
-                    className={`h-3.5 w-3.5 rounded-full ${
-                      isDark ? "bg-slate-300" : "bg-slate-900"
+                {errorMessage ? (
+                  <div className="flex h-[420px] items-center justify-center px-6 text-center text-lg font-semibold text-red-500">
+                    {errorMessage}
+                  </div>
+                ) : isLoading ? (
+                  <div
+                    className={`flex h-[420px] items-center justify-center text-lg font-semibold ${
+                      isDark ? "text-slate-400" : "text-slate-500"
                     }`}
-                  />
-                  <span className="text-slate-500">Paid Transactions</span>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <span className="h-3.5 w-3.5 rounded-full bg-green-500" />
-                  <span className="text-slate-500">Pending for Payment</span>
-                </div>
+                  >
+                    Loading transactions...
+                  </div>
+                ) : filteredTransactions.length === 0 ? (
+                  <div
+                    className={`flex h-[420px] items-center justify-center text-2xl font-black ${
+                      isDark ? "text-slate-500" : "text-slate-400"
+                    }`}
+                  >
+                    No data
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <div style={{ minWidth: TABLE_MIN_WIDTH }}>
+                      <HeaderRow isDark={isDark} mode={viewMode} />
+                      <List
+                        height={LIST_HEIGHT}
+                        itemCount={filteredTransactions.length}
+                        itemSize={ROW_HEIGHT}
+                        width={TABLE_MIN_WIDTH}
+                        itemData={listData}
+                        overscanCount={8}
+                        outerElementType={ListOuter}
+                        innerElementType={ListInner}
+                      >
+                        {TransactionRow}
+                      </List>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
+
+            <SummaryPanel
+              isDark={isDark}
+              viewMode={viewMode}
+              summary={summary}
+            />
           </div>
         </div>
       </div>
@@ -2544,6 +2544,7 @@ export default function PosPayment() {
         isDark={isDark}
         modeOfPayments={modeOfPayments}
         chargeOptions={chargeOptions}
+        mode={viewMode}
         onSaved={fetchAll}
       />
     </>
