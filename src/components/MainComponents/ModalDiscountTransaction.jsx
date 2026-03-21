@@ -439,8 +439,7 @@ const PrintableDiscountReceipt = React.forwardRef(
         />
 
         <div style={{ textAlign: "center", fontSize: "10px" }}>
-          <div style={{ fontWeight: "700" }}>Thank you</div>
-          <div style={{ fontWeight: "700" }}>Please come again.</div>
+          <div style={{ fontWeight: "700" }}>THIS DOCUMENT IS NOT VALID FOR CLAIM OF INPUT TAX</div>
         </div>
 
         {/* <div
@@ -640,7 +639,7 @@ const OrderedItemsSummaryModal = ({
                         }`}
                       >
                         <div className="min-w-0">
-                          <p className="truncate font-bold">
+                          <p className="font-bold truncate">
                             {item.item_name || item.product_id}
                           </p>
                           <p className="mt-0.5 text-[10px] text-slate-500">
@@ -1092,7 +1091,7 @@ const ModalDiscountTransaction = ({
               </div>
             </div>
 
-            <div className="space-y-3 p-3">
+            <div className="p-3 space-y-3">
               <div className={`rounded-[1rem] p-3 ${cardClass}`}>
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
@@ -1110,7 +1109,7 @@ const ModalDiscountTransaction = ({
                   <button
                     type="button"
                     onClick={() => setShowItemsModal(true)}
-                    className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white transition-all hover:bg-blue-500"
+                    className="inline-flex items-center gap-2 px-3 py-2 text-xs font-bold text-white transition-all bg-blue-600 rounded-lg hover:bg-blue-500"
                   >
                     <FiEye size={14} />
                     View Ordered Items
@@ -1120,7 +1119,7 @@ const ModalDiscountTransaction = ({
 
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                 <div className={`rounded-[1rem] p-3 ${cardClass}`}>
-                  <div className="mb-2 flex items-center gap-2">
+                  <div className="flex items-center gap-2 mb-2">
                     <FiFileText size={14} className="text-slate-500" />
                     <h3 className="text-sm font-black">Discount Setup</h3>
                   </div>
@@ -1180,7 +1179,7 @@ const ModalDiscountTransaction = ({
                         : "bg-white border border-slate-200"
                     }`}
                   >
-                    <div className="mb-2 flex items-center gap-2">
+                    <div className="flex items-center gap-2 mb-2">
                       {isManualDiscount ? (
                         <FiPercent size={14} className="text-slate-500" />
                       ) : (
@@ -1308,20 +1307,20 @@ const ModalDiscountTransaction = ({
                 </div>
 
                 <div className={`rounded-[1rem] p-3 ${cardClass}`}>
-                  <div className="mb-2 flex items-center gap-2">
+                  <div className="flex items-center gap-2 mb-2">
                     <FiTag size={14} className="text-slate-500" />
                     <h3 className="text-sm font-black">Computation Summary</h3>
                   </div>
 
                   <div className="space-y-2 text-[13px]">
-                    <div className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
+                    <div className="flex items-center justify-between gap-2 pb-2 border-b border-dashed border-slate-300/20">
                       <span className="text-slate-500">Disc. Gross</span>
                       <span className="font-semibold">
                         ₱ {peso(computed.discountableGross)}
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
+                    <div className="flex items-center justify-between gap-2 pb-2 border-b border-dashed border-slate-300/20">
                       <span className="text-slate-500">Disc. Base</span>
                       <span className="font-semibold">
                         ₱ {peso(computed.discountableBase)}
@@ -1330,7 +1329,7 @@ const ModalDiscountTransaction = ({
 
                     {!isManualDiscount && (
                       <>
-                        <div className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
+                        <div className="flex items-center justify-between gap-2 pb-2 border-b border-dashed border-slate-300/20">
                           <span className="text-slate-500">Ratio</span>
                           <span className="font-semibold">
                             {computed.safeQualifiedCount} /{" "}
@@ -1338,7 +1337,7 @@ const ModalDiscountTransaction = ({
                           </span>
                         </div>
 
-                        <div className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
+                        <div className="flex items-center justify-between gap-2 pb-2 border-b border-dashed border-slate-300/20">
                           <span className="text-slate-500">Prorated</span>
                           <span className="font-semibold">
                             ₱ {peso(computed.proratedBase)}
@@ -1347,7 +1346,7 @@ const ModalDiscountTransaction = ({
                       </>
                     )}
 
-                    <div className="flex items-center justify-between gap-2 rounded-lg bg-emerald-500/10 px-3 py-2">
+                    <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-emerald-500/10">
                       <span className="text-[12px] font-bold">
                         {discountType}
                       </span>
@@ -1356,7 +1355,7 @@ const ModalDiscountTransaction = ({
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
+                    <div className="flex items-center justify-between gap-2 pb-2 border-b border-dashed border-slate-300/20">
                       <span className="text-slate-500">Gross Total</span>
                       <span className="font-semibold">
                         ₱ {peso(computed.grossTotal)}

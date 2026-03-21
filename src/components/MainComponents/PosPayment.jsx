@@ -281,7 +281,7 @@ const YesNoModal = ({
           <p className="mt-2 text-sm text-slate-500">{message}</p>
         </div>
 
-        <div className="mt-6 grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 mt-6">
           <button
             type="button"
             onClick={onClose}
@@ -337,7 +337,7 @@ const SuccessModal = ({
           <p className="mt-2 text-sm text-slate-500">{message}</p>
         </div>
 
-        <div className="mt-6 grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 mt-6">
           <button
             type="button"
             onClick={onClose}
@@ -353,7 +353,7 @@ const SuccessModal = ({
           <button
             type="button"
             onClick={onPrint}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-6 py-3 text-sm font-black text-white transition hover:bg-blue-500"
+            className="inline-flex items-center justify-center gap-2 px-6 py-3 text-sm font-black text-white transition bg-blue-600 rounded-2xl hover:bg-blue-500"
           >
             <FiPrinter size={15} />
             Print Receipt
@@ -419,7 +419,7 @@ function PendingTransactionRow({ index, style, data }) {
           <button
             type="button"
             onClick={() => onOpen(row)}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white transition hover:bg-blue-500"
+            className="inline-flex items-center justify-center text-white transition bg-blue-600 h-11 w-11 rounded-2xl hover:bg-blue-500"
             title="Open Payment"
           >
             <FiEye size={17} />
@@ -445,7 +445,7 @@ function PendingTransactionRow({ index, style, data }) {
           {row.transaction_date || "-"}
         </div>
 
-        <div className="px-5 py-4 text-right whitespace-nowrap font-black">
+        <div className="px-5 py-4 font-black text-right whitespace-nowrap">
           {peso(row.TotalSales)}
         </div>
 
@@ -478,7 +478,7 @@ function StatCard({ title, value, icon: Icon, isDark }) {
           : "border-slate-200 bg-white shadow-sm"
       }`}
     >
-      <div className="mb-3 flex items-center justify-between">
+      <div className="flex items-center justify-between mb-3">
         <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
           {title}
         </div>
@@ -559,12 +559,12 @@ const PaymentMethodPickerModal = ({
                   <img
                     src={buildImagePath(method.mop)}
                     alt={method.mop}
-                    className="h-12 w-12 object-contain"
+                    className="object-contain w-12 h-12"
                     onError={(e) => {
                       e.currentTarget.style.display = "none";
                     }}
                   />
-                  <span className="text-center text-sm font-semibold leading-tight">
+                  <span className="text-sm font-semibold leading-tight text-center">
                     {method.mop}
                   </span>
                 </div>
@@ -573,10 +573,10 @@ const PaymentMethodPickerModal = ({
           </div>
         )}
 
-        <div className="mt-6 flex justify-center">
+        <div className="flex justify-center mt-6">
           <button
             onClick={onClose}
-            className="rounded-2xl bg-blue-600 px-10 py-3 text-sm font-black text-white transition hover:bg-blue-500"
+            className="px-10 py-3 text-sm font-black text-white transition bg-blue-600 rounded-2xl hover:bg-blue-500"
           >
             Close
           </button>
@@ -630,7 +630,7 @@ const OtherChargesModal = ({
         </p>
       </div>
 
-      <div className="space-y-4 p-5 md:p-6">
+      <div className="p-5 space-y-4 md:p-6">
         {rows.map((row, index) => (
           <div
             key={index}
@@ -643,7 +643,7 @@ const OtherChargesModal = ({
             <button
               type="button"
               onClick={() => removeRow(index)}
-              className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white transition hover:bg-blue-500"
+              className="flex items-center justify-center text-white transition bg-blue-600 h-11 w-11 rounded-2xl hover:bg-blue-500"
             >
               <FiTrash2 size={16} />
             </button>
@@ -700,7 +700,7 @@ const OtherChargesModal = ({
 
           <button
             onClick={onClose}
-            className="rounded-2xl bg-blue-600 px-10 py-3 text-sm font-black text-white transition hover:bg-blue-500"
+            className="px-10 py-3 text-sm font-black text-white transition bg-blue-600 rounded-2xl hover:bg-blue-500"
           >
             Continue
           </button>
@@ -748,7 +748,7 @@ const CustomerInfoModal = ({
       zIndex="z-[100002]"
     >
       <div className="p-5 md:p-6">
-        <div className="mb-5 flex items-start justify-between gap-4">
+        <div className="flex items-start justify-between gap-4 mb-5">
           <div className="flex items-center gap-3">
             <div
               className={`flex h-12 w-12 items-center justify-center rounded-2xl ${
@@ -803,7 +803,7 @@ const CustomerInfoModal = ({
               </div>
             </div>
 
-            <div className="hidden items-center justify-center md:flex">
+            <div className="items-center justify-center hidden md:flex">
               <div
                 className={`flex h-24 w-24 items-center justify-center rounded-full ${
                   isDark
@@ -841,7 +841,7 @@ const CustomerInfoModal = ({
                       : "border-slate-200 bg-slate-50"
                   }`}
                 >
-                  <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="flex items-center justify-between gap-3 mb-3">
                     <div>
                       <h3 className="text-sm font-black">
                         Customer #{index + 1}
@@ -854,7 +854,7 @@ const CustomerInfoModal = ({
                     <button
                       type="button"
                       onClick={() => clearCard(index)}
-                      className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white transition hover:bg-blue-500"
+                      className="flex items-center justify-center text-white transition bg-blue-600 h-11 w-11 rounded-2xl hover:bg-blue-500"
                     >
                       <FiTrash2 size={16} />
                     </button>
@@ -932,10 +932,10 @@ const CustomerInfoModal = ({
           )}
         </div>
 
-        <div className="mt-5 flex justify-center">
+        <div className="flex justify-center mt-5">
           <button
             onClick={onClose}
-            className="rounded-2xl bg-blue-600 px-10 py-3 text-sm font-black text-white transition hover:bg-blue-500"
+            className="px-10 py-3 text-sm font-black text-white transition bg-blue-600 rounded-2xl hover:bg-blue-500"
           >
             Continue
           </button>
@@ -999,10 +999,10 @@ const DiscountSetupModal = ({
         </div>
       </div>
 
-      <div className="space-y-4 p-5">
+      <div className="p-5 space-y-4">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <SectionCard isDark={isDark}>
-            <div className="mb-3 flex items-center gap-2">
+            <div className="flex items-center gap-2 mb-3">
               <FiFileText size={14} className="text-slate-500" />
               <h3 className="text-sm font-black">Discount Type</h3>
             </div>
@@ -1060,7 +1060,7 @@ const DiscountSetupModal = ({
                   : "border-slate-200 bg-slate-50"
               }`}
             >
-              <div className="mb-3 flex items-center gap-2">
+              <div className="flex items-center gap-2 mb-3">
                 {isManualDiscount ? (
                   <FiTag size={14} className="text-slate-500" />
                 ) : (
@@ -1120,20 +1120,20 @@ const DiscountSetupModal = ({
           </SectionCard>
 
           <SectionCard isDark={isDark}>
-            <div className="mb-3 flex items-center gap-2">
+            <div className="flex items-center gap-2 mb-3">
               <FiTag size={14} className="text-slate-500" />
               <h3 className="text-sm font-black">Computation Summary</h3>
             </div>
 
             <div className="space-y-2 text-[13px]">
-              <div className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
+              <div className="flex items-center justify-between gap-2 pb-2 border-b border-dashed border-slate-300/20">
                 <span className="text-slate-500">Discountable Gross</span>
                 <span className="font-semibold">
                   {peso(computed.discountableGross)}
                 </span>
               </div>
 
-              <div className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
+              <div className="flex items-center justify-between gap-2 pb-2 border-b border-dashed border-slate-300/20">
                 <span className="text-slate-500">Discountable Base</span>
                 <span className="font-semibold">
                   {peso(computed.discountableBase)}
@@ -1142,7 +1142,7 @@ const DiscountSetupModal = ({
 
               {!isManualDiscount && discountType !== "No Discount" ? (
                 <>
-                  <div className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
+                  <div className="flex items-center justify-between gap-2 pb-2 border-b border-dashed border-slate-300/20">
                     <span className="text-slate-500">Ratio</span>
                     <span className="font-semibold">
                       {computed.safeQualifiedCount} /{" "}
@@ -1150,14 +1150,14 @@ const DiscountSetupModal = ({
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
+                  <div className="flex items-center justify-between gap-2 pb-2 border-b border-dashed border-slate-300/20">
                     <span className="text-slate-500">Prorated Base</span>
                     <span className="font-semibold">
                       {peso(computed.proratedBase)}
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
+                  <div className="flex items-center justify-between gap-2 pb-2 border-b border-dashed border-slate-300/20">
                     <span className="text-slate-500">VAT Exemption</span>
                     <span className="font-semibold text-red-500">
                       {negativePeso(computed.vatExemption)}
@@ -1166,7 +1166,7 @@ const DiscountSetupModal = ({
                 </>
               ) : null}
 
-              <div className="flex items-center justify-between gap-2 rounded-2xl bg-emerald-500/10 px-3 py-3">
+              <div className="flex items-center justify-between gap-2 px-3 py-3 rounded-2xl bg-emerald-500/10">
                 <span className="text-[12px] font-bold">{discountType}</span>
                 <span className="text-[13px] font-black text-red-500">
                   {negativePeso(computed.discount)}
@@ -1179,7 +1179,7 @@ const DiscountSetupModal = ({
         <div className="flex justify-end">
           <button
             onClick={onClose}
-            className="rounded-2xl bg-blue-600 px-10 py-3 text-sm font-black text-white transition hover:bg-blue-500"
+            className="px-10 py-3 text-sm font-black text-white transition bg-blue-600 rounded-2xl hover:bg-blue-500"
           >
             Continue
           </button>
@@ -1237,12 +1237,12 @@ const InputPaymentsModal = ({
         </p>
       </div>
 
-      <div className="space-y-4 p-5 md:p-6">
+      <div className="p-5 space-y-4 md:p-6">
         <div className="grid gap-3 md:grid-cols-2 md:items-center">
           <div className="text-2xl font-black text-slate-700 dark:text-slate-200">
             TOTAL AMOUNT DUE
           </div>
-          <div className="text-right text-3xl font-black text-emerald-500">
+          <div className="text-3xl font-black text-right text-emerald-500">
             {peso(totalAmountDue)}
           </div>
         </div>
@@ -1254,12 +1254,12 @@ const InputPaymentsModal = ({
               : "border-slate-200 bg-slate-50"
           }`}
         >
-          <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="flex items-center justify-between gap-3 mb-3">
             <p className="text-sm font-bold text-slate-500">Payments</p>
             <button
               type="button"
               onClick={onAddPaymentMethod}
-              className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-xs font-bold text-white transition hover:bg-blue-500"
+              className="inline-flex items-center gap-2 px-4 py-3 text-xs font-bold text-white transition bg-blue-600 rounded-2xl hover:bg-blue-500"
             >
               <FiPlus size={14} />
               Add Payment Method
@@ -1290,16 +1290,16 @@ const InputPaymentsModal = ({
                   <button
                     type="button"
                     onClick={() => removeRow(index)}
-                    className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white transition hover:bg-blue-500"
+                    className="flex items-center justify-center text-white transition bg-blue-600 h-11 w-11 rounded-2xl hover:bg-blue-500"
                   >
                     <FiTrash2 size={16} />
                   </button>
 
-                  <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 dark:border-white/5 dark:bg-slate-900">
+                  <div className="flex items-center gap-3 px-3 py-2 bg-white border rounded-2xl border-slate-200 dark:border-white/5 dark:bg-slate-900">
                     <img
                       src={buildImagePath(row.payment_method)}
                       alt={row.payment_method}
-                      className="h-10 w-10 object-contain"
+                      className="object-contain w-10 h-10"
                       onError={(e) => {
                         e.currentTarget.style.display = "none";
                       }}
@@ -1338,7 +1338,7 @@ const InputPaymentsModal = ({
             )}
           </div>
 
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3 mt-4 md:grid-cols-2">
             <div
               className={`rounded-2xl border p-4 ${
                 isDark
@@ -1373,7 +1373,7 @@ const InputPaymentsModal = ({
         <div className="flex justify-center">
           <button
             onClick={onClose}
-            className="rounded-2xl bg-blue-600 px-10 py-3 text-sm font-black text-white transition hover:bg-blue-500"
+            className="px-10 py-3 text-sm font-black text-white transition bg-blue-600 rounded-2xl hover:bg-blue-500"
           >
             Continue
           </button>
@@ -1829,7 +1829,7 @@ const TransactionPaymentModal = ({
                   Transaction {transaction?.transaction_id || "-"}
                 </h2>
 
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 mt-2">
                   <InfoPill isDark={isDark}>
                     Table: {transaction?.table_number || "-"}
                   </InfoPill>
@@ -1854,7 +1854,7 @@ const TransactionPaymentModal = ({
           </div>
         </div>
 
-        <div className="min-h-0 overflow-y-auto p-4">
+        <div className="min-h-0 p-4 overflow-y-auto">
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
             <div className="space-y-4">
               <SectionCard isDark={isDark}>
@@ -1904,7 +1904,7 @@ const TransactionPaymentModal = ({
               </SectionCard>
 
               <SectionCard isDark={isDark}>
-                <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="flex items-center justify-between gap-3 mb-3">
                   <div>
                     <h3 className="text-sm font-black">Ordered Items</h3>
                     <p className="mt-1 text-xs text-slate-500">
@@ -1952,7 +1952,7 @@ const TransactionPaymentModal = ({
                           } md:grid-cols-[minmax(0,1fr)_56px_95px_110px]`}
                         >
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-bold">
+                            <p className="text-sm font-bold truncate">
                               {item.item_name || item.product_id}
                             </p>
                             <p className="mt-1 text-[11px] text-slate-500">
@@ -2073,13 +2073,13 @@ const TransactionPaymentModal = ({
               </SectionCard>
 
               {errorMessage ? (
-                <div className="rounded-2xl bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-500">
+                <div className="px-4 py-3 text-sm font-semibold text-red-500 rounded-2xl bg-red-500/10">
                   {errorMessage}
                 </div>
               ) : null}
 
               {!canSave && payments.length > 0 ? (
-                <div className="rounded-2xl bg-blue-500/10 px-4 py-3 text-sm font-semibold text-blue-500">
+                <div className="px-4 py-3 text-sm font-semibold text-blue-500 rounded-2xl bg-blue-500/10">
                   {computed.safeQualifiedCount > 0 &&
                   customerIdsForPosting.length < computed.safeQualifiedCount
                     ? "Complete all customer IDs for every qualified discount customer."
@@ -2347,7 +2347,7 @@ export default function PosPayment() {
             : "min-h-screen bg-slate-100 text-slate-900"
         }
       >
-        <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="fixed inset-0 overflow-hidden pointer-events-none">
           <div
             className={`absolute -left-20 top-0 h-72 w-72 rounded-full blur-[120px] ${
               isDark ? "bg-blue-600/10" : "bg-blue-500/15"
@@ -2361,7 +2361,7 @@ export default function PosPayment() {
         </div>
 
         <div className="relative z-10 mx-auto max-w-[1700px] p-4 sm:p-6 lg:p-8">
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
             <button
               onClick={() => navigate("/poscorehomescreen")}
               className={`inline-flex items-center gap-3 rounded-2xl border px-5 py-3 font-semibold transition ${
@@ -2371,7 +2371,7 @@ export default function PosPayment() {
               }`}
             >
               <FaArrowLeft size={14} />
-              Back
+              BACK TO MENU
             </button>
 
             <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.22em] text-blue-500">
@@ -2425,7 +2425,7 @@ export default function PosPayment() {
             >
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_150px]">
                 <div className="relative">
-                  <FiSearch className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <FiSearch className="absolute -translate-y-1/2 pointer-events-none left-4 top-1/2 text-slate-500" />
                   <input
                     type="text"
                     placeholder="Search transaction, table, cashier, remarks..."
@@ -2441,7 +2441,7 @@ export default function PosPayment() {
 
                 <button
                   onClick={fetchAll}
-                  className="flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-4 font-semibold text-white transition hover:bg-blue-500"
+                  className="flex items-center justify-center gap-2 px-4 py-4 font-semibold text-white transition bg-blue-600 rounded-2xl hover:bg-blue-500"
                 >
                   <FiRefreshCw size={16} />
                   Refresh
