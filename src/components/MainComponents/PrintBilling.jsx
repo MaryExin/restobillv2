@@ -11,6 +11,8 @@ import {
   FaLayerGroup,
   FaChevronLeft,
   FaChevronRight,
+  FaThLarge,
+  FaList,
 } from "react-icons/fa";
 import { motion, AnimatePresence } from "framer-motion";
 import useApiHost from "../../hooks/useApiHost";
@@ -22,12 +24,14 @@ const PrintBilling = () => {
   const navigate = useNavigate();
   const dateInputRef = useRef(null);
 
-  // const [apiHost, setApiHost] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [originalTableList, setOriginalTableList] = useState([]);
   const [tablelist, setTablelist] = useState([]);
   const [searchtable, setsearchtable] = useState("");
   const [statusFilter, setStatusFilter] = useState("pending");
+  
+  // --- NEW VIEW MODE STATE ---
+  const [viewMode, setViewMode] = useState("grid"); 
 
   const [tableselected, settableselected] = useState("");
   const [transpertable, settranspertable] = useState([]);
@@ -37,18 +41,12 @@ const PrintBilling = () => {
 
   // --- PAGINATION STATE ---
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 12; // Adjusted for a nice 6x2 or 4x3 grid
+  const itemsPerPage = viewMode === "grid" ? 12 : 10;
 
   const handleCalendarClick = () => {
-    // date now comes from backend open shift; keep function/refs without breaking structure
     return;
   };
 
-  // useEffect(() => {
-  //   fetch("./ip.txt")
-  //     .then((res) => res.text())
-  //     .then((data) => setApiHost(data.trim()));
-  // }, []);
   const apiHost = useApiHost();
 
   useEffect(() => {
@@ -110,7 +108,6 @@ const PrintBilling = () => {
       });
   }, [apiHost, dateFrom]);
 
-  // Handle Filtering and Reset Page to 1 on Search/Filter
   useEffect(() => {
     let filtered = originalTableList.filter((table) =>
       table.table_number
@@ -126,10 +123,9 @@ const PrintBilling = () => {
       );
     }
     setTablelist(filtered);
-    setCurrentPage(1); // Reset to first page when filtering
+    setCurrentPage(1);
   }, [searchtable, statusFilter, originalTableList]);
 
-  // --- PAGINATION LOGIC ---
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = tablelist.slice(indexOfFirstItem, indexOfLastItem);
@@ -160,7 +156,7 @@ const PrintBilling = () => {
       }`}
     >
       <Icon size={12} />
-      <span className="text-xs font-bold uppercase tracking-widest">
+      <span className="text-xs font-bold tracking-widest uppercase">
         {label}
       </span>
     </button>
@@ -182,19 +178,19 @@ const PrintBilling = () => {
         />
       </div>
 
-<AnimatePresence>
-  {showtranslistpertable && (
-    <ModalTrans_List
-      tableselected={tableselected}
-      data={transpertable}
-      setshowtranslistpertable={setshowtranslistpertable}
-      dateFrom={dateFrom}
-    />
-  )}
-</AnimatePresence>
+      <AnimatePresence>
+        {showtranslistpertable && (
+          <ModalTrans_List
+            tableselected={tableselected}
+            data={transpertable}
+            setshowtranslistpertable={setshowtranslistpertable}
+            dateFrom={dateFrom}
+          />
+        )}
+      </AnimatePresence>
 
       <div className="relative z-10 max-w-7xl mx-auto flex flex-col min-h-[90vh]">
-        <nav className="mb-8 flex justify-between items-center">
+        <nav className="flex items-center justify-between mb-8">
           <button
             onClick={() => navigate("/poscorehomescreen")}
             className={`flex items-center gap-3 mt-2 px-10 py-6 rounded-full transition-all ${
@@ -206,27 +202,47 @@ const PrintBilling = () => {
             <FaArrowLeft size={14} />
             <span className="text-sm font-bold uppercase">Back To Menu</span>
           </button>
-          <div className="text-blue-400 font-bold uppercase tracking-widest text-xs flex items-center gap-2">
+          <div className="flex items-center gap-2 text-xs font-bold tracking-widest text-blue-400 uppercase">
             <FaPrint /> Billing Center
           </div>
         </nav>
 
-        <header className="mb-10">
-          <h1
-            className={`text-4xl sm:text-5xl font-black mb-2 ${
-              isDark ? "text-white" : "text-slate-900"
-            }`}
-          >
-            Print Billing
-          </h1>
-          <p className="text-slate-400">
-            Showing {tablelist.length} tables found for this date.
-          </p>
+        <header className="flex flex-col justify-between gap-6 mb-10 md:flex-row md:items-end">
+          <div>
+            <h1
+              className={`text-4xl sm:text-5xl font-black mb-2 ${
+                isDark ? "text-white" : "text-slate-900"
+              }`}
+            >
+              Print Billing
+            </h1>
+            <p className="text-slate-400">
+              Showing {tablelist.length} tables found for this date.
+            </p>
+          </div>
+
+          {/* VIEW SWITCHER BUTTONS */}
+          <div className={`flex p-1.5 rounded-2xl border ${isDark ? "bg-slate-900/50 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
+            <button 
+              onClick={() => setViewMode("grid")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${viewMode === "grid" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-500 hover:text-blue-500"}`}
+            >
+              <FaThLarge size={14} />
+              <span className="text-[10px] font-bold uppercase"></span>
+            </button>
+            <button 
+              onClick={() => setViewMode("list")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${viewMode === "list" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-500 hover:text-blue-500"}`}
+            >
+              <FaList size={14} />
+              <span className="text-[10px] font-bold uppercase"></span>
+            </button>
+          </div>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div className="grid grid-cols-1 gap-4 mb-6 md:grid-cols-2">
           <div className="relative group" onClick={handleCalendarClick}>
-            <FaCalendarAlt className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none z-20" />
+            <FaCalendarAlt className="absolute z-20 -translate-y-1/2 pointer-events-none left-4 top-1/2 text-slate-500" />
             <input
               ref={dateInputRef}
               type="text"
@@ -241,7 +257,7 @@ const PrintBilling = () => {
           </div>
 
           <div className="relative group">
-            <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-500" />
+            <FaSearch className="absolute -translate-y-1/2 left-4 top-1/2 text-slate-500 group-focus-within:text-blue-500" />
             <input
               type="text"
               placeholder="Search table number..."
@@ -264,7 +280,7 @@ const PrintBilling = () => {
 
         <main className="flex-grow">
           {isLoading || isDateLoading ? (
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-4">
+            <div className="grid grid-cols-3 gap-4 sm:grid-cols-6">
               {[...Array(6)].map((_, i) => (
                 <div
                   key={i}
@@ -276,10 +292,11 @@ const PrintBilling = () => {
                 />
               ))}
             </div>
-          ) : (
+          ) : viewMode === "grid" ? (
+            /* --- GRID VIEW --- */
             <motion.div
               layout
-              className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4"
+              className="grid grid-cols-3 gap-4 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6"
             >
               {currentItems.map((table, index) => {
                 const isPending =
@@ -328,6 +345,49 @@ const PrintBilling = () => {
                 );
               })}
             </motion.div>
+          ) : (
+            /* --- LIST VIEW --- */
+            <motion.div layout className="flex flex-col gap-3">
+              {currentItems.map((table, index) => {
+                const isPending = table.status_label?.toLowerCase() === "pending";
+                return (
+                  <motion.button
+                    layout
+                    key={index}
+                    onClick={() => table_trasaction(table.table_number)}
+                    className={`flex items-center justify-between p-4 rounded-3xl border transition-all ${
+                      isDark 
+                        ? "bg-slate-900/40 border-white/5 hover:bg-slate-800" 
+                        : "bg-white border-slate-200 hover:bg-slate-50 shadow-sm"
+                    }`}
+                  >
+                    <div className="flex items-center gap-5">
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black text-2xl ${
+                        isDark ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-900"
+                      }`}>
+                        {String(table.table_number || "").replace(/^\D+/g, "")}
+                      </div>
+                      <div className="text-left">
+                        <p className={`font-black uppercase text-sm ${isDark ? "text-white" : "text-slate-900"}`}>
+                          Table {table.table_number}
+                        </p>
+                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                          Ready for billing
+                        </p>
+                      </div>
+                    </div>
+                    <div className={`px-5 py-2 rounded-full border flex items-center gap-3 ${
+                      isPending 
+                        ? "border-amber-500/20 bg-amber-500/5 text-amber-500" 
+                        : "border-emerald-500/20 bg-emerald-500/5 text-emerald-500"
+                    }`}>
+                      <div className={`w-2 h-2 rounded-full ${isPending ? "bg-amber-500 animate-pulse" : "bg-emerald-500"}`} />
+                      <span className="text-[10px] font-black uppercase tracking-widest">{table.status_label}</span>
+                    </div>
+                  </motion.button>
+                );
+              })}
+            </motion.div>
           )}
 
           {/* NO RESULTS STATE */}
@@ -339,7 +399,7 @@ const PrintBilling = () => {
                   : "bg-white border-slate-200"
               }`}
             >
-              <p className="text-slate-500 font-bold uppercase tracking-widest">
+              <p className="font-bold tracking-widest uppercase text-slate-500">
                 No Tables Found
               </p>
             </div>
@@ -348,7 +408,7 @@ const PrintBilling = () => {
 
         {/* --- PAGINATION CONTROLS --- */}
         {totalPages > 1 && (
-          <div className="mt-12 mb-6 flex items-center justify-center gap-6">
+          <div className="flex items-center justify-center gap-6 mt-12 mb-6">
             <button
               disabled={currentPage === 1}
               onClick={() => setCurrentPage((prev) => prev - 1)}

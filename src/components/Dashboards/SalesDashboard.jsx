@@ -239,11 +239,11 @@ const ReportPrintReceipt = React.forwardRef(
           printColorAdjust: "exact",
         }}
       >
-        <div className="text-center mb-4">
-          <h2 className="text-xl font-bold uppercase underline">
+        <div className="mb-4 text-center">
+          <h2 className="text-xl font-bold underline uppercase">
             {reportTitle}
           </h2>
-          <p className="font-bold text-sm">
+          <p className="text-sm font-bold">
             {dateFrom} to {dateTo}
           </p>
           <p>{printedAt}</p>
@@ -254,15 +254,15 @@ const ReportPrintReceipt = React.forwardRef(
                 ? "ACTIVE + VOID"
                 : "ACTIVE ONLY"}
           </p>
-          <div className="border-b border-dashed border-black my-2" />
+          <div className="my-2 border-b border-black border-dashed" />
         </div>
 
         <table className="w-full mb-4">
           <thead>
             <tr className="border-b border-black text-[10px]">
-              <th className="text-left py-1">Item</th>
-              <th className="text-center py-1">Qty</th>
-              <th className="text-right py-1">Value</th>
+              <th className="py-1 text-left">Item</th>
+              <th className="py-1 text-center">Qty</th>
+              <th className="py-1 text-right">Value</th>
             </tr>
           </thead>
 
@@ -271,7 +271,7 @@ const ReportPrintReceipt = React.forwardRef(
               <tr>
                 <td
                   colSpan="3"
-                  className="text-center py-4 italic text-gray-500"
+                  className="py-4 italic text-center text-gray-500"
                 >
                   No data
                 </td>
@@ -295,15 +295,15 @@ const ReportPrintReceipt = React.forwardRef(
                       </div>
                     ) : null}
                   </td>
-                  <td className="text-center align-top pt-2">{item.qty}</td>
-                  <td className="text-right align-top pt-2">{item.value}</td>
+                  <td className="pt-2 text-center align-top">{item.qty}</td>
+                  <td className="pt-2 text-right align-top">{item.value}</td>
                 </tr>
               ))
             )}
           </tbody>
         </table>
 
-        <div className="border-t-2 border-black pt-2 mb-4">
+        <div className="pt-2 mb-4 border-t-2 border-black">
           {totals.map((t, index) => (
             <div
               key={`${t.label}-${index}`}
@@ -317,8 +317,8 @@ const ReportPrintReceipt = React.forwardRef(
           ))}
         </div>
 
-        <div className="mt-3 mb-2 text-center font-bold">
-          <div className="border-y border-dashed border-black py-1">
+        <div className="mt-3 mb-2 font-bold text-center">
+          <div className="py-1 border-black border-dashed border-y">
             <p className="text-[22px] font-black uppercase tracking-widest">
               Report Copy
             </p>
@@ -1358,9 +1358,9 @@ const SalesDashboard = () => {
               </button>
             </div>
 
-            <div className="mt-4 grid grid-cols-1 gap-3">
+            <div className="grid grid-cols-1 gap-3 mt-4">
               <div className={`${T.glowBg} p-4`}>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="relative">
                     <div className={T.miniLabel}>From</div>
                     <FiCalendar className="absolute left-4 top-[46px] text-slate-500" />
@@ -1404,7 +1404,7 @@ const SalesDashboard = () => {
                   </div>
                 </div>
 
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 mt-3">
                   <Chip
                     t={T}
                     on={draftIncludeVoided}
@@ -1430,7 +1430,7 @@ const SalesDashboard = () => {
                   </Chip>
                 </div>
 
-                <div className="mt-4 flex items-center justify-between gap-2">
+                <div className="flex items-center justify-between gap-2 mt-4">
                   <div
                     className={`text-xs ${
                       theme === "dark" ? "text-slate-500" : "text-slate-600"
@@ -1455,7 +1455,7 @@ const SalesDashboard = () => {
 
               <div className={`${T.glowBg} p-4`}>
                 <div className={T.miniLabel}>Prints</div>
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 mt-3">
                   <Chip
                     t={T}
                     on={false}
@@ -1492,7 +1492,7 @@ const SalesDashboard = () => {
               </div>
               <div className={`${T.glowBg} p-4`}>
                 <div className={T.miniLabel}>Exports</div>
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 mt-3">
                   <Chip
                     t={T}
                     on={false}
@@ -1540,7 +1540,7 @@ const SalesDashboard = () => {
       <div className={T.softBlobBg} />
 
       <div className={T.nav}>
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
+        <div className="flex items-center justify-between mx-auto max-w-7xl">
           <div className="flex items-center gap-3">
             <div
               className={`h-2 w-2 rounded-full ${
@@ -1552,7 +1552,7 @@ const SalesDashboard = () => {
 
           <div className="text-[11px] opacity-70">
             <button
-              onClick={() => navigate("/")}
+              onClick={() => navigate("/poscorehomescreen")}
               className={`flex items-center gap-3 px-6 py-2 ${
                 theme === "dark"
                   ? "bg-slate-900/50 border border-white/5 rounded-full text-slate-400 hover:text-white transition-all"
@@ -1591,7 +1591,7 @@ const SalesDashboard = () => {
           </div>
         ) : null}
 
-        <section className="mt-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <section className="grid grid-cols-1 gap-4 mt-4 sm:grid-cols-2 xl:grid-cols-4">
           <KpiCard
             icon={
               <FiBarChart2
@@ -1648,7 +1648,7 @@ const SalesDashboard = () => {
 
         {enabledReports.has("daily") && (
           <section className={`${T.glowBg} p-5 mt-4`}>
-            <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <FiBarChart2
                   className={
@@ -1708,7 +1708,7 @@ const SalesDashboard = () => {
 
         {enabledReports.has("hourly") && (
           <section className={`${T.glowBg} p-5 mt-4`}>
-            <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <FiClock
                   className={
@@ -1747,7 +1747,7 @@ const SalesDashboard = () => {
               </div>
             </div>
 
-            <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 mt-4 lg:grid-cols-3">
               <div
                 className={`${
                   theme === "dark"
@@ -1833,7 +1833,7 @@ const SalesDashboard = () => {
 
         {enabledReports.has("perproduct") && (
           <section className={`${T.glowBg} p-5 mt-4`}>
-            <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <FiBarChart2
                   className={
@@ -1891,7 +1891,7 @@ const SalesDashboard = () => {
               </div>
             </div>
 
-            <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 mt-4 lg:grid-cols-3">
               <div
                 className={`${
                   theme === "dark"
@@ -1948,7 +1948,7 @@ const SalesDashboard = () => {
 
         {enabledReports.has("hourlyperproduct") && (
           <section className={`${T.glowBg} p-5 mt-4`}>
-            <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <FiClock
                   className={
@@ -2008,7 +2008,7 @@ const SalesDashboard = () => {
           <motion.button
             type="button"
             onClick={() => setIsFilterOpen(true)}
-            className="rounded-full px-4 py-3 text-xs font-extrabold text-white shadow-2xl flex items-center gap-2"
+            className="flex items-center gap-2 px-4 py-3 text-xs font-extrabold text-white rounded-full shadow-2xl"
             style={{
               background:
                 "linear-gradient(135deg, rgba(59,130,246,1) 0%, rgba(99,102,241,1) 100%)",
@@ -2022,7 +2022,7 @@ const SalesDashboard = () => {
           <motion.button
             type="button"
             onClick={() => exportReport("daily")}
-            className="rounded-full px-4 py-3 text-xs font-extrabold text-white shadow-2xl flex items-center gap-2"
+            className="flex items-center gap-2 px-4 py-3 text-xs font-extrabold text-white rounded-full shadow-2xl"
             style={{
               background:
                 "linear-gradient(135deg, rgba(34,197,94,1) 0%, rgba(16,185,129,1) 100%)",
@@ -2036,7 +2036,7 @@ const SalesDashboard = () => {
           <motion.button
             type="button"
             onClick={printDailyReport}
-            className="rounded-full px-4 py-3 text-xs font-extrabold text-white shadow-2xl flex items-center gap-2"
+            className="flex items-center gap-2 px-4 py-3 text-xs font-extrabold text-white rounded-full shadow-2xl"
             style={{
               background:
                 "linear-gradient(135deg, rgba(234,179,8,1) 0%, rgba(245,158,11,1) 100%)",

@@ -10,6 +10,7 @@ import PosLogin from "./pages/PosCore/PosLogin";
 import PosSelectBusunit from "./pages/PosCore/PosSelectBusunit";
 import PosHomeScreen from "./pages/PosCore/PosHomeScreen";
 import PosPayment from "./components/MainComponents/PosPayment";
+import ProductList from "./components/MainComponents/ProductList";
 
 const App = () => {
   return (
@@ -19,6 +20,7 @@ const App = () => {
         <Route exact path="/ordering" element={<ViewOrdering />} />
         <Route exact path="/printbilling" element={<PrintBilling />} />
         <Route exact path="/salesdashboard" element={<SalesDashboard />} />
+        <Route exact path="/productlist" element={<ProductList />} />
         <Route
           exact
           path="/transactionrecords"

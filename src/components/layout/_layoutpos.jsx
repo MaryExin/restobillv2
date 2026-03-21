@@ -240,11 +240,11 @@ const LayoutPos = ({ children }) => {
       />
 
       <PosQuickActionTile
-        label="Product List"
-        icon={<FaBoxOpen className="text-[28px] sm:text-[30px]" />}
-        color="violet"
-        onClick={() => {}}
-      />
+  label="Product List"
+  icon={<FaBoxOpen className="text-[28px] sm:text-[30px]" />}
+  color="violet"
+  onClick={() => navigate("/productlist")} // Dapat pareho ito sa path sa App.js
+/>
 
       <OpenNewDay />
 
@@ -279,7 +279,7 @@ const LayoutPos = ({ children }) => {
       /> */}
 
       <SwitchUser />
-
+        
       <PosQuickActionTile
         label="POS Reading"
         icon={<FaFileAlt className="text-[28px] sm:text-[30px]" />}
@@ -288,6 +288,21 @@ const LayoutPos = ({ children }) => {
         onClick={() => setIsPosReadingOpen(true)}
       />
 
+            <PosQuickActionTile
+        label="Payment"
+        icon={<FaReceipt className="text-[28px] sm:text-[30px]" />}
+        color="green"
+        onClick={() => navigate("/payments")}
+      />
+
+      {/* --- POS REPORTS  --- */}
+      <PosQuickActionTile
+        label="POS Reports"
+        icon={<FaChartPie className="text-[28px] sm:text-[30px]" />}
+        color="indigo"
+        onClick={() => setIsReportsOpen(true)}
+      />
+      
       {menuOptions.map((item) => {
         const disabled =
           item.id !== "salesdashboard" &&
@@ -402,7 +417,7 @@ const LayoutPos = ({ children }) => {
                   : "border-white/70 bg-white"
               }`}
             >
-              <div className="mb-5 flex items-center justify-between">
+              <div className="flex items-center justify-between mb-5">
                 <div>
                   <h2
                     className={`text-xl font-black ${
@@ -469,7 +484,7 @@ const LayoutPos = ({ children }) => {
 
                   <button
                     onClick={handlePasswordSubmit}
-                    className="flex-1 rounded-2xl bg-gradient-to-b from-cyan-500 to-sky-600 px-5 py-4 font-bold text-white transition-all hover:brightness-110"
+                    className="flex-1 px-5 py-4 font-bold text-white transition-all rounded-2xl bg-gradient-to-b from-cyan-500 to-sky-600 hover:brightness-110"
                   >
                     Enter
                   </button>
@@ -480,9 +495,9 @@ const LayoutPos = ({ children }) => {
         )}
       </AnimatePresence>
 
-      <div className="relative z-10 h-screen w-full overflow-hidden">
+      <div className="relative z-10 w-full h-screen overflow-hidden">
         <header
-          className="fixed left-0 right-0 top-0 z-40 border-b px-3 py-2 sm:px-4"
+          className="fixed top-0 left-0 right-0 z-40 px-3 py-2 border-b sm:px-4"
           style={{
             height: `${HEADER_HEIGHT}px`,
             background: isDark
@@ -593,7 +608,7 @@ const LayoutPos = ({ children }) => {
         </header>
 
         <main
-          className="h-full overflow-y-auto px-3 sm:px-4"
+          className="h-full px-3 overflow-y-auto sm:px-4"
           style={{
             paddingTop: `${HEADER_HEIGHT + 28}px`,
             paddingBottom: `${FOOTER_HEIGHT + 18}px`,
@@ -603,7 +618,7 @@ const LayoutPos = ({ children }) => {
         </main>
 
         <div
-          className="fixed bottom-0 left-0 right-0 z-40 px-3 pb-3 pt-2 sm:px-4 sm:pb-4"
+          className="fixed bottom-0 left-0 right-0 z-40 px-3 pt-2 pb-3 sm:px-4 sm:pb-4"
           style={{
             background: isDark
               ? "linear-gradient(180deg, rgba(15,23,42,0.08) 0%, rgba(15,23,42,0.92) 20%, rgba(15,23,42,0.98) 100%)"
@@ -614,7 +629,7 @@ const LayoutPos = ({ children }) => {
           <div className="flex flex-wrap gap-2 sm:gap-2.5">{quickActions}</div>
         </div>
 
-        <div className="pointer-events-none fixed bottom-3 right-3 z-50 sm:bottom-4 sm:right-4">
+        <div className="fixed z-50 pointer-events-none bottom-3 right-3 sm:bottom-4 sm:right-4">
           <div
             className={`grid h-12 w-12 place-items-center rounded-full border shadow-[0_12px_30px_rgba(0,0,0,0.18)] sm:h-14 sm:w-14 ${
               isDark
