@@ -65,7 +65,7 @@ const LayoutPos = ({ children }) => {
 
     try {
       const response = await fetch(
-        `${apiHost}/api/get_shift_details.php?user_id=${userId}`
+        `${apiHost}/api/get_shift_details.php?user_id=${userId}`,
       );
 
       const result = await response.json();
@@ -198,16 +198,16 @@ const LayoutPos = ({ children }) => {
       //   icon: <FaWallet className="text-[26px]" />,
       //   badge: "Cashier",
       // },
-// {
-//   id: "payment",
-//   title: "Payment",
-//   description: "Receive customer payments and complete checkout.",
-//   image: Billing,
-//   path: "/payments",
-//   color: "blue", // Changed from "green"
-//   icon: <FaReceipt className="text-[26px]" />,
-//   badge: "Checkout",
-// },
+      // {
+      //   id: "payment",
+      //   title: "Payment",
+      //   description: "Receive customer payments and complete checkout.",
+      //   image: Billing,
+      //   path: "/payments",
+      //   color: "blue", // Changed from "green"
+      //   icon: <FaReceipt className="text-[26px]" />,
+      //   badge: "Checkout",
+      // },
       {
         id: "salesdashboard",
         title: "Sales Dashboard",
@@ -227,7 +227,7 @@ const LayoutPos = ({ children }) => {
       //   badge: "Records",
       // },
     ],
-    []
+    [],
   );
 
   const quickActions = (
@@ -246,7 +246,7 @@ const LayoutPos = ({ children }) => {
         onClick={() => {}}
       />
 
-      <OpenNewDay  />
+      <OpenNewDay />
 
       <PosQuickActionTile
         label="New Transaction"
@@ -255,8 +255,20 @@ const LayoutPos = ({ children }) => {
         disabled={isClosed}
         onClick={() => !isClosed && navigate("/ordering")}
       />
-      
+      <PosQuickActionTile
+        label="Billing"
+        icon={<FaReceipt className="text-[28px] sm:text-[30px]" />}
+        color="violet"
+        disabled={isClosed}
+        onClick={() => !isClosed && navigate("/printbilling")}
+      />
 
+      <PosQuickActionTile
+        label="Payment"
+        icon={<FaReceipt className="text-[28px] sm:text-[30px]" />}
+        color="green"
+        onClick={() => navigate("/payments")}
+      />
 
       {/* <PosQuickActionTile
         label="Trans. Records"
@@ -275,21 +287,7 @@ const LayoutPos = ({ children }) => {
         disabled={isClosed}
         onClick={() => setIsPosReadingOpen(true)}
       />
-      
-      <PosQuickActionTile
-        label="Billing"
-        icon={<FaReceipt className="text-[28px] sm:text-[30px]" />}
-        color="violet"
-        disabled={isClosed}
-        onClick={() => !isClosed && navigate("/printbilling")}
-      />
 
-            <PosQuickActionTile
-        label="Payment"
-        icon={<FaReceipt className="text-[28px] sm:text-[30px]" />}
-        color="green"
-        onClick={() => navigate("/payments")}
-      />
       {menuOptions.map((item) => {
         const disabled =
           item.id !== "salesdashboard" &&
@@ -324,12 +322,8 @@ const LayoutPos = ({ children }) => {
             disabled={disabled}
             onClick={() => !disabled && handleCardClick(item)}
           />
-          
         );
-        
       })}
-
-
     </>
   );
 

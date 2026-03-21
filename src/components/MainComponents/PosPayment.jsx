@@ -129,7 +129,20 @@ const ModalShell = ({
   );
 };
 
-function StatCard({ title, value, icon: Icon, isDark }) {
+function StatCard({ title, value, icon: Icon, isDark, tone = "blue" }) {
+  const toneClasses = {
+    blue: isDark ? "bg-blue-500/10 text-blue-300" : "bg-blue-50 text-blue-600",
+    green: isDark
+      ? "bg-emerald-500/10 text-emerald-300"
+      : "bg-emerald-50 text-emerald-600",
+    yellow: isDark
+      ? "bg-amber-500/10 text-amber-300"
+      : "bg-amber-50 text-amber-600",
+    slate: isDark
+      ? "bg-slate-800 text-slate-300"
+      : "bg-slate-100 text-slate-600",
+  };
+
   return (
     <div
       className={`rounded-[24px] border p-5 ${
@@ -144,20 +157,111 @@ function StatCard({ title, value, icon: Icon, isDark }) {
         </div>
         <div
           className={`flex h-10 w-10 items-center justify-center rounded-2xl ${
-            isDark
-              ? "bg-slate-800 text-slate-300"
-              : "bg-slate-100 text-slate-600"
+            toneClasses[tone]
           }`}
         >
           <Icon size={18} />
         </div>
       </div>
+
       <div
         className={`text-2xl font-black ${
           isDark ? "text-white" : "text-slate-900"
         }`}
       >
         {value}
+      </div>
+    </div>
+  );
+}
+
+function SummaryPanel({ isDark, viewMode, summary }) {
+  return (
+    <div
+      className={`rounded-[28px] border p-5 lg:sticky lg:top-6 ${
+        isDark
+          ? "border-white/5 bg-white/[0.03]"
+          : "border-slate-200 bg-white shadow-sm"
+      }`}
+    >
+      <div className="mb-5">
+        <div className="text-xs font-bold uppercase tracking-[0.2em] text-blue-500">
+          Summary
+        </div>
+        <h2
+          className={`mt-2 text-2xl font-black ${
+            isDark ? "text-white" : "text-slate-900"
+          }`}
+        >
+          {viewMode === "paid" ? "Paid Overview" : "Pending Overview"}
+        </h2>
+        <p className="mt-2 text-sm text-slate-500">
+          Quick totals and payment setup information.
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        <StatCard
+          title={
+            viewMode === "paid" ? "Paid Transactions" : "Pending Transactions"
+          }
+          value={summary.totalTransactions}
+          icon={FiDatabase}
+          isDark={isDark}
+          tone={viewMode === "paid" ? "green" : "yellow"}
+        />
+
+        <StatCard
+          title={viewMode === "paid" ? "Paid Amount" : "Pending Sales"}
+          value={peso(summary.totalSales)}
+          icon={FaMoneyBill}
+          isDark={isDark}
+          tone={viewMode === "paid" ? "green" : "yellow"}
+        />
+
+        <StatCard
+          title="Payment Methods"
+          value={summary.totalMethods}
+          icon={FiCreditCard}
+          isDark={isDark}
+          tone="blue"
+        />
+
+        <StatCard
+          title="Charge Options"
+          value={summary.totalCharges}
+          icon={FaMoneyBill}
+          isDark={isDark}
+          tone="slate"
+        />
+      </div>
+
+      <div
+        className={`mt-5 rounded-[22px] border p-4 ${
+          isDark
+            ? "border-white/5 bg-slate-950/50"
+            : "border-slate-200 bg-slate-50"
+        }`}
+      >
+        <div
+          className={`mb-3 text-xs font-black uppercase tracking-[0.18em] ${
+            isDark ? "text-white" : "text-slate-900"
+          }`}
+        >
+          Legend
+        </div>
+
+        <div className="space-y-3 text-sm">
+          <div className="flex items-center gap-3">
+            <span className="h-3.5 w-3.5 rounded-full bg-emerald-500" />
+            <span className="text-slate-500">Paid Transactions</span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className="h-3.5 w-3.5 rounded-full bg-amber-500" />
+            <span className="text-slate-500">Pending for Payment</span>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -204,7 +308,10 @@ function TransactionRow({ index, style, data }) {
 
   const remarksText =
     row.remarks || (mode === "paid" ? "Paid" : "Pending for Payment");
-  const isPending = normalizeText(remarksText).includes("pending");
+
+  const normalizedRemarks = normalizeText(remarksText);
+  const isPaid = normalizedRemarks.includes("paid");
+  const isPending = normalizedRemarks.includes("pending");
 
   return (
     <div style={style}>
@@ -236,34 +343,36 @@ function TransactionRow({ index, style, data }) {
           </div>
         </div>
 
-        <div className="px-5 py-4 whitespace-nowrap">
+        <div className="whitespace-nowrap px-5 py-4">
           {row.table_number || "-"}
         </div>
 
-        <div className="px-5 py-4 whitespace-nowrap">
+        <div className="whitespace-nowrap px-5 py-4">
           {row.order_type || "-"}
         </div>
 
-        <div className="px-5 py-4 whitespace-nowrap">
+        <div className="whitespace-nowrap px-5 py-4">
           {row.transaction_date || "-"}
         </div>
 
-        <div className="px-5 py-4 text-right whitespace-nowrap font-black">
+        <div className="whitespace-nowrap px-5 py-4 text-right font-black">
           {mode === "paid"
             ? peso(row.TotalAmountDue || row.payment_amount || 0)
             : peso(row.TotalSales)}
         </div>
 
-        <div className="px-5 py-4 whitespace-nowrap">{row.cashier || "-"}</div>
+        <div className="whitespace-nowrap px-5 py-4">{row.cashier || "-"}</div>
 
         <div className="flex items-center px-5 py-4">
           <span
             className={`rounded-full px-3 py-1 text-xs font-bold ${
-              isPending
-                ? "bg-green-500/10 text-green-500"
-                : isDark
-                  ? "bg-slate-500/10 text-slate-300"
-                  : "bg-slate-900/10 text-slate-700"
+              isPaid
+                ? "bg-emerald-500/10 text-emerald-500"
+                : isPending
+                  ? "bg-amber-500/10 text-amber-500"
+                  : isDark
+                    ? "bg-slate-500/10 text-slate-300"
+                    : "bg-slate-900/10 text-slate-700"
             }`}
           >
             {remarksText}
@@ -504,180 +613,127 @@ export default function PosPayment() {
             </p>
           </div>
 
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-              <StatCard
-                title={
-                  viewMode === "paid"
-                    ? "Paid Transactions"
-                    : "Pending Transactions"
-                }
-                value={summary.totalTransactions}
-                icon={FiDatabase}
-                isDark={isDark}
-              />
-              <StatCard
-                title={viewMode === "paid" ? "Paid Amount" : "Pending Sales"}
-                value={peso(summary.totalSales)}
-                icon={FaMoneyBill}
-                isDark={isDark}
-              />
-              <StatCard
-                title="Payment Methods"
-                value={summary.totalMethods}
-                icon={FiCreditCard}
-                isDark={isDark}
-              />
-              <StatCard
-                title="Charge Options"
-                value={summary.totalCharges}
-                icon={FaMoneyBill}
-                isDark={isDark}
-              />
-            </div>
-
-            <div
-              className={`rounded-[28px] border p-4 sm:p-5 ${
-                isDark
-                  ? "border-white/5 bg-white/[0.03]"
-                  : "border-slate-200 bg-white shadow-sm"
-              }`}
-            >
-              <div className="mb-3 flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  onClick={() => setViewMode("pending")}
-                  className={`rounded-2xl px-4 py-3 text-sm font-black transition ${
-                    viewMode === "pending"
-                      ? "bg-blue-600 text-white"
-                      : isDark
-                        ? "border border-slate-700 bg-slate-900 text-slate-300"
-                        : "border border-slate-200 bg-slate-50 text-slate-700"
-                  }`}
-                >
-                  Pending
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setViewMode("paid")}
-                  className={`rounded-2xl px-4 py-3 text-sm font-black transition ${
-                    viewMode === "paid"
-                      ? "bg-blue-600 text-white"
-                      : isDark
-                        ? "border border-slate-700 bg-slate-900 text-slate-300"
-                        : "border border-slate-200 bg-slate-50 text-slate-700"
-                  }`}
-                >
-                  Paid
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_150px]">
-                <div className="relative">
-                  <FiSearch className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
-                  <input
-                    type="text"
-                    placeholder="Search transaction, table, cashier, remarks..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className={`w-full rounded-2xl py-4 pl-12 pr-4 outline-none transition ${
-                      isDark
-                        ? "border border-slate-800 bg-slate-950 text-white focus:border-blue-500"
-                        : "border border-slate-200 bg-slate-50 text-slate-900 focus:border-blue-400"
-                    }`}
-                  />
-                </div>
-
-                <button
-                  onClick={fetchAll}
-                  className="flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-4 font-semibold text-white transition hover:bg-blue-500"
-                >
-                  <FiRefreshCw size={16} />
-                  Refresh
-                </button>
-              </div>
-            </div>
-
-            <div
-              className={`overflow-hidden rounded-[30px] border ${
-                isDark
-                  ? "border-white/5 bg-white/[0.03]"
-                  : "border-slate-200 bg-white shadow-sm"
-              }`}
-            >
-              {errorMessage ? (
-                <div className="flex h-[420px] items-center justify-center px-6 text-center text-lg font-semibold text-red-500">
-                  {errorMessage}
-                </div>
-              ) : isLoading ? (
-                <div
-                  className={`flex h-[420px] items-center justify-center text-lg font-semibold ${
-                    isDark ? "text-slate-400" : "text-slate-500"
-                  }`}
-                >
-                  Loading transactions...
-                </div>
-              ) : filteredTransactions.length === 0 ? (
-                <div
-                  className={`flex h-[420px] items-center justify-center text-2xl font-black ${
-                    isDark ? "text-slate-500" : "text-slate-400"
-                  }`}
-                >
-                  No data
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <div style={{ minWidth: TABLE_MIN_WIDTH }}>
-                    <HeaderRow isDark={isDark} mode={viewMode} />
-                    <List
-                      height={LIST_HEIGHT}
-                      itemCount={filteredTransactions.length}
-                      itemSize={ROW_HEIGHT}
-                      width={TABLE_MIN_WIDTH}
-                      itemData={listData}
-                      overscanCount={8}
-                      outerElementType={ListOuter}
-                      innerElementType={ListInner}
-                    >
-                      {TransactionRow}
-                    </List>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div
-              className={`rounded-[28px] border p-5 ${
-                isDark
-                  ? "border-white/5 bg-white/[0.03]"
-                  : "border-slate-200 bg-white shadow-sm"
-              }`}
-            >
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="space-y-6">
               <div
-                className={`mb-4 text-sm font-black uppercase tracking-[0.18em] ${
-                  isDark ? "text-white" : "text-slate-900"
+                className={`rounded-[28px] border p-4 sm:p-5 ${
+                  isDark
+                    ? "border-white/5 bg-white/[0.03]"
+                    : "border-slate-200 bg-white shadow-sm"
                 }`}
               >
-                Legend
+                <div className="flex flex-col items-start gap-4">
+                  <div className="flex flex-wrap justify-start gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setViewMode("pending")}
+                      className={`rounded-2xl px-4 py-3 text-sm font-black transition ${
+                        viewMode === "pending"
+                          ? "bg-amber-500 text-gray-100"
+                          : isDark
+                            ? "border border-slate-700 bg-slate-900 text-slate-300"
+                            : "border border-slate-200 bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      Pending
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setViewMode("paid")}
+                      className={`rounded-2xl px-4 py-3 text-sm font-black transition ${
+                        viewMode === "paid"
+                          ? "bg-emerald-600 text-gray-100"
+                          : isDark
+                            ? "border border-slate-700 bg-slate-900 text-slate-300"
+                            : "border border-slate-200 bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      Paid
+                    </button>
+                  </div>
+
+                  <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-[1fr_150px]">
+                    <div className="relative">
+                      <FiSearch className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+                      <input
+                        type="text"
+                        placeholder="Search transaction, table, cashier, remarks..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className={`w-full rounded-2xl py-4 pl-12 pr-4 outline-none transition ${
+                          isDark
+                            ? "border border-slate-800 bg-slate-950 text-white focus:border-blue-500"
+                            : "border border-slate-200 bg-slate-50 text-slate-900 focus:border-blue-400"
+                        }`}
+                      />
+                    </div>
+
+                    <button
+                      onClick={fetchAll}
+                      className="flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-4 font-semibold text-white transition hover:bg-blue-500"
+                    >
+                      <FiRefreshCw size={16} />
+                      Refresh
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              <div className="flex flex-wrap gap-6 text-sm">
-                <div className="flex items-center gap-3">
-                  <span
-                    className={`h-3.5 w-3.5 rounded-full ${
-                      isDark ? "bg-slate-300" : "bg-slate-900"
+              <div
+                className={`overflow-hidden rounded-[30px] border ${
+                  isDark
+                    ? "border-white/5 bg-white/[0.03]"
+                    : "border-slate-200 bg-white shadow-sm"
+                }`}
+              >
+                {errorMessage ? (
+                  <div className="flex h-[420px] items-center justify-center px-6 text-center text-lg font-semibold text-red-500">
+                    {errorMessage}
+                  </div>
+                ) : isLoading ? (
+                  <div
+                    className={`flex h-[420px] items-center justify-center text-lg font-semibold ${
+                      isDark ? "text-slate-400" : "text-slate-500"
                     }`}
-                  />
-                  <span className="text-slate-500">Paid Transactions</span>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <span className="h-3.5 w-3.5 rounded-full bg-green-500" />
-                  <span className="text-slate-500">Pending for Payment</span>
-                </div>
+                  >
+                    Loading transactions...
+                  </div>
+                ) : filteredTransactions.length === 0 ? (
+                  <div
+                    className={`flex h-[420px] items-center justify-center text-2xl font-black ${
+                      isDark ? "text-slate-500" : "text-slate-400"
+                    }`}
+                  >
+                    No data
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <div style={{ minWidth: TABLE_MIN_WIDTH }}>
+                      <HeaderRow isDark={isDark} mode={viewMode} />
+                      <List
+                        height={LIST_HEIGHT}
+                        itemCount={filteredTransactions.length}
+                        itemSize={ROW_HEIGHT}
+                        width={TABLE_MIN_WIDTH}
+                        itemData={listData}
+                        overscanCount={8}
+                        outerElementType={ListOuter}
+                        innerElementType={ListInner}
+                      >
+                        {TransactionRow}
+                      </List>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
+
+            <SummaryPanel
+              isDark={isDark}
+              viewMode={viewMode}
+              summary={summary}
+            />
           </div>
         </div>
       </div>
