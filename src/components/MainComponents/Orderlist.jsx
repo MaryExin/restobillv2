@@ -33,7 +33,7 @@ import { useNavigate } from "react-router-dom";
 import useApiHost from "../../hooks/useApiHost";
 import { useTheme } from "../../context/ThemeContext";
 import ModalDiscountTransaction from "./ModalDiscountTransaction";
-
+import useZustandLoginCred from "../../context/useZustandLoginCred";
 const Orderlist = ({
   tableselected,
   setshoworderlist,
@@ -97,6 +97,68 @@ const Orderlist = ({
   const printAllRef = useRef();
   const billingPrintRef = useRef();
   const [isReprint, setIsReprint] = useState(false);
+
+  const userId = localStorage.getItem("user_id") || "0";
+  const userName = localStorage.getItem("username") || "Store Crew";
+  const email = localStorage.getItem("email") || "Store Crew";
+  const [salesTypeList, setSalesTypeList] = useState([]);
+  const [selectedSalesType, setSelectedSalesType] = useState("");
+  const [pricingDetailsList, setPricingDetailsList] = useState([]);
+  const [selectedPricingDetails, setSelectedPricingDetails] = useState("");
+  
+
+  useEffect(() => {
+    if (!apiHost) return;
+
+    fetch(`${apiHost}/api/sales_type_list.php`)
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch sales type");
+        return res.json();
+      })
+      .then((result) => {
+        const rows = Array.isArray(result?.data) ? result.data : [];
+        setSalesTypeList(rows);
+
+        if (rows.length > 0) {
+          setSelectedSalesType(rows[0].sales_type_id);
+        }
+      })
+      .catch(() => {
+        setSalesTypeList([]);
+      });
+  }, [apiHost]);
+
+useEffect(() => {
+  if (!apiHost || !selectedSalesType) {
+    setPricingDetailsList([]);
+    setSelectedPricingDetails("");
+    return;
+  }
+
+  fetch(
+    `${apiHost}/api/pricing_details_list.php?sales_type_id=${encodeURIComponent(
+      selectedSalesType
+    )}`
+  )
+    .then((res) => {
+      if (!res.ok) throw new Error("Failed to fetch pricing details");
+      return res.json();
+    })
+    .then((result) => {
+      const rows = Array.isArray(result?.data) ? result.data : [];
+      setPricingDetailsList(rows);
+
+      if (rows.length > 0) {
+        setSelectedPricingDetails(rows[0].pricing_details_id);
+      } else {
+        setSelectedPricingDetails("");
+      }
+    })
+    .catch(() => {
+      setPricingDetailsList([]);
+      setSelectedPricingDetails("");
+    });
+}, [apiHost, selectedSalesType]);
 
   const printPageStyle = `
     @page {
@@ -773,6 +835,17 @@ const Orderlist = ({
       const formData = new FormData();
       const txId = transactionId || Date.now();
 
+      // get logged in user info
+      const loggedUserId =
+        localStorage.getItem("userId") ||
+        sessionStorage.getItem("userId") ||
+        "0";
+
+      const loggedUserName =
+        localStorage.getItem("firstName") ||
+        sessionStorage.getItem("firstName") ||
+        "Store Crew";
+
       formData.append("transaction_id", txId);
       formData.append("Category_Code", "Crab & Crack");
       formData.append("Unit_Code", "BU-247001cd32f1");
@@ -794,7 +867,9 @@ const Orderlist = ({
       formData.append("discount_type", "");
       formData.append("payment_method", "");
       formData.append("special_instructions", instructions || "");
-      formData.append("cashier", "Store Crew");
+      formData.append("cashier", userName);
+      formData.append("user_id", userId);
+      formData.append("user_name", email);
       formData.append("remarks", "Pending for Payment");
       formData.append("order_status", "Pending");
       formData.append("status", "Active");
@@ -1049,6 +1124,56 @@ const Orderlist = ({
                   : "bg-white border-r border-slate-200"
               }`}
             >
+            <div className="px-4 pt-4 mb-2">
+              <label 
+                className={`text-[10px] font-bold uppercase tracking-[0.2em] mb-2 block px-1 ${
+                  isDark ? "text-slate-500" : "text-slate-400"
+                }`}
+              >
+                Service Type
+              </label>
+              <div className="relative group">
+                <select
+                  value={selectedSalesType}
+                  onChange={(e) => setSelectedSalesType(e.target.value)}
+                  className={`w-full appearance-none rounded-2xl py-3.5 pl-5 pr-12 outline-none cursor-pointer transition-all duration-300 font-semibold text-sm ${
+                    isDark
+                      ? "bg-slate-800/40 border border-slate-700 text-white focus:border-blue-500/50 focus:bg-slate-800/60"
+                      : "bg-white border border-slate-200 text-slate-900 shadow-sm focus:border-blue-400 focus:shadow-md"
+                  }`}
+                >
+                  <option value="" disabled>Choose Sales Type...</option>
+                  {salesTypeList.map((item) => (
+                    <option 
+                      key={item.sales_type_id} 
+                      value={item.sales_type_id}
+                      className={isDark ? "bg-slate-900 text-white" : "bg-white text-slate-900"}
+                    >
+                      {item.description}
+                    </option>
+                  ))}
+                </select>
+                
+                {/* Custom Chevron Arrow */}
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none transition-transform group-focus-within:rotate-180">
+                  <svg 
+                    width="12" 
+                    height="12" 
+                    viewBox="0 0 12 12" 
+                    fill="none" 
+                    xmlns="http://www.w3.org/2000/svg"
+                    className={isDark ? "text-slate-500" : "text-slate-400"}
+                  >
+                    <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+
+                {/* Subtle Glow Effect on Hover (Dark Mode Only) */}
+                {isDark && (
+                  <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 rounded-2xl blur opacity-0 group-hover:opacity-100 transition duration-500 pointer-events-none" />
+                )}
+              </div>
+            </div>
               <div className="p-4 flex flex-col h-full">
                 <h3
                   className={`text-[10px] font-bold uppercase tracking-widest mb-4 px-2 ${

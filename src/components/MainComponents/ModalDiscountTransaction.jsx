@@ -1212,6 +1212,12 @@ const ModalDiscountTransaction = ({
       throw new Error("Please fix the discount validation first.");
     }
 
+    const loggedUserId = localStorage.getItem("user_id") || "";
+    const loggedUserName =
+      localStorage.getItem("username") ||
+      transaction?.cashier ||
+      "System";
+
     const discountBreakdownPayload = computed.discountBreakdown
       .filter(
         (entry) =>
@@ -1239,6 +1245,9 @@ const ModalDiscountTransaction = ({
       unit_code:
         transaction?.Unit_Code || transaction?.unit_code || "BU-247001cd32f1",
 
+      user_id: loggedUserId,
+      user_name: loggedUserName,
+
       customer_exclusive_id: transaction?.customer_exclusive_id || "",
       customer_head_count: Number(customerCount || 1),
       customer_count_for_discount: Number(computed?.totalQualifiedAll || 0),
@@ -1258,7 +1267,7 @@ const ModalDiscountTransaction = ({
       payment_amount: Number(transaction?.payment_amount || 0),
       payment_method: transaction?.payment_method || "Cash",
       change_amount: Number(transaction?.change_amount || 0),
-      cashier: transaction?.cashier || "System",
+      cashier: loggedUserName,
 
       discount_breakdown: discountBreakdownPayload,
 
@@ -1692,6 +1701,10 @@ const ModalDiscountTransaction = ({
           ref={printRef}
           transaction={{
             ...transaction,
+            cashier:
+              localStorage.getItem("username") ||
+              transaction?.cashier ||
+              "System",
             billing_no:
               latestBillingNo ||
               billingNo ||
