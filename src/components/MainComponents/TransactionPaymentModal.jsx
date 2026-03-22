@@ -29,7 +29,9 @@ const peso = (value) =>
 
 const CASH_METHOD_KEYWORDS = ["cash", "salapi"];
 
-const QUICK_DENOMINATIONS = [20, 50, 100, 200, 500, 1000, 1500, 2000];
+const QUICK_DENOMINATIONS = [
+  20, 50, 100, 200, 500, 1000, 1500, 2000, 2500, 3000, 5000, 10000,
+];
 
 const isCashMethod = (method = "") =>
   CASH_METHOD_KEYWORDS.some((keyword) =>
@@ -1435,9 +1437,15 @@ const InputPaymentsModal = ({
   onAddPaymentMethod,
   readOnly = false,
 }) => {
+  const [activePaymentIndex, setActivePaymentIndex] = useState(0);
+
   const inputClass = isDark
     ? "bg-slate-950 border border-slate-800 text-white placeholder:text-slate-500"
     : "bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400";
+
+  const activeInputClass = isDark
+    ? "bg-slate-950 border-2 border-blue-500 text-white placeholder:text-slate-500"
+    : "bg-white border-2 border-blue-500 text-slate-900 placeholder:text-slate-400";
 
   const totalPaid = payments.reduce(
     (sum, row) => sum + toNum(row.payment_amount),
@@ -1450,16 +1458,29 @@ const InputPaymentsModal = ({
       prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)),
     );
 
-  const removeRow = (index) =>
-    setPayments((prev) => prev.filter((_, i) => i !== index));
+  const removeRow = (index) => {
+    setPayments((prev) => {
+      const next = prev.filter((_, i) => i !== index);
 
-  const setExactAmountForRow = (index) => {
+      if (next.length === 0) {
+        setActivePaymentIndex(0);
+      } else if (activePaymentIndex >= next.length) {
+        setActivePaymentIndex(next.length - 1);
+      }
+
+      return next;
+    });
+  };
+
+  const setExactAmountForActiveRow = () => {
+    if (payments.length === 0) return;
+
     setPayments((prev) =>
       prev.map((row, i) => {
-        if (i !== index) return row;
+        if (i !== activePaymentIndex) return row;
 
         const otherRowsTotal = prev.reduce((sum, item, rowIndex) => {
-          if (rowIndex === index) return sum;
+          if (rowIndex === activePaymentIndex) return sum;
           return sum + toNum(item.payment_amount);
         }, 0);
 
@@ -1473,10 +1494,12 @@ const InputPaymentsModal = ({
     );
   };
 
-  const addDenominationToRow = (index, amountToAdd) => {
+  const addDenominationToActiveRow = (amountToAdd) => {
+    if (payments.length === 0) return;
+
     setPayments((prev) =>
       prev.map((row, i) => {
-        if (i !== index) return row;
+        if (i !== activePaymentIndex) return row;
 
         const current = toNum(row.payment_amount);
         return {
@@ -1487,12 +1510,50 @@ const InputPaymentsModal = ({
     );
   };
 
-  const clearAmountForRow = (index) => {
+  const clearAmountForActiveRow = () => {
+    if (payments.length === 0) return;
+
     setPayments((prev) =>
       prev.map((row, i) =>
-        i === index ? { ...row, payment_amount: "" } : row,
+        i === activePaymentIndex ? { ...row, payment_amount: "" } : row,
       ),
     );
+  };
+
+  const getDenominationColor = (amount, isDark) => {
+    if (amount === 20) {
+      return isDark
+        ? "border-orange-500/30 bg-orange-500/10 text-orange-300 hover:bg-orange-500/20"
+        : "border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100";
+    }
+
+    if (amount === 50) {
+      return isDark
+        ? "border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20"
+        : "border-red-200 bg-red-50 text-red-700 hover:bg-red-100";
+    }
+
+    if (amount === 100) {
+      return isDark
+        ? "border-violet-500/30 bg-violet-500/10 text-violet-300 hover:bg-violet-500/20"
+        : "border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100";
+    }
+
+    if (amount === 200) {
+      return isDark
+        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
+        : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100";
+    }
+
+    if (amount === 500) {
+      return isDark
+        ? "border-yellow-500/30 bg-yellow-500/10 text-yellow-300 hover:bg-yellow-500/20"
+        : "border-yellow-200 bg-yellow-50 text-yellow-700 hover:bg-yellow-100";
+    }
+
+    return isDark
+      ? "border-sky-500/30 bg-sky-500/10 text-sky-300 hover:bg-sky-500/20"
+      : "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100";
   };
 
   return (
@@ -1561,10 +1622,14 @@ const InputPaymentsModal = ({
               payments.map((row, index) => (
                 <div
                   key={`${row.payment_method}-${index}`}
-                  className={`rounded-[22px] border p-4 ${
-                    isDark
-                      ? "border-white/5 bg-slate-950"
-                      : "border-slate-200 bg-white"
+                  className={`rounded-[22px] border p-4 transition ${
+                    index === activePaymentIndex
+                      ? isDark
+                        ? "border-blue-500/60 bg-slate-950 shadow-[0_0_0_1px_rgba(59,130,246,0.35)]"
+                        : "border-blue-300 bg-white shadow-[0_0_0_1px_rgba(59,130,246,0.18)]"
+                      : isDark
+                        ? "border-white/5 bg-slate-950"
+                        : "border-slate-200 bg-white"
                   }`}
                 >
                   <div className="grid gap-3 md:grid-cols-[60px_170px_minmax(0,1fr)]">
@@ -1597,7 +1662,9 @@ const InputPaymentsModal = ({
                           {row.payment_method || "No method"}
                         </p>
                         <p className="text-[11px] text-slate-500">
-                          Quick amount enabled
+                          {index === activePaymentIndex
+                            ? "Active amount field"
+                            : "Tap amount field to activate"}
                         </p>
                       </div>
                     </div>
@@ -1617,9 +1684,16 @@ const InputPaymentsModal = ({
                             onChange={(e) =>
                               updateRow(index, "payment_amount", e.target.value)
                             }
-                            onFocus={handleSelectAllOnFocus}
+                            onFocus={(e) => {
+                              setActivePaymentIndex(index);
+                              handleSelectAllOnFocus(e);
+                            }}
                             placeholder="0.00"
-                            className={`h-12 w-full rounded-2xl px-4 text-base font-bold outline-none ${inputClass}`}
+                            className={`h-12 w-full rounded-2xl px-4 text-base font-bold outline-none transition ${
+                              index === activePaymentIndex
+                                ? activeInputClass
+                                : inputClass
+                            }`}
                           />
                         </div>
 
@@ -1643,69 +1717,72 @@ const InputPaymentsModal = ({
                           />
                         </div>
                       </div>
-
-                      <div
-                        className={`rounded-[20px] border p-3 ${
-                          isDark
-                            ? "border-white/5 bg-white/[0.02]"
-                            : "border-slate-200 bg-slate-50"
-                        }`}
-                      >
-                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                          <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
-                            Quick Amount Input
-                          </p>
-
-                          <div className="flex flex-wrap gap-2">
-                            <button
-                              type="button"
-                              disabled={readOnly}
-                              onClick={() => setExactAmountForRow(index)}
-                              className="rounded-xl bg-emerald-600 px-3 py-2 text-[11px] font-black text-white transition hover:bg-emerald-500 disabled:opacity-50"
-                            >
-                              Exact
-                            </button>
-
-                            <button
-                              type="button"
-                              disabled={readOnly}
-                              onClick={() => clearAmountForRow(index)}
-                              className={`rounded-xl px-3 py-2 text-[11px] font-black transition disabled:opacity-50 ${
-                                isDark
-                                  ? "bg-slate-800 text-slate-200 hover:bg-slate-700"
-                                  : "bg-slate-200 text-slate-700 hover:bg-slate-300"
-                              }`}
-                            >
-                              Clear
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                          {QUICK_DENOMINATIONS.map((amount) => (
-                            <button
-                              key={amount}
-                              type="button"
-                              disabled={readOnly}
-                              onClick={() =>
-                                addDenominationToRow(index, amount)
-                              }
-                              className={`rounded-2xl px-3 py-3 text-sm font-black transition disabled:opacity-50 ${
-                                isDark
-                                  ? "border border-slate-700 bg-slate-900 text-slate-100 hover:border-blue-500 hover:bg-slate-800"
-                                  : "border border-slate-200 bg-white text-slate-800 hover:border-blue-400 hover:bg-blue-50"
-                              }`}
-                            >
-                              ₱{amount.toLocaleString("en-PH")}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
                     </div>
                   </div>
                 </div>
               ))
             )}
+          </div>
+
+          <div
+            className={`mt-4 rounded-[22px] border p-4 ${
+              isDark
+                ? "border-white/5 bg-slate-950"
+                : "border-slate-200 bg-white"
+            }`}
+          >
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
+                  Shared Quick Amount Input
+                </p>
+                <p className="mt-1 text-sm font-semibold text-blue-500">
+                  Active Row: #
+                  {payments.length > 0 ? activePaymentIndex + 1 : 0}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={readOnly || payments.length === 0}
+                  onClick={setExactAmountForActiveRow}
+                  className="rounded-xl bg-emerald-600 px-3 py-2 text-[11px] font-black text-white transition hover:bg-emerald-500 disabled:opacity-50"
+                >
+                  Exact
+                </button>
+
+                <button
+                  type="button"
+                  disabled={readOnly || payments.length === 0}
+                  onClick={clearAmountForActiveRow}
+                  className={`rounded-xl px-3 py-2 text-[11px] font-black transition disabled:opacity-50 ${
+                    isDark
+                      ? "bg-slate-800 text-slate-200 hover:bg-slate-700"
+                      : "bg-slate-200 text-slate-700 hover:bg-slate-300"
+                  }`}
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+              {QUICK_DENOMINATIONS.map((amount) => (
+                <button
+                  key={amount}
+                  type="button"
+                  disabled={readOnly || payments.length === 0}
+                  onClick={() => addDenominationToActiveRow(amount)}
+                  className={`rounded-2xl border px-3 py-3 text-sm font-black transition disabled:opacity-50 ${getDenominationColor(
+                    amount,
+                    isDark,
+                  )}`}
+                >
+                  ₱{amount.toLocaleString("en-PH")}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="mt-4 grid gap-3 md:grid-cols-2">
