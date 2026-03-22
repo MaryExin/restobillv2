@@ -33,6 +33,11 @@ export default function PosReadingModal({
   });
   const [isPrinting, setIsPrinting] = useState(false);
   const [isCheckingBlockers, setIsCheckingBlockers] = useState(false);
+  const [blockerModal, setBlockerModal] = useState({
+    open: false,
+    title: "",
+    message: "",
+  });
 
   const parsedCashDrawer = useMemo(
     () => Number(values.cashDrawerAmount || 0),
@@ -64,10 +69,27 @@ export default function PosReadingModal({
     });
   };
 
+  const openBlockerModal = (title, message) => {
+    setBlockerModal({
+      open: true,
+      title,
+      message,
+    });
+  };
+
+  const closeBlockerModal = () => {
+    setBlockerModal({
+      open: false,
+      title: "",
+      message: "",
+    });
+  };
+
   const handleCloseAll = () => {
-    if (isPrinting || isCheckingBlockers) return;
+    if (isPrinting) return;
     setActiveType(null);
     resetForm();
+    closeBlockerModal();
     onClose();
   };
 
@@ -101,26 +123,28 @@ export default function PosReadingModal({
     return result;
   };
 
-  const handleOpenReading = async (type) => {
+  const handleOpenZReading = async () => {
     try {
       setIsCheckingBlockers(true);
 
       const result = await checkReadingBlockers();
 
       if (result.blocked) {
-        alert(
-          `You cannot proceed with POS Reading yet.\n\n` +
-            `There are ${result.totalTransactions} transaction(s) with remarks ` +
-            `"Pending for Payment" or "Billed" for ${result.transactionDate}.`,
+        openBlockerModal(
+          "POS Reading Blocked",
+          `There are ${result.totalTransactions} transaction(s) with remarks "Pending for Payment" or "Billed" for ${result.transactionDate}.`,
         );
         return;
       }
 
-      setActiveType(type);
+      setActiveType("z");
       resetForm();
     } catch (error) {
       console.error(error);
-      alert(error.message || "Unable to validate transactions.");
+      openBlockerModal(
+        "Validation Error",
+        error.message || "Unable to validate transactions.",
+      );
     } finally {
       setIsCheckingBlockers(false);
     }
@@ -280,114 +304,114 @@ export default function PosReadingModal({
       data.vatExemption ?? data.lessVatExemption ?? data.vatExemptVat ?? 0;
 
     return `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="utf-8" />
-        <title>Z Reading</title>
-        ${commonPrintStyles}
-      </head>
-      <body>
-        <div class="receipt">
-          <div class="center">
-            <div class="title">${data.corpName || ""}</div>
-            <div class="subtitle">${data.businessUnitName || ""}</div>
-            <div class="subtitle">${data.businessUnitAddress || ""}</div>
-            <div class="subtitle">${data.tinLabel || ""}</div>
-            <div class="subtitle">MIN: ${data.machineNumber || ""}</div>
-            <div class="subtitle">S/N: ${data.serialNumber || ""}</div>
-            <div class="subtitle">PTU No: ${data.ptuNumber || ""}</div>
-            <div class="subtitle">PTU Date Issued: ${data.ptuDateIssued || ""}</div>
-            <div class="title" style="margin-top:8px;">Z-READING</div>
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>Z Reading</title>
+          ${commonPrintStyles}
+        </head>
+        <body>
+          <div class="receipt">
+            <div class="center">
+              <div class="title">${data.corpName || ""}</div>
+              <div class="subtitle">${data.businessUnitName || ""}</div>
+              <div class="subtitle">${data.businessUnitAddress || ""}</div>
+              <div class="subtitle">${data.tinLabel || ""}</div>
+              <div class="subtitle">MIN: ${data.machineNumber || ""}</div>
+              <div class="subtitle">S/N: ${data.serialNumber || ""}</div>
+              <div class="subtitle">PTU No: ${data.ptuNumber || ""}</div>
+              <div class="subtitle">PTU Date Issued: ${data.ptuDateIssued || ""}</div>
+              <div class="title" style="margin-top:8px;">Z-READING</div>
+            </div>
+
+            <div class="line"></div>
+            <table>
+              <tr><td class="label">Date Issued</td><td class="value">${data.reportDate || ""}</td></tr>
+              <tr><td class="label">Time</td><td class="value">${data.reportTime || ""}</td></tr>
+              <tr><td class="label">Beg SI No.</td><td class="value">${data.begSI || ""}</td></tr>
+              <tr><td class="label">End SI No.</td><td class="value">${data.endSI || ""}</td></tr>
+              <tr><td class="label">Beg Void No.</td><td class="value">${data.begVoid || ""}</td></tr>
+              <tr><td class="label">End Void No.</td><td class="value">${data.endVoid || ""}</td></tr>
+              <tr><td class="label">Beg Return No.</td><td class="value">${data.begReturn || ""}</td></tr>
+              <tr><td class="label">End Return No.</td><td class="value">${data.endReturn || ""}</td></tr>
+              <tr><td class="label">Reset Counter No.</td><td class="value">${data.resetCounterNo || 0}</td></tr>
+              <tr><td class="label">Z Counter No.</td><td class="value">${data.zCounterNo || 0}</td></tr>
+            </table>
+
+            <div class="line"></div>
+            <table>
+              <tr><td class="label">Present Accum. Sales</td><td class="value">${money(data.presentAccumulatedSales)}</td></tr>
+              <tr><td class="label">Previous Accum. Sales</td><td class="value">${money(data.previousAccumulatedSales)}</td></tr>
+              <tr><td class="label">Sales for the Day</td><td class="value">${money(data.salesForTheDay)}</td></tr>
+            </table>
+
+            <div class="line"></div>
+            <div class="strong">BREAKDOWN OF SALES</div>
+            <table>
+              <tr><td class="label">VATABLE SALES</td><td class="value">${money(data.vatableSales)}</td></tr>
+              <tr><td class="label">VAT AMOUNT</td><td class="value">${money(data.vatAmount)}</td></tr>
+              <tr><td class="label">VAT-EXEMPT SALES</td><td class="value">${money(data.vatExemptSales)}</td></tr>
+              <tr><td class="label">VAT EXEMPTION</td><td class="value">${money(vatExemptionValue)}</td></tr>
+              <tr><td class="label">ZERO RATED SALES</td><td class="value">${money(data.zeroRatedSales)}</td></tr>
+              <tr><td class="label">OTHER CHARGES</td><td class="value">${money(data.otherCharges)}</td></tr>
+            </table>
+
+            <div class="line"></div>
+            <table>
+              <tr><td class="label">Gross Amount:</td><td class="value">${money(data.grossAmount)}</td></tr>
+              <tr><td class="label">Discount:</td><td class="value">${money(data.lessDiscount)}</td></tr>
+              <tr><td class="label">VAT Exemption:</td><td class="value">${money(vatExemptionValue)}</td></tr>
+              <tr><td class="label">Refund:</td><td class="value">${money(data.lessReturn)}</td></tr>
+              <tr><td class="label">Void:</td><td class="value">${money(data.lessVoid)}</td></tr>
+              <tr><td class="label">VAT Adjustment:</td><td class="value">${money(data.lessVatAdjustment)}</td></tr>
+              <tr><td class="label strong">Net Amount:</td><td class="value strong">${money(data.netAmount)}</td></tr>
+            </table>
+
+            <div class="line"></div>
+            <div class="strong">DISCOUNT SUMMARY</div>
+            <table>
+              <tr><td class="label">SC Disc</td><td class="value">${money(data.scDisc)}</td></tr>
+              <tr><td class="label">PWD Disc</td><td class="value">${money(data.pwdDisc)}</td></tr>
+              <tr><td class="label">NAAC Disc</td><td class="value">${money(data.naacDisc)}</td></tr>
+              <tr><td class="label">Solo Parent Disc</td><td class="value">${money(data.soloParentDisc)}</td></tr>
+              <tr><td class="label">Other Disc</td><td class="value">${money(data.otherDisc)}</td></tr>
+            </table>
+
+            <div class="line"></div>
+            <div class="strong">SALES ADJUSTMENT</div>
+            <table>
+              <tr><td class="label">Void</td><td class="value">${money(data.salesAdjustmentVoid)}</td></tr>
+              <tr><td class="label">Return</td><td class="value">${money(data.salesAdjustmentReturn)}</td></tr>
+            </table>
+
+            <div class="line"></div>
+            <div class="strong">VAT ADJUSTMENT</div>
+            <table>
+              <tr><td class="label">SC Trans VAT Adj</td><td class="value">${money(data.scTransVatAdj)}</td></tr>
+              <tr><td class="label">PWD Trans VAT Adj</td><td class="value">${money(data.pwdTransVatAdj)}</td></tr>
+              <tr><td class="label">Reg Disc Trans VAT Adj</td><td class="value">${money(data.regDiscTransVatAdj)}</td></tr>
+              <tr><td class="label">Zero Rated Trans VAT Adj</td><td class="value">${money(data.zeroRatedTransVatAdj)}</td></tr>
+              <tr><td class="label">VAT on Return</td><td class="value">${money(data.vatOnReturn)}</td></tr>
+              <tr><td class="label">Other VAT Adjustments</td><td class="value">${money(data.otherVatAdjustments)}</td></tr>
+            </table>
+
+            <div class="line"></div>
+            <div class="strong">TRANSACTION SUMMARY</div>
+            <table>
+              <tr><td class="label">Cash In Drawer</td><td class="value">${money(data.cashInDrawer)}</td></tr>
+              <tr><td class="label">Cheque</td><td class="value">${money(data.cheque)}</td></tr>
+              <tr><td class="label">Credit Card</td><td class="value">${money(data.creditCard)}</td></tr>
+              <tr><td class="label">Other Payments</td><td class="value">${money(data.otherPayments)}</td></tr>
+              <tr><td class="label">Opening Fund</td><td class="value">${money(data.openingFund)}</td></tr>
+              <tr><td class="label">Less Withdrawal</td><td class="value">${money(data.lessWithdrawal)}</td></tr>
+              <tr><td class="label">Payments Received</td><td class="value">${money(data.paymentsReceived)}</td></tr>
+              <tr><td class="label strong">Short / Over</td><td class="value strong">${money(data.shortOver)}</td></tr>
+            </table>
           </div>
-
-          <div class="line"></div>
-          <table>
-            <tr><td class="label">Date Issued</td><td class="value">${data.reportDate || ""}</td></tr>
-            <tr><td class="label">Time</td><td class="value">${data.reportTime || ""}</td></tr>
-            <tr><td class="label">Beg SI No.</td><td class="value">${data.begSI || ""}</td></tr>
-            <tr><td class="label">End SI No.</td><td class="value">${data.endSI || ""}</td></tr>
-            <tr><td class="label">Beg Void No.</td><td class="value">${data.begVoid || ""}</td></tr>
-            <tr><td class="label">End Void No.</td><td class="value">${data.endVoid || ""}</td></tr>
-            <tr><td class="label">Beg Return No.</td><td class="value">${data.begReturn || ""}</td></tr>
-            <tr><td class="label">End Return No.</td><td class="value">${data.endReturn || ""}</td></tr>
-            <tr><td class="label">Reset Counter No.</td><td class="value">${data.resetCounterNo || 0}</td></tr>
-            <tr><td class="label">Z Counter No.</td><td class="value">${data.zCounterNo || 0}</td></tr>
-          </table>
-
-          <div class="line"></div>
-          <table>
-            <tr><td class="label">Present Accum. Sales</td><td class="value">${money(data.presentAccumulatedSales)}</td></tr>
-            <tr><td class="label">Previous Accum. Sales</td><td class="value">${money(data.previousAccumulatedSales)}</td></tr>
-            <tr><td class="label">Sales for the Day</td><td class="value">${money(data.salesForTheDay)}</td></tr>
-          </table>
-
-          <div class="line"></div>
-          <div class="strong">BREAKDOWN OF SALES</div>
-          <table>
-            <tr><td class="label">VATABLE SALES</td><td class="value">${money(data.vatableSales)}</td></tr>
-            <tr><td class="label">VAT AMOUNT</td><td class="value">${money(data.vatAmount)}</td></tr>
-            <tr><td class="label">VAT-EXEMPT SALES</td><td class="value">${money(data.vatExemptSales)}</td></tr>
-            <tr><td class="label">VAT EXEMPTION</td><td class="value">${money(vatExemptionValue)}</td></tr>
-            <tr><td class="label">ZERO RATED SALES</td><td class="value">${money(data.zeroRatedSales)}</td></tr>
-            <tr><td class="label">OTHER CHARGES</td><td class="value">${money(data.otherCharges)}</td></tr>
-          </table>
-
-          <div class="line"></div>
-          <table>
-            <tr><td class="label">Gross Amount:</td><td class="value">${money(data.grossAmount)}</td></tr>
-            <tr><td class="label">Discount:</td><td class="value">${money(data.lessDiscount)}</td></tr>
-            <tr><td class="label">VAT Exemption:</td><td class="value">${money(vatExemptionValue)}</td></tr>
-            <tr><td class="label">Refund:</td><td class="value">${money(data.lessReturn)}</td></tr>
-            <tr><td class="label">Void:</td><td class="value">${money(data.lessVoid)}</td></tr>
-            <tr><td class="label">VAT Adjustment:</td><td class="value">${money(data.lessVatAdjustment)}</td></tr>
-            <tr><td class="label strong">Net Amount:</td><td class="value strong">${money(data.netAmount)}</td></tr>
-          </table>
-
-          <div class="line"></div>
-          <div class="strong">DISCOUNT SUMMARY</div>
-          <table>
-            <tr><td class="label">SC Disc</td><td class="value">${money(data.scDisc)}</td></tr>
-            <tr><td class="label">PWD Disc</td><td class="value">${money(data.pwdDisc)}</td></tr>
-            <tr><td class="label">NAAC Disc</td><td class="value">${money(data.naacDisc)}</td></tr>
-            <tr><td class="label">Solo Parent Disc</td><td class="value">${money(data.soloParentDisc)}</td></tr>
-            <tr><td class="label">Other Disc</td><td class="value">${money(data.otherDisc)}</td></tr>
-          </table>
-
-          <div class="line"></div>
-          <div class="strong">SALES ADJUSTMENT</div>
-          <table>
-            <tr><td class="label">Void</td><td class="value">${money(data.salesAdjustmentVoid)}</td></tr>
-            <tr><td class="label">Return</td><td class="value">${money(data.salesAdjustmentReturn)}</td></tr>
-          </table>
-
-          <div class="line"></div>
-          <div class="strong">VAT ADJUSTMENT</div>
-          <table>
-            <tr><td class="label">SC Trans VAT Adj</td><td class="value">${money(data.scTransVatAdj)}</td></tr>
-            <tr><td class="label">PWD Trans VAT Adj</td><td class="value">${money(data.pwdTransVatAdj)}</td></tr>
-            <tr><td class="label">Reg Disc Trans VAT Adj</td><td class="value">${money(data.regDiscTransVatAdj)}</td></tr>
-            <tr><td class="label">Zero Rated Trans VAT Adj</td><td class="value">${money(data.zeroRatedTransVatAdj)}</td></tr>
-            <tr><td class="label">VAT on Return</td><td class="value">${money(data.vatOnReturn)}</td></tr>
-            <tr><td class="label">Other VAT Adjustments</td><td class="value">${money(data.otherVatAdjustments)}</td></tr>
-          </table>
-
-          <div class="line"></div>
-          <div class="strong">TRANSACTION SUMMARY</div>
-          <table>
-            <tr><td class="label">Cash In Drawer</td><td class="value">${money(data.cashInDrawer)}</td></tr>
-            <tr><td class="label">Cheque</td><td class="value">${money(data.cheque)}</td></tr>
-            <tr><td class="label">Credit Card</td><td class="value">${money(data.creditCard)}</td></tr>
-            <tr><td class="label">Other Payments</td><td class="value">${money(data.otherPayments)}</td></tr>
-            <tr><td class="label">Opening Fund</td><td class="value">${money(data.openingFund)}</td></tr>
-            <tr><td class="label">Less Withdrawal</td><td class="value">${money(data.lessWithdrawal)}</td></tr>
-            <tr><td class="label">Payments Received</td><td class="value">${money(data.paymentsReceived)}</td></tr>
-            <tr><td class="label strong">Short / Over</td><td class="value strong">${money(data.shortOver)}</td></tr>
-          </table>
-        </div>
-      </body>
-    </html>
-  `;
+        </body>
+      </html>
+    `;
   };
 
   const handlePrint = async () => {
@@ -507,14 +531,17 @@ export default function PosReadingModal({
           }
         } catch (error) {
           console.error("Print error:", error);
-          alert("Unable to open the print dialog.");
+          openBlockerModal("Print Error", "Unable to open the print dialog.");
         } finally {
           setIsPrinting(false);
         }
       }, 400);
     } catch (error) {
       console.error(error);
-      alert(error.message || "Something went wrong while printing.");
+      openBlockerModal(
+        "Processing Error",
+        error.message || "Something went wrong while printing.",
+      );
       setIsPrinting(false);
     }
   };
@@ -534,13 +561,13 @@ export default function PosReadingModal({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: 20 }}
           transition={{ duration: 0.2 }}
-          className="relative w-full max-w-4xl overflow-hidden rounded-[24px] border border-zinc-200 bg-[#e9eef7] p-8 shadow-[0_20px_60px_rgba(0,0,0,0.20)]"
+          className="relative w-full max-w-4xl overflow-hidden rounded-[28px] border border-zinc-200 bg-[#eef2f8] p-8 shadow-[0_24px_70px_rgba(0,0,0,0.22)]"
         >
           <button
             type="button"
             onClick={handleCloseAll}
-            disabled={isPrinting || isCheckingBlockers}
-            className="absolute right-4 top-4 inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/80 text-zinc-600 shadow-sm transition hover:scale-105 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={isPrinting}
+            className="absolute right-4 top-4 inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-zinc-600 shadow-sm transition hover:scale-105 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <FiX size={20} />
           </button>
@@ -554,14 +581,17 @@ export default function PosReadingModal({
               <ReadingCard
                 title="X-Reading"
                 iconClassName="bg-sky-100 text-sky-600"
-                onClick={() => handleOpenReading("x")}
-                disabled={isPrinting || isCheckingBlockers}
+                onClick={() => {
+                  setActiveType("x");
+                  resetForm();
+                }}
+                disabled={isPrinting}
               />
 
               <ReadingCard
                 title="Z-Reading"
                 iconClassName="bg-orange-100 text-orange-500"
-                onClick={() => handleOpenReading("z")}
+                onClick={handleOpenZReading}
                 disabled={isPrinting || isCheckingBlockers}
               />
             </div>
@@ -578,10 +608,10 @@ export default function PosReadingModal({
               <button
                 type="button"
                 onClick={handleCloseAll}
-                disabled={isPrinting || isCheckingBlockers}
-                className="min-w-[290px] rounded-full bg-gradient-to-r from-pink-400 via-[#c5a9d9] to-cyan-400 px-10 py-4 text-2xl font-extrabold text-white shadow-[0_10px_30px_rgba(56,189,248,0.25)] transition hover:scale-[1.02] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-70"
+                disabled={isPrinting}
+                className="min-w-[290px] rounded-[30px] bg-gradient-to-b from-[#4f6df5] to-[#3f5fe0] px-10 py-4 text-2xl font-extrabold text-white shadow-[0_14px_34px_rgba(63,95,224,0.28)] transition hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-70"
               >
-                Cancel
+                Close
               </button>
             </div>
           </div>
@@ -673,7 +703,7 @@ export default function PosReadingModal({
                         resetForm();
                       }}
                       disabled={isPrinting}
-                      className="rounded-2xl border border-zinc-200 px-5 py-3 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="rounded-[24px] bg-[#e5e7eb] px-6 py-3 text-sm font-bold text-zinc-800 transition hover:bg-[#dcdfe4] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       Back
                     </button>
@@ -682,10 +712,63 @@ export default function PosReadingModal({
                       type="button"
                       onClick={handlePrint}
                       disabled={isPrinting}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#37578d] to-[#5aa7e6] px-5 py-3 text-sm font-bold text-white shadow-md transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
+                      className="inline-flex items-center justify-center gap-2 rounded-[24px] bg-gradient-to-b from-[#4f6df5] to-[#3f5fe0] px-6 py-3 text-sm font-bold text-white shadow-[0_12px_30px_rgba(63,95,224,0.28)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
                     >
                       <FaPrint className="shrink-0" />
                       {isPrinting ? "Preparing Print..." : "Print Now"}
+                    </button>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence>
+            {blockerModal.open && (
+              <motion.div
+                className="absolute inset-0 z-[30] flex items-center justify-center bg-black/45 px-4 backdrop-blur-[2px]"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.96, y: 16 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.96, y: 16 }}
+                  transition={{ duration: 0.2 }}
+                  className="w-full max-w-2xl rounded-[30px] border border-white/70 bg-[#f7f8fb] p-8 shadow-[0_25px_60px_rgba(15,23,42,0.28)]"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="text-[30px] font-extrabold tracking-tight text-[#1f2937]">
+                        {blockerModal.title}
+                      </div>
+                      <div className="mt-4 max-w-[720px] text-[22px] leading-[1.7] text-[#202938]">
+                        {blockerModal.title === "POS Reading Blocked"
+                          ? "You cannot proceed with POS Reading yet."
+                          : "Please check the message below."}
+                      </div>
+                      <div className="mt-8 max-w-[720px] text-[20px] leading-[1.8] text-[#202938]">
+                        {blockerModal.message}
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={closeBlockerModal}
+                      className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white text-zinc-500 shadow-sm transition hover:scale-105 hover:text-zinc-800"
+                    >
+                      <FiX size={20} />
+                    </button>
+                  </div>
+
+                  <div className="mt-10 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={closeBlockerModal}
+                      className="min-w-[140px] rounded-[999px] border-[3px] border-[#5b57e6] bg-gradient-to-b from-[#5f6ff2] to-[#5448df] px-8 py-4 text-2xl font-extrabold text-white shadow-[0_14px_30px_rgba(84,72,223,0.30)] transition hover:brightness-110 active:scale-[0.99]"
+                    >
+                      OK
                     </button>
                   </div>
                 </motion.div>
@@ -727,10 +810,12 @@ function AmountField({ label, name, value, onChange, error }) {
       <label className="mb-2 block text-sm font-semibold text-zinc-700">
         {label}
       </label>
+
       <div className="relative">
         <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400">
           ₱
         </span>
+
         <input
           type="text"
           inputMode="decimal"
@@ -744,6 +829,7 @@ function AmountField({ label, name, value, onChange, error }) {
           }`}
         />
       </div>
+
       {error ? <p className="mt-2 text-sm text-rose-500">{error}</p> : null}
     </div>
   );
