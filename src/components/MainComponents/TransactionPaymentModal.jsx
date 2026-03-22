@@ -14,6 +14,13 @@ import {
 import { FaMoneyBill } from "react-icons/fa";
 import PosPaymentReceipt from "./PosPaymentReceipt";
 
+const loggedUserId = localStorage.getItem("user_id") || "";
+const loggedUserName =
+  localStorage.getItem("username") ||
+  localStorage.getItem("user_name") ||
+  transaction?.cashier ||
+  "Store Crew";
+
 const peso = (value) =>
   `₱ ${Number(value || 0).toLocaleString("en-PH", {
     minimumFractionDigits: 2,
@@ -1760,6 +1767,12 @@ export default function TransactionPaymentModal({
     try {
       const payload = {
         transaction_id: transaction.transaction_id,
+
+        // needed by backend logs
+        user_id: loggedUserId,
+        user_name: loggedUserName,
+        cashier: loggedUserName,
+
         discount_type: computed.discountTypeSummary || "No Discount",
         customer_exclusive_id: customerCards?.[0]?.customer_exclusive_id || "",
         customer_head_count: computed.safeCustomerCount,
@@ -1790,25 +1803,27 @@ export default function TransactionPaymentModal({
             prorated_base: Number(entry.proratedBase || 0),
           })),
 
-        TotalSales: computed.grossTotal,
-        Discount: computed.totalDiscount,
-        OtherCharges: computed.otherChargesTotal,
-        TotalAmountDue: computed.totalAmountDue,
-        VATableSales: computed.vatableSales,
-        VATableSales_VAT: computed.vatableSalesVat,
-        VATExemptSales: computed.vatExemptSales,
-        VATExemptSales_VAT: computed.vatExemptSalesVat,
-        VATZeroRatedSales: computed.vatZeroRatedSales,
-        payment_amount: computed.totalPaid,
-        payment_method: groupedPaymentMethodText,
-        change_amount: computed.changeAmount,
-        short_over: computed.shortOver,
+        TotalSales: Number(computed.grossTotal || 0),
+        Discount: Number(computed.totalDiscount || 0),
+        OtherCharges: Number(computed.otherChargesTotal || 0),
+        TotalAmountDue: Number(computed.totalAmountDue || 0),
+
+        VATableSales: Number(computed.vatableSales || 0),
+        VATableSales_VAT: Number(computed.vatableSalesVat || 0),
+        VATExemptSales: Number(computed.vatExemptSales || 0),
+        VATExemptSales_VAT: Number(computed.vatExemptSalesVat || 0),
+        VATZeroRatedSales: Number(computed.vatZeroRatedSales || 0),
+
+        payment_amount: Number(computed.totalPaid || 0),
+        payment_method: groupedPaymentMethodText || "Cash",
+        change_amount: Number(computed.changeAmount || 0),
+        short_over: Number(computed.shortOver || 0),
 
         payments: payments
           .filter((row) => row.payment_method && toNum(row.payment_amount) > 0)
           .map((row) => ({
             payment_method: row.payment_method,
-            payment_amount: toNum(row.payment_amount),
+            payment_amount: Number(toNum(row.payment_amount)),
             payment_reference: row.payment_reference || "",
           })),
 
@@ -1816,7 +1831,7 @@ export default function TransactionPaymentModal({
           .filter((row) => row.particulars && toNum(row.amount) > 0)
           .map((row) => ({
             particulars: row.particulars,
-            amount: toNum(row.amount),
+            amount: Number(toNum(row.amount)),
             reference: row.reference || "",
           })),
       };
@@ -1846,6 +1861,7 @@ export default function TransactionPaymentModal({
           payment_method: groupedPaymentMethodText,
           payment_amount: computed.totalPaid,
           change_amount: computed.changeAmount,
+          cashier: loggedUserName,
           remarks: "Paid",
         },
         items: [...items],
@@ -1872,6 +1888,7 @@ export default function TransactionPaymentModal({
     setReceiptSnapshot({
       transaction: {
         ...transaction,
+        cashier: loggedUserName,
       },
       items: [...items],
       computed: { ...computed },

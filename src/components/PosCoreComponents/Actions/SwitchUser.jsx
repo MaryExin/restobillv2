@@ -29,7 +29,7 @@ const SwitchUser = () => {
     updateUserRole,
     setProfilePic,
   } = useZustandLoginCred();
-
+console.log(toggleEmail);
   useEffect(() => {
     let isMounted = true;
 
