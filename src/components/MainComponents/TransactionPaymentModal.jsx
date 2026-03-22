@@ -18,7 +18,7 @@ const loggedUserId = localStorage.getItem("user_id") || "";
 const loggedUserName =
   localStorage.getItem("username") ||
   localStorage.getItem("user_name") ||
-  transaction?.cashier ||
+  (typeof transaction !== "undefined" ? transaction?.cashier : "") ||
   "Store Crew";
 
 const peso = (value) =>
@@ -26,6 +26,21 @@ const peso = (value) =>
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
+
+const CASH_METHOD_KEYWORDS = ["cash", "salapi"];
+
+const QUICK_DENOMINATIONS = [20, 50, 100, 200, 500, 1000, 1500, 2000];
+
+const isCashMethod = (method = "") =>
+  CASH_METHOD_KEYWORDS.some((keyword) =>
+    String(method).toLowerCase().includes(keyword),
+  );
+
+const formatAmountInput = (value) => {
+  const num = Number(value || 0);
+  if (!Number.isFinite(num) || num <= 0) return "";
+  return String(num);
+};
 
 const negativePeso = (value) => `- ${peso(value)}`;
 const toNum = (value) => Number(value || 0);
@@ -106,7 +121,7 @@ const ModalShell = ({
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.97, opacity: 0, y: 14 }}
           transition={{ duration: 0.18 }}
-          className={`relative flex w-full ${maxWidth} max-h-[calc(100vh-1.5rem)] flex-col overflow-hidden rounded-[30px] border shadow-[0_30px_100px_rgba(15,23,42,0.35)] ${
+          className={`relative flex w-full ${maxWidth} max-h-[calc(100vh-1.5rem)] flex-col overflow-auto rounded-[30px] border shadow-[0_30px_100px_rgba(15,23,42,0.35)] ${
             isDark
               ? "border-white/10 bg-[#0f172a] text-white"
               : "border-slate-200 bg-white text-slate-900"
@@ -1069,6 +1084,347 @@ const DiscountSetupModal = ({
   );
 };
 
+// const InputPaymentsModal = ({
+//   isOpen,
+//   onClose,
+//   isDark,
+//   totalAmountDue,
+//   payments,
+//   setPayments,
+//   onAddPaymentMethod,
+//   readOnly = false,
+// }) => {
+//   const inputClass = isDark
+//     ? "bg-slate-950 border border-slate-800 text-white placeholder:text-slate-500"
+//     : "bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400";
+
+//   const totalPaid = payments.reduce(
+//     (sum, row) => sum + toNum(row.payment_amount),
+//     0,
+//   );
+//   const remaining = Math.max(toNum(totalAmountDue) - totalPaid, 0);
+
+//   const updateRow = (index, field, value) =>
+//     setPayments((prev) =>
+//       prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)),
+//     );
+
+//   const removeRow = (index) =>
+//     setPayments((prev) => prev.filter((_, i) => i !== index));
+
+//   const setExactAmountForRow = (index) => {
+//     setPayments((prev) =>
+//       prev.map((row, i) => {
+//         if (i !== index) return row;
+
+//         const otherRowsTotal = prev.reduce((sum, item, rowIndex) => {
+//           if (rowIndex === index) return sum;
+//           return sum + toNum(item.payment_amount);
+//         }, 0);
+
+//         const exactNeeded = Math.max(toNum(totalAmountDue) - otherRowsTotal, 0);
+
+//         return {
+//           ...row,
+//           payment_amount: formatAmountInput(exactNeeded),
+//         };
+//       }),
+//     );
+//   };
+
+//   const addDenominationToRow = (index, amountToAdd) => {
+//     setPayments((prev) =>
+//       prev.map((row, i) => {
+//         if (i !== index) return row;
+
+//         const current = toNum(row.payment_amount);
+//         return {
+//           ...row,
+//           payment_amount: formatAmountInput(current + Number(amountToAdd || 0)),
+//         };
+//       }),
+//     );
+//   };
+
+//   const clearAmountForRow = (index) => {
+//     setPayments((prev) =>
+//       prev.map((row, i) =>
+//         i === index ? { ...row, payment_amount: "" } : row,
+//       ),
+//     );
+//   };
+
+//   return (
+//     <ModalShell
+//       isOpen={isOpen}
+//       onClose={onClose}
+//       isDark={isDark}
+//       maxWidth="max-w-[980px]"
+//       zIndex="z-[100001]"
+//     >
+//       <div
+//         className={`px-5 py-5 ${
+//           isDark
+//             ? "border-b border-white/5 bg-white/[0.03]"
+//             : "border-b border-slate-200 bg-slate-50"
+//         }`}
+//       >
+//         <h2 className="text-2xl font-black">Input Payments</h2>
+//         <p className="mt-1 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+//           Allocate payment amounts and references
+//         </p>
+//       </div>
+
+//       <div className="space-y-4 p-5 md:p-6">
+//         <div className="grid gap-3 md:grid-cols-2 md:items-center">
+//           <div className="text-2xl font-black text-slate-700 dark:text-slate-200">
+//             TOTAL AMOUNT DUE
+//           </div>
+//           <div className="text-right text-3xl font-black text-emerald-500">
+//             {peso(totalAmountDue)}
+//           </div>
+//         </div>
+
+//         <div
+//           className={`rounded-[24px] border p-4 ${
+//             isDark
+//               ? "border-white/5 bg-white/[0.03]"
+//               : "border-slate-200 bg-slate-50"
+//           }`}
+//         >
+//           <div className="mb-3 flex items-center justify-between gap-3">
+//             <p className="text-sm font-bold text-slate-500">Payments</p>
+
+//             {!readOnly ? (
+//               <button
+//                 type="button"
+//                 onClick={onAddPaymentMethod}
+//                 className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-xs font-bold text-white transition hover:bg-blue-500"
+//               >
+//                 <FiPlus size={14} />
+//                 Add Payment Method
+//               </button>
+//             ) : null}
+//           </div>
+
+//           <div className="space-y-4">
+//             {payments.length === 0 ? (
+//               <div
+//                 className={`flex min-h-[120px] items-center justify-center rounded-2xl border border-dashed ${
+//                   isDark ? "border-white/10" : "border-slate-300"
+//                 }`}
+//               >
+//                 <p className="text-sm text-slate-500">No payment rows.</p>
+//               </div>
+//             ) : (
+//               payments.map((row, index) => {
+//                 const cashRow = isCashMethod(row.payment_method);
+
+//                 return (
+//                   <div
+//                     key={`${row.payment_method}-${index}`}
+//                     className={`rounded-[22px] border p-4 ${
+//                       isDark
+//                         ? "border-white/5 bg-slate-950"
+//                         : "border-slate-200 bg-white"
+//                     }`}
+//                   >
+//                     <div className="grid gap-3 md:grid-cols-[60px_170px_minmax(0,1fr)]">
+//                       <button
+//                         type="button"
+//                         onClick={() => removeRow(index)}
+//                         disabled={readOnly}
+//                         className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white transition hover:bg-blue-500 disabled:opacity-50"
+//                       >
+//                         <FiTrash2 size={16} />
+//                       </button>
+
+//                       <div
+//                         className={`flex items-center gap-3 rounded-2xl border px-3 py-2 ${
+//                           isDark
+//                             ? "border-white/5 bg-slate-900"
+//                             : "border-slate-200 bg-slate-50"
+//                         }`}
+//                       >
+//                         <img
+//                           src={buildImagePath(row.payment_method)}
+//                           alt={row.payment_method}
+//                           className="h-10 w-10 object-contain"
+//                           onError={(e) => {
+//                             e.currentTarget.style.display = "none";
+//                           }}
+//                         />
+//                         <div className="min-w-0">
+//                           <p className="truncate text-sm font-black">
+//                             {row.payment_method || "No method"}
+//                           </p>
+//                           <p className="text-[11px] text-slate-500">
+//                             {cashRow ? "Cash shortcut enabled" : "Manual entry"}
+//                           </p>
+//                         </div>
+//                       </div>
+
+//                       <div className="space-y-3">
+//                         <div className="grid gap-3 md:grid-cols-2">
+//                           <div>
+//                             <label className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
+//                               Amount
+//                             </label>
+//                             <input
+//                               type="number"
+//                               min="0"
+//                               step="0.01"
+//                               value={row.payment_amount}
+//                               disabled={readOnly}
+//                               onChange={(e) =>
+//                                 updateRow(
+//                                   index,
+//                                   "payment_amount",
+//                                   e.target.value,
+//                                 )
+//                               }
+//                               onFocus={handleSelectAllOnFocus}
+//                               placeholder="0.00"
+//                               className={`h-12 w-full rounded-2xl px-4 text-base font-bold outline-none ${inputClass}`}
+//                             />
+//                           </div>
+
+//                           <div>
+//                             <label className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
+//                               Reference
+//                             </label>
+//                             <input
+//                               type="text"
+//                               value={row.payment_reference}
+//                               disabled={readOnly}
+//                               onChange={(e) =>
+//                                 updateRow(
+//                                   index,
+//                                   "payment_reference",
+//                                   e.target.value,
+//                                 )
+//                               }
+//                               placeholder={
+//                                 cashRow ? "Optional for cash" : "Reference"
+//                               }
+//                               className={`h-12 w-full rounded-2xl px-4 text-sm outline-none ${inputClass}`}
+//                             />
+//                           </div>
+//                         </div>
+
+//                         {cashRow ? (
+//                           <div
+//                             className={`rounded-[20px] border p-3 ${
+//                               isDark
+//                                 ? "border-white/5 bg-white/[0.02]"
+//                                 : "border-slate-200 bg-slate-50"
+//                             }`}
+//                           >
+//                             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+//                               <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
+//                                 Quick Cash Input
+//                               </p>
+
+//                               <div className="flex flex-wrap gap-2">
+//                                 <button
+//                                   type="button"
+//                                   disabled={readOnly}
+//                                   onClick={() => setExactAmountForRow(index)}
+//                                   className="rounded-xl bg-emerald-600 px-3 py-2 text-[11px] font-black text-white transition hover:bg-emerald-500 disabled:opacity-50"
+//                                 >
+//                                   Exact
+//                                 </button>
+
+//                                 <button
+//                                   type="button"
+//                                   disabled={readOnly}
+//                                   onClick={() => clearAmountForRow(index)}
+//                                   className={`rounded-xl px-3 py-2 text-[11px] font-black transition disabled:opacity-50 ${
+//                                     isDark
+//                                       ? "bg-slate-800 text-slate-200 hover:bg-slate-700"
+//                                       : "bg-slate-200 text-slate-700 hover:bg-slate-300"
+//                                   }`}
+//                                 >
+//                                   Clear
+//                                 </button>
+//                               </div>
+//                             </div>
+
+//                             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+//                               {QUICK_DENOMINATIONS.map((amount) => (
+//                                 <button
+//                                   key={amount}
+//                                   type="button"
+//                                   disabled={readOnly}
+//                                   onClick={() =>
+//                                     addDenominationToRow(index, amount)
+//                                   }
+//                                   className={`rounded-2xl px-3 py-3 text-sm font-black transition disabled:opacity-50 ${
+//                                     isDark
+//                                       ? "border border-slate-700 bg-slate-900 text-slate-100 hover:border-blue-500 hover:bg-slate-800"
+//                                       : "border border-slate-200 bg-white text-slate-800 hover:border-blue-400 hover:bg-blue-50"
+//                                   }`}
+//                                 >
+//                                   ₱{amount.toLocaleString("en-PH")}
+//                                 </button>
+//                               ))}
+//                             </div>
+//                           </div>
+//                         ) : null}
+//                       </div>
+//                     </div>
+//                   </div>
+//                 );
+//               })
+//             )}
+//           </div>
+
+//           <div className="mt-4 grid gap-3 md:grid-cols-2">
+//             <div
+//               className={`rounded-2xl border p-4 ${
+//                 isDark
+//                   ? "border-white/5 bg-slate-950"
+//                   : "border-slate-200 bg-white"
+//               }`}
+//             >
+//               <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+//                 Total Paid
+//               </p>
+//               <p className="mt-1 text-lg font-black text-blue-500">
+//                 {peso(totalPaid)}
+//               </p>
+//             </div>
+
+//             <div
+//               className={`rounded-2xl border p-4 ${
+//                 isDark
+//                   ? "border-white/5 bg-slate-950"
+//                   : "border-slate-200 bg-white"
+//               }`}
+//             >
+//               <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+//                 Remaining
+//               </p>
+//               <p className="mt-1 text-lg font-black text-blue-500">
+//                 {peso(remaining)}
+//               </p>
+//             </div>
+//           </div>
+//         </div>
+
+//         <div className="flex justify-center">
+//           <button
+//             onClick={onClose}
+//             className="rounded-2xl bg-blue-600 px-10 py-3 text-sm font-black text-white transition hover:bg-blue-500"
+//           >
+//             Continue
+//           </button>
+//         </div>
+//       </div>
+//     </ModalShell>
+//   );
+// };
+
 const InputPaymentsModal = ({
   isOpen,
   onClose,
@@ -1097,12 +1453,54 @@ const InputPaymentsModal = ({
   const removeRow = (index) =>
     setPayments((prev) => prev.filter((_, i) => i !== index));
 
+  const setExactAmountForRow = (index) => {
+    setPayments((prev) =>
+      prev.map((row, i) => {
+        if (i !== index) return row;
+
+        const otherRowsTotal = prev.reduce((sum, item, rowIndex) => {
+          if (rowIndex === index) return sum;
+          return sum + toNum(item.payment_amount);
+        }, 0);
+
+        const exactNeeded = Math.max(toNum(totalAmountDue) - otherRowsTotal, 0);
+
+        return {
+          ...row,
+          payment_amount: formatAmountInput(exactNeeded),
+        };
+      }),
+    );
+  };
+
+  const addDenominationToRow = (index, amountToAdd) => {
+    setPayments((prev) =>
+      prev.map((row, i) => {
+        if (i !== index) return row;
+
+        const current = toNum(row.payment_amount);
+        return {
+          ...row,
+          payment_amount: formatAmountInput(current + Number(amountToAdd || 0)),
+        };
+      }),
+    );
+  };
+
+  const clearAmountForRow = (index) => {
+    setPayments((prev) =>
+      prev.map((row, i) =>
+        i === index ? { ...row, payment_amount: "" } : row,
+      ),
+    );
+  };
+
   return (
     <ModalShell
       isOpen={isOpen}
       onClose={onClose}
       isDark={isDark}
-      maxWidth="max-w-[880px]"
+      maxWidth="max-w-[980px]"
       zIndex="z-[100001]"
     >
       <div
@@ -1137,6 +1535,7 @@ const InputPaymentsModal = ({
         >
           <div className="mb-3 flex items-center justify-between gap-3">
             <p className="text-sm font-bold text-slate-500">Payments</p>
+
             {!readOnly ? (
               <button
                 type="button"
@@ -1149,76 +1548,160 @@ const InputPaymentsModal = ({
             ) : null}
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-4">
             {payments.length === 0 ? (
               <div
                 className={`flex min-h-[120px] items-center justify-center rounded-2xl border border-dashed ${
                   isDark ? "border-white/10" : "border-slate-300"
                 }`}
               >
-                <p className="text-sm italic text-slate-500">
-                  No payment rows.
-                </p>
+                <p className="text-sm text-slate-500">No payment rows.</p>
               </div>
             ) : (
               payments.map((row, index) => (
                 <div
                   key={`${row.payment_method}-${index}`}
-                  className={`grid gap-3 rounded-[22px] border p-4 ${
+                  className={`rounded-[22px] border p-4 ${
                     isDark
                       ? "border-white/5 bg-slate-950"
                       : "border-slate-200 bg-white"
-                  } md:grid-cols-[60px_150px_minmax(0,1fr)]`}
+                  }`}
                 >
-                  <button
-                    type="button"
-                    onClick={() => removeRow(index)}
-                    disabled={readOnly}
-                    className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white transition hover:bg-blue-500 disabled:opacity-50"
-                  >
-                    <FiTrash2 size={16} />
-                  </button>
+                  <div className="grid gap-3 md:grid-cols-[60px_170px_minmax(0,1fr)]">
+                    <button
+                      type="button"
+                      onClick={() => removeRow(index)}
+                      disabled={readOnly}
+                      className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white transition hover:bg-blue-500 disabled:opacity-50"
+                    >
+                      <FiTrash2 size={16} />
+                    </button>
 
-                  <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 dark:border-white/5 dark:bg-slate-900">
-                    <img
-                      src={buildImagePath(row.payment_method)}
-                      alt={row.payment_method}
-                      className="h-10 w-10 object-contain"
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                      }}
-                    />
-                    <div>
-                      <p className="text-sm font-black">
-                        {row.payment_method || "No method"}
-                      </p>
+                    <div
+                      className={`flex items-center gap-3 rounded-2xl border px-3 py-2 ${
+                        isDark
+                          ? "border-white/5 bg-slate-900"
+                          : "border-slate-200 bg-slate-50"
+                      }`}
+                    >
+                      <img
+                        src={buildImagePath(row.payment_method)}
+                        alt={row.payment_method}
+                        className="h-10 w-10 object-contain"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                        }}
+                      />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-black">
+                          {row.payment_method || "No method"}
+                        </p>
+                        <p className="text-[11px] text-slate-500">
+                          Quick amount enabled
+                        </p>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={row.payment_amount}
-                      disabled={readOnly}
-                      onChange={(e) =>
-                        updateRow(index, "payment_amount", e.target.value)
-                      }
-                      onFocus={handleSelectAllOnFocus}
-                      placeholder="0.00"
-                      className={`h-11 rounded-2xl px-3 text-sm outline-none ${inputClass}`}
-                    />
-                    <input
-                      type="text"
-                      value={row.payment_reference}
-                      disabled={readOnly}
-                      onChange={(e) =>
-                        updateRow(index, "payment_reference", e.target.value)
-                      }
-                      placeholder="Reference"
-                      className={`h-11 rounded-2xl px-3 text-sm outline-none ${inputClass}`}
-                    />
+                    <div className="space-y-3">
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div>
+                          <label className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
+                            Amount
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={row.payment_amount}
+                            disabled={readOnly}
+                            onChange={(e) =>
+                              updateRow(index, "payment_amount", e.target.value)
+                            }
+                            onFocus={handleSelectAllOnFocus}
+                            placeholder="0.00"
+                            className={`h-12 w-full rounded-2xl px-4 text-base font-bold outline-none ${inputClass}`}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
+                            Reference
+                          </label>
+                          <input
+                            type="text"
+                            value={row.payment_reference}
+                            disabled={readOnly}
+                            onChange={(e) =>
+                              updateRow(
+                                index,
+                                "payment_reference",
+                                e.target.value,
+                              )
+                            }
+                            placeholder="Reference"
+                            className={`h-12 w-full rounded-2xl px-4 text-sm outline-none ${inputClass}`}
+                          />
+                        </div>
+                      </div>
+
+                      <div
+                        className={`rounded-[20px] border p-3 ${
+                          isDark
+                            ? "border-white/5 bg-white/[0.02]"
+                            : "border-slate-200 bg-slate-50"
+                        }`}
+                      >
+                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
+                            Quick Amount Input
+                          </p>
+
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              disabled={readOnly}
+                              onClick={() => setExactAmountForRow(index)}
+                              className="rounded-xl bg-emerald-600 px-3 py-2 text-[11px] font-black text-white transition hover:bg-emerald-500 disabled:opacity-50"
+                            >
+                              Exact
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={readOnly}
+                              onClick={() => clearAmountForRow(index)}
+                              className={`rounded-xl px-3 py-2 text-[11px] font-black transition disabled:opacity-50 ${
+                                isDark
+                                  ? "bg-slate-800 text-slate-200 hover:bg-slate-700"
+                                  : "bg-slate-200 text-slate-700 hover:bg-slate-300"
+                              }`}
+                            >
+                              Clear
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                          {QUICK_DENOMINATIONS.map((amount) => (
+                            <button
+                              key={amount}
+                              type="button"
+                              disabled={readOnly}
+                              onClick={() =>
+                                addDenominationToRow(index, amount)
+                              }
+                              className={`rounded-2xl px-3 py-3 text-sm font-black transition disabled:opacity-50 ${
+                                isDark
+                                  ? "border border-slate-700 bg-slate-900 text-slate-100 hover:border-blue-500 hover:bg-slate-800"
+                                  : "border border-slate-200 bg-white text-slate-800 hover:border-blue-400 hover:bg-blue-50"
+                              }`}
+                            >
+                              ₱{amount.toLocaleString("en-PH")}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               ))
@@ -1240,6 +1723,7 @@ const InputPaymentsModal = ({
                 {peso(totalPaid)}
               </p>
             </div>
+
             <div
               className={`rounded-2xl border p-4 ${
                 isDark
