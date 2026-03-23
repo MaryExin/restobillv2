@@ -442,6 +442,9 @@ export default function PosReadingModal({
           serialNumber: "20000000001",
           ptuNumber: "00000000-000-0000000-00000",
           ptuDateIssued: "01/01/2023",
+          user_id: localStorage.getItem("user_id") || "",
+          user_name: localStorage.getItem("Cashier") || "Store Crew",
+          cashier_name: localStorage.getItem("username") || "Store Crew",
         }),
       });
 
