@@ -251,7 +251,7 @@ const OpenNewDay = () => {
   const buttons = useMemo(() => {
     if (step === 1) {
       return [
-        { label: "Cancel", variant: "secondary", onClick: handleClose },
+        { label: "Cancel", variant: "danger", onClick: handleClose },
         { label: "Continue", variant: "primary", onClick: handleNext },
       ];
     }

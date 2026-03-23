@@ -25,10 +25,10 @@ const ProductList = () => {
   const [passError, setPassError] = useState(false);
 
   const ADMIN_PASSWORD = "1324"; 
-
+console.log(passwordInput);
   const handlePasswordSubmit = (e) => {
     e.preventDefault();
-    if (passwordInput === ADMIN_PASSWORD) {
+    if ((passwordInput) === ADMIN_PASSWORD) {
       setIsAuthenticated(true);
       setPassError(false);
     } else {

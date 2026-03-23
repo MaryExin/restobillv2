@@ -249,6 +249,7 @@ const PosLoginComponent = () => {
           header="Login Error"
           message="Invalid username or password. Please try again."
           setIsModalOpen={setInvalidAuth}
+          button="Accept"
         />
       )}
 
@@ -272,14 +273,14 @@ const PosLoginComponent = () => {
         />
       )}
 
-      {modalAttemp && (
+      {/* {modalAttemp && (
         <ModalAttemp
           setIsModalOpen={setModalAttemp}
           header="Maximum Attempts Reached"
           message="You have reached the maximum login attempts."
           button="Accept"
         />
-      )}
+      )} */}
     </>
   );
 };

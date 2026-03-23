@@ -152,7 +152,9 @@ const PosModal = ({
           </div>
         )}
 
-        <div className={`min-h-0 flex-1 overflow-y-auto px-8 pb-6 ${bodyClassName}`}>
+        <div
+          className={`min-h-0 flex-1 overflow-y-auto px-8 pb-6 ${bodyClassName}`}
+        >
           {children ? children : renderFields()}
         </div>
 
@@ -177,11 +179,11 @@ const PosModal = ({
 
                   switch (variant) {
                     case "secondary":
-                      return "bg-gradient-to-r from-pink-300 to-cyan-300 text-white shadow-md hover:scale-[1.02]";
+                      return "bg-blue-600 text-white shadow-md hover:scale-[1.02]";
                     case "danger":
-                      return "bg-gradient-to-r from-red-400 to-pink-400 text-white shadow-md hover:scale-[1.02]";
+                      return "bg-red-600 text-gray-100 shadow-md hover:scale-[1.02]";
                     default:
-                      return "bg-gradient-to-r from-pink-300 to-cyan-300 text-white shadow-md hover:scale-[1.02]";
+                      return "bg-blue-600  text-white shadow-md hover:scale-[1.02]";
                   }
                 };
 

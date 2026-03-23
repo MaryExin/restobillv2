@@ -51,8 +51,8 @@ const safeReadJson = async (response, label) => {
   }
 };
 
-const TABLE_COLUMN_TEMPLATE = "120px 200px 120px 140px 180px 170px 170px 190px";
-const TABLE_MIN_WIDTH = 1290;
+const TABLE_COLUMN_TEMPLATE = "210px 200px 120px 140px 180px 170px 170px 190px";
+const TABLE_MIN_WIDTH = 1380;
 const ROW_HEIGHT = 76;
 const LIST_HEIGHT = 560;
 
@@ -261,6 +261,16 @@ function SummaryPanel({ isDark, viewMode, summary }) {
             <span className="h-3.5 w-3.5 rounded-full bg-amber-500" />
             <span className="text-slate-500">Pending for Payment</span>
           </div>
+
+          <div className="flex items-center gap-3">
+            <span className="h-3.5 w-3.5 rounded-full bg-red-500" />
+            <span className="text-slate-500">Void Action</span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className="h-3.5 w-3.5 rounded-full bg-yellow-500" />
+            <span className="text-slate-500">Refund Action</span>
+          </div>
         </div>
       </div>
     </div>
@@ -269,7 +279,7 @@ function SummaryPanel({ isDark, viewMode, summary }) {
 
 function HeaderRow({ isDark, mode }) {
   const headers = [
-    mode === "paid" ? "Action / Print" : "Action",
+    "Actions",
     "Transaction ID",
     "Table",
     "Order Type",
@@ -300,10 +310,168 @@ function HeaderRow({ isDark, mode }) {
   );
 }
 
+function ActionRemarksModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  remarks,
+  setRemarks,
+  isDark,
+  actionType,
+  activeRow,
+  isSubmitting,
+}) {
+  const title =
+    actionType === "refund" ? "Refund Transaction" : "Void Transaction";
+  const buttonClass =
+    actionType === "refund"
+      ? "bg-yellow-500 hover:bg-yellow-400 text-white"
+      : "bg-red-600 hover:bg-red-500 text-white";
+
+  return (
+    <ModalShell
+      isOpen={isOpen}
+      onClose={!isSubmitting ? onClose : undefined}
+      isDark={isDark}
+      maxWidth="max-w-[620px]"
+      zIndex="z-[110000]"
+    >
+      <div className="p-6 md:p-7">
+        <div className="pr-14">
+          <div
+            className={`text-xs font-black uppercase tracking-[0.18em] ${
+              actionType === "refund" ? "text-yellow-500" : "text-red-500"
+            }`}
+          >
+            {title}
+          </div>
+          <h3
+            className={`mt-2 text-2xl font-black ${
+              isDark ? "text-white" : "text-slate-900"
+            }`}
+          >
+            {activeRow?.transaction_id || "-"}
+          </h3>
+          <p className="mt-2 text-sm text-slate-500">
+            Please enter remarks before continuing.
+          </p>
+        </div>
+
+        <div
+          className={`mt-5 rounded-[22px] border p-4 text-sm ${
+            isDark
+              ? "border-white/5 bg-slate-950/50"
+              : "border-slate-200 bg-slate-50"
+          }`}
+        >
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <div className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                Transaction ID
+              </div>
+              <div className="mt-1 font-bold">
+                {activeRow?.transaction_id || "-"}
+              </div>
+            </div>
+
+            <div>
+              <div className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                Invoice No
+              </div>
+              <div className="mt-1 font-bold">
+                {activeRow?.invoice_no || "-"}
+              </div>
+            </div>
+
+            <div>
+              <div className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                Table
+              </div>
+              <div className="mt-1 font-bold">
+                {activeRow?.table_number || "-"}
+              </div>
+            </div>
+
+            <div>
+              <div className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                Amount
+              </div>
+              <div className="mt-1 font-bold">
+                {peso(
+                  actionType === "refund"
+                    ? activeRow?.TotalAmountDue ||
+                        activeRow?.payment_amount ||
+                        0
+                    : activeRow?.TotalSales || 0,
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-5">
+          <label
+            className={`mb-2 block text-sm font-bold ${
+              isDark ? "text-slate-200" : "text-slate-700"
+            }`}
+          >
+            Remarks
+          </label>
+          <textarea
+            value={remarks}
+            onChange={(e) => setRemarks(e.target.value)}
+            rows={5}
+            placeholder={
+              actionType === "refund"
+                ? "Enter refund remarks..."
+                : "Enter void remarks..."
+            }
+            className={`w-full resize-none rounded-[22px] border px-4 py-4 outline-none transition ${
+              isDark
+                ? "border-slate-700 bg-slate-950 text-white placeholder:text-slate-500 focus:border-blue-500"
+                : "border-slate-200 bg-slate-50 text-slate-900 placeholder:text-slate-400 focus:border-blue-400"
+            }`}
+          />
+        </div>
+
+        <div className="mt-6 flex flex-wrap justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className={`rounded-2xl px-5 py-3 font-bold transition ${
+              isDark
+                ? "bg-slate-800 text-slate-200 hover:bg-slate-700 disabled:opacity-60"
+                : "bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-60"
+            }`}
+          >
+            Cancel
+          </button>
+
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={isSubmitting}
+            className={`rounded-2xl px-5 py-3 font-bold transition disabled:opacity-60 ${buttonClass}`}
+          >
+            {isSubmitting
+              ? actionType === "refund"
+                ? "Processing Refund..."
+                : "Processing Void..."
+              : title}
+          </button>
+        </div>
+      </div>
+    </ModalShell>
+  );
+}
+
 function TransactionRow({ index, style, data }) {
   const row = data.rows[index];
   const isDark = data.isDark;
   const onOpen = data.onOpen;
+  const onVoid = data.onVoid;
+  const onRefund = data.onRefund;
   const mode = data.mode;
 
   const remarksText =
@@ -334,6 +502,26 @@ function TransactionRow({ index, style, data }) {
           >
             {mode === "paid" ? <FiPrinter size={17} /> : <FiEye size={17} />}
           </button>
+
+          {mode === "pending" ? (
+            <button
+              type="button"
+              onClick={() => onVoid(row)}
+              className="inline-flex h-11 items-center justify-center rounded-2xl bg-red-600 px-4 text-sm font-bold text-white transition hover:bg-red-500"
+              title="Void Transaction"
+            >
+              Void
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onRefund(row)}
+              className="inline-flex h-11 items-center justify-center rounded-2xl bg-yellow-500 px-4 text-sm font-bold text-white transition hover:bg-yellow-400"
+              title="Refund Transaction"
+            >
+              Refund
+            </button>
+          )}
         </div>
 
         <div className="px-5 py-4">
@@ -392,6 +580,7 @@ export default function PosPayment() {
       : themeContext?.theme === "dark";
 
   const navigate = useNavigate();
+  const remarksInputRef = useRef(null);
 
   const [viewMode, setViewMode] = useState("pending");
   const [pendingTransactions, setPendingTransactions] = useState([]);
@@ -400,10 +589,16 @@ export default function PosPayment() {
   const [chargeOptions, setChargeOptions] = useState([]);
 
   const [isLoading, setIsLoading] = useState(false);
+  const [isActionLoading, setIsActionLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+
+  const [isActionModalOpen, setIsActionModalOpen] = useState(false);
+  const [actionType, setActionType] = useState("");
+  const [activeRow, setActiveRow] = useState(null);
+  const [actionRemarks, setActionRemarks] = useState("");
 
   const fetchAll = useCallback(async () => {
     if (!apiHost) return;
@@ -500,6 +695,121 @@ export default function PosPayment() {
     fetchAll();
   }, [fetchAll]);
 
+  useEffect(() => {
+    if (isActionModalOpen && remarksInputRef.current) {
+      remarksInputRef.current.focus();
+    }
+  }, [isActionModalOpen]);
+
+  const closeActionModal = useCallback(() => {
+    if (isActionLoading) return;
+    setIsActionModalOpen(false);
+    setActionType("");
+    setActiveRow(null);
+    setActionRemarks("");
+  }, [isActionLoading]);
+
+  const openVoidModal = useCallback((row) => {
+    setActionType("void");
+    setActiveRow(row);
+    setActionRemarks("");
+    setIsActionModalOpen(true);
+  }, []);
+
+  const openRefundModal = useCallback((row) => {
+    setActionType("refund");
+    setActiveRow(row);
+    setActionRemarks("");
+    setIsActionModalOpen(true);
+  }, []);
+
+  const submitAction = useCallback(async () => {
+    if (!apiHost || !activeRow?.transaction_id || !actionType) return;
+
+    const trimmedRemarks = actionRemarks.trim();
+    if (!trimmedRemarks) {
+      window.alert(
+        actionType === "refund"
+          ? "Please enter refund remarks."
+          : "Please enter void remarks.",
+      );
+      return;
+    }
+
+    setIsActionLoading(true);
+    setErrorMessage("");
+
+    try {
+      const endpoint =
+        actionType === "refund"
+          ? `${apiHost}/api/pos_payment_refund.php`
+          : `${apiHost}/api/pos_payment_void.php`;
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          transaction_id: activeRow.transaction_id,
+          invoice_no: activeRow.invoice_no || "",
+          table_number: activeRow.table_number || "",
+          amount_due: activeRow.TotalAmountDue || activeRow.payment_amount || 0,
+          remarks: trimmedRemarks,
+          category_code: activeRow.Category_Code || "",
+          unit_code: activeRow.Unit_Code || "",
+          user_id:
+            localStorage.getItem("userid") ||
+            localStorage.getItem("user_id") ||
+            "",
+        }),
+      });
+
+      const result = await safeReadJson(
+        response,
+        actionType === "refund"
+          ? "Refund transaction API"
+          : "Void transaction API",
+      );
+
+      if (!response.ok || !result?.success) {
+        throw new Error(
+          result?.message ||
+            (actionType === "refund"
+              ? "Failed to refund transaction."
+              : "Failed to void transaction."),
+        );
+      }
+
+      closeActionModal();
+      await fetchAll();
+
+      window.alert(
+        result?.message ||
+          (actionType === "refund"
+            ? "Transaction refunded successfully."
+            : "Transaction voided successfully."),
+      );
+    } catch (error) {
+      console.error(error);
+      setErrorMessage(
+        error.message ||
+          (actionType === "refund"
+            ? "Failed to refund transaction."
+            : "Failed to void transaction."),
+      );
+    } finally {
+      setIsActionLoading(false);
+    }
+  }, [
+    apiHost,
+    activeRow,
+    actionType,
+    actionRemarks,
+    closeActionModal,
+    fetchAll,
+  ]);
+
   const sourceTransactions = useMemo(
     () => (viewMode === "paid" ? paidTransactions : pendingTransactions),
     [viewMode, paidTransactions, pendingTransactions],
@@ -551,8 +861,10 @@ export default function PosPayment() {
         setSelectedTransaction(row);
         setIsPaymentModalOpen(true);
       },
+      onVoid: openVoidModal,
+      onRefund: openRefundModal,
     }),
-    [filteredTransactions, isDark, viewMode],
+    [filteredTransactions, isDark, viewMode, openVoidModal, openRefundModal],
   );
 
   return (
@@ -608,8 +920,9 @@ export default function PosPayment() {
                 : "Pending for Payment"}
             </h1>
             <p className="mt-2 text-sm text-slate-500">
-              Review billed transactions, open payment posting, and reprint
-              duplicate invoice copies.
+              Review billed transactions, open payment posting, reprint
+              duplicate invoice copies, void pending transactions, and refund
+              paid transactions.
             </p>
           </div>
 
@@ -671,7 +984,8 @@ export default function PosPayment() {
 
                     <button
                       onClick={fetchAll}
-                      className="flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-4 font-semibold text-white transition hover:bg-blue-500"
+                      disabled={isLoading || isActionLoading}
+                      className="flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-4 font-semibold text-white transition hover:bg-blue-500 disabled:opacity-60"
                     >
                       <FiRefreshCw size={16} />
                       Refresh
@@ -751,6 +1065,18 @@ export default function PosPayment() {
         chargeOptions={chargeOptions}
         mode={viewMode}
         onSaved={fetchAll}
+      />
+
+      <ActionRemarksModal
+        isOpen={isActionModalOpen}
+        onClose={closeActionModal}
+        onSubmit={submitAction}
+        remarks={actionRemarks}
+        setRemarks={setActionRemarks}
+        isDark={isDark}
+        actionType={actionType}
+        activeRow={activeRow}
+        isSubmitting={isActionLoading}
       />
     </>
   );

@@ -33,7 +33,7 @@ import { useNavigate } from "react-router-dom";
 import useApiHost from "../../hooks/useApiHost";
 import { useTheme } from "../../context/ThemeContext";
 import ModalDiscountTransaction from "./ModalDiscountTransaction";
-
+import useZustandLoginCred from "../../context/useZustandLoginCred";
 const Orderlist = ({
   tableselected,
   setshoworderlist,
@@ -97,6 +97,97 @@ const Orderlist = ({
   const printAllRef = useRef();
   const billingPrintRef = useRef();
   const [isReprint, setIsReprint] = useState(false);
+
+  const userId = localStorage.getItem("user_id") || "0";
+  const userName = localStorage.getItem("username") || "Store Crew";
+  const email = localStorage.getItem("email") || "Store Crew";
+  const [salesTypeList, setSalesTypeList] = useState([]);
+  const [selectedSalesType, setSelectedSalesType] = useState("");
+  
+  const [newtransaction, setNewTransaction] = useState({
+    business_info: {},
+    inventory_types: [],
+    sales_types: [],
+    item_categories: [],
+  });
+
+  const [pricingData, setPricingData] = useState({
+    sales_type_id: "",
+    pricing_category: "",
+    products: [],
+  });
+
+  const [isPricingLoading, setIsPricingLoading] = useState(false);
+
+  useEffect(() => {
+    if (!apiHost) return;
+
+    const fetchNewTransaction = async () => {
+      try {
+        const response = await fetch(`${apiHost}/api/new_transactions.php`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            user_id: userId || 0,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (result?.status === "success") {
+          const salesTypes = Array.isArray(result.sales_types)
+            ? result.sales_types
+            : [];
+          const itemCategories = Array.isArray(result.item_categories)
+            ? result.item_categories
+            : [];
+
+          setNewTransaction({
+            business_info: result.business_info || {},
+            inventory_types: Array.isArray(result.inventory_types)
+              ? result.inventory_types
+              : [],
+            sales_types: salesTypes,
+            item_categories: itemCategories,
+          });
+
+          setSalesTypeList(salesTypes);
+          setcategorylist(itemCategories);
+
+          if (salesTypes.length > 0) {
+            setSelectedSalesType(String(salesTypes[0].sales_type_id));
+          }
+
+          if (itemCategories.length > 0) {
+            setselectcategory(itemCategories[0].item_category);
+          }
+        } else {
+          setNewTransaction({
+            business_info: {},
+            inventory_types: [],
+            sales_types: [],
+            item_categories: [],
+          });
+          setSalesTypeList([]);
+          setcategorylist([]);
+        }
+      } catch (error) {
+        console.error("Failed to fetch new transaction setup:", error);
+        setNewTransaction({
+          business_info: {},
+          inventory_types: [],
+          sales_types: [],
+          item_categories: [],
+        });
+        setSalesTypeList([]);
+        setcategorylist([]);
+      }
+    };
+
+    fetchNewTransaction();
+  }, [apiHost, userId]);
 
   const printPageStyle = `
     @page {
@@ -224,87 +315,173 @@ const Orderlist = ({
     setOriginalLoadedItems([]);
   }, [tableselected]);
 
-  useEffect(() => {
-    if (!apiHost) return;
+  const selectedSalesTypeObject = useMemo(() => {
+    return (
+      salesTypeList.find(
+        (item) => String(item.sales_type_id) === String(selectedSalesType),
+      ) || null
+    );
+  }, [salesTypeList, selectedSalesType]);
 
-    fetch(`${apiHost}/api/category_list.php`)
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to fetch transaction");
-        return res.json();
-      })
-      .then((data) => {
-        const arr = Array.isArray(data) ? data : [];
-        setcategorylist(arr);
-        if (arr.length > 0) setselectcategory(arr[0].item_category);
-      })
-      .catch(() => {
-        setcategorylist([]);
+  useEffect(() => {
+  if (!apiHost) return;
+
+  const categoryCode = newtransaction?.business_info?.Category_Code || "";
+  const unitCode = newtransaction?.business_info?.Unit_Code || "";
+  const salesTypeDesc =
+    selectedSalesTypeObject?.sales_type ||
+    selectedSalesTypeObject?.description ||
+    "";
+
+  if (!categoryCode || !unitCode || !salesTypeDesc || !selectcategory) {
+    setPricingData({
+      sales_type_id: "",
+      pricing_category: "",
+      products: [],
+    });
+    setproductlist([]);
+    return;
+  }
+
+  const fetchPricingProducts = async () => {
+    try {
+      setIsPricingLoading(true);
+
+      const response = await fetch(`${apiHost}/api/get_pricing_selection.php`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          category_code: categoryCode,
+          unit_code: unitCode,
+          sales_type: salesTypeDesc,
+          item_category: selectcategory,
+          search: productsearch || "",
+          limit: 100,
+        }),
       });
-  }, [apiHost]);
 
-  useEffect(() => {
-    if (!selectcategory || !apiHost) return;
+      const result = await response.json();
 
-    fetch(
-      `${apiHost}/api/product_list.php?category=${encodeURIComponent(
-        selectcategory,
-      )}`,
-    )
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to fetch transaction");
-        return res.json();
-      })
-      .then((data) => setproductlist(Array.isArray(data) ? data : []))
-      .catch(() => setproductlist([]));
-  }, [selectcategory, apiHost]);
+      if (result?.status === "success") {
+        const mappedProducts = Array.isArray(result.products)
+          ? result.products.map((item, index) => ({
+              id: item.product_id || `${item.sku || "ITEM"}-${index}`,
+              product_id: item.product_id || "",
+              item_name: item.item_name || "NO NAME",
+              selling_price: Number(item.selling_price || 0),
+              sku: item.sku || "",
+              item_category: item.item_category || "",
+              isDiscountable: item.isDiscountable || "",
+              vatable: item.vatable || "",
+              unit_cost: Number(item.unit_cost || 0),
+              unit_of_measure: item.unit_of_measure || "",
+              inventory_type: item.inventory_type || "",
+              raw: item,
+            }))
+          : [];
 
-  useEffect(() => {
-    if (!apiHost || !transactionId) return;
+        setPricingData({
+          sales_type_id: result.sales_type_id || "",
+          pricing_category: result.pricing_category || "",
+          products: mappedProducts,
+        });
 
-    fetch(
-      `${apiHost}/api/view_table_transaction.php?transaction_id=${transactionId}`,
-    )
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to fetch transaction");
-        return res.json();
-      })
-      .then((data) => {
-        if (!data || !Array.isArray(data.order_details)) return;
+        setproductlist(mappedProducts);
+      } else {
+        setPricingData({
+          sales_type_id: "",
+          pricing_category: "",
+          products: [],
+        });
+        setproductlist([]);
+      }
+    } catch (error) {
+      console.error("Failed to fetch pricing products:", error);
+      setPricingData({
+        sales_type_id: "",
+        pricing_category: "",
+        products: [],
+      });
+      setproductlist([]);
+    } finally {
+      setIsPricingLoading(false);
+    }
+  };
 
-        const mappedCart = data.order_details.map((item) => ({
-          code: item.product_id,
-          name: item.item_name || item.product_id,
-          price: Number(item.selling_price),
-          quantity: Number(item.sales_quantity),
-          isDiscountable: item.isDiscountable,
-          itemInstruction: item.item_instruction || "",
+  fetchPricingProducts();
+}, [
+  apiHost,
+  newtransaction?.business_info?.Category_Code,
+  newtransaction?.business_info?.Unit_Code,
+  selectedSalesTypeObject?.sales_type,
+  selectedSalesTypeObject?.description,
+  selectcategory,
+  productsearch,
+]);
+
+useEffect(() => {
+  if (!apiHost || !transactionId) return;
+
+  fetch(
+    `${apiHost}/api/view_table_transaction.php?transaction_id=${transactionId}`,
+  )
+    .then((res) => {
+      if (!res.ok) throw new Error("Failed to fetch transaction");
+      return res.json();
+    })
+    .then((data) => {
+      if (!data) return;
+
+      if (data.summary?.order_type && Array.isArray(salesTypeList)) {
+        const matched = salesTypeList.find(
+          (item) =>
+            String(item.sales_type || item.description).toUpperCase() ===
+            String(data.summary.order_type).toUpperCase(),
+        );
+
+        if (matched) {
+          setSelectedSalesType(String(matched.sales_type_id));
+        }
+      }
+
+      if (!Array.isArray(data.order_details)) return;
+
+      const mappedCart = data.order_details.map((item) => ({
+        code: item.product_id,
+        name: item.item_name || item.product_id,
+        price: Number(item.selling_price),
+        quantity: Number(item.sales_quantity),
+        isDiscountable: item.isDiscountable,
+        itemInstruction: item.item_instruction || "",
+        item_category: item.item_category || "",
+        isLoadedFromDB: true,
+      }));
+
+      setproductcart({
+        customer: tableselected,
+        items: mappedCart,
+      });
+
+      setcartlist(mappedCart);
+      setOriginalLoadedItems(mappedCart);
+
+      setcartforqr({
+        customer: tableselected,
+        items: mappedCart.map((item) => ({
+          code: item.code,
+          quantity: item.quantity,
+          itemInstruction: item.itemInstruction || "",
           item_category: item.item_category || "",
           isLoadedFromDB: true,
-        }));
-
-        setproductcart({
-          customer: tableselected,
-          items: mappedCart,
-        });
-
-        setcartlist(mappedCart);
-        setOriginalLoadedItems(mappedCart);
-
-        setcartforqr({
-          customer: tableselected,
-          items: mappedCart.map((item) => ({
-            code: item.code,
-            quantity: item.quantity,
-            itemInstruction: item.itemInstruction || "",
-            item_category: item.item_category || "",
-            isLoadedFromDB: true,
-          })),
-        });
-      })
-      .catch((err) => {
-        console.error("Transaction fetch error:", err);
+        })),
       });
-  }, [apiHost, transactionId, tableselected]);
+    })
+    .catch((err) => {
+      console.error("Transaction fetch error:", err);
+    });
+}, [apiHost, transactionId, tableselected, salesTypeList]);
 
   const filteredProducts = useMemo(() => {
     return (productlist || []).filter((p) =>
@@ -761,6 +938,13 @@ const Orderlist = ({
       alert(error.message || "Failed to process billing.");
     }
   };
+  const selectedTypeObj = salesTypeList.find(
+    (item) => String(item.sales_type_id) === String(selectedSalesType)
+  );
+
+  const orderTypeName = selectedTypeObj 
+  ? (selectedTypeObj.sales_type || selectedTypeObj.description) 
+  : "DINE IN";
 
   const saveOrderToServer = async () => {
     if (productcart.items.length === 0) {
@@ -772,6 +956,17 @@ const Orderlist = ({
       const now = new Date();
       const formData = new FormData();
       const txId = transactionId || Date.now();
+
+      // get logged in user info
+      const loggedUserId =
+        localStorage.getItem("userId") ||
+        sessionStorage.getItem("userId") ||
+        "0";
+
+      const loggedUserName =
+        localStorage.getItem("firstName") ||
+        sessionStorage.getItem("firstName") ||
+        "Store Crew";
 
       formData.append("transaction_id", txId);
       formData.append("Category_Code", "Crab & Crack");
@@ -789,12 +984,14 @@ const Orderlist = ({
       formData.append("terminal_number", "1");
       formData.append("order_slip_no", txId);
       formData.append("table_number", tableselected);
-      formData.append("order_type", "DINE-IN");
+      formData.append("order_type", orderTypeName);
       formData.append("customer_head_count", 1);
       formData.append("discount_type", "");
       formData.append("payment_method", "");
       formData.append("special_instructions", instructions || "");
-      formData.append("cashier", "Store Crew");
+      formData.append("cashier", userName);
+      formData.append("user_id", userId);
+      formData.append("user_name", email);
       formData.append("remarks", "Pending for Payment");
       formData.append("order_status", "Pending");
       formData.append("status", "Active");
@@ -1049,6 +1246,56 @@ const Orderlist = ({
                   : "bg-white border-r border-slate-200"
               }`}
             >
+            <div className="px-4 pt-4 mb-2">
+              <label 
+                className={`text-[10px] font-bold uppercase tracking-[0.2em] mb-2 block px-1 ${
+                  isDark ? "text-slate-500" : "text-slate-400"
+                }`}
+              >
+                Service Type
+              </label>
+              <div className="relative group">
+                <select
+                  value={selectedSalesType}
+                  onChange={(e) => setSelectedSalesType(e.target.value)}
+                  className={`w-full appearance-none rounded-2xl py-3.5 pl-5 pr-12 outline-none cursor-pointer transition-all duration-300 font-semibold text-sm ${
+                    isDark
+                      ? "bg-slate-800/40 border border-slate-700 text-white focus:border-blue-500/50 focus:bg-slate-800/60"
+                      : "bg-white border border-slate-200 text-slate-900 shadow-sm focus:border-blue-400 focus:shadow-md"
+                  }`}
+                >
+                  <option value="" disabled>Choose Sales Type...</option>
+                  {salesTypeList.map((item) => (
+                <option
+                  key={item.sales_type_id}
+                  value={String(item.sales_type_id)}
+                  className={isDark ? "bg-slate-900 text-white" : "bg-white text-slate-900"}
+                >
+                  {item.sales_type || item.description}
+                </option>
+                  ))}
+                </select>
+                
+                {/* Custom Chevron Arrow */}
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none transition-transform group-focus-within:rotate-180">
+                  <svg 
+                    width="12" 
+                    height="12" 
+                    viewBox="0 0 12 12" 
+                    fill="none" 
+                    xmlns="http://www.w3.org/2000/svg"
+                    className={isDark ? "text-slate-500" : "text-slate-400"}
+                  >
+                    <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+
+                {/* Subtle Glow Effect on Hover (Dark Mode Only) */}
+                {isDark && (
+                  <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 rounded-2xl blur opacity-0 group-hover:opacity-100 transition duration-500 pointer-events-none" />
+                )}
+              </div>
+            </div>
               <div className="p-4 flex flex-col h-full">
                 <h3
                   className={`text-[10px] font-bold uppercase tracking-widest mb-4 px-2 ${
