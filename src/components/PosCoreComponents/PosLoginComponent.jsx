@@ -115,6 +115,16 @@ const PosLoginComponent = () => {
       if (result.message === "loginsuccess") {
         resetAttempts();
 
+        const nextUserId = result.userid || "";
+        const nextUsername = result.username || "";
+        const nextEmail = result.email || "";
+        const nextProfilePic = result.profile_pic || "";
+
+        let nextRole = result.userrole || "";
+        if (Array.isArray(nextRole)) {
+          nextRole = nextRole[0] || "";
+        }
+
         if (result.access_token) {
           localStorage.setItem("access_token", result.access_token);
         }
@@ -123,12 +133,25 @@ const PosLoginComponent = () => {
           localStorage.setItem("refresh_token", result.refresh_token);
         }
 
+        localStorage.setItem("user_id", nextUserId);
+        localStorage.setItem("username", nextUsername);
+        localStorage.setItem("email", nextEmail);
+        localStorage.setItem(
+          "user_role",
+          Array.isArray(result.userrole)
+            ? JSON.stringify(result.userrole)
+            : nextRole
+        );
+        localStorage.setItem("profile_pic", nextProfilePic);
+
         toggleAuthToTrue();
-        toggleFirstName(result.username || "");
-        updateUserRole(result.userrole || "");
-        toggleEmail(result.email || "");
-        setUserId(result.userid || "");
-        setProfilePic(result.profile_pic || "");
+        toggleFirstName(nextUsername);
+        updateUserRole(nextRole);
+        toggleEmail(nextEmail);
+        setUserId(nextUserId);
+        setProfilePic(nextProfilePic);
+
+        window.dispatchEvent(new Event("storage"));
 
         setIsSuccessModalOpen(true);
       } else {
