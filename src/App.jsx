@@ -5,6 +5,7 @@ import PrintBilling from "./components/MainComponents/PrintBilling";
 import SalesDashboard from "./components/Dashboards/SalesDashboard";
 import TransactionRecords from "./components/Dashboards/TransactionRecords";
 import GlobalThemeToggle from "./components/common/GlobalThemeToggle";
+import GlobalSync from "./components/common/GlobalSync"; 
 import PosReadingModal from "./components/MainComponents/PosReadingModal";
 import PosLogin from "./pages/PosCore/PosLogin";
 import PosSelectBusunit from "./pages/PosCore/PosSelectBusunit";
@@ -15,27 +16,22 @@ import ProductList from "./components/MainComponents/ProductList";
 const App = () => {
   return (
     <HashRouter>
+      {}
+      <GlobalSync /> 
+      
       <Routes>
         <Route exact path="/" element={<PosLogin />} />
         <Route exact path="/ordering" element={<ViewOrdering />} />
         <Route exact path="/printbilling" element={<PrintBilling />} />
         <Route exact path="/salesdashboard" element={<SalesDashboard />} />
         <Route exact path="/productlist" element={<ProductList />} />
-        <Route
-          exact
-          path="/transactionrecords"
-          element={<TransactionRecords />}
-        />
+        <Route exact path="/transactionrecords" element={<TransactionRecords />} />
         <Route exact path="/posreading" element={<PosReadingModal />} />
-        <Route
-          exact
-          path="/poscoreselectbusunit"
-          element={<PosSelectBusunit />}
-        />
+        <Route exact path="/poscoreselectbusunit" element={<PosSelectBusunit />} />
         <Route exact path="/poscorehomescreen" element={<PosHomeScreen />} />
-        <Route exact path="/ " element={<TransactionRecords />} />
         <Route exact path="/payments" element={<PosPayment />} />
       </Routes>
+
       <GlobalThemeToggle />
     </HashRouter>
   );
