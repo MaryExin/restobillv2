@@ -1451,7 +1451,15 @@ const InputPaymentsModal = ({
     (sum, row) => sum + toNum(row.payment_amount),
     0,
   );
+
   const remaining = Math.max(toNum(totalAmountDue) - totalPaid, 0);
+
+  const activePaymentMethod =
+    payments.length > 0 &&
+    activePaymentIndex >= 0 &&
+    activePaymentIndex < payments.length
+      ? payments[activePaymentIndex]?.payment_method || "No method selected"
+      : "No method selected";
 
   const updateRow = (index, field, value) =>
     setPayments((prev) =>
@@ -1464,8 +1472,10 @@ const InputPaymentsModal = ({
 
       if (next.length === 0) {
         setActivePaymentIndex(0);
-      } else if (activePaymentIndex >= next.length) {
-        setActivePaymentIndex(next.length - 1);
+      } else if (index === activePaymentIndex) {
+        setActivePaymentIndex(Math.max(0, index - 1));
+      } else if (activePaymentIndex > index) {
+        setActivePaymentIndex((prevActive) => Math.max(0, prevActive - 1));
       }
 
       return next;
@@ -1474,6 +1484,7 @@ const InputPaymentsModal = ({
 
   const setExactAmountForActiveRow = () => {
     if (payments.length === 0) return;
+    if (activePaymentIndex < 0 || activePaymentIndex >= payments.length) return;
 
     setPayments((prev) =>
       prev.map((row, i) => {
@@ -1496,6 +1507,7 @@ const InputPaymentsModal = ({
 
   const addDenominationToActiveRow = (amountToAdd) => {
     if (payments.length === 0) return;
+    if (activePaymentIndex < 0 || activePaymentIndex >= payments.length) return;
 
     setPayments((prev) =>
       prev.map((row, i) => {
@@ -1512,6 +1524,7 @@ const InputPaymentsModal = ({
 
   const clearAmountForActiveRow = () => {
     if (payments.length === 0) return;
+    if (activePaymentIndex < 0 || activePaymentIndex >= payments.length) return;
 
     setPayments((prev) =>
       prev.map((row, i) =>
@@ -1565,36 +1578,36 @@ const InputPaymentsModal = ({
       zIndex="z-[100001]"
     >
       <div
-        className={`px-5 py-5 ${
+        className={`px-5 py-3 ${
           isDark
             ? "border-b border-white/5 bg-white/[0.03]"
             : "border-b border-slate-200 bg-slate-50"
         }`}
       >
-        <h2 className="text-2xl font-black">Input Payments</h2>
+        <h2 className="text-xl font-black">Input Payments</h2>
         <p className="mt-1 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
           Allocate payment amounts and references
         </p>
       </div>
 
-      <div className="space-y-4 p-5 md:p-6">
+      <div className="space-y-4 px-5 py-2 md:px-6">
         <div className="grid gap-3 md:grid-cols-2 md:items-center">
-          <div className="text-2xl font-black text-slate-700 dark:text-slate-200">
+          <div className="text-xl font-black text-slate-700 dark:text-slate-200">
             TOTAL AMOUNT DUE
           </div>
-          <div className="text-right text-3xl font-black text-emerald-500">
+          <div className="text-right text-2xl font-black text-emerald-500">
             {peso(totalAmountDue)}
           </div>
         </div>
 
         <div
-          className={`rounded-[24px] border p-4 ${
+          className={`rounded-[24px] border px-4 py-2 ${
             isDark
               ? "border-white/5 bg-white/[0.03]"
               : "border-slate-200 bg-slate-50"
           }`}
         >
-          <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="mb-2 flex items-center justify-between gap-3">
             <p className="text-sm font-bold text-slate-500">Payments</p>
 
             {!readOnly ? (
@@ -1712,6 +1725,7 @@ const InputPaymentsModal = ({
                                 e.target.value,
                               )
                             }
+                            onFocus={() => setActivePaymentIndex(index)}
                             placeholder="Reference"
                             className={`h-12 w-full rounded-2xl px-4 text-sm outline-none ${inputClass}`}
                           />
@@ -1731,14 +1745,15 @@ const InputPaymentsModal = ({
                 : "border-slate-200 bg-white"
             }`}
           >
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
                   Shared Quick Amount Input
                 </p>
-                <p className="mt-1 text-sm font-semibold text-blue-500">
-                  Active Row: #
-                  {payments.length > 0 ? activePaymentIndex + 1 : 0}
+
+                <p className="mt-1 text-[11px] text-slate-500 font-black ">
+                  Active Payment Method:{" "}
+                  <span className="text-blue-600">{activePaymentMethod}</span>
                 </p>
               </div>
 
@@ -1747,7 +1762,7 @@ const InputPaymentsModal = ({
                   type="button"
                   disabled={readOnly || payments.length === 0}
                   onClick={setExactAmountForActiveRow}
-                  className="rounded-xl bg-emerald-600 px-3 py-2 text-[11px] font-black text-white transition hover:bg-emerald-500 disabled:opacity-50"
+                  className="rounded-xl bg-emerald-600 px-4 py-3 text-xs font-black text-gray-100 transition hover:bg-emerald-500 disabled:opacity-50"
                 >
                   Exact
                 </button>
@@ -1756,7 +1771,7 @@ const InputPaymentsModal = ({
                   type="button"
                   disabled={readOnly || payments.length === 0}
                   onClick={clearAmountForActiveRow}
-                  className={`rounded-xl px-3 py-2 text-[11px] font-black transition disabled:opacity-50 ${
+                  className={`rounded-xl px-4 py-3 text-xs font-black transition disabled:opacity-50 ${
                     isDark
                       ? "bg-slate-800 text-slate-200 hover:bg-slate-700"
                       : "bg-slate-200 text-slate-700 hover:bg-slate-300"
@@ -1774,7 +1789,7 @@ const InputPaymentsModal = ({
                   type="button"
                   disabled={readOnly || payments.length === 0}
                   onClick={() => addDenominationToActiveRow(amount)}
-                  className={`rounded-2xl border px-3 py-3 text-sm font-black transition disabled:opacity-50 ${getDenominationColor(
+                  className={`rounded-2xl border px-3 py-6 text-lg font-black transition disabled:opacity-50 ${getDenominationColor(
                     amount,
                     isDark,
                   )}`}

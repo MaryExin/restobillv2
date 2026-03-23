@@ -103,7 +103,7 @@ const Orderlist = ({
   const email = localStorage.getItem("email") || "Store Crew";
   const [salesTypeList, setSalesTypeList] = useState([]);
   const [selectedSalesType, setSelectedSalesType] = useState("");
-  
+
   const [newtransaction, setNewTransaction] = useState({
     business_info: {},
     inventory_types: [],
@@ -324,164 +324,167 @@ const Orderlist = ({
   }, [salesTypeList, selectedSalesType]);
 
   useEffect(() => {
-  if (!apiHost) return;
+    if (!apiHost) return;
 
-  const categoryCode = newtransaction?.business_info?.Category_Code || "";
-  const unitCode = newtransaction?.business_info?.Unit_Code || "";
-  const salesTypeDesc =
-    selectedSalesTypeObject?.sales_type ||
-    selectedSalesTypeObject?.description ||
-    "";
+    const categoryCode = newtransaction?.business_info?.Category_Code || "";
+    const unitCode = newtransaction?.business_info?.Unit_Code || "";
+    const salesTypeDesc =
+      selectedSalesTypeObject?.sales_type ||
+      selectedSalesTypeObject?.description ||
+      "";
 
-  if (!categoryCode || !unitCode || !salesTypeDesc || !selectcategory) {
-    setPricingData({
-      sales_type_id: "",
-      pricing_category: "",
-      products: [],
-    });
-    setproductlist([]);
-    return;
-  }
-
-  const fetchPricingProducts = async () => {
-    try {
-      setIsPricingLoading(true);
-
-      const response = await fetch(`${apiHost}/api/get_pricing_selection.php`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          category_code: categoryCode,
-          unit_code: unitCode,
-          sales_type: salesTypeDesc,
-          item_category: selectcategory,
-          search: productsearch || "",
-          limit: 100,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (result?.status === "success") {
-        const mappedProducts = Array.isArray(result.products)
-          ? result.products.map((item, index) => ({
-              id: item.product_id || `${item.sku || "ITEM"}-${index}`,
-              product_id: item.product_id || "",
-              item_name: item.item_name || "NO NAME",
-              selling_price: Number(item.selling_price || 0),
-              sku: item.sku || "",
-              item_category: item.item_category || "",
-              isDiscountable: item.isDiscountable || "",
-              vatable: item.vatable || "",
-              unit_cost: Number(item.unit_cost || 0),
-              unit_of_measure: item.unit_of_measure || "",
-              inventory_type: item.inventory_type || "",
-              raw: item,
-            }))
-          : [];
-
-        setPricingData({
-          sales_type_id: result.sales_type_id || "",
-          pricing_category: result.pricing_category || "",
-          products: mappedProducts,
-        });
-
-        setproductlist(mappedProducts);
-      } else {
-        setPricingData({
-          sales_type_id: "",
-          pricing_category: "",
-          products: [],
-        });
-        setproductlist([]);
-      }
-    } catch (error) {
-      console.error("Failed to fetch pricing products:", error);
+    if (!categoryCode || !unitCode || !salesTypeDesc || !selectcategory) {
       setPricingData({
         sales_type_id: "",
         pricing_category: "",
         products: [],
       });
       setproductlist([]);
-    } finally {
-      setIsPricingLoading(false);
+      return;
     }
-  };
 
-  fetchPricingProducts();
-}, [
-  apiHost,
-  newtransaction?.business_info?.Category_Code,
-  newtransaction?.business_info?.Unit_Code,
-  selectedSalesTypeObject?.sales_type,
-  selectedSalesTypeObject?.description,
-  selectcategory,
-  productsearch,
-]);
+    const fetchPricingProducts = async () => {
+      try {
+        setIsPricingLoading(true);
 
-useEffect(() => {
-  if (!apiHost || !transactionId) return;
-
-  fetch(
-    `${apiHost}/api/view_table_transaction.php?transaction_id=${transactionId}`,
-  )
-    .then((res) => {
-      if (!res.ok) throw new Error("Failed to fetch transaction");
-      return res.json();
-    })
-    .then((data) => {
-      if (!data) return;
-
-      if (data.summary?.order_type && Array.isArray(salesTypeList)) {
-        const matched = salesTypeList.find(
-          (item) =>
-            String(item.sales_type || item.description).toUpperCase() ===
-            String(data.summary.order_type).toUpperCase(),
+        const response = await fetch(
+          `${apiHost}/api/get_pricing_selection.php`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              category_code: categoryCode,
+              unit_code: unitCode,
+              sales_type: salesTypeDesc,
+              item_category: selectcategory,
+              search: productsearch || "",
+              limit: 100,
+            }),
+          },
         );
 
-        if (matched) {
-          setSelectedSalesType(String(matched.sales_type_id));
+        const result = await response.json();
+
+        if (result?.status === "success") {
+          const mappedProducts = Array.isArray(result.products)
+            ? result.products.map((item, index) => ({
+                id: item.product_id || `${item.sku || "ITEM"}-${index}`,
+                product_id: item.product_id || "",
+                item_name: item.item_name || "NO NAME",
+                selling_price: Number(item.selling_price || 0),
+                sku: item.sku || "",
+                item_category: item.item_category || "",
+                isDiscountable: item.isDiscountable || "",
+                vatable: item.vatable || "",
+                unit_cost: Number(item.unit_cost || 0),
+                unit_of_measure: item.unit_of_measure || "",
+                inventory_type: item.inventory_type || "",
+                raw: item,
+              }))
+            : [];
+
+          setPricingData({
+            sales_type_id: result.sales_type_id || "",
+            pricing_category: result.pricing_category || "",
+            products: mappedProducts,
+          });
+
+          setproductlist(mappedProducts);
+        } else {
+          setPricingData({
+            sales_type_id: "",
+            pricing_category: "",
+            products: [],
+          });
+          setproductlist([]);
         }
+      } catch (error) {
+        console.error("Failed to fetch pricing products:", error);
+        setPricingData({
+          sales_type_id: "",
+          pricing_category: "",
+          products: [],
+        });
+        setproductlist([]);
+      } finally {
+        setIsPricingLoading(false);
       }
+    };
 
-      if (!Array.isArray(data.order_details)) return;
+    fetchPricingProducts();
+  }, [
+    apiHost,
+    newtransaction?.business_info?.Category_Code,
+    newtransaction?.business_info?.Unit_Code,
+    selectedSalesTypeObject?.sales_type,
+    selectedSalesTypeObject?.description,
+    selectcategory,
+    productsearch,
+  ]);
 
-      const mappedCart = data.order_details.map((item) => ({
-        code: item.product_id,
-        name: item.item_name || item.product_id,
-        price: Number(item.selling_price),
-        quantity: Number(item.sales_quantity),
-        isDiscountable: item.isDiscountable,
-        itemInstruction: item.item_instruction || "",
-        item_category: item.item_category || "",
-        isLoadedFromDB: true,
-      }));
+  useEffect(() => {
+    if (!apiHost || !transactionId) return;
 
-      setproductcart({
-        customer: tableselected,
-        items: mappedCart,
-      });
+    fetch(
+      `${apiHost}/api/view_table_transaction.php?transaction_id=${transactionId}`,
+    )
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch transaction");
+        return res.json();
+      })
+      .then((data) => {
+        if (!data) return;
 
-      setcartlist(mappedCart);
-      setOriginalLoadedItems(mappedCart);
+        if (data.summary?.order_type && Array.isArray(salesTypeList)) {
+          const matched = salesTypeList.find(
+            (item) =>
+              String(item.sales_type || item.description).toUpperCase() ===
+              String(data.summary.order_type).toUpperCase(),
+          );
 
-      setcartforqr({
-        customer: tableselected,
-        items: mappedCart.map((item) => ({
-          code: item.code,
-          quantity: item.quantity,
-          itemInstruction: item.itemInstruction || "",
+          if (matched) {
+            setSelectedSalesType(String(matched.sales_type_id));
+          }
+        }
+
+        if (!Array.isArray(data.order_details)) return;
+
+        const mappedCart = data.order_details.map((item) => ({
+          code: item.product_id,
+          name: item.item_name || item.product_id,
+          price: Number(item.selling_price),
+          quantity: Number(item.sales_quantity),
+          isDiscountable: item.isDiscountable,
+          itemInstruction: item.item_instruction || "",
           item_category: item.item_category || "",
           isLoadedFromDB: true,
-        })),
+        }));
+
+        setproductcart({
+          customer: tableselected,
+          items: mappedCart,
+        });
+
+        setcartlist(mappedCart);
+        setOriginalLoadedItems(mappedCart);
+
+        setcartforqr({
+          customer: tableselected,
+          items: mappedCart.map((item) => ({
+            code: item.code,
+            quantity: item.quantity,
+            itemInstruction: item.itemInstruction || "",
+            item_category: item.item_category || "",
+            isLoadedFromDB: true,
+          })),
+        });
+      })
+      .catch((err) => {
+        console.error("Transaction fetch error:", err);
       });
-    })
-    .catch((err) => {
-      console.error("Transaction fetch error:", err);
-    });
-}, [apiHost, transactionId, tableselected, salesTypeList]);
+  }, [apiHost, transactionId, tableselected, salesTypeList]);
 
   const filteredProducts = useMemo(() => {
     return (productlist || []).filter((p) =>
@@ -939,12 +942,12 @@ useEffect(() => {
     }
   };
   const selectedTypeObj = salesTypeList.find(
-    (item) => String(item.sales_type_id) === String(selectedSalesType)
+    (item) => String(item.sales_type_id) === String(selectedSalesType),
   );
 
-  const orderTypeName = selectedTypeObj 
-  ? (selectedTypeObj.sales_type || selectedTypeObj.description) 
-  : "DINE IN";
+  const orderTypeName = selectedTypeObj
+    ? selectedTypeObj.sales_type || selectedTypeObj.description
+    : "DINE IN";
 
   const saveOrderToServer = async () => {
     if (productcart.items.length === 0) {
@@ -1246,56 +1249,68 @@ useEffect(() => {
                   : "bg-white border-r border-slate-200"
               }`}
             >
-            <div className="px-4 pt-4 mb-2">
-              <label 
-                className={`text-[10px] font-bold uppercase tracking-[0.2em] mb-2 block px-1 ${
-                  isDark ? "text-slate-500" : "text-slate-400"
-                }`}
-              >
-                Service Type
-              </label>
-              <div className="relative group">
-                <select
-                  value={selectedSalesType}
-                  onChange={(e) => setSelectedSalesType(e.target.value)}
-                  className={`w-full appearance-none rounded-2xl py-3.5 pl-5 pr-12 outline-none cursor-pointer transition-all duration-300 font-semibold text-sm ${
-                    isDark
-                      ? "bg-slate-800/40 border border-slate-700 text-white focus:border-blue-500/50 focus:bg-slate-800/60"
-                      : "bg-white border border-slate-200 text-slate-900 shadow-sm focus:border-blue-400 focus:shadow-md"
+              <div className="px-4 pt-4 mb-2">
+                <label
+                  className={`text-[10px] font-bold uppercase tracking-[0.2em] mb-2 block px-1 ${
+                    isDark ? "text-slate-500" : "text-slate-400"
                   }`}
                 >
-                  <option value="" disabled>Choose Sales Type...</option>
-                  {salesTypeList.map((item) => (
-                <option
-                  key={item.sales_type_id}
-                  value={String(item.sales_type_id)}
-                  className={isDark ? "bg-slate-900 text-white" : "bg-white text-slate-900"}
-                >
-                  {item.sales_type || item.description}
-                </option>
-                  ))}
-                </select>
-                
-                {/* Custom Chevron Arrow */}
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none transition-transform group-focus-within:rotate-180">
-                  <svg 
-                    width="12" 
-                    height="12" 
-                    viewBox="0 0 12 12" 
-                    fill="none" 
-                    xmlns="http://www.w3.org/2000/svg"
-                    className={isDark ? "text-slate-500" : "text-slate-400"}
+                  Service Type
+                </label>
+                <div className="relative group">
+                  <select
+                    value={selectedSalesType}
+                    onChange={(e) => setSelectedSalesType(e.target.value)}
+                    className={`w-full appearance-none rounded-2xl py-3.5 pl-5 pr-12 outline-none cursor-pointer transition-all duration-300 font-semibold text-sm ${
+                      isDark
+                        ? "bg-slate-800/40 border border-slate-700 text-white focus:border-blue-500/50 focus:bg-slate-800/60"
+                        : "bg-white border border-slate-200 text-slate-900 shadow-sm focus:border-blue-400 focus:shadow-md"
+                    }`}
                   >
-                    <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </div>
+                    <option value="" disabled>
+                      Choose Sales Type...
+                    </option>
+                    {salesTypeList.map((item) => (
+                      <option
+                        key={item.sales_type_id}
+                        value={String(item.sales_type_id)}
+                        className={
+                          isDark
+                            ? "bg-slate-900 text-white"
+                            : "bg-white text-slate-900"
+                        }
+                      >
+                        {item.sales_type || item.description}
+                      </option>
+                    ))}
+                  </select>
 
-                {/* Subtle Glow Effect on Hover (Dark Mode Only) */}
-                {isDark && (
-                  <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 rounded-2xl blur opacity-0 group-hover:opacity-100 transition duration-500 pointer-events-none" />
-                )}
+                  {/* Custom Chevron Arrow */}
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none transition-transform group-focus-within:rotate-180">
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 12 12"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                      className={isDark ? "text-slate-500" : "text-slate-400"}
+                    >
+                      <path
+                        d="M2.5 4.5L6 8L9.5 4.5"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </div>
+
+                  {/* Subtle Glow Effect on Hover (Dark Mode Only) */}
+                  {isDark && (
+                    <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 rounded-2xl blur opacity-0 group-hover:opacity-100 transition duration-500 pointer-events-none" />
+                  )}
+                </div>
               </div>
-            </div>
               <div className="p-4 flex flex-col h-full">
                 <h3
                   className={`text-[10px] font-bold uppercase tracking-widest mb-4 px-2 ${
@@ -1828,7 +1843,7 @@ useEffect(() => {
 
               <button
                 onClick={requestSaveOnly}
-                className="w-full mt-3 bg-emerald-600 text-white font-bold py-5 rounded-2xl flex items-center justify-center gap-3 text-lg shadow-lg shadow-emerald-600/20"
+                className="w-full mt-3 bg-emerald-600 text-gray-100 font-bold py-5 rounded-2xl flex items-center justify-center gap-3 text-lg shadow-lg shadow-emerald-600/20"
               >
                 <FaCheckCircle /> Save Only
               </button>
@@ -2243,7 +2258,7 @@ useEffect(() => {
 
               <button
                 onClick={requestSaveOnly}
-                className="w-full mb-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 shadow-xl shadow-emerald-600/20"
+                className="w-full mb-3 bg-emerald-600 hover:bg-emerald-500 text-gray-100 font-bold py-4 rounded-2xl flex items-center justify-center gap-2 shadow-xl shadow-emerald-600/20"
               >
                 <FaCheckCircle /> Save Only
               </button>
