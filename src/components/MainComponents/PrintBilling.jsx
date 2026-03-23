@@ -29,9 +29,9 @@ const PrintBilling = () => {
   const [tablelist, setTablelist] = useState([]);
   const [searchtable, setsearchtable] = useState("");
   const [statusFilter, setStatusFilter] = useState("pending");
-  
+
   // --- NEW VIEW MODE STATE ---
-  const [viewMode, setViewMode] = useState("grid"); 
+  const [viewMode, setViewMode] = useState("grid");
 
   const [tableselected, settableselected] = useState("");
   const [transpertable, settranspertable] = useState([]);
@@ -222,15 +222,17 @@ const PrintBilling = () => {
           </div>
 
           {/* VIEW SWITCHER BUTTONS */}
-          <div className={`flex p-1.5 rounded-2xl border ${isDark ? "bg-slate-900/50 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
-            <button 
+          <div
+            className={`flex p-1.5 rounded-2xl border ${isDark ? "bg-slate-900/50 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}
+          >
+            <button
               onClick={() => setViewMode("grid")}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${viewMode === "grid" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-500 hover:text-blue-500"}`}
             >
               <FaThLarge size={14} />
               <span className="text-[10px] font-bold uppercase"></span>
             </button>
-            <button 
+            <button
               onClick={() => setViewMode("list")}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${viewMode === "list" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-500 hover:text-blue-500"}`}
             >
@@ -303,8 +305,7 @@ const PrintBilling = () => {
                   table.status_label?.toLowerCase() === "pending";
                 return (
                   <motion.button
-                    layout
-                    whileHover={{ y: -5 }}
+                    whileHover={{ scale: 1.05 }}
                     key={index}
                     onClick={() => table_trasaction(table.table_number)}
                     className={`aspect-square rounded-[2rem] border flex flex-col items-center justify-center relative overflow-hidden transition-all shadow-xl ${
@@ -349,26 +350,33 @@ const PrintBilling = () => {
             /* --- LIST VIEW --- */
             <motion.div layout className="flex flex-col gap-3">
               {currentItems.map((table, index) => {
-                const isPending = table.status_label?.toLowerCase() === "pending";
+                const isPending =
+                  table.status_label?.toLowerCase() === "pending";
                 return (
                   <motion.button
                     layout
                     key={index}
                     onClick={() => table_trasaction(table.table_number)}
                     className={`flex items-center justify-between p-4 rounded-3xl border transition-all ${
-                      isDark 
-                        ? "bg-slate-900/40 border-white/5 hover:bg-slate-800" 
+                      isDark
+                        ? "bg-slate-900/40 border-white/5 hover:bg-slate-800"
                         : "bg-white border-slate-200 hover:bg-slate-50 shadow-sm"
                     }`}
                   >
                     <div className="flex items-center gap-5">
-                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black text-2xl ${
-                        isDark ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-900"
-                      }`}>
+                      <div
+                        className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black text-2xl ${
+                          isDark
+                            ? "bg-slate-800 text-white"
+                            : "bg-slate-100 text-slate-900"
+                        }`}
+                      >
                         {String(table.table_number || "").replace(/^\D+/g, "")}
                       </div>
                       <div className="text-left">
-                        <p className={`font-black uppercase text-sm ${isDark ? "text-white" : "text-slate-900"}`}>
+                        <p
+                          className={`font-black uppercase text-sm ${isDark ? "text-white" : "text-slate-900"}`}
+                        >
                           Table {table.table_number}
                         </p>
                         <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
@@ -376,13 +384,19 @@ const PrintBilling = () => {
                         </p>
                       </div>
                     </div>
-                    <div className={`px-5 py-2 rounded-full border flex items-center gap-3 ${
-                      isPending 
-                        ? "border-amber-500/20 bg-amber-500/5 text-amber-500" 
-                        : "border-emerald-500/20 bg-emerald-500/5 text-emerald-500"
-                    }`}>
-                      <div className={`w-2 h-2 rounded-full ${isPending ? "bg-amber-500 animate-pulse" : "bg-emerald-500"}`} />
-                      <span className="text-[10px] font-black uppercase tracking-widest">{table.status_label}</span>
+                    <div
+                      className={`px-5 py-2 rounded-full border flex items-center gap-3 ${
+                        isPending
+                          ? "border-amber-500/20 bg-amber-500/5 text-amber-500"
+                          : "border-emerald-500/20 bg-emerald-500/5 text-emerald-500"
+                      }`}
+                    >
+                      <div
+                        className={`w-2 h-2 rounded-full ${isPending ? "bg-amber-500 animate-pulse" : "bg-emerald-500"}`}
+                      />
+                      <span className="text-[10px] font-black uppercase tracking-widest">
+                        {table.status_label}
+                      </span>
                     </div>
                   </motion.button>
                 );
