@@ -99,7 +99,7 @@ const Orderlist = ({
   const [isReprint, setIsReprint] = useState(false);
 
   const userId = localStorage.getItem("user_id") || "0";
-  const userName = localStorage.getItem("username") || "Store Crew";
+  const userName = localStorage.getItem("Cashier") || "Store Crew";
   const email = localStorage.getItem("email") || "Store Crew";
   const [salesTypeList, setSalesTypeList] = useState([]);
   const [selectedSalesType, setSelectedSalesType] = useState("");
@@ -966,10 +966,6 @@ const Orderlist = ({
         sessionStorage.getItem("userId") ||
         "0";
 
-      const loggedUserName =
-        localStorage.getItem("firstName") ||
-        sessionStorage.getItem("firstName") ||
-        "Store Crew";
 
       formData.append("transaction_id", txId);
       formData.append("Category_Code", "Crab & Crack");

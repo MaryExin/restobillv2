@@ -1,11 +1,5 @@
 import React, { useMemo, useState, useEffect } from "react";
-import {
-  FaUsers,
-  FaUserCircle,
-  FaLock,
-  FaExchangeAlt,
-  FaCheckCircle,
-} from "react-icons/fa";
+import { FaUsers, FaUserCircle } from "react-icons/fa";
 
 import PosQuickActionTile from "../Common/PosQuickActionTile";
 import PosModal from "../Common/PosModal";
@@ -35,7 +29,7 @@ const SwitchUser = () => {
     updateUserRole,
     setProfilePic,
   } = useZustandLoginCred();
-console.log(toggleEmail);
+
   useEffect(() => {
     let isMounted = true;
 
@@ -44,9 +38,7 @@ console.log(toggleEmail);
 
       try {
         const response = await fetch(
-          `${apiHost}/api/get_shift_details.php?user_id=${encodeURIComponent(
-            userId,
-          )}`,
+          `${apiHost}/api/get_shift_details.php?user_id=${encodeURIComponent(userId)}`
         );
 
         const result = await response.json();
@@ -105,8 +97,11 @@ console.log(toggleEmail);
     setSelectedUser(normalizedUser);
     setPassword("");
     setErrorMessage("");
+
+    // hide main switch user modal first
     setOpen(false);
 
+    // then open password modal
     setTimeout(() => {
       setPasswordModalOpen(true);
     }, 120);
@@ -131,7 +126,7 @@ console.log(toggleEmail);
 
   const handleSwitchUserLogin = async () => {
     const loginEmail = String(
-      selectedUser?.email ?? selectedUser?.username ?? "",
+      selectedUser?.email ?? selectedUser?.username ?? ""
     ).trim();
 
     if (!loginEmail) {
@@ -192,13 +187,17 @@ console.log(toggleEmail);
         "user_role",
         Array.isArray(result?.userrole)
           ? JSON.stringify(result.userrole)
-          : (result?.userrole ?? ""),
+          : (result?.userrole ?? "")
       );
       localStorage.setItem("profile_pic", nextProfilePic);
 
+      // close password modal first
       setPasswordModalOpen(false);
+
+      // make sure the switch modal stays closed
       setOpen(false);
 
+      // show success modal after modal transition finishes
       setTimeout(() => {
         setIsSuccessModalOpen(true);
       }, 180);
@@ -212,7 +211,7 @@ console.log(toggleEmail);
 
   const buttons = [
     {
-      label: "Close",
+      label: "Cancel",
       variant: "secondary",
       onClick: handleClose,
       disabled: isSubmitting,
@@ -222,18 +221,18 @@ console.log(toggleEmail);
 
   const passwordButtons = [
     {
-      label: "Back",
+      label: "Cancel",
       variant: "secondary",
       onClick: handlePasswordModalClose,
       disabled: isSubmitting,
       className: "min-w-[140px]",
     },
     {
-      label: isSubmitting ? "Switching..." : "Switch User",
+      label: isSubmitting ? "Switching..." : "Login",
       variant: "primary",
       onClick: handleSwitchUserLogin,
       disabled: isSubmitting,
-      className: "min-w-[160px]",
+      className: "min-w-[140px]",
     },
   ];
 
@@ -252,96 +251,51 @@ console.log(toggleEmail);
           open={open}
           title="Switch User"
           onClose={handleClose}
-          width="max-w-[1100px]"
+          width="max-w-[95vw]"
           height="h-[82vh]"
           bodyClassName="pt-2"
           buttons={buttons}
         >
           <div className="flex h-full flex-col">
-            <div className="mb-5 rounded-[22px] border border-slate-200 bg-gradient-to-r from-sky-50 via-white to-indigo-50 p-5">
-              <div className="flex items-start gap-4">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-100 text-sky-600">
-                  <FaExchangeAlt className="text-[22px]" />
-                </div>
-
-                <div>
-                  <div className="text-[22px] font-bold text-slate-800">
-                    Choose account
-                  </div>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Select the account you want to switch into for this active
-                    shift.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {users.length > 0 ? (
-              <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                {users.map((user) => {
-                  const isActive =
-                    selectedUser?.id === (user?.id ?? user?.uuid);
+            <div className="flex flex-wrap content-start gap-5">
+              {users.length > 0 ? (
+                users.map((user) => {
+                  const isActive = selectedUser?.id === user.id;
 
                   return (
                     <button
-                      key={user.id ?? user.uuid}
+                      key={user.id}
                       type="button"
                       disabled={isSubmitting}
                       onClick={() => handleUserClick(user)}
-                      className={`group relative overflow-hidden rounded-[24px] border bg-white p-5 text-left shadow-sm transition-all duration-300 ${
+                      className={`flex h-[120px] w-[120px] flex-col items-center justify-center rounded-[16px] border bg-white px-3 shadow-sm transition ${
                         isSubmitting
                           ? "cursor-not-allowed opacity-70"
-                          : "hover:-translate-y-1.5 hover:border-sky-300 hover:shadow-[0_20px_40px_rgba(14,165,233,0.12)]"
+                          : "hover:-translate-y-1 hover:shadow-md"
                       } ${
                         isActive
-                          ? "border-sky-400 ring-4 ring-sky-100"
+                          ? "border-sky-400 ring-2 ring-sky-200"
                           : "border-slate-200"
                       }`}
                     >
-                      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-sky-500 via-cyan-400 to-indigo-500 opacity-90" />
+                      <FaUserCircle className="text-[48px] text-sky-500" />
 
-                      <div className="flex flex-col items-center text-center">
-                        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-sky-50 text-sky-500 transition group-hover:scale-105">
-                          <FaUserCircle className="text-[54px]" />
-                        </div>
+                      <span className="mt-2 text-center text-[14px] font-bold leading-tight text-slate-600">
+                        {user.name}
+                      </span>
 
-                        <div className="mt-4 line-clamp-2 text-[15px] font-bold leading-tight text-slate-800">
-                          {user.name}
-                        </div>
-
-                        <div className="mt-2 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-500">
-                          {user.userRole || "User"}
-                        </div>
-
-                        <div className="mt-3 line-clamp-2 text-[12px] text-slate-400">
-                          {user.email || user.username || ""}
-                        </div>
-                      </div>
-
-                      <div className="mt-5 flex items-center justify-center">
-                        <span className="rounded-xl bg-sky-50 px-3 py-2 text-[12px] font-semibold text-sky-600 transition group-hover:bg-sky-100">
-                          Switch to this account
-                        </span>
-                      </div>
+                      <span className="mt-1 text-center text-[11px] leading-tight text-slate-400">
+                        {user.userRole || ""}
+                      </span>
                     </button>
                   );
-                })}
-              </div>
-            ) : (
-              <div className="flex flex-1 items-center justify-center">
-                <div className="w-full max-w-md rounded-[28px] border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">
-                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white text-slate-400 shadow-sm">
-                    <FaUsers className="text-[24px]" />
-                  </div>
-                  <div className="mt-4 text-lg font-bold text-slate-700">
-                    No accounts found
-                  </div>
-                  <p className="mt-2 text-sm text-slate-500">
-                    There are no available accounts to switch to right now.
-                  </p>
+                })
+              ) : (
+                <div className="w-full py-10 text-center text-sm text-slate-500">
+                  No accounts found.
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </PosModal>
       )}
@@ -351,37 +305,32 @@ console.log(toggleEmail);
           open={passwordModalOpen}
           title="Confirm Switch User"
           onClose={handlePasswordModalClose}
-          width="max-w-[480px]"
+          width="max-w-[420px]"
           height="h-auto"
           bodyClassName="pt-2"
           buttons={passwordButtons}
         >
-          <div className="flex flex-col gap-5 py-2">
-            <div className="rounded-[24px] border border-slate-200 bg-gradient-to-b from-white to-slate-50 p-6">
-              <div className="flex flex-col items-center justify-center text-center">
-                <div className="flex h-24 w-24 items-center justify-center rounded-full bg-sky-50 text-sky-500 shadow-inner">
-                  <FaUserCircle className="text-[64px]" />
-                </div>
+          <div className="flex flex-col gap-4 py-2">
+            <div className="flex flex-col items-center justify-center">
+              <FaUserCircle className="text-[64px] text-sky-500" />
 
-                <div className="mt-4 text-[22px] font-bold text-slate-800">
-                  {selectedUser?.name || "Selected User"}
-                </div>
+              <div className="mt-3 text-center text-[18px] font-bold text-slate-700">
+                {selectedUser?.name || "Selected User"}
+              </div>
 
-                <div className="mt-2 rounded-full bg-slate-100 px-3 py-1 text-[12px] font-semibold text-slate-500">
-                  {selectedUser?.userRole || "User"}
-                </div>
+              <div className="mt-1 text-center text-[13px] text-slate-500">
+                {selectedUser?.userRole || ""}
+              </div>
 
-                <div className="mt-3 text-[13px] text-slate-400">
-                  {selectedUser?.email || selectedUser?.username || ""}
-                </div>
+              <div className="mt-1 text-center text-[12px] text-slate-400">
+                {selectedUser?.email || selectedUser?.username || ""}
               </div>
             </div>
 
-            <div className="rounded-[20px] border border-slate-200 bg-white p-4">
-              <div className="mb-3 flex items-center gap-2 text-slate-700">
-                <FaLock className="text-sky-500" />
-                <label className="text-sm font-semibold">Password</label>
-              </div>
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-semibold text-slate-600">
+                Password
+              </label>
 
               <input
                 type="password"
@@ -394,19 +343,15 @@ console.log(toggleEmail);
                   }
                 }}
                 placeholder="Enter password"
-                className="w-full rounded-[14px] border border-slate-300 px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100 disabled:bg-slate-100"
+                className="w-full rounded-[12px] border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100 disabled:bg-slate-100"
               />
             </div>
 
             {errorMessage ? (
-              <div className="rounded-[16px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+              <div className="rounded-[12px] border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
                 {errorMessage}
               </div>
-            ) : (
-              <div className="rounded-[16px] border border-sky-100 bg-sky-50 px-4 py-3 text-sm text-sky-700">
-                Enter the password for this account to continue switching user.
-              </div>
-            )}
+            ) : null}
           </div>
         </PosModal>
       )}
@@ -414,9 +359,7 @@ console.log(toggleEmail);
       {isSuccessModalOpen && (
         <ModalSuccessNavToSelf
           header="Switch User Success"
-          message={`You are now logged in as ${
-            selectedUser?.name || "the selected user"
-          }.`}
+          message={`You are now logged in as ${selectedUser?.name || "the selected user"}.`}
           setIsModalOpen={setIsSuccessModalOpen}
           resetForm={handleSuccessAcknowledge}
           button="Accept"
