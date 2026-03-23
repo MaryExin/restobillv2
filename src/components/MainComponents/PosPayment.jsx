@@ -22,6 +22,7 @@ import { useTheme } from "../../context/ThemeContext";
 import useApiHost from "../../hooks/useApiHost";
 import { useNavigate } from "react-router-dom";
 import TransactionPaymentModal from "./TransactionPaymentModal";
+import ModalSuccessNavToSelf from "../Modals/ModalSuccessNavToSelf";
 
 const peso = (value) =>
   `₱ ${Number(value || 0).toLocaleString("en-PH", {
@@ -138,6 +139,7 @@ function StatCard({ title, value, icon: Icon, isDark, tone = "blue" }) {
     yellow: isDark
       ? "bg-amber-500/10 text-amber-300"
       : "bg-amber-50 text-amber-600",
+    red: isDark ? "bg-red-500/10 text-red-300" : "bg-red-50 text-red-600",
     slate: isDark
       ? "bg-slate-800 text-slate-300"
       : "bg-slate-100 text-slate-600",
@@ -176,6 +178,34 @@ function StatCard({ title, value, icon: Icon, isDark, tone = "blue" }) {
 }
 
 function SummaryPanel({ isDark, viewMode, summary }) {
+  const titleMap = {
+    pending: "Pending Overview",
+    paid: "Paid Overview",
+    voided: "Voided Overview",
+    refunded: "Refunded Overview",
+  };
+
+  const countMap = {
+    pending: "Pending Transactions",
+    paid: "Paid Transactions",
+    voided: "Voided Transactions",
+    refunded: "Refunded Transactions",
+  };
+
+  const amountMap = {
+    pending: "Pending Sales",
+    paid: "Paid Amount",
+    voided: "Voided Amount",
+    refunded: "Refunded Amount",
+  };
+
+  const toneMap = {
+    pending: "yellow",
+    paid: "green",
+    voided: "red",
+    refunded: "blue",
+  };
+
   return (
     <div
       className={`rounded-[28px] border p-5 lg:sticky lg:top-6 ${
@@ -193,7 +223,7 @@ function SummaryPanel({ isDark, viewMode, summary }) {
             isDark ? "text-white" : "text-slate-900"
           }`}
         >
-          {viewMode === "paid" ? "Paid Overview" : "Pending Overview"}
+          {titleMap[viewMode]}
         </h2>
         <p className="mt-2 text-sm text-slate-500">
           Quick totals and payment setup information.
@@ -202,21 +232,19 @@ function SummaryPanel({ isDark, viewMode, summary }) {
 
       <div className="space-y-4">
         <StatCard
-          title={
-            viewMode === "paid" ? "Paid Transactions" : "Pending Transactions"
-          }
+          title={countMap[viewMode]}
           value={summary.totalTransactions}
           icon={FiDatabase}
           isDark={isDark}
-          tone={viewMode === "paid" ? "green" : "yellow"}
+          tone={toneMap[viewMode]}
         />
 
         <StatCard
-          title={viewMode === "paid" ? "Paid Amount" : "Pending Sales"}
+          title={amountMap[viewMode]}
           value={peso(summary.totalSales)}
           icon={FaMoneyBill}
           isDark={isDark}
-          tone={viewMode === "paid" ? "green" : "yellow"}
+          tone={toneMap[viewMode]}
         />
 
         <StatCard
@@ -264,12 +292,12 @@ function SummaryPanel({ isDark, viewMode, summary }) {
 
           <div className="flex items-center gap-3">
             <span className="h-3.5 w-3.5 rounded-full bg-red-500" />
-            <span className="text-slate-500">Void Action</span>
+            <span className="text-slate-500">Voided Transactions</span>
           </div>
 
           <div className="flex items-center gap-3">
-            <span className="h-3.5 w-3.5 rounded-full bg-yellow-500" />
-            <span className="text-slate-500">Refund Action</span>
+            <span className="h-3.5 w-3.5 rounded-full bg-blue-500" />
+            <span className="text-slate-500">Refunded Transactions</span>
           </div>
         </div>
       </div>
@@ -284,7 +312,7 @@ function HeaderRow({ isDark, mode }) {
     "Table",
     "Order Type",
     "Transaction Date",
-    mode === "paid" ? "Amount Due / Paid" : "Total Sales",
+    mode === "pending" ? "Total Sales" : "Amount",
     "Cashier",
     "Remarks",
   ];
@@ -475,11 +503,31 @@ function TransactionRow({ index, style, data }) {
   const mode = data.mode;
 
   const remarksText =
-    row.remarks || (mode === "paid" ? "Paid" : "Pending for Payment");
+    row.remarks ||
+    (mode === "paid"
+      ? "Paid"
+      : mode === "pending"
+        ? "Pending for Payment"
+        : mode === "voided"
+          ? "Voided"
+          : "Refunded");
 
   const normalizedRemarks = normalizeText(remarksText);
   const isPaid = normalizedRemarks.includes("paid");
   const isPending = normalizedRemarks.includes("pending");
+  const isVoided =
+    normalizedRemarks.includes("void") ||
+    normalizeText(row.status).includes("void");
+  const isRefunded =
+    normalizedRemarks.includes("refund") ||
+    normalizeText(row.status).includes("refund");
+
+  const viewTitle =
+    mode === "paid"
+      ? "Review / Print Duplicate"
+      : mode === "pending"
+        ? "Open Payment"
+        : "View Transaction";
 
   return (
     <div style={style}>
@@ -496,9 +544,7 @@ function TransactionRow({ index, style, data }) {
             type="button"
             onClick={() => onOpen(row)}
             className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white transition hover:bg-blue-500"
-            title={
-              mode === "paid" ? "Review / Print Duplicate" : "Open Payment"
-            }
+            title={viewTitle}
           >
             {mode === "paid" ? <FiPrinter size={17} /> : <FiEye size={17} />}
           </button>
@@ -512,7 +558,7 @@ function TransactionRow({ index, style, data }) {
             >
               Void
             </button>
-          ) : (
+          ) : mode === "paid" ? (
             <button
               type="button"
               onClick={() => onRefund(row)}
@@ -521,6 +567,16 @@ function TransactionRow({ index, style, data }) {
             >
               Refund
             </button>
+          ) : (
+            <span
+              className={`inline-flex h-11 items-center justify-center rounded-2xl px-4 text-sm font-bold ${
+                mode === "voided"
+                  ? "bg-red-500/10 text-red-500"
+                  : "bg-blue-500/10 text-blue-500"
+              }`}
+            >
+              View Only
+            </span>
           )}
         </div>
 
@@ -544,9 +600,11 @@ function TransactionRow({ index, style, data }) {
         </div>
 
         <div className="whitespace-nowrap px-5 py-4 text-right font-black">
-          {mode === "paid"
-            ? peso(row.TotalAmountDue || row.payment_amount || 0)
-            : peso(row.TotalSales)}
+          {peso(
+            mode === "pending"
+              ? row.TotalSales
+              : row.TotalAmountDue || row.payment_amount || row.TotalSales || 0,
+          )}
         </div>
 
         <div className="whitespace-nowrap px-5 py-4">{row.cashier || "-"}</div>
@@ -554,16 +612,20 @@ function TransactionRow({ index, style, data }) {
         <div className="flex items-center px-5 py-4">
           <span
             className={`rounded-full px-3 py-1 text-xs font-bold ${
-              isPaid
-                ? "bg-emerald-500/10 text-emerald-500"
-                : isPending
-                  ? "bg-amber-500/10 text-amber-500"
-                  : isDark
-                    ? "bg-slate-500/10 text-slate-300"
-                    : "bg-slate-900/10 text-slate-700"
+              isVoided
+                ? "bg-red-500/10 text-red-500"
+                : isRefunded
+                  ? "bg-blue-500/10 text-blue-500"
+                  : isPaid
+                    ? "bg-emerald-500/10 text-emerald-500"
+                    : isPending
+                      ? "bg-amber-500/10 text-amber-500"
+                      : isDark
+                        ? "bg-slate-500/10 text-slate-300"
+                        : "bg-slate-900/10 text-slate-700"
             }`}
           >
-            {remarksText}
+            {row.status || remarksText}
           </span>
         </div>
       </div>
@@ -585,6 +647,8 @@ export default function PosPayment() {
   const [viewMode, setViewMode] = useState("pending");
   const [pendingTransactions, setPendingTransactions] = useState([]);
   const [paidTransactions, setPaidTransactions] = useState([]);
+  const [voidedTransactions, setVoidedTransactions] = useState([]);
+  const [refundedTransactions, setRefundedTransactions] = useState([]);
   const [modeOfPayments, setModeOfPayments] = useState([]);
   const [chargeOptions, setChargeOptions] = useState([]);
 
@@ -600,6 +664,12 @@ export default function PosPayment() {
   const [activeRow, setActiveRow] = useState(null);
   const [actionRemarks, setActionRemarks] = useState("");
 
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [successHeader, setSuccessHeader] = useState("Saved Successfully");
+  const [successMessage, setSuccessMessage] = useState(
+    "Your changes have been saved.",
+  );
+
   const fetchAll = useCallback(async () => {
     if (!apiHost) return;
 
@@ -607,10 +677,12 @@ export default function PosPayment() {
     setErrorMessage("");
 
     try {
-      const [pendingRes, paidRes, mopRes, chargesRes] =
+      const [pendingRes, paidRes, voidedRes, refundedRes, mopRes, chargesRes] =
         await Promise.allSettled([
           fetch(`${apiHost}/api/pos_payment_read_pending.php`),
           fetch(`${apiHost}/api/pos_payment_read_paid.php`),
+          fetch(`${apiHost}/api/pos_payment_read_voided.php`),
+          fetch(`${apiHost}/api/pos_payment_read_refunded.php`),
           fetch(`${apiHost}/api/pos_payment_read_mode_of_payment.php`),
           fetch(`${apiHost}/api/pos_payment_read_other_charges.php`),
         ]);
@@ -657,6 +729,52 @@ export default function PosPayment() {
         }
       } else {
         setPaidTransactions([]);
+      }
+
+      if (voidedRes.status === "fulfilled") {
+        try {
+          const voidedData = await safeReadJson(
+            voidedRes.value,
+            "Voided transactions API",
+          );
+          if (voidedRes.value.ok && voidedData?.success) {
+            setVoidedTransactions(
+              Array.isArray(voidedData?.transactions)
+                ? voidedData.transactions
+                : [],
+            );
+          } else {
+            setVoidedTransactions([]);
+          }
+        } catch (error) {
+          console.error(error);
+          setVoidedTransactions([]);
+        }
+      } else {
+        setVoidedTransactions([]);
+      }
+
+      if (refundedRes.status === "fulfilled") {
+        try {
+          const refundedData = await safeReadJson(
+            refundedRes.value,
+            "Refunded transactions API",
+          );
+          if (refundedRes.value.ok && refundedData?.success) {
+            setRefundedTransactions(
+              Array.isArray(refundedData?.transactions)
+                ? refundedData.transactions
+                : [],
+            );
+          } else {
+            setRefundedTransactions([]);
+          }
+        } catch (error) {
+          console.error(error);
+          setRefundedTransactions([]);
+        }
+      } else {
+        setRefundedTransactions([]);
       }
 
       if (mopRes.status === "fulfilled") {
@@ -784,12 +902,16 @@ export default function PosPayment() {
       closeActionModal();
       await fetchAll();
 
-      window.alert(
+      setSuccessHeader(
+        actionType === "refund" ? "Refund Successful" : "Void Successful",
+      );
+      setSuccessMessage(
         result?.message ||
           (actionType === "refund"
             ? "Transaction refunded successfully."
             : "Transaction voided successfully."),
       );
+      setIsSuccessModalOpen(true);
     } catch (error) {
       console.error(error);
       setErrorMessage(
@@ -810,10 +932,18 @@ export default function PosPayment() {
     fetchAll,
   ]);
 
-  const sourceTransactions = useMemo(
-    () => (viewMode === "paid" ? paidTransactions : pendingTransactions),
-    [viewMode, paidTransactions, pendingTransactions],
-  );
+  const sourceTransactions = useMemo(() => {
+    if (viewMode === "paid") return paidTransactions;
+    if (viewMode === "voided") return voidedTransactions;
+    if (viewMode === "refunded") return refundedTransactions;
+    return pendingTransactions;
+  }, [
+    viewMode,
+    pendingTransactions,
+    paidTransactions,
+    voidedTransactions,
+    refundedTransactions,
+  ]);
 
   const filteredTransactions = useMemo(() => {
     const searchValue = normalizeText(search);
@@ -829,7 +959,10 @@ export default function PosPayment() {
         row.cashier,
         row.transaction_date,
         row.remarks,
+        row.status,
         row.invoice_no,
+        row.void_remarks,
+        row.refund_remarks,
       ]
         .join(" ")
         .toLowerCase();
@@ -841,12 +974,14 @@ export default function PosPayment() {
   const summary = useMemo(() => {
     return {
       totalTransactions: filteredTransactions.length,
-      totalSales: filteredTransactions.reduce(
-        (sum, row) =>
-          sum +
-          toNum(viewMode === "paid" ? row.TotalAmountDue : row.TotalSales),
-        0,
-      ),
+      totalSales: filteredTransactions.reduce((sum, row) => {
+        const amount =
+          viewMode === "pending"
+            ? row.TotalSales
+            : row.TotalAmountDue || row.payment_amount || row.TotalSales || 0;
+
+        return sum + toNum(amount);
+      }, 0),
       totalMethods: modeOfPayments.length,
       totalCharges: chargeOptions.length,
     };
@@ -866,6 +1001,8 @@ export default function PosPayment() {
     }),
     [filteredTransactions, isDark, viewMode, openVoidModal, openRefundModal],
   );
+
+  const isPaymentReadOnly = viewMode === "voided" || viewMode === "refunded";
 
   return (
     <>
@@ -915,14 +1052,17 @@ export default function PosPayment() {
                 isDark ? "text-white" : "text-slate-900"
               }`}
             >
-              {viewMode === "paid"
-                ? "Paid Transactions"
-                : "Pending for Payment"}
+              {viewMode === "pending"
+                ? "Pending for Payment"
+                : viewMode === "paid"
+                  ? "Paid Transactions"
+                  : viewMode === "voided"
+                    ? "Voided Transactions"
+                    : "Refunded Transactions"}
             </h1>
             <p className="mt-2 text-sm text-slate-500">
-              Review billed transactions, open payment posting, reprint
-              duplicate invoice copies, void pending transactions, and refund
-              paid transactions.
+              Review pending, paid, voided, and refunded transactions in one
+              page.
             </p>
           </div>
 
@@ -963,6 +1103,34 @@ export default function PosPayment() {
                       }`}
                     >
                       Paid
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setViewMode("voided")}
+                      className={`rounded-2xl px-4 py-3 text-sm font-black transition ${
+                        viewMode === "voided"
+                          ? "bg-red-600 text-gray-100"
+                          : isDark
+                            ? "border border-slate-700 bg-slate-900 text-slate-300"
+                            : "border border-slate-200 bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      Voided
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setViewMode("refunded")}
+                      className={`rounded-2xl px-4 py-3 text-sm font-black transition ${
+                        viewMode === "refunded"
+                          ? "bg-blue-600 text-gray-100"
+                          : isDark
+                            ? "border border-slate-700 bg-slate-900 text-slate-300"
+                            : "border border-slate-200 bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      Refunded
                     </button>
                   </div>
 
@@ -1064,6 +1232,7 @@ export default function PosPayment() {
         modeOfPayments={modeOfPayments}
         chargeOptions={chargeOptions}
         mode={viewMode}
+        readOnly={isPaymentReadOnly}
         onSaved={fetchAll}
       />
 
@@ -1078,6 +1247,19 @@ export default function PosPayment() {
         activeRow={activeRow}
         isSubmitting={isActionLoading}
       />
+
+      {isSuccessModalOpen && (
+        <ModalSuccessNavToSelf
+          header={successHeader}
+          message={successMessage}
+          button="OK"
+          setIsModalOpen={setIsSuccessModalOpen}
+          resetForm={() => {
+            setSuccessHeader("Saved Successfully");
+            setSuccessMessage("Your changes have been saved.");
+          }}
+        />
+      )}
     </>
   );
 }
