@@ -382,8 +382,7 @@ export default function PosReadingModal({
             <div class="subtitle">${data.tinLabel || ""}</div>
             <div class="subtitle">MIN: ${terminalConfig.machineNumber}</div>
             <div class="subtitle">S/N: ${terminalConfig.serialNumber}</div>
-            <div class="subtitle">PTU No: ${terminalConfig.ptuNumber}</div>
-            <div class="subtitle">PTU Date Issued: ${terminalConfig.ptuDateIssued}</div>
+           
             <div class="title" style="margin-top:8px;">X-READING</div>
           </div>
 
@@ -451,9 +450,7 @@ export default function PosReadingModal({
               <div class="subtitle">${data.businessUnitAddress || ""}</div>
               <div class="subtitle">${data.tinLabel || ""}</div>
               <div class="subtitle">MIN: ${terminalConfig.machineNumber}</div>
-              <div class="subtitle">S/N: ${terminalConfig.serialNumber}</div>
-              <div class="subtitle">PTU No: ${terminalConfig.ptuNumber}</div>
-              <div class="subtitle">PTU Date Issued: ${terminalConfig.ptuDateIssued}</div>
+              <div class="subtitle">S/N: ${terminalConfig.serialNumber}</div>           
               <div class="title" style="margin-top:8px;">Z-READING</div>
             </div>
 

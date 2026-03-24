@@ -2904,6 +2904,11 @@ export default function TransactionPaymentModal({
           otherCharges={receiptSnapshot?.otherCharges || otherCharges}
           customerCards={receiptSnapshot?.customerCards || customerCards}
           isDuplicateCopy={receiptSnapshot?.isDuplicateCopy || false}
+          apiHost={apiHost}
+          categoryCode={transaction?.Category_Code || ""}
+          unitCode={transaction?.Unit_Code || ""}
+          terminalNumber={transaction?.terminal_number || "1"}
+          corpName="Crabs N Crack Seafood House"
         />
       </div>
     </>
