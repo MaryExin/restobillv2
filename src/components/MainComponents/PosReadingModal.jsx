@@ -236,69 +236,104 @@ export default function PosReadingModal({
   `;
 
   const buildXPrintHtml = (data) => {
+    const otherPaymentsBreakdown = Array.isArray(data?.otherPaymentsBreakdown)
+      ? data.otherPaymentsBreakdown
+      : Array.isArray(data?.paymentBreakdown)
+        ? data.paymentBreakdown
+        : [];
+
+    const otherPaymentsRows =
+      otherPaymentsBreakdown.length > 0
+        ? otherPaymentsBreakdown
+            .map(
+              (item) => `
+              <tr>
+                <td class="label sublabel">- ${item?.payment_method || "Other"}</td>
+                <td class="value subvalue">${money(item?.payment_amount || 0)}</td>
+              </tr>
+            `,
+            )
+            .join("")
+        : `
+          <tr>
+            <td class="label sublabel">- None</td>
+            <td class="value subvalue">${money(0)}</td>
+          </tr>
+        `;
+
     return `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8" />
-          <title>X Reading</title>
-          ${commonPrintStyles}
-        </head>
-        <body>
-          <div class="receipt">
-            <div class="center">
-              <div class="title">${posConfig.corpName}</div>
-              <div class="subtitle">${data.businessUnitName || ""}</div>
-              <div class="subtitle">${data.businessUnitAddress || ""}</div>
-              <div class="subtitle">${data.tinLabel || ""}</div>
-              <div class="subtitle">MIN: ${posConfig.machineNumber}</div>
-              <div class="subtitle">S/N: ${posConfig.serialNumber}</div>
-              <div class="subtitle">PTU No: ${posConfig.ptuNumber}</div>
-              <div class="subtitle">PTU Date Issued: ${posConfig.ptuDateIssued}</div>
-              <div class="title" style="margin-top:8px;">X-READING</div>
-            </div>
-
-            <div class="line"></div>
-            <table>
-              <tr><td class="label">Report Date</td><td class="value">${data.reportDate || ""}</td></tr>
-              <tr><td class="label">Report Time</td><td class="value">${data.reportTime || ""}</td></tr>
-              <tr><td class="label">Start Date/Time</td><td class="value">${data.startDateTime || ""}</td></tr>
-              <tr><td class="label">End Date/Time</td><td class="value">${data.endDateTime || ""}</td></tr>
-              <tr><td class="label">Cashier</td><td class="value">${data.cashier || ""}</td></tr>
-              <tr><td class="label">Beg. INV.</td><td class="value">${data.begOR || ""}</td></tr>
-              <tr><td class="label">End INV.</td><td class="value">${data.endOR || ""}</td></tr>
-            </table>
-
-            <div class="line"></div>
-            <div class="strong">PAYMENTS</div>
-            <table>
-              <tr><td class="label">Opening Fund</td><td class="value">${money(data.openingFund)}</td></tr>
-              <tr><td class="label">Cash</td><td class="value">${money(data.cash)}</td></tr>
-              <tr><td class="label">Cheque</td><td class="value">${money(data.cheque)}</td></tr>
-              <tr><td class="label">Credit Card</td><td class="value">${money(data.creditCard)}</td></tr>
-              <tr><td class="label">Other Payments</td><td class="value">${money(data.otherPayments)}</td></tr>
-              <tr><td class="label strong">Total Payments</td><td class="value strong">${money(data.totalPayments)}</td></tr>
-              <tr><td class="label">Void</td><td class="value">${money(data.void)}</td></tr>
-              <tr><td class="label">Refund</td><td class="value">${money(data.refund)}</td></tr>
-              <tr><td class="label">Withdrawal</td><td class="value">${money(data.withdrawal)}</td></tr>
-            </table>
-
-            <div class="line"></div>
-            <div class="strong">SUMMARY</div>
-            <table>
-              <tr><td class="label">Cash In Drawer</td><td class="value">${money(data.summaryCashInDrawer)}</td></tr>
-              <tr><td class="label">Cheque</td><td class="value">${money(data.summaryCheque)}</td></tr>
-              <tr><td class="label">Credit Card</td><td class="value">${money(data.summaryCreditCard)}</td></tr>
-              <tr><td class="label">Other Payments</td><td class="value">${money(data.summaryOtherPayments)}</td></tr>
-              <tr><td class="label">Opening Fund</td><td class="value">${money(data.summaryOpeningFund)}</td></tr>
-              <tr><td class="label">Withdrawal</td><td class="value">${money(data.summaryWithdrawal)}</td></tr>
-              <tr><td class="label">Payments Received</td><td class="value">${money(data.summaryPaymentsReceived)}</td></tr>
-              <tr><td class="label strong">Short / Over</td><td class="value strong">${money(data.summaryShortOver)}</td></tr>
-            </table>
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>X Reading</title>
+        ${commonPrintStyles}
+        <style>
+          .sublabel {
+            padding-left: 14px;
+            font-size: 11px;
+          }
+          .subvalue {
+            font-size: 11px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="receipt">
+          <div class="center">
+            <div class="title">${posConfig.corpName}</div>
+            <div class="subtitle">${data.businessUnitName || ""}</div>
+            <div class="subtitle">${data.businessUnitAddress || ""}</div>
+            <div class="subtitle">${data.tinLabel || ""}</div>
+            <div class="subtitle">MIN: ${posConfig.machineNumber}</div>
+            <div class="subtitle">S/N: ${posConfig.serialNumber}</div>
+            <div class="subtitle">PTU No: ${posConfig.ptuNumber}</div>
+            <div class="subtitle">PTU Date Issued: ${posConfig.ptuDateIssued}</div>
+            <div class="title" style="margin-top:8px;">X-READING</div>
           </div>
-        </body>
-      </html>
-    `;
+
+          <div class="line"></div>
+          <table>
+            <tr><td class="label">Report Date</td><td class="value">${data.reportDate || ""}</td></tr>
+            <tr><td class="label">Report Time</td><td class="value">${data.reportTime || ""}</td></tr>
+            <tr><td class="label">Start Date/Time</td><td class="value">${data.startDateTime || ""}</td></tr>
+            <tr><td class="label">End Date/Time</td><td class="value">${data.endDateTime || ""}</td></tr>
+            <tr><td class="label">Cashier</td><td class="value">${data.cashier || ""}</td></tr>
+            <tr><td class="label">Beg. INV.</td><td class="value">${data.begOR || ""}</td></tr>
+            <tr><td class="label">End INV.</td><td class="value">${data.endOR || ""}</td></tr>
+          </table>
+
+          <div class="line"></div>
+          <div class="strong">PAYMENTS</div>
+          <table>
+            <tr><td class="label">Opening Fund</td><td class="value">${money(data.openingFund)}</td></tr>
+            <tr><td class="label">Cash</td><td class="value">${money(data.cash)}</td></tr>
+            <tr><td class="label">Cheque</td><td class="value">${money(data.cheque)}</td></tr>
+            <tr><td class="label">Credit Card</td><td class="value">${money(data.creditCard)}</td></tr>
+            <tr><td class="label">Other Payments</td><td class="value">${money(data.otherPaymentsTotal ?? data.otherPayments)}</td></tr>
+            ${otherPaymentsRows}
+            <tr><td class="label strong">Total Payments</td><td class="value strong">${money(data.totalPayments)}</td></tr>
+            <tr><td class="label">Void</td><td class="value">${money(data.void)}</td></tr>
+            <tr><td class="label">Refund</td><td class="value">${money(data.refund)}</td></tr>
+            <tr><td class="label">Withdrawal</td><td class="value">${money(data.withdrawal)}</td></tr>
+          </table>
+
+          <div class="line"></div>
+          <div class="strong">SUMMARY</div>
+          <table>
+            <tr><td class="label">Cash In Drawer</td><td class="value">${money(data.summaryCashInDrawer)}</td></tr>
+            <tr><td class="label">Cheque</td><td class="value">${money(data.summaryCheque)}</td></tr>
+            <tr><td class="label">Credit Card</td><td class="value">${money(data.summaryCreditCard)}</td></tr>
+            <tr><td class="label">Other Payments</td><td class="value">${money(data.summaryOtherPayments)}</td></tr>
+            <tr><td class="label">Opening Fund</td><td class="value">${money(data.summaryOpeningFund)}</td></tr>
+            <tr><td class="label">Withdrawal</td><td class="value">${money(data.summaryWithdrawal)}</td></tr>
+            <tr><td class="label">Payments Received</td><td class="value">${money(data.summaryPaymentsReceived)}</td></tr>
+            <tr><td class="label strong">Short / Over</td><td class="value strong">${money(data.summaryShortOver)}</td></tr>
+          </table>
+        </div>
+      </body>
+    </html>
+  `;
   };
 
   const buildZPrintHtml = (data) => {
