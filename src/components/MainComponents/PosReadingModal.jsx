@@ -458,12 +458,12 @@ export default function PosReadingModal({
 
       const payload = {
         ...result.data,
-        corpName: result.data?.corpName || corpName,
-        machineNumber: result.data?.machineNumber || "10000000001",
-        serialNumber: result.data?.serialNumber || "20000000001",
-        terminalNumber: result.data?.terminalNumber || terminalNumber || "1",
-        ptuNumber: result.data?.ptuNumber || "00000000-000-0000000-00000",
-        ptuDateIssued: result.data?.ptuDateIssued || "01/01/2023",
+        corpName: posConfig.corpName ,
+        machineNumber: posConfig.machineNumber || "10000000001",
+        serialNumber: posConfig.serialNumber || "10000000001",
+        terminalNumber: posConfig.terminalNumber || "1",
+        ptuNumber: posConfig.ptuNumber || "00000000-000-0000000-00000",
+        ptuDateIssued: posConfig.ptuDateIssued || "01/01/2023",
         summaryCashInDrawer: Number(values.cashDrawerAmount || 0),
         cashInDrawer: Number(values.cashDrawerAmount || 0),
         vatExemption:
