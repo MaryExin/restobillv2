@@ -2871,11 +2871,22 @@ const CartList = ({
                   </span>
                   <input
                     type="number"
-                    min="1"
+                    min="0"
                     value={item.quantity}
+                    onFocus={(e) => e.target.select()}
                     onChange={(e) =>
                       updateQuantityByInput?.(item.code, e.target.value)
                     }
+                    onBlur={(e) => {
+                      const value = e.target.value.trim();
+                      if (
+                        value === "" ||
+                        Number(value) <= 0 ||
+                        Number.isNaN(Number(value))
+                      ) {
+                        updateQuantityByInput?.(item.code, "1");
+                      }
+                    }}
                     className={`w-20 rounded-lg px-3 py-2 text-sm outline-none transition-colors ${
                       isDark
                         ? "bg-slate-900 border border-white/10 text-white focus:border-blue-500/50"
