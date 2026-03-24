@@ -1761,15 +1761,6 @@ const InputPaymentsModal = ({
                 <button
                   type="button"
                   disabled={readOnly || payments.length === 0}
-                  onClick={setExactAmountForActiveRow}
-                  className="rounded-xl bg-emerald-600 px-4 py-3 text-xs font-black text-gray-100 transition hover:bg-emerald-500 disabled:opacity-50"
-                >
-                  Exact
-                </button>
-
-                <button
-                  type="button"
-                  disabled={readOnly || payments.length === 0}
                   onClick={clearAmountForActiveRow}
                   className={`rounded-xl px-4 py-3 text-xs font-black transition disabled:opacity-50 ${
                     isDark
@@ -1797,6 +1788,14 @@ const InputPaymentsModal = ({
                   ₱{amount.toLocaleString("en-PH")}
                 </button>
               ))}
+              <button
+                type="button"
+                disabled={readOnly || payments.length === 0}
+                onClick={setExactAmountForActiveRow}
+                className="rounded-2xl bg-emerald-500 col-span-2 px-8 py-5 text-lg font-black tracking-wide text-emerald-100 shadow-lg transition hover:bg-emerald-700 disabled:opacity-50"
+              >
+                Exact
+              </button>
             </div>
           </div>
 

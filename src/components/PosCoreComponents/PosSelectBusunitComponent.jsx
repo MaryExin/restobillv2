@@ -922,7 +922,7 @@ const PosSelectBusunitComponent = () => {
                 </h1>
               </div>
 
-              <button
+              {/* <button
                 type="button"
                 onClick={() => {
                   setActiveCrudTab("category");
@@ -931,7 +931,7 @@ const PosSelectBusunitComponent = () => {
                 className="rounded-2xl bg-white/10 px-4 py-2 text-sm font-bold text-gray-100 backdrop-blur-md transition hover:bg-white/15"
               >
                 Manage Data
-              </button>
+              </button> */}
             </div>
           </div>
 
