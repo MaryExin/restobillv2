@@ -92,7 +92,7 @@ const CustomCalendar = ({
       ref={calendarRef}
       className="absolute left-0 top-full z-[100005] mt-2 w-[320px] rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl"
     >
-      <div className="mb-4 flex items-center justify-between px-1">
+      <div className="flex items-center justify-between px-1 mb-4">
         <h4 className="text-lg font-semibold text-slate-900">
           {monthNames[currentView.getMonth()]} {currentView.getFullYear()}
         </h4>
@@ -109,7 +109,7 @@ const CustomCalendar = ({
                 ),
               );
             }}
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition hover:bg-slate-200"
+            className="flex items-center justify-center w-8 h-8 transition rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200"
           >
             <FaChevronLeft size={10} />
           </button>
@@ -125,7 +125,7 @@ const CustomCalendar = ({
                 ),
               );
             }}
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition hover:bg-slate-200"
+            className="flex items-center justify-center w-8 h-8 transition rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200"
           >
             <FaChevronRight size={10} />
           </button>
@@ -311,10 +311,10 @@ const HourlySalesModal = ({ isOpen, onClose }) => {
   return (
     <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-slate-900/35 p-3 backdrop-blur-md">
       <div className="relative flex h-[97vh] w-full max-w-[99%] flex-col overflow-hidden rounded-[32px] border border-slate-200 bg-[#f8fafc] shadow-[0_30px_90px_rgba(15,23,42,0.18)]">
-        <div className="shrink-0 border-b border-slate-200 bg-white px-8 py-6">
+        <div className="px-8 py-6 bg-white border-b shrink-0 border-slate-200">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-4">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-white">
+              <div className="flex items-center justify-center text-white bg-blue-600 h-14 w-14 rounded-2xl">
                 {viewMode === "general" ? <FaClock size={22} /> : <FaBox size={22} />}
               </div>
 
@@ -329,8 +329,8 @@ const HourlySalesModal = ({ isOpen, onClose }) => {
                     : "Hourly Product Sales"}
                 </h2>
 
-                <div className="mt-3 inline-flex items-center gap-3 rounded-full border border-blue-100 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700">
-                  <span>Sta. Maria</span>
+                <div className="inline-flex items-center gap-3 px-4 py-2 mt-3 text-sm font-medium text-blue-700 border border-blue-100 rounded-full bg-blue-50">
+                  <span>Report Date</span>
                   <FaArrowRight size={9} />
                   <span>{dateFrom}</span>
                   <FaArrowRight size={9} />
@@ -344,7 +344,7 @@ const HourlySalesModal = ({ isOpen, onClose }) => {
                 onClick={() =>
                   setViewMode(viewMode === "general" ? "product" : "general")
                 }
-                className="flex h-11 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                className="flex items-center gap-2 px-4 text-sm font-semibold transition bg-white border h-11 rounded-2xl border-slate-200 text-slate-700 hover:bg-slate-100"
               >
                 <FaTable className="text-blue-500" size={13} />
                 {viewMode === "general" ? "Product View" : "General View"}
@@ -352,7 +352,7 @@ const HourlySalesModal = ({ isOpen, onClose }) => {
 
               <button
                 onClick={exportToExcel}
-                className="flex h-11 items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-600 hover:text-white"
+                className="flex items-center gap-2 px-4 text-sm font-semibold transition border h-11 rounded-2xl border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white"
               >
                 <FaFileExcel size={14} />
                 Export Excel
@@ -360,7 +360,7 @@ const HourlySalesModal = ({ isOpen, onClose }) => {
 
               <button
                 onClick={onClose}
-                className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 transition hover:bg-rose-500 hover:text-white"
+                className="flex items-center justify-center transition bg-white border h-11 w-11 rounded-2xl border-slate-200 text-slate-500 hover:bg-rose-500 hover:text-white"
               >
                 <FaTimes size={16} />
               </button>
@@ -368,12 +368,12 @@ const HourlySalesModal = ({ isOpen, onClose }) => {
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center justify-between gap-4 bg-slate-100/70 px-8 py-4">
+        <div className="flex items-center justify-between gap-4 px-8 py-4 shrink-0 bg-slate-100/70">
           {viewMode === "product" ? (
             <div className="flex flex-1 gap-3">
-              <div className="relative max-w-sm flex-1">
+              <div className="relative flex-1 max-w-sm">
                 <FaSearch
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                  className="absolute -translate-y-1/2 left-4 top-1/2 text-slate-400"
                   size={13}
                 />
                 <input
@@ -381,14 +381,14 @@ const HourlySalesModal = ({ isOpen, onClose }) => {
                   placeholder="Search product or code..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="h-12 w-full rounded-2xl border border-slate-200 bg-white pl-11 pr-4 text-sm font-medium text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-500"
+                  className="w-full h-12 pr-4 text-sm font-medium transition bg-white border outline-none rounded-2xl border-slate-200 pl-11 text-slate-700 placeholder:text-slate-400 focus:border-blue-500"
                 />
               </div>
 
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-500"
+                className="px-4 text-sm font-medium transition bg-white border outline-none rounded-2xl border-slate-200 text-slate-700 focus:border-blue-500"
               >
                 {categories.map((cat) => (
                   <option key={cat} value={cat}>
@@ -406,14 +406,14 @@ const HourlySalesModal = ({ isOpen, onClose }) => {
           <div className="flex gap-3">
             <button
               onClick={fetchData}
-              className="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
+              className="flex items-center justify-center w-12 h-12 transition bg-white border rounded-2xl border-slate-200 text-slate-600 hover:bg-slate-50"
             >
               <FaSyncAlt className={loading ? "animate-spin" : ""} size={15} />
             </button>
 
             <button
               onClick={() => setShowFilter(true)}
-              className="flex h-12 items-center gap-2 rounded-2xl bg-blue-600 px-5 text-sm font-semibold text-white transition hover:bg-blue-700"
+              className="flex items-center h-12 gap-2 px-5 text-sm font-semibold text-white transition bg-blue-600 rounded-2xl hover:bg-blue-700"
             >
               <FaCalendarAlt size={13} />
               Filters
@@ -421,7 +421,7 @@ const HourlySalesModal = ({ isOpen, onClose }) => {
           </div>
         </div>
 
-        <div className="flex-1 overflow-hidden px-8 py-5">
+        <div className="flex-1 px-8 py-5 overflow-hidden">
           <div className="custom-scrollbar relative h-full overflow-auto rounded-[28px] border border-slate-200 bg-white">
             <table className="w-full min-w-[2000px] border-separate border-spacing-0 text-left">
               <thead className="sticky top-0 z-[50]">
@@ -459,7 +459,7 @@ const HourlySalesModal = ({ isOpen, onClose }) => {
                           </span>
                         ) : (
                           <div className="flex flex-col">
-                            <span className="truncate font-semibold text-slate-900">
+                            <span className="font-semibold truncate text-slate-900">
                               {item["Product Name"]}
                             </span>
                             <span className="text-xs text-slate-500">
@@ -469,7 +469,7 @@ const HourlySalesModal = ({ isOpen, onClose }) => {
                         )}
                       </td>
 
-                      <td className="border-r border-slate-100 bg-slate-50/50 p-4 text-center text-sm font-semibold text-slate-900">
+                      <td className="p-4 text-sm font-semibold text-center border-r border-slate-100 bg-slate-50/50 text-slate-900">
                         {viewMode === "general"
                           ? peso(item["Total Sales"] || 0)
                           : Number(item.TOTAL || 0).toLocaleString()}
@@ -495,7 +495,7 @@ const HourlySalesModal = ({ isOpen, onClose }) => {
                   <tr>
                     <td
                       colSpan={26}
-                      className="p-16 text-center text-sm text-slate-400"
+                      className="p-16 text-sm text-center text-slate-400"
                     >
                       No records found.
                     </td>
@@ -506,7 +506,7 @@ const HourlySalesModal = ({ isOpen, onClose }) => {
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center justify-between border-t border-slate-200 bg-white px-8 py-5">
+        <div className="flex items-center justify-between px-8 py-5 bg-white border-t shrink-0 border-slate-200">
           <div className="flex items-center gap-8">
             <div>
               <p className="text-xs font-medium text-slate-400">Rows</p>
@@ -515,15 +515,15 @@ const HourlySalesModal = ({ isOpen, onClose }) => {
               </p>
             </div>
 
-            <div className="h-10 w-px bg-slate-200" />
+            <div className="w-px h-10 bg-slate-200" />
 
             <div>
-              <p className="text-xs font-medium text-slate-400">Store</p>
-              <p className="text-2xl font-bold text-blue-600">Sta. Maria</p>
+              <p className="text-xs font-medium text-slate-400">Hourly</p>
+              <p className="text-2xl font-bold text-blue-600">Sales</p>
             </div>
           </div>
 
-          <div className="rounded-2xl bg-blue-600 px-7 py-4 text-right shadow-lg">
+          <div className="py-4 text-right bg-blue-600 shadow-lg rounded-2xl px-7">
             <span className="text-xs font-medium text-white/70">
               Active View
             </span>
@@ -535,12 +535,12 @@ const HourlySalesModal = ({ isOpen, onClose }) => {
 
         {showFilter && (
           <div className="absolute inset-y-0 right-0 z-[100001] flex w-[420px] flex-col border-l border-slate-200 bg-white p-8 shadow-2xl">
-            <div className="mb-8 flex shrink-0 items-center justify-between">
+            <div className="flex items-center justify-between mb-8 shrink-0">
               <h3 className="text-2xl font-bold text-slate-900">Filters</h3>
 
               <button
                 onClick={() => setShowFilter(false)}
-                className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500 transition hover:text-rose-500"
+                className="flex items-center justify-center w-10 h-10 transition rounded-xl bg-slate-100 text-slate-500 hover:text-rose-500"
               >
                 <FaTimes size={16} />
               </button>
@@ -548,7 +548,7 @@ const HourlySalesModal = ({ isOpen, onClose }) => {
 
             <div className="flex-1 space-y-6">
               <div className="relative">
-                <label className="mb-2 block text-sm font-medium text-slate-600">
+                <label className="block mb-2 text-sm font-medium text-slate-600">
                   From
                 </label>
 
@@ -557,7 +557,7 @@ const HourlySalesModal = ({ isOpen, onClose }) => {
                     setOpenStartCal(!openStartCal);
                     setOpenEndCal(false);
                   }}
-                  className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left text-slate-700 transition"
+                  className="flex items-center justify-between w-full px-4 py-3 text-left transition border rounded-2xl border-slate-200 bg-slate-50 text-slate-700"
                 >
                   <span className="font-medium">{dateFrom}</span>
                   <FaChevronDown className="text-slate-400" size={12} />
@@ -572,7 +572,7 @@ const HourlySalesModal = ({ isOpen, onClose }) => {
               </div>
 
               <div className="relative">
-                <label className="mb-2 block text-sm font-medium text-slate-600">
+                <label className="block mb-2 text-sm font-medium text-slate-600">
                   To
                 </label>
 
@@ -581,7 +581,7 @@ const HourlySalesModal = ({ isOpen, onClose }) => {
                     setOpenEndCal(!openEndCal);
                     setOpenStartCal(false);
                   }}
-                  className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left text-slate-700 transition"
+                  className="flex items-center justify-between w-full px-4 py-3 text-left transition border rounded-2xl border-slate-200 bg-slate-50 text-slate-700"
                 >
                   <span className="font-medium">{dateTo}</span>
                   <FaChevronDown className="text-slate-400" size={12} />

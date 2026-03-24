@@ -398,7 +398,7 @@ const TransactionsModal = ({ isOpen, onClose }) => {
                 Transaction <span className="text-[#3b82f6]">Records</span>
               </h2>
               <p className="mt-1 text-[9px] font-black uppercase text-slate-500 tracking-widest">
-                CNC - STA MARIA | System Data
+                Branch | System Data
               </p>
             </div>
           </div>
