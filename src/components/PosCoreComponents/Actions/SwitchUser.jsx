@@ -267,15 +267,13 @@ const SwitchUser = () => {
 
   return (
     <>
-      <div className="flex flex-col gap-2">
-        <PosQuickActionTile
-          label="Switch Users"
-          icon={<FaUsers className="text-[28px] sm:text-[30px]" />}
-          color="indigo"
-          disabled={isClosed}
-          onClick={() => !isClosed && setOpen(true)}
-        />
-      </div>
+      <PosQuickActionTile
+        label="Switch Users"
+        icon={<FaUsers className="text-[28px] sm:text-[30px]" />}
+        color="indigo"
+        disabled={isClosed}
+        onClick={() => !isClosed && setOpen(true)}
+      />
 
       {!passwordModalOpen && !isSuccessModalOpen && (
         <PosModal
