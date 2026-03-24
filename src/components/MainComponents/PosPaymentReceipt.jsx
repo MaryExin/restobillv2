@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 
 const peso = (value) =>
   Number(value || 0).toLocaleString("en-PH", {
@@ -18,9 +18,121 @@ const PosPaymentReceipt = React.forwardRef(
       otherCharges = [],
       customerCards = [],
       isDuplicateCopy = false,
+      apiHost = "",
+      categoryCode = "",
+      unitCode = "",
+      terminalNumber = "",
+      corpName = "",
     },
     ref,
   ) => {
+    const [terminalConfig, setTerminalConfig] = useState({
+      categoryCode: categoryCode || transaction?.Category_Code || "",
+      unitCode: unitCode || transaction?.Unit_Code || "",
+      businessUnitName: "",
+      terminalNumber: terminalNumber || transaction?.terminal_number || "1",
+      corpName: corpName || transaction?.corp_name || "",
+      machineNumber: "",
+      serialNumber: "",
+      ptuNumber: "",
+      ptuDateIssued: "",
+    });
+
+    useEffect(() => {
+      if (!apiHost) return;
+
+      let isMounted = true;
+
+      const loadTerminalConfig = async () => {
+        try {
+          const params = new URLSearchParams({
+            unitCode: unitCode || transaction?.Unit_Code || "",
+            terminalNumber:
+              terminalNumber || transaction?.terminal_number || "1",
+            categoryCode: categoryCode || transaction?.Category_Code || "",
+          });
+
+          const response = await fetch(
+            `${apiHost}/api/read_pos_terminal_config.php?${params.toString()}`,
+            {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json",
+              },
+            },
+          );
+
+          const result = await response.json();
+
+          if (!isMounted) return;
+
+          if (!response.ok || !result.success) {
+            throw new Error(
+              result?.message || "Failed to load POS terminal configuration.",
+            );
+          }
+
+          const cfg = result.data || {};
+
+          setTerminalConfig({
+            categoryCode: String(
+              cfg.categoryCode ??
+                categoryCode ??
+                transaction?.Category_Code ??
+                "",
+            ),
+            unitCode: String(
+              cfg.unitCode ?? unitCode ?? transaction?.Unit_Code ?? "",
+            ),
+            businessUnitName: String(cfg.businessUnitName ?? ""),
+            terminalNumber: String(
+              cfg.terminalNumber ??
+                terminalNumber ??
+                transaction?.terminal_number ??
+                "1",
+            ),
+            corpName: String(
+              cfg.corpName ?? corpName ?? transaction?.corp_name ?? "",
+            ),
+            machineNumber: String(cfg.machineNumber ?? ""),
+            serialNumber: String(cfg.serialNumber ?? ""),
+            ptuNumber: String(cfg.ptuNumber ?? ""),
+            ptuDateIssued: String(cfg.ptuDateIssued ?? ""),
+          });
+        } catch (error) {
+          if (!isMounted) return;
+
+          setTerminalConfig((prev) => ({
+            ...prev,
+            categoryCode:
+              categoryCode || transaction?.Category_Code || prev.categoryCode,
+            unitCode: unitCode || transaction?.Unit_Code || prev.unitCode,
+            terminalNumber:
+              terminalNumber ||
+              transaction?.terminal_number ||
+              prev.terminalNumber,
+            corpName: corpName || transaction?.corp_name || prev.corpName,
+          }));
+        }
+      };
+
+      loadTerminalConfig();
+
+      return () => {
+        isMounted = false;
+      };
+    }, [
+      apiHost,
+      categoryCode,
+      unitCode,
+      terminalNumber,
+      corpName,
+      transaction?.Category_Code,
+      transaction?.Unit_Code,
+      transaction?.terminal_number,
+      transaction?.corp_name,
+    ]);
+
     const paymentLabel =
       payments.length > 0
         ? [
@@ -79,13 +191,18 @@ const PosPaymentReceipt = React.forwardRef(
           <div
             style={{ fontWeight: "900", fontSize: "15px", lineHeight: 1.15 }}
           >
-            {String("CRABS N CRACK SEAFOOD HOUSE").toUpperCase()}
+            {String(
+              terminalConfig.corpName || "CRABS N CRACK SEAFOOD HOUSE",
+            ).toUpperCase()}
           </div>
+
           <div
             style={{ fontWeight: "700", fontSize: "12px", marginTop: "2px" }}
           >
-            AND SHAKING CRABS - STA. MARIA
+            {terminalConfig.businessUnitName ||
+              "AND SHAKING CRABS - STA. MARIA"}
           </div>
+
           <div style={{ fontWeight: "700", fontSize: "12px" }}>
             ARU FOOD CORP.
           </div>
@@ -95,8 +212,14 @@ const PosPaymentReceipt = React.forwardRef(
           </div>
           <div style={{ fontSize: "10px" }}>BULACAN</div>
           <div style={{ fontSize: "10px" }}>VAT REG TIN: 634-742-586-00012</div>
-          <div style={{ fontSize: "10px" }}>MIN:</div>
-          <div style={{ fontSize: "10px" }}>S/N:</div>
+
+          <div style={{ fontSize: "10px" }}>
+            MIN: {terminalConfig.machineNumber || "-"}
+          </div>
+          <div style={{ fontSize: "10px" }}>
+            S/N: {terminalConfig.serialNumber || "-"}
+          </div>
+         
         </div>
 
         <div style={{ borderTop: "1px solid #000", margin: "10px 0 8px" }} />
@@ -168,7 +291,9 @@ const PosPaymentReceipt = React.forwardRef(
                 Terminal No.:
               </td>
               <td style={{ textAlign: "right", padding: "1px 0" }}>
-                {transaction?.terminal_number || "-"}
+                {transaction?.terminal_number ||
+                  terminalConfig.terminalNumber ||
+                  "-"}
               </td>
             </tr>
             <tr>
