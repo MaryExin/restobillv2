@@ -1,6 +1,7 @@
 import React from "react";
 import { createPortal } from "react-dom";
 import { FiX } from "react-icons/fi";
+import { useTheme } from "../../../context/ThemeContext";
 
 const PosModal = ({
   open,
@@ -19,6 +20,9 @@ const PosModal = ({
   showCloseButton = false,
   closeOnBackdrop = true,
 }) => {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+
   if (!open) return null;
 
   const handleFieldChange = (name, value) => {
@@ -51,21 +55,33 @@ const PosModal = ({
 
           const baseInputStyles = `w-full rounded-[20px] border px-5 text-[16px] outline-none shadow-sm transition-all ${
             disabled
-              ? "border-gray-200 bg-gray-100 text-gray-400"
-              : "border-[#f0b06b] bg-white text-gray-700 focus:ring-2 focus:ring-[#f0b06b]/20"
+              ? isDark
+                ? "border-slate-700 bg-slate-800 text-slate-500"
+                : "border-gray-200 bg-gray-100 text-gray-400"
+              : isDark
+                ? "border-slate-700 bg-slate-900 text-slate-100 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                : "border-[#f0b06b] bg-white text-gray-700 focus:ring-2 focus:ring-[#f0b06b]/20"
           } ${icon ? "pl-12" : ""}`;
 
           return (
             <div key={name || index} className="flex flex-col">
               {label && (
-                <label className="mb-2 ml-1 block text-[16px] font-semibold text-[#2e4a7d]">
+                <label
+                  className={`mb-2 ml-1 block text-[16px] font-semibold ${
+                    isDark ? "text-slate-200" : "text-[#2e4a7d]"
+                  }`}
+                >
                   {label}
                 </label>
               )}
 
               <div className="relative">
                 {icon && (
-                  <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-lg text-[#4d8df7]">
+                  <div
+                    className={`pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-lg ${
+                      isDark ? "text-blue-400" : "text-[#4d8df7]"
+                    }`}
+                  >
                     {icon}
                   </div>
                 )}
@@ -96,7 +112,11 @@ const PosModal = ({
                     readOnly={readOnly}
                     onChange={(e) => handleFieldChange(name, e.target.value)}
                     onDoubleClick={onDoubleClick}
-                    className={`${baseInputStyles} min-h-[180px] py-4 resize-none placeholder:text-gray-300`}
+                    className={`${baseInputStyles} min-h-[180px] py-4 resize-none ${
+                      isDark
+                        ? "placeholder:text-slate-500"
+                        : "placeholder:text-gray-300"
+                    }`}
                   />
                 ) : (
                   <input
@@ -107,7 +127,11 @@ const PosModal = ({
                     readOnly={readOnly}
                     onChange={(e) => handleFieldChange(name, e.target.value)}
                     onDoubleClick={onDoubleClick}
-                    className={`${baseInputStyles} h-[58px] placeholder:text-gray-300`}
+                    className={`${baseInputStyles} h-[58px] ${
+                      isDark
+                        ? "placeholder:text-slate-500"
+                        : "placeholder:text-gray-300"
+                    }`}
                   />
                 )}
               </div>
@@ -120,11 +144,17 @@ const PosModal = ({
 
   const modalContent = (
     <div
-      className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/30 backdrop-blur-[2px] p-4"
+      className={`fixed inset-0 z-[99999] flex items-center justify-center p-4 backdrop-blur-[2px] ${
+        isDark ? "bg-black/60" : "bg-black/30"
+      }`}
       onClick={handleBackdropClick}
     >
       <div
-        className={`relative flex w-full flex-col overflow-hidden rounded-[24px] border border-white/50 bg-[#e9edf4] shadow-[0_20px_60px_rgba(0,0,0,0.2)] ${width} ${height} ${contentClassName}`}
+        className={`relative flex w-full flex-col overflow-hidden rounded-[24px] border shadow-[0_20px_60px_rgba(0,0,0,0.2)] ${
+          isDark
+            ? "border-slate-700 bg-slate-900"
+            : "border-white/50 bg-[#e9edf4]"
+        } ${width} ${height} ${contentClassName}`}
       >
         {(title || subtitle || showCloseButton) && (
           <div className="relative flex-shrink-0 px-8 pt-8 pb-4">
@@ -132,20 +162,32 @@ const PosModal = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="absolute grid w-10 h-10 transition rounded-full shadow-sm right-6 top-6 place-items-center bg-white/80 text-slate-600 hover:bg-white hover:text-red-500"
+                className={`absolute right-6 top-6 grid h-10 w-10 place-items-center rounded-full shadow-sm transition ${
+                  isDark
+                    ? "bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-red-400"
+                    : "bg-white/80 text-slate-600 hover:bg-white hover:text-red-500"
+                }`}
               >
                 <FiX className="text-[20px]" />
               </button>
             )}
 
             {title && (
-              <h2 className="text-center text-[24px] font-bold text-[#2e4a7d] md:text-[30px]">
+              <h2
+                className={`text-center text-[24px] font-bold md:text-[30px] ${
+                  isDark ? "text-slate-100" : "text-[#2e4a7d]"
+                }`}
+              >
                 {title}
               </h2>
             )}
 
             {subtitle && (
-              <p className="mt-2 text-center text-[14px] text-slate-500">
+              <p
+                className={`mt-2 text-center text-[14px] ${
+                  isDark ? "text-slate-400" : "text-slate-500"
+                }`}
+              >
                 {subtitle}
               </p>
             )}
@@ -153,7 +195,9 @@ const PosModal = ({
         )}
 
         <div
-          className={`min-h-0 flex-1 overflow-y-auto px-8 pb-6 ${bodyClassName}`}
+          className={`min-h-0 flex-1 overflow-y-auto px-8 pb-6 ${
+            isDark ? "text-slate-200" : ""
+          } ${bodyClassName}`}
         >
           {children ? children : renderFields()}
         </div>
@@ -174,16 +218,20 @@ const PosModal = ({
 
                 const getVariantClasses = () => {
                   if (disabled || loading) {
-                    return "bg-gray-300 text-white cursor-not-allowed";
+                    return isDark
+                      ? "bg-slate-700 text-slate-400 cursor-not-allowed"
+                      : "bg-gray-300 text-white cursor-not-allowed";
                   }
 
                   switch (variant) {
                     case "secondary":
-                      return "bg-blue-600 text-white shadow-md hover:scale-[1.02]";
+                      return isDark
+                        ? "bg-slate-700 text-white shadow-md hover:bg-slate-600 hover:scale-[1.02]"
+                        : "bg-blue-600 text-white shadow-md hover:scale-[1.02]";
                     case "danger":
                       return "bg-red-600 text-gray-100 shadow-md hover:scale-[1.02]";
                     default:
-                      return "bg-blue-600  text-white shadow-md hover:scale-[1.02]";
+                      return "bg-blue-600 text-white shadow-md hover:scale-[1.02]";
                   }
                 };
 
