@@ -567,7 +567,7 @@ function TransactionRow({ index, style, data }) {
             <button
               type="button"
               onClick={() => onVoid(row)}
-              className="inline-flex h-11 items-center justify-center rounded-2xl bg-red-600 px-4 text-sm font-bold text-white transition hover:bg-red-500"
+              className="inline-flex h-11 items-center justify-center rounded-2xl bg-red-600 px-4 text-sm font-bold text-gray-100 transition hover:bg-red-500"
               title="Void Transaction"
             >
               Void
@@ -1075,17 +1075,19 @@ export default function PosPayment() {
         <div className="relative z-10 mx-auto max-w-[1700px] px-4 py-6 md:px-6 lg:px-8">
           <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
             <div>
-            <button
-              onClick={() => navigate("/poscorehomescreen")}
-              className={`flex items-center gap-3 mt-2 px-10 py-6 rounded-full transition-all ${
-                isDark
-                  ? "bg-slate-900/50 border border-white/5 text-slate-400 hover:text-white"
-                  : "bg-white border border-slate-200 text-slate-600 hover:text-slate-900 shadow-sm"
-              }`}
-            >
-              <FaArrowLeft size={14} />
-              <span className="text-sm font-bold uppercase">BACK TO DASHBOARD</span>
-            </button>
+              <button
+                onClick={() => navigate("/poscorehomescreen")}
+                className={`flex items-center gap-3 mt-2 px-10 py-6 rounded-full transition-all ${
+                  isDark
+                    ? "bg-slate-900/50 border border-white/5 text-slate-400 hover:text-white"
+                    : "bg-white border border-slate-200 text-slate-600 hover:text-slate-900 shadow-sm"
+                }`}
+              >
+                <FaArrowLeft size={14} />
+                <span className="text-sm font-bold uppercase">
+                  BACK TO DASHBOARD
+                </span>
+              </button>
 
               <h1
                 className={`mt-2 text-3xl font-black md:text-4xl ${
@@ -1117,7 +1119,7 @@ export default function PosPayment() {
                       onClick={() => setViewMode("pending")}
                       className={`rounded-2xl px-4 py-3 text-sm font-black transition ${
                         viewMode === "pending"
-                          ? "bg-amber-500 text-white"
+                          ? "bg-amber-500 text-gray-100"
                           : isDark
                             ? "border border-slate-700 bg-slate-900 text-slate-300"
                             : "border border-slate-200 bg-slate-50 text-slate-700"
@@ -1131,7 +1133,7 @@ export default function PosPayment() {
                       onClick={() => setViewMode("paid")}
                       className={`rounded-2xl px-4 py-3 text-sm font-black transition ${
                         viewMode === "paid"
-                          ? "bg-emerald-600 text-white"
+                          ? "bg-emerald-600 text-gray-100"
                           : isDark
                             ? "border border-slate-700 bg-slate-900 text-slate-300"
                             : "border border-slate-200 bg-slate-50 text-slate-700"
@@ -1145,7 +1147,7 @@ export default function PosPayment() {
                       onClick={() => setViewMode("voided")}
                       className={`rounded-2xl px-4 py-3 text-sm font-black transition ${
                         viewMode === "voided"
-                          ? "bg-red-600 text-white"
+                          ? "bg-red-600 text-gray-100"
                           : isDark
                             ? "border border-slate-700 bg-slate-900 text-slate-300"
                             : "border border-slate-200 bg-slate-50 text-slate-700"
@@ -1159,7 +1161,7 @@ export default function PosPayment() {
                       onClick={() => setViewMode("refunded")}
                       className={`rounded-2xl px-4 py-3 text-sm font-black transition ${
                         viewMode === "refunded"
-                          ? "bg-blue-600 text-white"
+                          ? "bg-blue-600 text-gray-100"
                           : isDark
                             ? "border border-slate-700 bg-slate-900 text-slate-300"
                             : "border border-slate-200 bg-slate-50 text-slate-700"
