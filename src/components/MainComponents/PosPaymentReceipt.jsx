@@ -45,7 +45,7 @@ const PosPaymentReceipt = React.forwardRef(
           minHeight: "100vh",
           background: "#ffffff",
           color: "#000000",
-          padding: "14px 12px",
+          padding: "14px 5px",
           fontFamily: "Arial, Helvetica, sans-serif",
           fontSize: "11px",
           lineHeight: 1.25,

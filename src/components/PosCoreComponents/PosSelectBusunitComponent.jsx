@@ -1,9 +1,4 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useWindowSize } from "react-use";
@@ -150,7 +145,8 @@ function ReadBusunitManageModal({
                         Manage Categories & Business Units
                       </div>
                       <div className="mt-1 text-sm theme-muted">
-                        Hardcoded seed data removed. Live shift data is now used.
+                        Hardcoded seed data removed. Live shift data is now
+                        used.
                       </div>
                     </div>
 
@@ -683,8 +679,12 @@ const PosSelectBusunitComponent = () => {
 
   const liveDisplayInfo = useMemo(() => {
     return {
-      categoryCode: shiftDetails?.Category_Code || selectedBUData?.info?.categoryCode || "-",
-      unitCode: shiftDetails?.Unit_Code || selectedBUData?.info?.unitCode || "-",
+      categoryCode:
+        shiftDetails?.Category_Code ||
+        selectedBUData?.info?.categoryCode ||
+        "-",
+      unitCode:
+        shiftDetails?.Unit_Code || selectedBUData?.info?.unitCode || "-",
       unitName: shiftDetails?.Unit_Name || selectedBUData?.label || "-",
       shiftStatus: shiftDetails?.Shift_Status || "-",
       shiftId: shiftDetails?.Shift_ID || "-",
@@ -695,21 +695,29 @@ const PosSelectBusunitComponent = () => {
       userName: shiftDetails?.userName || firstName || "-",
       userRole: shiftDetails?.userRole || "-",
       selectedDate: shiftDetails?.selectedDate || "-",
-      businessType: shiftDetails?.Business_Type || selectedBUData?.info?.businessType || "-",
+      businessType:
+        shiftDetails?.Business_Type ||
+        selectedBUData?.info?.businessType ||
+        "-",
       tinNumber: shiftDetails?.TIN_No || selectedBUData?.info?.tinNumber || "-",
       address: shiftDetails?.Address || selectedBUData?.info?.address || "-",
-      corporation: shiftDetails?.Corp_Name || selectedBUData?.info?.corporation || "-",
+      corporation:
+        shiftDetails?.Corp_Name || selectedBUData?.info?.corporation || "-",
     };
   }, [shiftDetails, selectedBUData, firstName]);
 
   const filteredCategories = useMemo(() => {
-    const q = String(manageSearch || "").toLowerCase().trim();
+    const q = String(manageSearch || "")
+      .toLowerCase()
+      .trim();
     if (!q) return categories;
     return categories.filter((item) => item.name.toLowerCase().includes(q));
   }, [categories, manageSearch]);
 
   const filteredBusinessUnits = useMemo(() => {
-    const q = String(manageSearch || "").toLowerCase().trim();
+    const q = String(manageSearch || "")
+      .toLowerCase()
+      .trim();
     if (!q) return businessUnits;
     return businessUnits.filter(
       (item) =>
@@ -761,7 +769,10 @@ const PosSelectBusunitComponent = () => {
       return;
     }
 
-    localStorage.setItem("posBusinessCategoryCode", liveDisplayInfo.categoryCode || "");
+    localStorage.setItem(
+      "posBusinessCategoryCode",
+      liveDisplayInfo.categoryCode || "",
+    );
     localStorage.setItem("posBusinessUnitCode", liveDisplayInfo.unitCode || "");
     localStorage.setItem("posBusinessUnitName", liveDisplayInfo.unitName || "");
     localStorage.setItem("posShiftId", String(liveDisplayInfo.shiftId || ""));
@@ -906,7 +917,7 @@ const PosSelectBusunitComponent = () => {
           >
             <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
               <div>
-                <h1 className="text-xl font-extrabold tracking-tight text-white sm:text-2xl">
+                <h1 className="text-xl font-extrabold tracking-tight text-gray-100 sm:text-2xl">
                   Select Business Unit
                 </h1>
               </div>
@@ -917,7 +928,7 @@ const PosSelectBusunitComponent = () => {
                   setActiveCrudTab("category");
                   setIsReadOpen(true);
                 }}
-                className="rounded-2xl bg-white/10 px-4 py-2 text-sm font-bold text-white backdrop-blur-md transition hover:bg-white/15"
+                className="rounded-2xl bg-white/10 px-4 py-2 text-sm font-bold text-gray-100 backdrop-blur-md transition hover:bg-white/15"
               >
                 Manage Data
               </button>
@@ -1031,24 +1042,44 @@ const PosSelectBusunitComponent = () => {
                 <div className="p-5 sm:p-6">
                   <div className="space-y-4">
                     {[
-                      { label: "Category Code:", value: liveDisplayInfo.categoryCode },
+                      {
+                        label: "Category Code:",
+                        value: liveDisplayInfo.categoryCode,
+                      },
                       { label: "Unit Code:", value: liveDisplayInfo.unitCode },
                       { label: "Unit Name:", value: liveDisplayInfo.unitName },
                       {
                         label: "Shift Status:",
-                        value: isShiftLoading ? "Loading..." : liveDisplayInfo.shiftStatus,
+                        value: isShiftLoading
+                          ? "Loading..."
+                          : liveDisplayInfo.shiftStatus,
                       },
                       { label: "Shift ID:", value: liveDisplayInfo.shiftId },
-                      { label: "Opening DateTime:", value: liveDisplayInfo.openingDateTime },
-                      { label: "Closing DateTime:", value: liveDisplayInfo.closingDateTime },
+                      {
+                        label: "Opening DateTime:",
+                        value: liveDisplayInfo.openingDateTime,
+                      },
+                      {
+                        label: "Closing DateTime:",
+                        value: liveDisplayInfo.closingDateTime,
+                      },
                       { label: "Opened By:", value: liveDisplayInfo.openedBy },
                       { label: "Closed By:", value: liveDisplayInfo.closedBy },
                       { label: "User Name:", value: liveDisplayInfo.userName },
                       { label: "User Role:", value: liveDisplayInfo.userRole },
-                      { label: "Business Type:", value: liveDisplayInfo.businessType },
-                      { label: "TIN Number:", value: liveDisplayInfo.tinNumber },
+                      {
+                        label: "Business Type:",
+                        value: liveDisplayInfo.businessType,
+                      },
+                      {
+                        label: "TIN Number:",
+                        value: liveDisplayInfo.tinNumber,
+                      },
                       { label: "Address:", value: liveDisplayInfo.address },
-                      { label: "Corporation:", value: liveDisplayInfo.corporation },
+                      {
+                        label: "Corporation:",
+                        value: liveDisplayInfo.corporation,
+                      },
                     ].map((row) => (
                       <div
                         key={row.label}
