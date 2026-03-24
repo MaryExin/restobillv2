@@ -12,6 +12,8 @@ import PosSelectBusunit from "./pages/PosCore/PosSelectBusunit";
 import PosHomeScreen from "./pages/PosCore/PosHomeScreen";
 import PosPayment from "./components/MainComponents/PosPayment";
 import ProductList from "./components/MainComponents/ProductList";
+import SyncProductsAndPricing from "./components/MainComponents/SyncProductsAndPricing";
+import PrivateRoute from "./routes/PrivateRoute";
 
 const App = () => {
   return (
@@ -30,6 +32,13 @@ const App = () => {
         <Route exact path="/poscoreselectbusunit" element={<PosSelectBusunit />} />
         <Route exact path="/poscorehomescreen" element={<PosHomeScreen />} />
         <Route exact path="/payments" element={<PosPayment />} />
+        {/* Private Routes */}
+        <Route
+          path="/pricesyncing"
+          element={<PrivateRoute routename={"/pricesyncing"} />}
+        >
+          <Route path="/pricesyncing" element={<SyncProductsAndPricing />} />
+        </Route>
       </Routes>
 
       <GlobalThemeToggle />
