@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useCallback } from "react";
 import ReactDOM from "react-dom";
 import { motion } from "framer-motion";
 import { FaCheckCircle } from "react-icons/fa";
@@ -18,6 +18,26 @@ const ModalSuccessNavToSelf = ({
   const { theme } = useTheme();
 
   const isDark = theme === "dark";
+
+  const handleClose = useCallback(() => {
+    setIsModalOpen(false);
+    resetForm && resetForm();
+  }, [setIsModalOpen, resetForm]);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        handleClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [handleClose]);
 
   const modalContent = (
     <motion.div
@@ -64,11 +84,9 @@ const ModalSuccessNavToSelf = ({
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            onClick={() => {
-              setIsModalOpen(false);
-              resetForm && resetForm();
-            }}
+            onClick={handleClose}
             className="w-full rounded-2xl bg-blue-600 py-3 font-bold text-white transition hover:bg-blue-500"
+            autoFocus
           >
             {button}
           </motion.button>
