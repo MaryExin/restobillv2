@@ -36,6 +36,28 @@ const PosPaymentReceipt = React.forwardRef(
         )
       : [];
 
+    const getDiscountCountLabel = (entry) => {
+      if (entry?.key === "senior") return "Senior Citizen Discount Count:";
+      if (entry?.key === "pwd") return "PWD Discount Count:";
+      if (entry?.key === "manual") return "Manual Discount Count:";
+      return `${entry?.label || "Discount"} Count:`;
+    };
+
+    const getDiscountAmountLabel = (entry) => {
+      if (entry?.key === "senior") return "Senior Citizen Discount Amount:";
+      if (entry?.key === "pwd") return "PWD Discount Amount:";
+      if (entry?.key === "manual") return "Manual Discount Amount:";
+      return `${entry?.label || "Discount"} Amount:`;
+    };
+
+    const shouldShowDiscountSummary =
+      Number(computed?.safeCustomerCount || 0) > 0 ||
+      Number(
+        computed?.totalQualifiedCount || computed?.totalQualifiedAll || 0,
+      ) > 0 ||
+      Number(computed?.statutoryQualifiedCount || 0) > 0 ||
+      activeBreakdown.length > 0;
+
     return (
       <div
         ref={ref}
@@ -370,6 +392,95 @@ const PosPaymentReceipt = React.forwardRef(
           </tbody>
         </table>
 
+        {shouldShowDiscountSummary ? (
+          <>
+            <div
+              style={{ borderTop: "1px solid #000", margin: "10px 0 8px" }}
+            />
+
+            <table
+              style={{
+                width: "100%",
+                fontSize: "10px",
+                borderCollapse: "collapse",
+              }}
+            >
+              <tbody>
+                <tr>
+                  <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                    Total Customers:
+                  </td>
+                  <td style={{ textAlign: "right", padding: "1px 0" }}>
+                    {Number(computed?.safeCustomerCount || 0)}
+                  </td>
+                </tr>
+
+                <tr>
+                  <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                    Total Qualified:
+                  </td>
+                  <td style={{ textAlign: "right", padding: "1px 0" }}>
+                    {Number(
+                      computed?.totalQualifiedCount ||
+                        computed?.totalQualifiedAll ||
+                        0,
+                    )}
+                  </td>
+                </tr>
+
+                <tr>
+                  <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                    Statutory Qualified:
+                  </td>
+                  <td style={{ textAlign: "right", padding: "1px 0" }}>
+                    {Number(computed?.statutoryQualifiedCount || 0)}
+                  </td>
+                </tr>
+
+                {activeBreakdown.map((entry) => (
+                  <React.Fragment key={`summary-${entry.key}`}>
+                    <tr>
+                      <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                        {getDiscountCountLabel(entry)}
+                      </td>
+                      <td style={{ textAlign: "right", padding: "1px 0" }}>
+                        {Number(entry?.qualifiedCount || 0)}
+                      </td>
+                    </tr>
+
+                    <tr>
+                      <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                        {getDiscountAmountLabel(entry)}
+                      </td>
+                      <td style={{ textAlign: "right", padding: "1px 0" }}>
+                        {peso(entry?.discountAmount)}
+                      </td>
+                    </tr>
+                  </React.Fragment>
+                ))}
+
+                <tr>
+                  <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                    Discountable Gross:
+                  </td>
+                  <td style={{ textAlign: "right", padding: "1px 0" }}>
+                    {peso(computed?.discountableGross)}
+                  </td>
+                </tr>
+
+                <tr>
+                  <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                    Discountable Base:
+                  </td>
+                  <td style={{ textAlign: "right", padding: "1px 0" }}>
+                    {peso(computed?.discountableBase)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </>
+        ) : null}
+
         {customerCards.length > 0 ? (
           <>
             <div
@@ -398,8 +509,14 @@ const PosPaymentReceipt = React.forwardRef(
               >
                 <tbody>
                   <tr>
+                    <td style={{ padding: "1px 0" }}>
+                      {card.customer_name || ""}
+                    </td>
+                  </tr>
+
+                  <tr>
                     <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                      Customer #{index + 1}:
+                      Name:
                     </td>
                     <td style={{ padding: "1px 0" }}>
                       {card.customer_name || ""}
@@ -413,31 +530,9 @@ const PosPaymentReceipt = React.forwardRef(
                   </tr>
                   <tr>
                     <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                      Birthdate:
+                      Signature:
                     </td>
-                    <td style={{ padding: "1px 0" }}>
-                      {card.date_of_birth || ""}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                      Gender:
-                    </td>
-                    <td style={{ padding: "1px 0" }}>{card.gender || ""}</td>
-                  </tr>
-                  <tr>
-                    <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                      TIN:
-                    </td>
-                    <td style={{ padding: "1px 0" }}>{card.tin || ""}</td>
-                  </tr>
-                  <tr>
-                    <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                      Contact:
-                    </td>
-                    <td style={{ padding: "1px 0" }}>
-                      {card.contact_no || ""}
-                    </td>
+                    <td style={{ padding: "1px 0" }}></td>
                   </tr>
                 </tbody>
               </table>
