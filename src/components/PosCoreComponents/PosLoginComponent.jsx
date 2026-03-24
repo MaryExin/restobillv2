@@ -140,7 +140,7 @@ const PosLoginComponent = () => {
           "user_role",
           Array.isArray(result.userrole)
             ? JSON.stringify(result.userrole)
-            : nextRole
+            : nextRole,
         );
         localStorage.setItem("profile_pic", nextProfilePic);
 

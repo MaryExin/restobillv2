@@ -16,6 +16,7 @@ import {
   FaWallet,
   FaChartPie,
   FaPowerOff,
+  FaMoneyBill,
 } from "react-icons/fa";
 import { HiOutlineStatusOnline } from "react-icons/hi";
 import { IoMdClose } from "react-icons/io";
@@ -194,6 +195,14 @@ const LayoutPos = ({ children }) => {
         color="violet"
         onClick={() => navigate("/productlist")}
       />
+
+      <PosQuickActionTile
+        label="Products & Price Syncing"
+        icon={<FaMoneyBill className="text-[28px] sm:text-[30px]" />}
+        color="violet"
+        onClick={() => navigate("/pricesyncing")} // Dapat pareho ito sa path sa App.js
+      />
+
       <OpenNewDay />
 
       <PosQuickActionTile
