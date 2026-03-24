@@ -1075,22 +1075,18 @@ export default function PosPayment() {
         <div className="relative z-10 mx-auto max-w-[1700px] px-4 py-6 md:px-6 lg:px-8">
           <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
             <div>
-              <button
-                type="button"
-                onClick={() => navigate(-1)}
-                className={`mb-3 inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-bold transition ${
-                  isDark
-                    ? "bg-white/5 text-slate-200 hover:bg-white/10"
-                    : "bg-white text-slate-700 shadow-sm hover:bg-slate-50"
-                }`}
-              >
-                <FaArrowLeft size={14} />
-                Back
-              </button>
+            <button
+              onClick={() => navigate("/poscorehomescreen")}
+              className={`flex items-center gap-3 mt-2 px-10 py-6 rounded-full transition-all ${
+                isDark
+                  ? "bg-slate-900/50 border border-white/5 text-slate-400 hover:text-white"
+                  : "bg-white border border-slate-200 text-slate-600 hover:text-slate-900 shadow-sm"
+              }`}
+            >
+              <FaArrowLeft size={14} />
+              <span className="text-sm font-bold uppercase">BACK TO DASHBOARD</span>
+            </button>
 
-              <div className="text-xs font-black uppercase tracking-[0.22em] text-blue-500">
-                POS • Payment Center
-              </div>
               <h1
                 className={`mt-2 text-3xl font-black md:text-4xl ${
                   isDark ? "text-white" : "text-slate-900"
