@@ -363,6 +363,14 @@ const PrintableDiscountReceipt = React.forwardRef(
             </tr>
             <tr>
               <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                VAT EXEMPTION:
+              </td>
+              <td style={{ textAlign: "right", padding: "1px 0" }}>
+                {peso(computed?.totalVatExemption)}
+              </td>
+            </tr>
+            <tr>
+              <td style={{ fontWeight: "700", padding: "1px 0" }}>
                 ZERO RATED SALES:
               </td>
               <td style={{ textAlign: "right", padding: "1px 0" }}>
@@ -1112,6 +1120,8 @@ const ModalDiscountTransaction = ({
       0,
     );
 
+    const finalVatExemptSales = Math.max(vatExemptSales - totalVatExemption, 0);
+
     const grossTotal = items.reduce((sum, item) => {
       return (
         sum + Number(item.sales_quantity || 0) * Number(item.selling_price || 0)
@@ -1150,7 +1160,8 @@ const ModalDiscountTransaction = ({
       safeCustomerCount,
       vatableSales,
       vatableSalesVat,
-      vatExemptSales,
+      vatExemptSales: finalVatExemptSales,
+      rawVatExemptSales: vatExemptSales,
       vatZeroRatedSales,
       totalDiscount,
       totalVatExemption,
@@ -1214,9 +1225,7 @@ const ModalDiscountTransaction = ({
 
     const loggedUserId = localStorage.getItem("user_id") || "";
     const loggedUserName =
-      localStorage.getItem("username") ||
-      transaction?.cashier ||
-      "System";
+      localStorage.getItem("username") || transaction?.cashier || "System";
 
     const discountBreakdownPayload = computed.discountBreakdown
       .filter(

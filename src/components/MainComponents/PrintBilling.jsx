@@ -200,7 +200,9 @@ const PrintBilling = () => {
             }`}
           >
             <FaArrowLeft size={14} />
-            <span className="text-sm font-bold uppercase">BACK TO DASHBOARD</span>
+            <span className="text-sm font-bold uppercase">
+              BACK TO DASHBOARD
+            </span>
           </button>
           <div className="flex items-center gap-2 text-xs font-bold tracking-widest text-blue-400 uppercase">
             <FaPrint /> Billing Center

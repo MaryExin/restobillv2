@@ -507,6 +507,14 @@ const PosPaymentReceipt = React.forwardRef(
             </tr>
             <tr>
               <td style={{ fontWeight: "700", padding: "1px 0" }}>
+                VAT EXEMPTION:
+              </td>
+              <td style={{ textAlign: "right", padding: "1px 0" }}>
+                {peso(computed?.totalVatExemption)}
+              </td>
+            </tr>
+            <tr>
+              <td style={{ fontWeight: "700", padding: "1px 0" }}>
                 ZERO RATED SALES:
               </td>
               <td style={{ textAlign: "right", padding: "1px 0" }}>

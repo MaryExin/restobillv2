@@ -2238,6 +2238,8 @@ export default function TransactionPaymentModal({
       0,
     );
 
+    const finalVatExemptSales = Math.max(vatExemptSales - totalVatExemption, 0);
+
     const otherChargesTotal = otherCharges.reduce(
       (sum, row) => sum + toNum(row.amount),
       0,
@@ -2283,7 +2285,7 @@ export default function TransactionPaymentModal({
       otherChargesTotal,
       vatableSales,
       vatableSalesVat,
-      vatExemptSales,
+      vatExemptSales: finalVatExemptSales,
       vatExemptSalesVat: totalVatExemption,
       vatZeroRatedSales,
       totalPaid,
