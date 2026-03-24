@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { FaCashRegister, FaPrint } from "react-icons/fa";
 import { FiX } from "react-icons/fi";
 import useApiHost from "../../hooks/useApiHost";
+import usePosConfig from "../../hooks/usePosConfig";
 
 export default function PosReadingModal({
   open = true,
@@ -21,6 +22,7 @@ export default function PosReadingModal({
 }) {
   const apiHost = useApiHost();
   const printFrameRef = useRef(null);
+  const { posConfig, isPosConfigLoading, posConfigError } = usePosConfig();
 
   const [activeType, setActiveType] = useState(null);
   const [values, setValues] = useState({
@@ -245,14 +247,14 @@ export default function PosReadingModal({
         <body>
           <div class="receipt">
             <div class="center">
-              <div class="title">${data.corpName || ""}</div>
+              <div class="title">${posConfig.corpName}</div>
               <div class="subtitle">${data.businessUnitName || ""}</div>
               <div class="subtitle">${data.businessUnitAddress || ""}</div>
               <div class="subtitle">${data.tinLabel || ""}</div>
-              <div class="subtitle">MIN: ${data.machineNumber || ""}</div>
-              <div class="subtitle">S/N: ${data.serialNumber || ""}</div>
-              <div class="subtitle">PTU No: ${data.ptuNumber || ""}</div>
-              <div class="subtitle">PTU Date Issued: ${data.ptuDateIssued || ""}</div>
+              <div class="subtitle">MIN: ${posConfig.machineNumber}</div>
+              <div class="subtitle">S/N: ${posConfig.serialNumber}</div>
+              <div class="subtitle">PTU No: ${posConfig.ptuNumber}</div>
+              <div class="subtitle">PTU Date Issued: ${posConfig.ptuDateIssued}</div>
               <div class="title" style="margin-top:8px;">X-READING</div>
             </div>
 
@@ -314,14 +316,14 @@ export default function PosReadingModal({
         <body>
           <div class="receipt">
             <div class="center">
-              <div class="title">${data.corpName || ""}</div>
+              <div class="title">${posConfig.corpName}</div>
               <div class="subtitle">${data.businessUnitName || ""}</div>
               <div class="subtitle">${data.businessUnitAddress || ""}</div>
               <div class="subtitle">${data.tinLabel || ""}</div>
-              <div class="subtitle">MIN: ${data.machineNumber || ""}</div>
-              <div class="subtitle">S/N: ${data.serialNumber || ""}</div>
-              <div class="subtitle">PTU No: ${data.ptuNumber || ""}</div>
-              <div class="subtitle">PTU Date Issued: ${data.ptuDateIssued || ""}</div>
+              <div class="subtitle">MIN: ${posConfig.machineNumber}</div>
+              <div class="subtitle">S/N: ${posConfig.serialNumber}</div>
+              <div class="subtitle">PTU No: ${posConfig.ptuNumber}</div>
+              <div class="subtitle">PTU Date Issued: ${posConfig.ptuDateIssued}</div>
               <div class="title" style="margin-top:8px;">Z-READING</div>
             </div>
 
@@ -433,15 +435,15 @@ export default function PosReadingModal({
           selectedCashier,
           cashDrawerAmount: Number(values.cashDrawerAmount || 0),
           verifyAmount: Number(values.verifyAmount || 0),
-          categoryCode,
-          unitCode,
-          terminalNumber: terminalNumber || "1",
-          corpName,
+          categoryCode: posConfig.categoryCode,
+          unitunitCode: posConfig.unitCodeCode,
+          terminalNumber: posConfig.terminalNumber,
+          corpName: posConfig.corpName,
           shiftingDate: normalizedShiftDate,
-          machineNumber: "10000000001",
-          serialNumber: "20000000001",
-          ptuNumber: "00000000-000-0000000-00000",
-          ptuDateIssued: "01/01/2023",
+          machineNumber: posConfig.machineNumber,
+          serialNumber: posConfig.serialNumber,
+          ptuNumber: posConfig.ptuNumber,
+          ptuDateIssued: posConfig.ptuDateIssued,
           user_id: localStorage.getItem("user_id") || "",
           user_name: localStorage.getItem("Cashier") || "Store Crew",
           cashier_name: localStorage.getItem("username") || "Store Crew",
