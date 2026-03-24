@@ -99,11 +99,11 @@ const Orderlist = ({
   const [isReprint, setIsReprint] = useState(false);
 
   const userId = localStorage.getItem("user_id") || "0";
-  const userName = localStorage.getItem("username") || "Store Crew";
+  const userName = localStorage.getItem("Cashier") || "Store Crew";
   const email = localStorage.getItem("email") || "Store Crew";
   const [salesTypeList, setSalesTypeList] = useState([]);
   const [selectedSalesType, setSelectedSalesType] = useState("");
-  
+
   const [newtransaction, setNewTransaction] = useState({
     business_info: {},
     inventory_types: [],
@@ -324,164 +324,167 @@ const Orderlist = ({
   }, [salesTypeList, selectedSalesType]);
 
   useEffect(() => {
-  if (!apiHost) return;
+    if (!apiHost) return;
 
-  const categoryCode = newtransaction?.business_info?.Category_Code || "";
-  const unitCode = newtransaction?.business_info?.Unit_Code || "";
-  const salesTypeDesc =
-    selectedSalesTypeObject?.sales_type ||
-    selectedSalesTypeObject?.description ||
-    "";
+    const categoryCode = newtransaction?.business_info?.Category_Code || "";
+    const unitCode = newtransaction?.business_info?.Unit_Code || "";
+    const salesTypeDesc =
+      selectedSalesTypeObject?.sales_type ||
+      selectedSalesTypeObject?.description ||
+      "";
 
-  if (!categoryCode || !unitCode || !salesTypeDesc || !selectcategory) {
-    setPricingData({
-      sales_type_id: "",
-      pricing_category: "",
-      products: [],
-    });
-    setproductlist([]);
-    return;
-  }
-
-  const fetchPricingProducts = async () => {
-    try {
-      setIsPricingLoading(true);
-
-      const response = await fetch(`${apiHost}/api/get_pricing_selection.php`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          category_code: categoryCode,
-          unit_code: unitCode,
-          sales_type: salesTypeDesc,
-          item_category: selectcategory,
-          search: productsearch || "",
-          limit: 100,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (result?.status === "success") {
-        const mappedProducts = Array.isArray(result.products)
-          ? result.products.map((item, index) => ({
-              id: item.product_id || `${item.sku || "ITEM"}-${index}`,
-              product_id: item.product_id || "",
-              item_name: item.item_name || "NO NAME",
-              selling_price: Number(item.selling_price || 0),
-              sku: item.sku || "",
-              item_category: item.item_category || "",
-              isDiscountable: item.isDiscountable || "",
-              vatable: item.vatable || "",
-              unit_cost: Number(item.unit_cost || 0),
-              unit_of_measure: item.unit_of_measure || "",
-              inventory_type: item.inventory_type || "",
-              raw: item,
-            }))
-          : [];
-
-        setPricingData({
-          sales_type_id: result.sales_type_id || "",
-          pricing_category: result.pricing_category || "",
-          products: mappedProducts,
-        });
-
-        setproductlist(mappedProducts);
-      } else {
-        setPricingData({
-          sales_type_id: "",
-          pricing_category: "",
-          products: [],
-        });
-        setproductlist([]);
-      }
-    } catch (error) {
-      console.error("Failed to fetch pricing products:", error);
+    if (!categoryCode || !unitCode || !salesTypeDesc || !selectcategory) {
       setPricingData({
         sales_type_id: "",
         pricing_category: "",
         products: [],
       });
       setproductlist([]);
-    } finally {
-      setIsPricingLoading(false);
+      return;
     }
-  };
 
-  fetchPricingProducts();
-}, [
-  apiHost,
-  newtransaction?.business_info?.Category_Code,
-  newtransaction?.business_info?.Unit_Code,
-  selectedSalesTypeObject?.sales_type,
-  selectedSalesTypeObject?.description,
-  selectcategory,
-  productsearch,
-]);
+    const fetchPricingProducts = async () => {
+      try {
+        setIsPricingLoading(true);
 
-useEffect(() => {
-  if (!apiHost || !transactionId) return;
-
-  fetch(
-    `${apiHost}/api/view_table_transaction.php?transaction_id=${transactionId}`,
-  )
-    .then((res) => {
-      if (!res.ok) throw new Error("Failed to fetch transaction");
-      return res.json();
-    })
-    .then((data) => {
-      if (!data) return;
-
-      if (data.summary?.order_type && Array.isArray(salesTypeList)) {
-        const matched = salesTypeList.find(
-          (item) =>
-            String(item.sales_type || item.description).toUpperCase() ===
-            String(data.summary.order_type).toUpperCase(),
+        const response = await fetch(
+          `${apiHost}/api/get_pricing_selection.php`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              category_code: categoryCode,
+              unit_code: unitCode,
+              sales_type: salesTypeDesc,
+              item_category: selectcategory,
+              search: productsearch || "",
+              limit: 100,
+            }),
+          },
         );
 
-        if (matched) {
-          setSelectedSalesType(String(matched.sales_type_id));
+        const result = await response.json();
+
+        if (result?.status === "success") {
+          const mappedProducts = Array.isArray(result.products)
+            ? result.products.map((item, index) => ({
+                id: item.product_id || `${item.sku || "ITEM"}-${index}`,
+                product_id: item.product_id || "",
+                item_name: item.item_name || "NO NAME",
+                selling_price: Number(item.selling_price || 0),
+                sku: item.sku || "",
+                item_category: item.item_category || "",
+                isDiscountable: item.isDiscountable || "",
+                vatable: item.vatable || "",
+                unit_cost: Number(item.unit_cost || 0),
+                unit_of_measure: item.unit_of_measure || "",
+                inventory_type: item.inventory_type || "",
+                raw: item,
+              }))
+            : [];
+
+          setPricingData({
+            sales_type_id: result.sales_type_id || "",
+            pricing_category: result.pricing_category || "",
+            products: mappedProducts,
+          });
+
+          setproductlist(mappedProducts);
+        } else {
+          setPricingData({
+            sales_type_id: "",
+            pricing_category: "",
+            products: [],
+          });
+          setproductlist([]);
         }
+      } catch (error) {
+        console.error("Failed to fetch pricing products:", error);
+        setPricingData({
+          sales_type_id: "",
+          pricing_category: "",
+          products: [],
+        });
+        setproductlist([]);
+      } finally {
+        setIsPricingLoading(false);
       }
+    };
 
-      if (!Array.isArray(data.order_details)) return;
+    fetchPricingProducts();
+  }, [
+    apiHost,
+    newtransaction?.business_info?.Category_Code,
+    newtransaction?.business_info?.Unit_Code,
+    selectedSalesTypeObject?.sales_type,
+    selectedSalesTypeObject?.description,
+    selectcategory,
+    productsearch,
+  ]);
 
-      const mappedCart = data.order_details.map((item) => ({
-        code: item.product_id,
-        name: item.item_name || item.product_id,
-        price: Number(item.selling_price),
-        quantity: Number(item.sales_quantity),
-        isDiscountable: item.isDiscountable,
-        itemInstruction: item.item_instruction || "",
-        item_category: item.item_category || "",
-        isLoadedFromDB: true,
-      }));
+  useEffect(() => {
+    if (!apiHost || !transactionId) return;
 
-      setproductcart({
-        customer: tableselected,
-        items: mappedCart,
-      });
+    fetch(
+      `${apiHost}/api/view_table_transaction.php?transaction_id=${transactionId}`,
+    )
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch transaction");
+        return res.json();
+      })
+      .then((data) => {
+        if (!data) return;
 
-      setcartlist(mappedCart);
-      setOriginalLoadedItems(mappedCart);
+        if (data.summary?.order_type && Array.isArray(salesTypeList)) {
+          const matched = salesTypeList.find(
+            (item) =>
+              String(item.sales_type || item.description).toUpperCase() ===
+              String(data.summary.order_type).toUpperCase(),
+          );
 
-      setcartforqr({
-        customer: tableselected,
-        items: mappedCart.map((item) => ({
-          code: item.code,
-          quantity: item.quantity,
-          itemInstruction: item.itemInstruction || "",
+          if (matched) {
+            setSelectedSalesType(String(matched.sales_type_id));
+          }
+        }
+
+        if (!Array.isArray(data.order_details)) return;
+
+        const mappedCart = data.order_details.map((item) => ({
+          code: item.product_id,
+          name: item.item_name || item.product_id,
+          price: Number(item.selling_price),
+          quantity: Number(item.sales_quantity),
+          isDiscountable: item.isDiscountable,
+          itemInstruction: item.item_instruction || "",
           item_category: item.item_category || "",
           isLoadedFromDB: true,
-        })),
+        }));
+
+        setproductcart({
+          customer: tableselected,
+          items: mappedCart,
+        });
+
+        setcartlist(mappedCart);
+        setOriginalLoadedItems(mappedCart);
+
+        setcartforqr({
+          customer: tableselected,
+          items: mappedCart.map((item) => ({
+            code: item.code,
+            quantity: item.quantity,
+            itemInstruction: item.itemInstruction || "",
+            item_category: item.item_category || "",
+            isLoadedFromDB: true,
+          })),
+        });
+      })
+      .catch((err) => {
+        console.error("Transaction fetch error:", err);
       });
-    })
-    .catch((err) => {
-      console.error("Transaction fetch error:", err);
-    });
-}, [apiHost, transactionId, tableselected, salesTypeList]);
+  }, [apiHost, transactionId, tableselected, salesTypeList]);
 
   const filteredProducts = useMemo(() => {
     return (productlist || []).filter((p) =>
@@ -939,12 +942,12 @@ useEffect(() => {
     }
   };
   const selectedTypeObj = salesTypeList.find(
-    (item) => String(item.sales_type_id) === String(selectedSalesType)
+    (item) => String(item.sales_type_id) === String(selectedSalesType),
   );
 
-  const orderTypeName = selectedTypeObj 
-  ? (selectedTypeObj.sales_type || selectedTypeObj.description) 
-  : "DINE IN";
+  const orderTypeName = selectedTypeObj
+    ? selectedTypeObj.sales_type || selectedTypeObj.description
+    : "DINE IN";
 
   const saveOrderToServer = async () => {
     if (productcart.items.length === 0) {
@@ -962,11 +965,6 @@ useEffect(() => {
         localStorage.getItem("userId") ||
         sessionStorage.getItem("userId") ||
         "0";
-
-      const loggedUserName =
-        localStorage.getItem("firstName") ||
-        sessionStorage.getItem("firstName") ||
-        "Store Crew";
 
       formData.append("transaction_id", txId);
       formData.append("Category_Code", "Crab & Crack");
@@ -1163,19 +1161,19 @@ useEffect(() => {
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className={`fixed inset-0 z-[100] backdrop-blur-xl flex items-center justify-center p-0 sm:p-4 ${
+        className={`fixed inset-0 z-[100] flex items-center justify-center p-0 backdrop-blur-xl sm:p-4 ${
           isDark ? "bg-slate-950/80" : "bg-slate-200/70"
         }`}
       >
         <div
-          className={`w-full h-full max-w-7xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden transition-colors ${
+          className={`flex h-full w-full max-w-7xl flex-col overflow-hidden shadow-2xl transition-colors sm:rounded-3xl ${
             isDark
-              ? "bg-slate-900/50 border border-white/10"
-              : "bg-white border border-slate-200"
+              ? "border border-white/10 bg-slate-900/50"
+              : "border border-slate-200 bg-white"
           }`}
         >
           <div
-            className={`px-6 py-4 flex justify-between items-center transition-colors ${
+            className={`flex items-center justify-between px-6 py-4 transition-colors ${
               isDark
                 ? "border-b border-white/5 bg-white/5"
                 : "border-b border-slate-200 bg-slate-50"
@@ -1184,7 +1182,7 @@ useEffect(() => {
             <div className="flex items-center gap-4">
               <button
                 onClick={() => setShowMobileCats(!showMobileCats)}
-                className={`md:hidden p-3 rounded-xl transition-colors ${
+                className={`rounded-xl p-3 transition-colors md:hidden ${
                   isDark
                     ? "bg-slate-800 text-blue-400"
                     : "bg-slate-100 text-blue-600"
@@ -1195,11 +1193,11 @@ useEffect(() => {
 
               <div>
                 <h2
-                  className={`font-bold text-xl ${
+                  className={`text-xl font-bold ${
                     isDark ? "text-white" : "text-slate-900"
                   }`}
                 >
-                  Table <span className="text-blue-500"> {tableselected}</span>
+                  Table <span className="text-blue-500">{tableselected}</span>
                 </h2>
                 <p
                   className={`text-xs uppercase tracking-widest ${
@@ -1215,7 +1213,7 @@ useEffect(() => {
               {transactionId && (
                 <button
                   onClick={openBillingModal}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-white font-semibold text-sm flex items-center gap-2"
+                  className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500"
                 >
                   <FaReceipt /> View Billing
                 </button>
@@ -1223,10 +1221,10 @@ useEffect(() => {
 
               <button
                 onClick={() => setshoworderlist(false)}
-                className={`p-2 rounded-full transition-colors ${
+                className={`rounded-full p-2 transition-colors ${
                   isDark
-                    ? "hover:bg-white/10 text-slate-400"
-                    : "hover:bg-slate-200 text-slate-500"
+                    ? "text-slate-400 hover:bg-white/10"
+                    : "text-slate-500 hover:bg-slate-200"
                 }`}
               >
                 <IoMdClose size={28} />
@@ -1234,78 +1232,90 @@ useEffect(() => {
             </div>
           </div>
 
-          <div className="flex-1 flex overflow-hidden relative">
+          <div className="relative flex min-h-0 flex-1">
             <aside
-              className={`absolute md:relative z-20 h-full w-64 transition-transform duration-300 ${
+              className={`no-scrollbar absolute z-20 h-full min-h-0 w-64 overflow-auto transition-transform duration-300 md:relative ${
                 showMobileCats
                   ? "translate-x-0"
                   : "-translate-x-full md:translate-x-0"
               } ${
                 isDark
-                  ? "bg-slate-900 border-r border-white/5"
-                  : "bg-white border-r border-slate-200"
+                  ? "border-r border-white/5 bg-slate-900"
+                  : "border-r border-slate-200 bg-white"
               }`}
             >
-            <div className="px-4 pt-4 mb-2">
-              <label 
-                className={`text-[10px] font-bold uppercase tracking-[0.2em] mb-2 block px-1 ${
-                  isDark ? "text-slate-500" : "text-slate-400"
-                }`}
-              >
-                Service Type
-              </label>
-              <div className="relative group">
-                <select
-                  value={selectedSalesType}
-                  onChange={(e) => setSelectedSalesType(e.target.value)}
-                  className={`w-full appearance-none rounded-2xl py-3.5 pl-5 pr-12 outline-none cursor-pointer transition-all duration-300 font-semibold text-sm ${
-                    isDark
-                      ? "bg-slate-800/40 border border-slate-700 text-white focus:border-blue-500/50 focus:bg-slate-800/60"
-                      : "bg-white border border-slate-200 text-slate-900 shadow-sm focus:border-blue-400 focus:shadow-md"
+              <div className="mb-2 px-4 pt-4">
+                <label
+                  className={`mb-2 block px-1 text-[10px] font-bold uppercase tracking-[0.2em] ${
+                    isDark ? "text-slate-500" : "text-slate-400"
                   }`}
                 >
-                  <option value="" disabled>Choose Sales Type...</option>
-                  {salesTypeList.map((item) => (
-                <option
-                  key={item.sales_type_id}
-                  value={String(item.sales_type_id)}
-                  className={isDark ? "bg-slate-900 text-white" : "bg-white text-slate-900"}
-                >
-                  {item.sales_type || item.description}
-                </option>
-                  ))}
-                </select>
-                
-                {/* Custom Chevron Arrow */}
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none transition-transform group-focus-within:rotate-180">
-                  <svg 
-                    width="12" 
-                    height="12" 
-                    viewBox="0 0 12 12" 
-                    fill="none" 
-                    xmlns="http://www.w3.org/2000/svg"
-                    className={isDark ? "text-slate-500" : "text-slate-400"}
-                  >
-                    <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </div>
+                  Service Type
+                </label>
 
-                {/* Subtle Glow Effect on Hover (Dark Mode Only) */}
-                {isDark && (
-                  <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 rounded-2xl blur opacity-0 group-hover:opacity-100 transition duration-500 pointer-events-none" />
-                )}
+                <div className="group relative">
+                  <select
+                    value={selectedSalesType}
+                    onChange={(e) => setSelectedSalesType(e.target.value)}
+                    className={`w-full cursor-pointer appearance-none rounded-2xl py-3.5 pl-5 pr-12 text-sm font-semibold outline-none transition-all duration-300 ${
+                      isDark
+                        ? "border border-slate-700 bg-slate-800/40 text-white focus:border-blue-500/50 focus:bg-slate-800/60"
+                        : "border border-slate-200 bg-white text-slate-900 shadow-sm focus:border-blue-400 focus:shadow-md"
+                    }`}
+                  >
+                    <option value="" disabled>
+                      Choose Sales Type...
+                    </option>
+                    {salesTypeList.map((item) => (
+                      <option
+                        key={item.sales_type_id}
+                        value={String(item.sales_type_id)}
+                        className={
+                          isDark
+                            ? "bg-slate-900 text-white"
+                            : "bg-white text-slate-900"
+                        }
+                      >
+                        {item.sales_type || item.description}
+                      </option>
+                    ))}
+                  </select>
+
+                  <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 transition-transform group-focus-within:rotate-180">
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 12 12"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                      className={isDark ? "text-slate-500" : "text-slate-400"}
+                    >
+                      <path
+                        d="M2.5 4.5L6 8L9.5 4.5"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </div>
+
+                  {isDark && (
+                    <div className="pointer-events-none absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-blue-500/20 to-cyan-500/20 opacity-0 blur transition duration-500 group-hover:opacity-100" />
+                  )}
+                </div>
               </div>
-            </div>
-              <div className="p-4 flex flex-col h-full">
+
+              <div className="flex h-full flex-col p-4">
                 <h3
-                  className={`text-[10px] font-bold uppercase tracking-widest mb-4 px-2 ${
+                  className={`mb-4 px-2 text-[10px] font-bold uppercase tracking-widest ${
                     isDark ? "text-slate-500" : "text-slate-500"
                   }`}
                 >
                   Menu Sections
                 </h3>
 
-                <div className="flex-1 overflow-y-auto space-y-2 no-scrollbar">
+                <div className="no-scrollbar flex-1 overflow-y-auto space-y-2">
                   {categorylist.map((cat, idx) => (
                     <button
                       key={idx}
@@ -1313,7 +1323,7 @@ useEffect(() => {
                         setselectcategory(cat.item_category);
                         setShowMobileCats(false);
                       }}
-                      className={`w-full text-left px-4 py-3 rounded-xl text-sm font-semibold flex items-center gap-3 transition-all ${
+                      className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-semibold transition-all ${
                         selectcategory === cat.item_category
                           ? "bg-blue-600 text-white shadow-lg"
                           : isDark
@@ -1330,11 +1340,11 @@ useEffect(() => {
             </aside>
 
             <main
-              className={`flex-1 flex flex-col min-w-0 transition-colors ${
+              className={`flex min-h-0 min-w-0 flex-1 flex-col transition-colors ${
                 isDark ? "bg-slate-900/20" : "bg-slate-50"
               }`}
             >
-              <div className="p-4">
+              <div className="shrink-0 p-4">
                 <div className="relative">
                   <FaSearch
                     className={`absolute left-4 top-1/2 -translate-y-1/2 ${
@@ -1346,17 +1356,17 @@ useEffect(() => {
                     placeholder="Search delicious food..."
                     value={productsearch}
                     onChange={(e) => setproductsearch(e.target.value)}
-                    className={`w-full rounded-2xl py-3 pl-12 pr-4 outline-none transition-colors ${
+                    className={`w-full rounded-2xl border py-3 pl-12 pr-4 outline-none transition-colors ${
                       isDark
-                        ? "bg-slate-800/40 border border-slate-700 text-white focus:border-blue-500/50"
-                        : "bg-white border border-slate-300 text-slate-900 focus:border-blue-400"
+                        ? "border-slate-700 bg-slate-800/40 text-white focus:border-blue-500/50"
+                        : "border-slate-300 bg-white text-slate-900 focus:border-blue-400"
                     }`}
                   />
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-4 pt-0">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar p-4 pt-2">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {filteredProducts.map((p, i) => (
                     <motion.button
                       key={i}
@@ -1380,7 +1390,7 @@ useEffect(() => {
                       <div className="relative flex min-h-[145px] flex-col justify-between p-5">
                         <div className="flex items-start justify-between gap-3">
                           <h4
-                            className={`max-w-[calc(100%-56px)] text-[15px] font-black leading-snug break-words ${
+                            className={`max-w-[calc(100%-56px)] break-words text-[15px] font-black leading-snug ${
                               isDark ? "text-white" : "text-slate-900"
                             }`}
                           >
@@ -1420,14 +1430,14 @@ useEffect(() => {
             </main>
 
             <aside
-              className={`hidden lg:flex w-80 flex-col relative overflow-hidden transition-colors ${
+              className={`relative hidden min-h-0 w-80 flex-col overflow-hidden transition-colors lg:flex ${
                 isDark
-                  ? "bg-slate-950/40 border-l border-white/5"
-                  : "bg-slate-50 border-l border-slate-200"
+                  ? "border-l border-white/5 bg-slate-950/40"
+                  : "border-l border-slate-200 bg-slate-50"
               }`}
             >
               <div
-                className={`p-6 font-bold flex items-center gap-2 transition-colors ${
+                className={`flex items-center gap-2 p-6 font-bold transition-colors ${
                   isDark
                     ? "border-b border-white/5 text-white"
                     : "border-b border-slate-200 text-slate-900"
@@ -1435,7 +1445,7 @@ useEffect(() => {
               >
                 <FaShoppingCart className="text-blue-500" /> Cart Summary
                 {isCartFromDB && (
-                  <span className="ml-auto text-[10px] px-2 py-1 rounded-full bg-green-500/10 text-green-400 border border-green-500/20">
+                  <span className="ml-auto rounded-full border border-green-500/20 bg-green-500/10 px-2 py-1 text-[10px] text-green-400">
                     Loaded Order
                   </span>
                 )}
@@ -1443,15 +1453,15 @@ useEffect(() => {
 
               <button
                 onClick={() => setSummaryCart(true)}
-                className="mx-4 mt-4 px-4 py-3 bg-blue-600 hover:bg-blue-500 rounded-2xl text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-lg"
+                className="mx-4 mt-4 flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-lg hover:bg-blue-500"
               >
                 <FaReceipt /> View Full Summary
               </button>
 
-              <div className="absolute top-[10px] right-4 z-20 flex flex-row gap-2">
+              <div className="absolute right-4 top-[10px] z-20 flex flex-row gap-2">
                 <button
                   onClick={() => setShowDesktopCartActions((prev) => !prev)}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-white font-semibold text-sm flex items-center gap-2"
+                  className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500"
                 >
                   Save
                 </button>
@@ -1459,7 +1469,7 @@ useEffect(() => {
                 {canPrintOnly && (
                   <button
                     onClick={handlePrintOnly}
-                    className="px-4 py-2 bg-yellow-600 hover:bg-yellow-500 rounded-xl text-white font-semibold text-sm flex items-center gap-2"
+                    className="flex items-center gap-2 rounded-xl bg-yellow-600 px-4 py-2 text-sm font-semibold text-white hover:bg-yellow-500"
                   >
                     <FiPrinter />
                   </button>
@@ -1475,7 +1485,7 @@ useEffect(() => {
                         : "border-t border-slate-200"
                     }`}
                   >
-                    <h4 className="text-xs font-bold uppercase tracking-widest text-emerald-500 mb-3">
+                    <h4 className="mb-3 text-xs font-bold uppercase tracking-widest text-emerald-500">
                       New Items
                     </h4>
                     <CartList
@@ -1493,7 +1503,7 @@ useEffect(() => {
                 {loadedCartItems.length > 0 && (
                   <div className="p-4 pb-2">
                     <h4
-                      className={`text-xs font-bold uppercase tracking-widest mb-3 ${
+                      className={`mb-3 text-xs font-bold uppercase tracking-widest ${
                         isDark ? "text-slate-400" : "text-slate-500"
                       }`}
                     >
@@ -1539,14 +1549,14 @@ useEffect(() => {
                       initial={{ scale: 0.95, y: 10 }}
                       animate={{ scale: 1, y: 0 }}
                       exit={{ scale: 0.95, y: 10 }}
-                      className={`rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl transition-colors ${
+                      className={`w-full max-w-sm rounded-3xl p-8 text-center shadow-2xl transition-colors ${
                         isDark
-                          ? "bg-slate-900 border border-white/10"
-                          : "bg-white border border-slate-200"
+                          ? "border border-white/10 bg-slate-900"
+                          : "border border-slate-200 bg-white"
                       }`}
                     >
                       <h3
-                        className={`text-xl font-black mb-2 ${
+                        className={`mb-2 text-xl font-black ${
                           isDark ? "text-white" : "text-slate-900"
                         }`}
                       >
@@ -1554,7 +1564,7 @@ useEffect(() => {
                       </h3>
 
                       <p
-                        className={`text-sm mb-6 ${
+                        className={`mb-6 text-sm ${
                           isDark ? "text-slate-400" : "text-slate-500"
                         }`}
                       >
@@ -1564,14 +1574,14 @@ useEffect(() => {
                       <div className="flex gap-3">
                         <button
                           onClick={confirmRemoveItem}
-                          className="flex-1 py-3 rounded-2xl bg-red-600 text-white font-bold hover:bg-red-500"
+                          className="flex-1 rounded-2xl bg-red-600 py-3 font-bold text-white hover:bg-red-500"
                         >
                           Yes
                         </button>
 
                         <button
                           onClick={cancelRemoveItem}
-                          className={`flex-1 py-3 rounded-2xl font-bold transition-colors ${
+                          className={`flex-1 rounded-2xl py-3 font-bold transition-colors ${
                             isDark
                               ? "bg-white/10 text-white hover:bg-white/20"
                               : "bg-slate-200 text-slate-800 hover:bg-slate-300"
@@ -1592,15 +1602,15 @@ useEffect(() => {
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 30 }}
                     transition={{ duration: 0.2 }}
-                    className={`absolute inset-y-0 right-0 z-20 w-[88%] max-w-[320px] backdrop-blur-xl shadow-2xl p-5 flex flex-col transition-colors ${
+                    className={`absolute inset-y-0 right-0 z-20 flex w-[88%] max-w-[320px] flex-col p-5 shadow-2xl backdrop-blur-xl transition-colors ${
                       isDark
-                        ? "bg-slate-950/95 border-l border-white/10"
-                        : "bg-white/95 border-l border-slate-200"
+                        ? "border-l border-white/10 bg-slate-950/95"
+                        : "border-l border-slate-200 bg-white/95"
                     }`}
                   >
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="mb-4 flex items-center justify-between">
                       <h3
-                        className={`font-black text-lg ${
+                        className={`text-lg font-black ${
                           isDark ? "text-white" : "text-slate-900"
                         }`}
                       >
@@ -1609,26 +1619,26 @@ useEffect(() => {
 
                       <button
                         onClick={() => setShowDesktopCartActions(false)}
-                        className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
+                        className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
                           isDark
-                            ? "bg-white/10 hover:bg-white/20 text-slate-300"
-                            : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                            ? "bg-white/10 text-slate-300 hover:bg-white/20"
+                            : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                         }`}
                       >
                         <FiX size={16} />
                       </button>
                     </div>
 
-                    <div className="space-y-4 flex-1 overflow-y-auto custom-scrollbar pr-1">
+                    <div className="custom-scrollbar flex-1 space-y-4 overflow-y-auto pr-1">
                       <div
                         className={`rounded-2xl p-4 transition-colors ${
                           isDark
-                            ? "bg-white/5 border border-white/10"
-                            : "bg-slate-50 border border-slate-200"
+                            ? "border border-white/10 bg-white/5"
+                            : "border border-slate-200 bg-slate-50"
                         }`}
                       >
                         <div
-                          className={`flex justify-between items-center font-black text-xl ${
+                          className={`flex items-center justify-between text-xl font-black ${
                             isDark ? "text-white" : "text-slate-900"
                           }`}
                         >
@@ -1637,18 +1647,14 @@ useEffect(() => {
                             ₱{totalPrice.toLocaleString()}
                           </span>
                         </div>
-                        <p
-                          className={`text-xs mt-1 ${
-                            isDark ? "text-slate-500" : "text-slate-500"
-                          }`}
-                        >
+                        <p className="mt-1 text-xs text-slate-500">
                           {totalItems} item{totalItems !== 1 ? "s" : ""}
                         </p>
                       </div>
                     </div>
 
                     <div
-                      className={`pt-4 space-y-3 ${
+                      className={`space-y-3 pt-4 ${
                         isDark
                           ? "border-t border-white/10"
                           : "border-t border-slate-200"
@@ -1656,7 +1662,7 @@ useEffect(() => {
                     >
                       <button
                         onClick={handleGenerateQR}
-                        className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 shadow-xl shadow-blue-600/20"
+                        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 py-4 font-bold text-white shadow-xl shadow-blue-600/20 hover:bg-blue-500"
                       >
                         <IoQrCode size={20} /> Confirm Order
                       </button>
@@ -1664,14 +1670,14 @@ useEffect(() => {
                       <button
                         onClick={requestClearCart}
                         disabled={isCartFromDB}
-                        className={`w-full font-bold py-3 rounded-2xl flex items-center justify-center gap-2 transition-colors ${
+                        className={`flex w-full items-center justify-center gap-2 rounded-2xl py-3 font-bold transition-colors ${
                           isCartFromDB
                             ? isDark
-                              ? "bg-white/5 text-slate-500 border border-white/10 cursor-not-allowed"
-                              : "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
+                              ? "cursor-not-allowed border border-white/10 bg-white/5 text-slate-500"
+                              : "cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400"
                             : isDark
-                              ? "bg-white/10 hover:bg-white/20 text-white border border-white/10"
-                              : "bg-slate-100 hover:bg-slate-200 text-slate-900 border border-slate-200"
+                              ? "border border-white/10 bg-white/10 text-white hover:bg-white/20"
+                              : "border border-slate-200 bg-slate-100 text-slate-900 hover:bg-slate-200"
                         }`}
                       >
                         <FaTrash size={16} /> Clear Cart
@@ -1684,15 +1690,15 @@ useEffect(() => {
           </div>
 
           <div
-            className={`lg:hidden p-4 transition-colors ${
+            className={`p-4 transition-colors lg:hidden ${
               isDark
-                ? "bg-slate-900 border-t border-white/10"
-                : "bg-white border-t border-slate-200"
+                ? "border-t border-white/10 bg-slate-900"
+                : "border-t border-slate-200 bg-white"
             }`}
           >
             <button
               onClick={() => setShowCartMobile(true)}
-              className="w-full bg-blue-600 py-4 rounded-2xl text-white font-bold flex justify-between px-6 shadow-xl"
+              className="flex w-full justify-between rounded-2xl bg-blue-600 px-6 py-4 font-bold text-white shadow-xl"
             >
               <div className="flex items-center gap-2">
                 <FaShoppingCart />
@@ -1828,7 +1834,7 @@ useEffect(() => {
 
               <button
                 onClick={requestSaveOnly}
-                className="w-full mt-3 bg-emerald-600 text-white font-bold py-5 rounded-2xl flex items-center justify-center gap-3 text-lg shadow-lg shadow-emerald-600/20"
+                className="w-full mt-3 bg-emerald-600 text-gray-100 font-bold py-5 rounded-2xl flex items-center justify-center gap-3 text-lg shadow-lg shadow-emerald-600/20"
               >
                 <FaCheckCircle /> Save Only
               </button>
@@ -2243,7 +2249,7 @@ useEffect(() => {
 
               <button
                 onClick={requestSaveOnly}
-                className="w-full mb-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 shadow-xl shadow-emerald-600/20"
+                className="w-full mb-3 bg-emerald-600 hover:bg-emerald-500 text-gray-100 font-bold py-4 rounded-2xl flex items-center justify-center gap-2 shadow-xl shadow-emerald-600/20"
               >
                 <FaCheckCircle /> Save Only
               </button>

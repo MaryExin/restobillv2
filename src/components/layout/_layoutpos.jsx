@@ -162,9 +162,38 @@ const LayoutPos = ({ children }) => {
       <PosQuickActionTile label="Home" icon={<FaHome className="text-[28px] sm:text-[30px]" />} color="green" onClick={() => navigate("/poscorehomescreen")} />
       <PosQuickActionTile label="Product List" icon={<FaBoxOpen className="text-[28px] sm:text-[30px]" />} color="violet" onClick={() => navigate("/productlist")} />
       <OpenNewDay />
-      <PosQuickActionTile label="New Transaction" icon={<FaReceipt className="text-[28px] sm:text-[30px]" />} color="orange" disabled={isClosed} onClick={() => !isClosed && navigate("/ordering")} />
-      <PosQuickActionTile label="Billing" icon={<FaReceipt className="text-[28px] sm:text-[30px]" />} color="violet" disabled={isClosed} onClick={() => !isClosed && navigate("/printbilling")} />
-      <PosQuickActionTile label="Payment" icon={<FaReceipt className="text-[28px] sm:text-[30px]" />} color="green" onClick={() => navigate("/payments")} />
+
+      <PosQuickActionTile
+        label="New Transaction"
+        icon={<FaReceipt className="text-[28px] sm:text-[30px]" />}
+        color="orange"
+        disabled={isClosed}
+        onClick={() => !isClosed && navigate("/ordering")}
+      />
+      <PosQuickActionTile
+        label="Billing"
+        icon={<FaReceipt className="text-[28px] sm:text-[30px]" />}
+        color="violet"
+        disabled={isClosed}
+        onClick={() => !isClosed && navigate("/printbilling")}
+      />
+
+      <PosQuickActionTile
+        label="Payment"
+        icon={<FaReceipt className="text-[28px] sm:text-[30px]" />}
+        color="green"
+        onClick={() => navigate("/payments")}
+        disabled={isClosed}
+      />
+
+      {/* <PosQuickActionTile
+        label="Trans. Records"
+        icon={<FaHistory className="text-[28px] sm:text-[30px]" />}
+        color="orange"
+        disabled={isClosed}
+        onClick={() => !isClosed && navigate("/transactionrecords")}
+      /> */}
+
       <SwitchUser />
       <PosQuickActionTile label="POS Reading" icon={<FaFileAlt className="text-[28px] sm:text-[30px]" />} color="indigo" disabled={isClosed} onClick={() => setIsPosReadingOpen(true)} />
       <PosQuickActionTile label="POS Reports" icon={<FaChartPie className="text-[28px] sm:text-[30px]" />} color="indigo" onClick={() => setIsReportsOpen(true)} />

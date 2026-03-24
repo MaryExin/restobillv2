@@ -54,10 +54,7 @@ const OpenNewDay = () => {
       delete window.refreshOpenNewDayShift;
     };
   }, [refreshShiftData]);
-
-  const { isLoading: shiftingLoading, mutateAsync: mutateShifting } =
-    useCustomSecuredMutation(`${apiHost}/api/open_shift.php`, "POST");
-
+const shiftingLoading = false;
   const getTodayLocal = () => {
     const today = new Date();
     const year = today.getFullYear();
@@ -169,19 +166,88 @@ const OpenNewDay = () => {
 
   const handleConfirmedSubmit = async () => {
     try {
+      if (!apiHost) {
+        alert("API host is not ready.");
+        return;
+      }
+
+      const loggedUserId =
+        userId ||
+        localStorage.getItem("user_id") ||
+        localStorage.getItem("id") ||
+        "";
+
+      const loggedUserName =
+        localStorage.getItem("username") ||
+        localStorage.getItem("email") ||
+        localStorage.getItem("Cashier") ||
+        "Store Crew";
+
+      const cashierName =
+        localStorage.getItem("Cashier") ||
+        localStorage.getItem("fullname") ||
+        localStorage.getItem("name") ||
+        loggedUserName;
+
+      if (!loggedUserId) {
+        alert("User ID is missing. Please log in again.");
+        return;
+      }
+
+      if (!values.category_code || !values.unit_code) {
+        alert("Category code or unit code is missing.");
+        return;
+      }
+
+      if (!values.selectedDate) {
+        alert("Please select a date.");
+        return;
+      }
+
+      const inputAmount = String(values.inputAmount ?? "").trim();
+      const verifyAmount = String(values.verifyAmount ?? "").trim();
+
+      if (inputAmount === "" || verifyAmount === "") {
+        alert("Please input amount first.");
+        return;
+      }
+
+      if (Number(inputAmount) <= 0 || Number(verifyAmount) <= 0) {
+        alert("Amounts must be greater than zero.");
+        return;
+      }
+
+      if (Number(inputAmount) !== Number(verifyAmount)) {
+        alert("Input amount and verify amount do not match.");
+        return;
+      }
+
       setIsSubmitting(true);
 
-      const payload = {
-        user_id: userId,
-        category_code: values.category_code,
-        unit_code: values.unit_code,
-        terminal_number: localStorage.getItem("posTerminalNumber") || "1",
-        opening_cash_count: values.inputAmount,
-        opening_cash_count_confirmation: values.verifyAmount,
-        opening_date: values.selectedDate,
-      };
+      const formData = new FormData();
+      formData.append("user_id", String(loggedUserId));
+      formData.append("user_name", String(loggedUserName));
+      formData.append("cashier_name", String(cashierName));
+      formData.append("category_code", String(values.category_code));
+      formData.append("unit_code", String(values.unit_code));
+      formData.append(
+        "terminal_number",
+        String(localStorage.getItem("posTerminalNumber") || "1")
+      );
+      formData.append("opening_cash_count", inputAmount);
+      formData.append("opening_cash_count_confirmation", verifyAmount);
+      formData.append("opening_date", String(values.selectedDate));
 
-      const response = await mutateShifting(payload);
+      const response = await fetch(`${apiHost}/api/open_shift.php`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || result?.status !== "success") {
+        throw new Error(result?.message || "Failed to open new shift.");
+      }
 
       await refreshShiftData();
 
@@ -197,14 +263,21 @@ const OpenNewDay = () => {
         await window.refreshSwitchUserShift();
       }
 
-      setSuccessMessage(response?.message || "New shift has been opened!");
+      if (window.refreshOpenNewDayShift) {
+        await window.refreshOpenNewDayShift();
+      }
 
+      if (queryClient) {
+        await queryClient.invalidateQueries();
+      }
+
+      setSuccessMessage(result?.message || "New shift has been opened successfully.");
       setIsYesNoModalOpen(false);
       setOpen(false);
       resetForm();
       setIsSuccessModalOpen(true);
     } catch (error) {
-      console.error("Failed:", error);
+      console.error("Open shift failed:", error);
       alert(error?.message || "Failed to open new shift.");
     } finally {
       setIsSubmitting(false);

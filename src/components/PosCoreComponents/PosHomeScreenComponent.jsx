@@ -29,6 +29,10 @@ useEffect(() => {
 
       const result = await response.json();
 
+      if (result.userName) {
+        localStorage.setItem("Cashier", result.userName);
+      }
+
       setDateSelection(result);
 
     } catch (error) {

@@ -572,19 +572,23 @@ const ViewOrdering = () => {
             }`}
           >
             <FaArrowLeft size={14} />
-            <span className="text-xs font-bold tracking-wider uppercase">Back To Menu</span>
+            <span className="text-xs font-bold tracking-wider uppercase">
+              Back To Menu
+            </span>
           </button>
 
           <div className="flex items-center gap-4">
             {/* --- VIEW SWITCHER --- */}
-            <div className={`flex p-1 rounded-2xl ${isDark ? "bg-slate-900/80 border border-white/5" : "bg-slate-100 border border-slate-200"}`}>
-              <button 
+            <div
+              className={`flex p-1 rounded-2xl ${isDark ? "bg-slate-900/80 border border-white/5" : "bg-slate-100 border border-slate-200"}`}
+            >
+              <button
                 onClick={() => setViewMode("card")}
                 className={`p-2.5 rounded-xl transition-all ${viewMode === "card" ? "bg-blue-600 text-white shadow-lg shadow-blue-900/20" : "text-slate-500 hover:text-slate-400"}`}
               >
                 <FaThLarge size={14} />
               </button>
-              <button 
+              <button
                 onClick={() => setViewMode("table")}
                 className={`p-2.5 rounded-xl transition-all ${viewMode === "table" ? "bg-blue-600 text-white shadow-lg shadow-blue-900/20" : "text-slate-500 hover:text-slate-400"}`}
               >
@@ -751,29 +755,45 @@ const ViewOrdering = () => {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -15 }}
                   className={`rounded-[2.5rem] overflow-hidden border ${
-                    isDark ? "bg-slate-950/40 border-white/5" : "bg-white border-slate-200 shadow-sm"
+                    isDark
+                      ? "bg-slate-950/40 border-white/5"
+                      : "bg-white border-slate-200 shadow-sm"
                   }`}
                 >
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className={`${isDark ? "bg-slate-900/50" : "bg-slate-100/50"}`}>
-                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Table info</th>
-                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Current Status</th>
-                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 text-right">Actions</th>
+                      <tr
+                        className={`${isDark ? "bg-slate-900/50" : "bg-slate-100/50"}`}
+                      >
+                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">
+                          Table info
+                        </th>
+                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">
+                          Current Status
+                        </th>
+                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 text-right">
+                          Actions
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
                       {currentTables.map((table) => (
-                        <tr 
-                          key={table.table_number} 
+                        <tr
+                          key={table.table_number}
                           className={`border-b last:border-0 transition-colors ${isDark ? "border-white/5 hover:bg-white/5" : "border-slate-100 hover:bg-slate-50"}`}
                         >
                           <td className="p-8">
                             <div className="flex items-center gap-4">
-                              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black ${isDark ? "bg-slate-900 text-blue-500" : "bg-blue-50 text-blue-600"}`}>
+                              <div
+                                className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black ${isDark ? "bg-slate-900 text-blue-500" : "bg-blue-50 text-blue-600"}`}
+                              >
                                 {table.table_number}
                               </div>
-                              <span className={`font-bold ${isDark ? "text-white" : "text-slate-900"}`}>Table {table.table_number}</span>
+                              <span
+                                className={`font-bold ${isDark ? "text-white" : "text-slate-900"}`}
+                              >
+                                Table {table.table_number}
+                              </span>
                             </div>
                           </td>
                           <td className="p-8">
@@ -783,7 +803,7 @@ const ViewOrdering = () => {
                             </span>
                           </td>
                           <td className="p-8 text-right">
-                            <button 
+                            <button
                               onClick={() => handleTableSelect(table)}
                               className="px-6 py-3 text-xs font-bold text-white transition-all bg-blue-600 shadow-lg hover:bg-blue-500 rounded-2xl shadow-blue-900/10"
                             >
