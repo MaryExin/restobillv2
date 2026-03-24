@@ -209,6 +209,7 @@ const PosLoginComponent = () => {
                         type={showPassword ? "text" : "password"}
                         value={formData.password}
                         onChange={handleChange("password")}
+                        onKeyDown={handleConfirmedLogin}
                         placeholder="••••••"
                         className="h-full w-full border-none bg-transparent text-center text-[17px] font-medium tracking-[0.2em] text-slate-600 outline-none placeholder:text-slate-400"
                         autoComplete="current-password"
