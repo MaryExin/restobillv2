@@ -22,6 +22,7 @@ import { useTheme } from "../../context/ThemeContext";
 import useApiHost from "../../hooks/useApiHost";
 import { useNavigate } from "react-router-dom";
 import TransactionPaymentModal from "./TransactionPaymentModal";
+import ModalSuccessNavToSelf from "../Modals/ModalSuccessNavToSelf";
 
 const peso = (value) =>
   `₱ ${Number(value || 0).toLocaleString("en-PH", {
@@ -138,6 +139,7 @@ function StatCard({ title, value, icon: Icon, isDark, tone = "blue" }) {
     yellow: isDark
       ? "bg-amber-500/10 text-amber-300"
       : "bg-amber-50 text-amber-600",
+    red: isDark ? "bg-red-500/10 text-red-300" : "bg-red-50 text-red-600",
     slate: isDark
       ? "bg-slate-800 text-slate-300"
       : "bg-slate-100 text-slate-600",
@@ -176,6 +178,34 @@ function StatCard({ title, value, icon: Icon, isDark, tone = "blue" }) {
 }
 
 function SummaryPanel({ isDark, viewMode, summary }) {
+  const titleMap = {
+    pending: "Pending Overview",
+    paid: "Paid Overview",
+    voided: "Voided Overview",
+    refunded: "Refunded Overview",
+  };
+
+  const countMap = {
+    pending: "Pending Transactions",
+    paid: "Paid Transactions",
+    voided: "Voided Transactions",
+    refunded: "Refunded Transactions",
+  };
+
+  const amountMap = {
+    pending: "Pending Sales",
+    paid: "Paid Amount",
+    voided: "Voided Amount",
+    refunded: "Refunded Amount",
+  };
+
+  const toneMap = {
+    pending: "yellow",
+    paid: "green",
+    voided: "red",
+    refunded: "blue",
+  };
+
   return (
     <div
       className={`rounded-[28px] border p-5 lg:sticky lg:top-6 ${
@@ -193,7 +223,7 @@ function SummaryPanel({ isDark, viewMode, summary }) {
             isDark ? "text-white" : "text-slate-900"
           }`}
         >
-          {viewMode === "paid" ? "Paid Overview" : "Pending Overview"}
+          {titleMap[viewMode]}
         </h2>
         <p className="mt-2 text-sm text-slate-500">
           Quick totals and payment setup information.
@@ -202,21 +232,19 @@ function SummaryPanel({ isDark, viewMode, summary }) {
 
       <div className="space-y-4">
         <StatCard
-          title={
-            viewMode === "paid" ? "Paid Transactions" : "Pending Transactions"
-          }
+          title={countMap[viewMode]}
           value={summary.totalTransactions}
           icon={FiDatabase}
           isDark={isDark}
-          tone={viewMode === "paid" ? "green" : "yellow"}
+          tone={toneMap[viewMode]}
         />
 
         <StatCard
-          title={viewMode === "paid" ? "Paid Amount" : "Pending Sales"}
+          title={amountMap[viewMode]}
           value={peso(summary.totalSales)}
           icon={FaMoneyBill}
           isDark={isDark}
-          tone={viewMode === "paid" ? "green" : "yellow"}
+          tone={toneMap[viewMode]}
         />
 
         <StatCard
@@ -264,12 +292,12 @@ function SummaryPanel({ isDark, viewMode, summary }) {
 
           <div className="flex items-center gap-3">
             <span className="h-3.5 w-3.5 rounded-full bg-red-500" />
-            <span className="text-slate-500">Void Action</span>
+            <span className="text-slate-500">Voided Transactions</span>
           </div>
 
           <div className="flex items-center gap-3">
-            <span className="h-3.5 w-3.5 rounded-full bg-yellow-500" />
-            <span className="text-slate-500">Refund Action</span>
+            <span className="h-3.5 w-3.5 rounded-full bg-blue-500" />
+            <span className="text-slate-500">Refunded Transactions</span>
           </div>
         </div>
       </div>
@@ -284,7 +312,7 @@ function HeaderRow({ isDark, mode }) {
     "Table",
     "Order Type",
     "Transaction Date",
-    mode === "paid" ? "Amount Due / Paid" : "Total Sales",
+    mode === "pending" ? "Total Sales" : "Amount",
     "Cashier",
     "Remarks",
   ];
@@ -320,9 +348,11 @@ function ActionRemarksModal({
   actionType,
   activeRow,
   isSubmitting,
+  remarksInputRef,
 }) {
   const title =
     actionType === "refund" ? "Refund Transaction" : "Void Transaction";
+
   const buttonClass =
     actionType === "refund"
       ? "bg-yellow-500 hover:bg-yellow-400 text-white"
@@ -401,8 +431,12 @@ function ActionRemarksModal({
                   actionType === "refund"
                     ? activeRow?.TotalAmountDue ||
                         activeRow?.payment_amount ||
+                        activeRow?.TotalSales ||
                         0
-                    : activeRow?.TotalSales || 0,
+                    : activeRow?.TotalSales ||
+                        activeRow?.TotalAmountDue ||
+                        activeRow?.payment_amount ||
+                        0,
                 )}
               </div>
             </div>
@@ -418,6 +452,7 @@ function ActionRemarksModal({
             Remarks
           </label>
           <textarea
+            ref={remarksInputRef}
             value={remarks}
             onChange={(e) => setRemarks(e.target.value)}
             rows={5}
@@ -475,11 +510,38 @@ function TransactionRow({ index, style, data }) {
   const mode = data.mode;
 
   const remarksText =
-    row.remarks || (mode === "paid" ? "Paid" : "Pending for Payment");
+    row.remarks ||
+    row.void_remarks ||
+    row.refund_remarks ||
+    (mode === "paid"
+      ? "Paid"
+      : mode === "pending"
+        ? "Pending for Payment"
+        : mode === "voided"
+          ? "Voided"
+          : "Refunded");
 
   const normalizedRemarks = normalizeText(remarksText);
   const isPaid = normalizedRemarks.includes("paid");
   const isPending = normalizedRemarks.includes("pending");
+  const isVoided =
+    normalizedRemarks.includes("void") ||
+    normalizeText(row.status).includes("void");
+  const isRefunded =
+    normalizedRemarks.includes("refund") ||
+    normalizeText(row.status).includes("refund");
+
+  const viewTitle =
+    mode === "paid"
+      ? "Review / Print Duplicate"
+      : mode === "pending"
+        ? "Open Payment"
+        : "View Transaction";
+
+  const amount =
+    mode === "pending"
+      ? row.TotalSales
+      : row.TotalAmountDue || row.payment_amount || row.TotalSales || 0;
 
   return (
     <div style={style}>
@@ -496,9 +558,7 @@ function TransactionRow({ index, style, data }) {
             type="button"
             onClick={() => onOpen(row)}
             className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white transition hover:bg-blue-500"
-            title={
-              mode === "paid" ? "Review / Print Duplicate" : "Open Payment"
-            }
+            title={viewTitle}
           >
             {mode === "paid" ? <FiPrinter size={17} /> : <FiEye size={17} />}
           </button>
@@ -512,7 +572,7 @@ function TransactionRow({ index, style, data }) {
             >
               Void
             </button>
-          ) : (
+          ) : mode === "paid" ? (
             <button
               type="button"
               onClick={() => onRefund(row)}
@@ -521,6 +581,16 @@ function TransactionRow({ index, style, data }) {
             >
               Refund
             </button>
+          ) : (
+            <span
+              className={`inline-flex h-11 items-center justify-center rounded-2xl px-4 text-sm font-bold ${
+                mode === "voided"
+                  ? "bg-red-500/10 text-red-500"
+                  : "bg-blue-500/10 text-blue-500"
+              }`}
+            >
+              View Only
+            </span>
           )}
         </div>
 
@@ -544,9 +614,7 @@ function TransactionRow({ index, style, data }) {
         </div>
 
         <div className="whitespace-nowrap px-5 py-4 text-right font-black">
-          {mode === "paid"
-            ? peso(row.TotalAmountDue || row.payment_amount || 0)
-            : peso(row.TotalSales)}
+          {peso(amount)}
         </div>
 
         <div className="whitespace-nowrap px-5 py-4">{row.cashier || "-"}</div>
@@ -554,13 +622,17 @@ function TransactionRow({ index, style, data }) {
         <div className="flex items-center px-5 py-4">
           <span
             className={`rounded-full px-3 py-1 text-xs font-bold ${
-              isPaid
-                ? "bg-emerald-500/10 text-emerald-500"
-                : isPending
-                  ? "bg-amber-500/10 text-amber-500"
-                  : isDark
-                    ? "bg-slate-500/10 text-slate-300"
-                    : "bg-slate-900/10 text-slate-700"
+              isVoided
+                ? "bg-red-500/10 text-red-500"
+                : isRefunded
+                  ? "bg-blue-500/10 text-blue-500"
+                  : isPaid
+                    ? "bg-emerald-500/10 text-emerald-500"
+                    : isPending
+                      ? "bg-amber-500/10 text-amber-500"
+                      : isDark
+                        ? "bg-slate-500/10 text-slate-300"
+                        : "bg-slate-900/10 text-slate-700"
             }`}
           >
             {remarksText}
@@ -585,6 +657,8 @@ export default function PosPayment() {
   const [viewMode, setViewMode] = useState("pending");
   const [pendingTransactions, setPendingTransactions] = useState([]);
   const [paidTransactions, setPaidTransactions] = useState([]);
+  const [voidedTransactions, setVoidedTransactions] = useState([]);
+  const [refundedTransactions, setRefundedTransactions] = useState([]);
   const [modeOfPayments, setModeOfPayments] = useState([]);
   const [chargeOptions, setChargeOptions] = useState([]);
 
@@ -600,6 +674,12 @@ export default function PosPayment() {
   const [activeRow, setActiveRow] = useState(null);
   const [actionRemarks, setActionRemarks] = useState("");
 
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [successHeader, setSuccessHeader] = useState("Saved Successfully");
+  const [successMessage, setSuccessMessage] = useState(
+    "Your changes have been saved.",
+  );
+
   const fetchAll = useCallback(async () => {
     if (!apiHost) return;
 
@@ -607,10 +687,12 @@ export default function PosPayment() {
     setErrorMessage("");
 
     try {
-      const [pendingRes, paidRes, mopRes, chargesRes] =
+      const [pendingRes, paidRes, voidedRes, refundedRes, mopRes, chargesRes] =
         await Promise.allSettled([
           fetch(`${apiHost}/api/pos_payment_read_pending.php`),
           fetch(`${apiHost}/api/pos_payment_read_paid.php`),
+          fetch(`${apiHost}/api/pos_payment_read_voided.php`),
+          fetch(`${apiHost}/api/pos_payment_read_refunded.php`),
           fetch(`${apiHost}/api/pos_payment_read_mode_of_payment.php`),
           fetch(`${apiHost}/api/pos_payment_read_other_charges.php`),
         ]);
@@ -657,6 +739,52 @@ export default function PosPayment() {
         }
       } else {
         setPaidTransactions([]);
+      }
+
+      if (voidedRes.status === "fulfilled") {
+        try {
+          const voidedData = await safeReadJson(
+            voidedRes.value,
+            "Voided transactions API",
+          );
+          if (voidedRes.value.ok && voidedData?.success) {
+            setVoidedTransactions(
+              Array.isArray(voidedData?.transactions)
+                ? voidedData.transactions
+                : [],
+            );
+          } else {
+            setVoidedTransactions([]);
+          }
+        } catch (error) {
+          console.error(error);
+          setVoidedTransactions([]);
+        }
+      } else {
+        setVoidedTransactions([]);
+      }
+
+      if (refundedRes.status === "fulfilled") {
+        try {
+          const refundedData = await safeReadJson(
+            refundedRes.value,
+            "Refunded transactions API",
+          );
+          if (refundedRes.value.ok && refundedData?.success) {
+            setRefundedTransactions(
+              Array.isArray(refundedData?.transactions)
+                ? refundedData.transactions
+                : [],
+            );
+          } else {
+            setRefundedTransactions([]);
+          }
+        } catch (error) {
+          console.error(error);
+          setRefundedTransactions([]);
+        }
+      } else {
+        setRefundedTransactions([]);
       }
 
       if (mopRes.status === "fulfilled") {
@@ -745,7 +873,7 @@ export default function PosPayment() {
       window.alert(
         actionType === "refund"
           ? "Please enter refund remarks."
-          : "Please enter void remarks."
+          : "Please enter void remarks.",
       );
       return;
     }
@@ -755,7 +883,9 @@ export default function PosPayment() {
       localStorage.getItem("user_id") ||
       localStorage.getItem("id") ||
       "";
+
     const userName = localStorage.getItem("Cashier") || "Store Crew";
+
     const payload = {
       transaction_id: String(activeRow.transaction_id || "").trim(),
       invoice_no: String(activeRow.invoice_no || "").trim(),
@@ -765,14 +895,15 @@ export default function PosPayment() {
         activeRow.TotalAmountDue ||
           activeRow.payment_amount ||
           activeRow.total_amount ||
-          0
+          activeRow.TotalSales ||
+          0,
       ),
       remarks: trimmedRemarks,
       category_code: String(
-        activeRow.Category_Code || activeRow.category_code || ""
+        activeRow.Category_Code || activeRow.category_code || "",
       ).trim(),
       unit_code: String(
-        activeRow.Unit_Code || activeRow.unit_code || ""
+        activeRow.Unit_Code || activeRow.unit_code || "",
       ).trim(),
       user_id: String(userId).trim(),
     };
@@ -798,7 +929,7 @@ export default function PosPayment() {
         response,
         actionType === "refund"
           ? "Refund transaction API"
-          : "Void transaction API"
+          : "Void transaction API",
       );
 
       if (!response.ok || !result?.success) {
@@ -806,30 +937,34 @@ export default function PosPayment() {
           result?.message ||
             (actionType === "refund"
               ? "Failed to refund transaction."
-              : "Failed to void transaction.")
+              : "Failed to void transaction."),
         );
       }
 
       closeActionModal();
       await fetchAll();
 
-      window.alert(
+      setSuccessHeader(
+        actionType === "refund" ? "Refund Successful" : "Void Successful",
+      );
+      setSuccessMessage(
         result?.message ||
           (actionType === "refund"
             ? "Transaction refunded successfully."
-            : "Transaction voided successfully.")
+            : "Transaction voided successfully."),
       );
+      setIsSuccessModalOpen(true);
     } catch (error) {
       console.error(
         `[${actionType === "refund" ? "REFUND" : "VOID"} ERROR]`,
-        error
+        error,
       );
 
       setErrorMessage(
         error?.message ||
           (actionType === "refund"
             ? "Failed to refund transaction."
-            : "Failed to void transaction.")
+            : "Failed to void transaction."),
       );
     } finally {
       setIsActionLoading(false);
@@ -843,10 +978,18 @@ export default function PosPayment() {
     fetchAll,
   ]);
 
-  const sourceTransactions = useMemo(
-    () => (viewMode === "paid" ? paidTransactions : pendingTransactions),
-    [viewMode, paidTransactions, pendingTransactions],
-  );
+  const sourceTransactions = useMemo(() => {
+    if (viewMode === "paid") return paidTransactions;
+    if (viewMode === "voided") return voidedTransactions;
+    if (viewMode === "refunded") return refundedTransactions;
+    return pendingTransactions;
+  }, [
+    viewMode,
+    pendingTransactions,
+    paidTransactions,
+    voidedTransactions,
+    refundedTransactions,
+  ]);
 
   const filteredTransactions = useMemo(() => {
     const searchValue = normalizeText(search);
@@ -862,7 +1005,10 @@ export default function PosPayment() {
         row.cashier,
         row.transaction_date,
         row.remarks,
+        row.status,
         row.invoice_no,
+        row.void_remarks,
+        row.refund_remarks,
       ]
         .join(" ")
         .toLowerCase();
@@ -874,12 +1020,14 @@ export default function PosPayment() {
   const summary = useMemo(() => {
     return {
       totalTransactions: filteredTransactions.length,
-      totalSales: filteredTransactions.reduce(
-        (sum, row) =>
-          sum +
-          toNum(viewMode === "paid" ? row.TotalAmountDue : row.TotalSales),
-        0,
-      ),
+      totalSales: filteredTransactions.reduce((sum, row) => {
+        const amount =
+          viewMode === "pending"
+            ? row.TotalSales
+            : row.TotalAmountDue || row.payment_amount || row.TotalSales || 0;
+
+        return sum + toNum(amount);
+      }, 0),
       totalMethods: modeOfPayments.length,
       totalCharges: chargeOptions.length,
     };
@@ -900,6 +1048,8 @@ export default function PosPayment() {
     [filteredTransactions, isDark, viewMode, openVoidModal, openRefundModal],
   );
 
+  const isPaymentReadOnly = viewMode === "voided" || viewMode === "refunded";
+
   return (
     <>
       <div
@@ -912,70 +1062,66 @@ export default function PosPayment() {
         <div className="pointer-events-none fixed inset-0 overflow-hidden">
           <div
             className={`absolute -left-20 top-0 h-72 w-72 rounded-full blur-[120px] ${
-              isDark ? "bg-blue-600/10" : "bg-blue-500/15"
+              isDark ? "bg-blue-500/10" : "bg-blue-300/30"
             }`}
           />
           <div
-            className={`absolute right-0 top-20 h-80 w-80 rounded-full blur-[140px] ${
-              isDark ? "bg-cyan-500/10" : "bg-sky-400/15"
+            className={`absolute right-0 top-20 h-72 w-72 rounded-full blur-[120px] ${
+              isDark ? "bg-cyan-500/10" : "bg-cyan-300/30"
             }`}
           />
         </div>
 
-        <div className="relative z-10 mx-auto max-w-[1700px] p-4 sm:p-6 lg:p-8">
+        <div className="relative z-10 mx-auto max-w-[1700px] px-4 py-6 md:px-6 lg:px-8">
           <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-            <button
-              onClick={() => navigate("/poscorehomescreen")}
-              className={`inline-flex items-center gap-3 rounded-2xl border px-5 py-3 font-semibold transition ${
-                isDark
-                  ? "border-white/5 bg-white/[0.03] text-slate-300 hover:text-white"
-                  : "border-slate-200 bg-white text-slate-700 hover:text-slate-900 shadow-sm"
-              }`}
-            >
-              <FaArrowLeft size={14} />
-              Back
-            </button>
+            <div>
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className={`mb-3 inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-bold transition ${
+                  isDark
+                    ? "bg-white/5 text-slate-200 hover:bg-white/10"
+                    : "bg-white text-slate-700 shadow-sm hover:bg-slate-50"
+                }`}
+              >
+                <FaArrowLeft size={14} />
+                Back
+              </button>
 
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.22em] text-blue-500">
-              <FiTag />
-              Payment Center
+              <div className="text-xs font-black uppercase tracking-[0.22em] text-blue-500">
+                POS • Payment Center
+              </div>
+              <h1
+                className={`mt-2 text-3xl font-black md:text-4xl ${
+                  isDark ? "text-white" : "text-slate-900"
+                }`}
+              >
+                Transaction Payment Management
+              </h1>
+              <p className="mt-2 max-w-3xl text-sm text-slate-500 md:text-base">
+                View pending, paid, voided, and refunded transactions in one
+                place.
+              </p>
             </div>
           </div>
 
-          <div className="mb-6">
-            <h1
-              className={`text-3xl font-black sm:text-4xl ${
-                isDark ? "text-white" : "text-slate-900"
-              }`}
-            >
-              {viewMode === "paid"
-                ? "Paid Transactions"
-                : "Pending for Payment"}
-            </h1>
-            <p className="mt-2 text-sm text-slate-500">
-              Review billed transactions, open payment posting, reprint
-              duplicate invoice copies, void pending transactions, and refund
-              paid transactions.
-            </p>
-          </div>
-
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="space-y-6">
+            <section className="order-1 min-w-0 space-y-6">
               <div
-                className={`rounded-[28px] border p-4 sm:p-5 ${
+                className={`rounded-[30px] border p-5 ${
                   isDark
                     ? "border-white/5 bg-white/[0.03]"
                     : "border-slate-200 bg-white shadow-sm"
                 }`}
               >
-                <div className="flex flex-col items-start gap-4">
-                  <div className="flex flex-wrap justify-start gap-3">
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                  <div className="flex flex-wrap gap-3">
                     <button
                       type="button"
                       onClick={() => setViewMode("pending")}
                       className={`rounded-2xl px-4 py-3 text-sm font-black transition ${
                         viewMode === "pending"
-                          ? "bg-amber-500 text-gray-100"
+                          ? "bg-amber-500 text-white"
                           : isDark
                             ? "border border-slate-700 bg-slate-900 text-slate-300"
                             : "border border-slate-200 bg-slate-50 text-slate-700"
@@ -989,7 +1135,7 @@ export default function PosPayment() {
                       onClick={() => setViewMode("paid")}
                       className={`rounded-2xl px-4 py-3 text-sm font-black transition ${
                         viewMode === "paid"
-                          ? "bg-emerald-600 text-gray-100"
+                          ? "bg-emerald-600 text-white"
                           : isDark
                             ? "border border-slate-700 bg-slate-900 text-slate-300"
                             : "border border-slate-200 bg-slate-50 text-slate-700"
@@ -997,28 +1143,68 @@ export default function PosPayment() {
                     >
                       Paid
                     </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setViewMode("voided")}
+                      className={`rounded-2xl px-4 py-3 text-sm font-black transition ${
+                        viewMode === "voided"
+                          ? "bg-red-600 text-white"
+                          : isDark
+                            ? "border border-slate-700 bg-slate-900 text-slate-300"
+                            : "border border-slate-200 bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      Voided
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setViewMode("refunded")}
+                      className={`rounded-2xl px-4 py-3 text-sm font-black transition ${
+                        viewMode === "refunded"
+                          ? "bg-blue-600 text-white"
+                          : isDark
+                            ? "border border-slate-700 bg-slate-900 text-slate-300"
+                            : "border border-slate-200 bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      Refunded
+                    </button>
                   </div>
 
-                  <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-[1fr_150px]">
-                    <div className="relative">
-                      <FiSearch className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <div className="flex flex-col gap-3 md:flex-row">
+                    <div
+                      className={`flex items-center gap-3 rounded-[22px] border px-4 py-3 ${
+                        isDark
+                          ? "border-slate-700 bg-slate-950"
+                          : "border-slate-200 bg-slate-50"
+                      }`}
+                    >
+                      <FiSearch
+                        size={18}
+                        className={isDark ? "text-slate-400" : "text-slate-500"}
+                      />
                       <input
-                        type="text"
-                        placeholder="Search transaction, table, cashier, remarks..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        className={`w-full rounded-2xl py-4 pl-12 pr-4 outline-none transition ${
+                        placeholder="Search transaction, table, cashier..."
+                        className={`w-full bg-transparent text-sm outline-none ${
                           isDark
-                            ? "border border-slate-800 bg-slate-950 text-white focus:border-blue-500"
-                            : "border border-slate-200 bg-slate-50 text-slate-900 focus:border-blue-400"
+                            ? "text-white placeholder:text-slate-500"
+                            : "text-slate-900 placeholder:text-slate-400"
                         }`}
                       />
                     </div>
 
                     <button
+                      type="button"
                       onClick={fetchAll}
-                      disabled={isLoading || isActionLoading}
-                      className="flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-4 font-semibold text-white transition hover:bg-blue-500 disabled:opacity-60"
+                      className={`inline-flex items-center justify-center gap-2 rounded-[22px] px-5 py-3 text-sm font-black transition ${
+                        isDark
+                          ? "bg-slate-800 text-slate-100 hover:bg-slate-700"
+                          : "bg-slate-900 text-white hover:bg-slate-800"
+                      }`}
                     >
                       <FiRefreshCw size={16} />
                       Refresh
@@ -1074,13 +1260,15 @@ export default function PosPayment() {
                   </div>
                 )}
               </div>
-            </div>
+            </section>
 
-            <SummaryPanel
-              isDark={isDark}
-              viewMode={viewMode}
-              summary={summary}
-            />
+            <aside className="order-2">
+              <SummaryPanel
+                isDark={isDark}
+                viewMode={viewMode}
+                summary={summary}
+              />
+            </aside>
           </div>
         </div>
       </div>
@@ -1097,6 +1285,7 @@ export default function PosPayment() {
         modeOfPayments={modeOfPayments}
         chargeOptions={chargeOptions}
         mode={viewMode}
+        readOnly={isPaymentReadOnly}
         onSaved={fetchAll}
       />
 
@@ -1110,7 +1299,21 @@ export default function PosPayment() {
         actionType={actionType}
         activeRow={activeRow}
         isSubmitting={isActionLoading}
+        remarksInputRef={remarksInputRef}
       />
+
+      {isSuccessModalOpen && (
+        <ModalSuccessNavToSelf
+          header={successHeader}
+          message={successMessage}
+          button="OK"
+          setIsModalOpen={setIsSuccessModalOpen}
+          resetForm={() => {
+            setSuccessHeader("Saved Successfully");
+            setSuccessMessage("Your changes have been saved.");
+          }}
+        />
+      )}
     </>
   );
 }
