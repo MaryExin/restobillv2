@@ -565,16 +565,14 @@ const ViewOrdering = () => {
         <div className="flex items-center justify-between mx-auto max-w-7xl">
           <button
             onClick={() => navigate("/poscorehomescreen")}
-            className={`flex items-center gap-3 px-6 py-3 rounded-full transition-all ${
+            className={`flex items-center gap-3 mt-2 px-10 py-6 rounded-full transition-all ${
               isDark
                 ? "bg-slate-900/50 border border-white/5 text-slate-400 hover:text-white"
                 : "bg-white border border-slate-200 text-slate-600 hover:text-slate-900 shadow-sm"
             }`}
           >
             <FaArrowLeft size={14} />
-            <span className="text-xs font-bold tracking-wider uppercase">
-              Back To Menu
-            </span>
+            <span className="text-sm font-bold uppercase">BACK TO DASHBOARD</span>
           </button>
 
           <div className="flex items-center gap-4">

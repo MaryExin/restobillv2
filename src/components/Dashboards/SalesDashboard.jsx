@@ -1541,6 +1541,17 @@ const SalesDashboard = () => {
 
       <div className={T.nav}>
         <div className="flex items-center justify-between mx-auto max-w-7xl">
+                    <button
+                      onClick={() => navigate("/poscorehomescreen")}
+             className={`flex items-center gap-3 mt-2 px-10 py-6 rounded-full transition-all ${
+                theme === "dark"
+                  ? "bg-slate-900/50 border border-white/5 rounded-full text-slate-400 hover:text-white transition-all"
+                  : "bg-white border border-slate-200/70 rounded-full text-slate-700 hover:text-slate-900 transition-all"
+              }`}
+            >
+                      <FaArrowLeft size={14} />
+                      <span className="text-sm font-bold uppercase">BACK TO DASHBOARD</span>
+                    </button>
           <div className="flex items-center gap-3">
             <div
               className={`h-2 w-2 rounded-full ${
@@ -1550,19 +1561,7 @@ const SalesDashboard = () => {
             <div className={T.miniLabel}>Live Reports</div>
           </div>
 
-          <div className="text-[11px] opacity-70">
-            <button
-              onClick={() => navigate("/poscorehomescreen")}
-              className={`flex items-center gap-3 px-6 py-2 ${
-                theme === "dark"
-                  ? "bg-slate-900/50 border border-white/5 rounded-full text-slate-400 hover:text-white transition-all"
-                  : "bg-white border border-slate-200/70 rounded-full text-slate-700 hover:text-slate-900 transition-all"
-              }`}
-            >
-              <FaArrowLeft size={14} />
-              <span className="text-sm font-bold uppercase">Back</span>
-            </button>
-          </div>
+
         </div>
       </div>
 
