@@ -219,7 +219,6 @@ const PosPaymentReceipt = React.forwardRef(
           <div style={{ fontSize: "10px" }}>
             S/N: {terminalConfig.serialNumber || "-"}
           </div>
-         
         </div>
 
         <div style={{ borderTop: "1px solid #000", margin: "10px 0 8px" }} />
@@ -694,7 +693,8 @@ const PosPaymentReceipt = React.forwardRef(
           <div>TIN: 626717559-000</div>
           <div>BIR ACC#: 25A6267175592023091853</div>
           <div>DATE ISSUED: 12/04/2023</div>
-          <div>PTU: FP02204-067-0432508-00003</div>
+          <div>PTU: {terminalConfig.ptuNumber}</div>
+          <div>DATE ISSUED: {terminalConfig.ptuDateIssued}</div>
         </div>
       </div>
     );
