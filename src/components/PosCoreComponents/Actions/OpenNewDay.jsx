@@ -54,7 +54,7 @@ const OpenNewDay = () => {
       delete window.refreshOpenNewDayShift;
     };
   }, [refreshShiftData]);
-const shiftingLoading = false;
+  const shiftingLoading = false;
   const getTodayLocal = () => {
     const today = new Date();
     const year = today.getFullYear();
@@ -212,10 +212,10 @@ const shiftingLoading = false;
         return;
       }
 
-      if (Number(inputAmount) <= 0 || Number(verifyAmount) <= 0) {
-        alert("Amounts must be greater than zero.");
-        return;
-      }
+      // if (Number(inputAmount) <= 0 || Number(verifyAmount) <= 0) {
+      //   alert("Amounts must be greater than zero.");
+      //   return;
+      // }
 
       if (Number(inputAmount) !== Number(verifyAmount)) {
         alert("Input amount and verify amount do not match.");
@@ -232,7 +232,7 @@ const shiftingLoading = false;
       formData.append("unit_code", String(values.unit_code));
       formData.append(
         "terminal_number",
-        String(localStorage.getItem("posTerminalNumber") || "1")
+        String(localStorage.getItem("posTerminalNumber") || "1"),
       );
       formData.append("opening_cash_count", inputAmount);
       formData.append("opening_cash_count_confirmation", verifyAmount);
@@ -271,7 +271,9 @@ const shiftingLoading = false;
         await queryClient.invalidateQueries();
       }
 
-      setSuccessMessage(result?.message || "New shift has been opened successfully.");
+      setSuccessMessage(
+        result?.message || "New shift has been opened successfully.",
+      );
       setIsYesNoModalOpen(false);
       setOpen(false);
       resetForm();
