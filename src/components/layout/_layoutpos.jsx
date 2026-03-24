@@ -267,6 +267,7 @@ const LayoutPos = ({ children }) => {
         label="Payment"
         icon={<FaReceipt className="text-[28px] sm:text-[30px]" />}
         color="green"
+        disabled={isClosed}
         onClick={() => navigate("/payments")}
       />
 
