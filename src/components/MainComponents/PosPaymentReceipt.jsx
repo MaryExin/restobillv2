@@ -428,14 +428,14 @@ const PosPaymentReceipt = React.forwardRef(
                   </td>
                 </tr>
 
-                <tr>
+                {/* <tr>
                   <td style={{ fontWeight: "700", padding: "1px 0" }}>
                     Statutory Qualified:
                   </td>
                   <td style={{ textAlign: "right", padding: "1px 0" }}>
                     {Number(computed?.statutoryQualifiedCount || 0)}
                   </td>
-                </tr>
+                </tr> */}
 
                 {activeBreakdown.map((entry) => (
                   <React.Fragment key={`summary-${entry.key}`}>
@@ -540,7 +540,7 @@ const PosPaymentReceipt = React.forwardRef(
           </>
         ) : null}
 
-        <div style={{ marginTop: "12px", fontSize: "10px" }}>
+        {/* <div style={{ marginTop: "12px", fontSize: "10px" }}>
           <div style={{ fontWeight: "700" }}>Customer Signature:</div>
           <div
             style={{
@@ -549,7 +549,7 @@ const PosPaymentReceipt = React.forwardRef(
               marginTop: "3px",
             }}
           />
-        </div>
+        </div> */}
 
         <div style={{ borderTop: "1px solid #000", margin: "10px 0 8px" }} />
 
