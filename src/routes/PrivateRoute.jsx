@@ -58,7 +58,7 @@ const PrivateRoute = ({ routename }) => {
         </p>
         <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
           <Link
-            to="/"
+            to="/poscorehomescreen"
             className="inline-block px-6 py-2 bg-blue-700 text-white rounded-md shadow-md"
           >
             Take Me Home
