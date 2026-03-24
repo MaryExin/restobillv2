@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   FiX, FiLayers, FiSettings, FiUsers, FiShield, 
   FiUser, FiTrendingUp, FiCreditCard, 
@@ -22,8 +22,15 @@ import PosBackupModal from "./PosSettingsModal/PosBackupModal";
 const PosSettings = ({ isOpen, onClose, branchInfo }) => {
   const { theme, setTheme } = useTheme(); 
   const isDark = theme === "dark";
-  const [activeTab, setActiveTab] = useState("Appearance");
+  
+  // Default to My Account
+  const [activeTab, setActiveTab] = useState("My Account");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Auto-reset to My Account when opened
+  useEffect(() => {
+    if (isOpen) setActiveTab("My Account");
+  }, [isOpen]);
 
   const adaptivePalette = [
     { name: "Crimson", light: "#ef4444", dark: "#fca5a5" },
@@ -48,49 +55,48 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
     { id: "Email Reports", icon: <FiMail /> },
     { id: "Data & Security", icon: <FiDatabase /> }, 
     { id: "Appearance", icon: <FiLayers /> },
-    { id: "General", icon: <FiSettings /> },
+    // { id: "General", icon: <FiSettings /> },
   ];
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center sm:p-6 bg-black/85 backdrop-blur-2xl">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 sm:p-4 md:p-8 bg-black/80 backdrop-blur-xl">
       
       <motion.div 
-        initial={{ scale: 0.98, opacity: 0 }}
+        initial={{ scale: 0.95, opacity: 0 }}
         animate={{ 
           scale: 1, 
           opacity: 1,
-          backgroundColor: isDark ? "#0f172a" : "#f8fafc",
-          borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(15,23,42,0.1)",
+          backgroundColor: isDark ? "#0f172a" : "#ffffff",
+          borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(15,23,42,0.08)",
         }}
-        className="relative w-full h-full sm:h-[92vh] sm:max-w-[1600px] flex flex-col lg:flex-row overflow-hidden sm:rounded-[50px] border-2 shadow-2xl transition-all duration-500"
+        // Inayos ang max-height at width para hindi magmukhang dambuhala sa malalaking screen
+        className="relative w-full h-full sm:h-[min(850px,95vh)] sm:max-w-[1400px] flex flex-col lg:flex-row overflow-hidden sm:rounded-[40px] border shadow-2xl transition-all duration-300"
       >
         
-        {/* SIDEBAR */}
-        <aside className={`hidden lg:flex flex-col w-[330px] p-12 border-r transition-colors duration-500 ${isDark ? "border-white/5 bg-slate-950/20" : "border-slate-200 bg-white"}`}>
-          <div className="mb-14">
-            {/* CNC ADMIN TITLE - STRAIGHT/NORMAL FONT */}
-            <h2 className="text-3xl font-black leading-none tracking-tighter uppercase" style={{ color: accentColor }}>
-              CNC - ADMIN
+        {/* SIDEBAR - Binawasan ang lapad at padding */}
+        <aside className={`hidden lg:flex flex-col w-[280px] p-8 border-r transition-colors duration-500 ${isDark ? "border-white/5 bg-slate-950/40" : "border-slate-100 bg-slate-50/50"}`}>
+          <div className="mb-10">
+            <h2 className="text-xl font-black leading-none tracking-tighter uppercase" style={{ color: accentColor }}>
+              SETTINGS
             </h2>
-            <div className="w-12 h-1.5 mt-3 rounded-full" style={{ backgroundColor: accentColor }} />
+            <div className="w-8 h-1 mt-2 rounded-full" style={{ backgroundColor: accentColor }} />
           </div>
 
-          <nav className="flex-1 space-y-2.5 overflow-y-auto no-scrollbar">
+          <nav className="flex-1 space-y-1.5 overflow-y-auto no-scrollbar">
             {navItems.map((nav) => (
               <button
                 key={nav.id}
                 onClick={() => setActiveTab(nav.id)}
-                className="w-full flex items-center gap-5 p-5 rounded-[28px] transition-all group active:scale-95"
+                className="flex items-center w-full gap-4 p-4 transition-all rounded-2xl group active:scale-95"
                 style={{ 
                     backgroundColor: activeTab === nav.id ? accentColor : "transparent",
                     color: activeTab === nav.id ? getContrastText() : (isDark ? "rgba(255,255,255,0.4)" : "rgba(15,23,42,0.5)"),
                 }}
               >
-                <span className="text-xl shrink-0">
+                <span className="text-lg shrink-0">
                   {nav.icon}
                 </span>
-                {/* NAV LABEL - STRAIGHT FONT */}
-                <span className="text-[11px] font-black uppercase tracking-[0.2em]">
+                <span className="text-[10px] font-bold uppercase tracking-[0.15em]">
                   {nav.id}
                 </span>
               </button>
@@ -99,89 +105,98 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
         </aside>
 
         {/* MAIN VIEWPORT */}
-        <main className="relative flex flex-col flex-1 overflow-y-auto no-scrollbar">
+        <main className="relative flex flex-col flex-1 overflow-hidden bg-transparent">
           
-          {/* HEADER AREA */}
-          <div className={`sticky top-0 z-20 p-10 flex items-center justify-between border-b ${isDark ? "bg-slate-900/90 border-white/5" : "bg-white/90 border-slate-200"} backdrop-blur-md`}>
+          {/* HEADER AREA - Mas compact ang padding */}
+          <div className={`sticky top-0 z-20 p-6 lg:px-10 flex items-center justify-between border-b ${isDark ? "bg-slate-900/40 border-white/5" : "bg-white/40 border-slate-100"} backdrop-blur-xl`}>
             <div>
-               <h3 className={`text-[10px] font-black uppercase tracking-[0.4em] ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+               <h3 className={`text-[9px] font-black uppercase tracking-[0.3em] opacity-50 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
                 System Module
                </h3>
-               <h1 className={`text-2xl font-black uppercase tracking-tight ${isDark ? "text-white" : "text-slate-800"}`}>
+               <h1 className={`text-xl font-black uppercase tracking-tight ${isDark ? "text-white" : "text-slate-800"}`}>
                 {activeTab}
                </h1>
             </div>
             
             <button 
               onClick={onClose}
-              className={`p-4 rounded-3xl transition-all active:scale-90 shadow-sm ${
-                  isDark ? 'bg-white/5 text-white border border-white/5 hover:bg-rose-500 hover:text-white' : 'bg-slate-100 text-slate-500 border border-slate-200 hover:bg-rose-500 hover:text-white'
+              className={`p-3 rounded-2xl transition-all active:scale-90 ${
+                  isDark ? 'bg-white/5 text-white hover:bg-rose-500/20 hover:text-rose-500' : 'bg-slate-100 text-slate-500 hover:bg-rose-500 hover:text-white'
               }`}
             >
-              <FiX size={24} />
+              <FiX size={20} />
             </button>
           </div>
 
-          <div className="p-10 lg:p-20 w-full max-w-[1250px] mx-auto min-h-full">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={`${activeTab}-${isDark}`}
-                initial={{ opacity: 0, y: 10 }} 
-                animate={{ opacity: 1, y: 0 }} 
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.35 }}
-              >
-                {/* --- RENDER CONTENT --- */}
-                {activeTab === "General" && (
-                  <div className="space-y-6">
-                    <h1 className={`text-6xl lg:text-8xl font-black uppercase tracking-tighter ${isDark ? "text-white" : "text-slate-900"}`}>
-                      General <span style={{color: accentColor}}>Settings</span>
-                    </h1>
-                    <p className="text-xs font-bold text-blue-500 uppercase tracking-[0.4em]">Global System Configuration</p>
-                  </div>
-                )}
-
-                {/* logic for other tabs... */}
-                {activeTab === "Email Reports" && <PosReportingModal isDark={isDark} accent={accentColor} />}
-                {activeTab === "Data & Security" && <PosBackupModal isDark={isDark} accent={accentColor} />}
-                {activeTab === "Appearance" && (
-                  <PosAppearance 
-                    isDark={isDark} setTheme={setTheme} accentColor={accentColor} 
-                    selectedColorObj={selectedColorObj} setSelectedColorObj={setSelectedColorObj} 
-                    adaptivePalette={adaptivePalette} getContrastText={getContrastText} 
-                  />
-                )}
-                {activeTab === "User Accounts" && <PosUserAccounts isDark={isDark} accent={accentColor} getContrastText={getContrastText} />}
-                {activeTab === "My Account" && <PosMyAccount isDark={isDark} accent={accentColor} branchInfo={branchInfo} />}
-                {activeTab === "User Roles" && <PosUserRolesSetUp isDark={isDark} accent={accentColor} textColor={getContrastText()} />}
-                {activeTab === "Registry Sales" && <PosSystemLogs isDark={isDark} accent={accentColor} />}
-                {activeTab === "Expenses & Petty" && <PosExpenses isDark={isDark} accent={accentColor} getContrastText={getContrastText} />}
-              </motion.div>
-            </AnimatePresence>
+          {/* CONTENT AREA - Binawasan ang padding para hindi siksik */}
+          <div className="flex-1 p-6 overflow-y-auto lg:p-12 no-scrollbar">
+            <div className="max-w-[1000px] mx-auto">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={`${activeTab}-${isDark}`}
+                  initial={{ opacity: 0, y: 8 }} 
+                  animate={{ opacity: 1, y: 0 }} 
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {activeTab === "My Account" && <PosMyAccount isDark={isDark} accent={accentColor} branchInfo={branchInfo} />}
+                  {activeTab === "User Roles" && <PosUserRolesSetUp isDark={isDark} accent={accentColor} textColor={getContrastText()} />}
+                  {activeTab === "User Accounts" && <PosUserAccounts isDark={isDark} accent={accentColor} getContrastText={getContrastText} />}
+                  {activeTab === "Registry Sales" && <PosSystemLogs isDark={isDark} accent={accentColor} />}
+                  {activeTab === "Expenses & Petty" && <PosExpenses isDark={isDark} accent={accentColor} getContrastText={getContrastText} />}
+                  {activeTab === "Email Reports" && <PosReportingModal isDark={isDark} accent={accentColor} />}
+                  {activeTab === "Data & Security" && <PosBackupModal isDark={isDark} accent={accentColor} />}
+                  {activeTab === "Appearance" && (
+                    <PosAppearance 
+                      isDark={isDark} setTheme={setTheme} accentColor={accentColor} 
+                      selectedColorObj={selectedColorObj} setSelectedColorObj={setSelectedColorObj} 
+                      adaptivePalette={adaptivePalette} getContrastText={getContrastText} 
+                    />
+                  )}
+                  {/* {activeTab === "General" && (
+                    <div className="space-y-4">
+                      <h1 className={`text-4xl lg:text-5xl font-black uppercase tracking-tighter ${isDark ? "text-white" : "text-slate-900"}`}>
+                        General <span style={{color: accentColor}}>Settings</span>
+                      </h1>
+                      <p className="text-[10px] font-bold text-blue-500 uppercase tracking-[0.4em]">Global System Configuration</p>
+                    </div>
+                  )} */}
+                </motion.div>
+              </AnimatePresence>
+            </div>
           </div>
         </main>
 
-        {/* MOBILE OVERLAY (Updated Font Styles too) */}
+        {/* MOBILE MENU TOGGLE (Visible only on small screens) */}
+        <button 
+          onClick={() => setIsMobileMenuOpen(true)}
+          className="fixed z-50 p-4 rounded-full shadow-2xl lg:hidden bottom-6 right-6"
+          style={{ backgroundColor: accentColor, color: getContrastText() }}
+        >
+          <FiMenu size={24} />
+        </button>
+
+        {/* MOBILE OVERLAY */}
         <AnimatePresence>
           {isMobileMenuOpen && (
              <motion.div 
                initial={{ x: "-100%" }} animate={{ x: 0 }} exit={{ x: "-100%" }}
-               className={`fixed inset-0 z-[115] p-10 flex flex-col ${isDark ? "bg-[#0f172a]" : "bg-white"}`}
+               className={`fixed inset-0 z-[115] p-8 flex flex-col ${isDark ? "bg-[#0f172a]" : "bg-white"}`}
              >
-               <div className="flex items-center justify-between mb-12">
-                 <h2 className="text-2xl font-black tracking-tighter uppercase" style={{ color: accentColor }}>Menu</h2>
-                 <button onClick={() => setIsMobileMenuOpen(false)} className="p-4 rounded-full bg-slate-500/10"><FiX size={24}/></button>
+               <div className="flex items-center justify-between mb-8">
+                 <h2 className="text-xl font-black tracking-tighter uppercase" style={{ color: accentColor }}>Menu</h2>
+                 <button onClick={() => setIsMobileMenuOpen(false)} className="p-3 rounded-xl bg-slate-500/10"><FiX size={20}/></button>
                </div>
-               <div className="flex-1 space-y-4 overflow-y-auto no-scrollbar">
+               <div className="flex-1 space-y-2 overflow-y-auto no-scrollbar">
                  {navItems.map((nav) => (
                    <button
                      key={nav.id}
                      onClick={() => { setActiveTab(nav.id); setIsMobileMenuOpen(false); }}
-                     className="w-full flex items-center gap-6 p-7 rounded-[35px] transition-all"
+                     className="flex items-center w-full gap-5 p-5 transition-all rounded-2xl"
                      style={activeTab === nav.id ? { backgroundColor: accentColor, color: getContrastText() } : { border: '1px solid rgba(0,0,0,0.05)' }}
                    >
-                     <span className="text-2xl">{nav.icon}</span>
-                     <span className="text-sm font-black uppercase tracking-[0.2em]">{nav.id}</span>
+                     <span className="text-xl">{nav.icon}</span>
+                     <span className="text-xs font-bold tracking-widest uppercase">{nav.id}</span>
                    </button>
                  ))}
                </div>

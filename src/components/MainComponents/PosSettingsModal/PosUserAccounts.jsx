@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import { FiUsers, FiTrash2, FiX, FiLoader, FiCamera, FiZoomIn, FiZoomOut } from "react-icons/fi";
+import React, { useState, useEffect, useRef } from "react";
+import { FiUsers, FiTrash2, FiX, FiLoader, FiCamera } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 import Cropper from "react-easy-crop";
 import useApiHost from "../../../hooks/useApiHost";
@@ -154,12 +154,15 @@ const PosUserAccounts = ({ isDark, accent, getContrastText }) => {
             {users.map((u) => (
               <tr key={u.uuid}>
                 <td className={`px-8 py-4 rounded-l-3xl ${theme.subPanel}`}>
-                    <div className="flex items-center justify-center overflow-hidden border h-14 w-14 rounded-2xl bg-slate-800 border-white/10">
+                    <div className="relative flex items-center justify-center overflow-hidden border h-14 w-14 rounded-2xl bg-slate-800 border-white/10">
                         {u.profile_pix ? (
-                            <img src={`${apiHost}/profile_pictures/${u.profile_pix}`} className="object-cover w-full h-full" />
-                        ) : (
-                            <span className="text-xl font-black text-white opacity-20">{u.firstname?.[0]}</span>
-                        )}
+                            <img 
+                              src={`${apiHost}/profile_pictures/${u.profile_pix}`} 
+                              className="object-cover w-full h-full" 
+                              onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }}
+                            />
+                        ) : null}
+                        <span className={`${u.profile_pix ? 'hidden' : 'block'} text-xl font-black text-white opacity-20`}>{u.firstname?.[0]}</span>
                     </div>
                 </td>
                 <td className={`px-8 py-6 font-black text-[12px] ${theme.subPanel} ${theme.textPrimary}`}>{u.firstname} {u.lastname}</td>

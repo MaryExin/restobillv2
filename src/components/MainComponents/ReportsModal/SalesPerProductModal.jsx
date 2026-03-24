@@ -96,7 +96,7 @@ const CustomCalendar = ({
         isDark ? "border-white/10 bg-[#0b1220]" : "border-slate-200 bg-white"
       }`}
     >
-      <div className="mb-4 flex items-center justify-between px-1">
+      <div className="flex items-center justify-between px-1 mb-4">
         <h4
           className={`text-base font-semibold ${
             isDark ? "text-white" : "text-slate-900"
@@ -384,7 +384,7 @@ const SalesPerProductModal = ({ isOpen, onClose }) => {
                       : "border-blue-100 bg-blue-50 text-blue-700"
                   }`}
                 >
-                  <span>Sta. Maria</span>
+                  <span>Report Date</span>
                   <FaArrowRight size={9} />
                   <span>{dateFrom}</span>
                   <FaArrowRight size={9} />
@@ -473,7 +473,7 @@ const SalesPerProductModal = ({ isOpen, onClose }) => {
 
             <button
               onClick={() => setShowFilter(true)}
-              className="flex h-12 items-center gap-2 rounded-2xl bg-blue-600 px-5 text-sm font-semibold text-white transition hover:bg-blue-700"
+              className="flex items-center h-12 gap-2 px-5 text-sm font-semibold text-white transition bg-blue-600 rounded-2xl hover:bg-blue-700"
             >
               <FaFilter size={13} />
               Filters
@@ -481,7 +481,7 @@ const SalesPerProductModal = ({ isOpen, onClose }) => {
           </div>
         </div>
 
-        <div className="flex-1 overflow-hidden px-8 py-5">
+        <div className="flex-1 px-8 py-5 overflow-hidden">
           <div
             className={`custom-scrollbar relative h-full overflow-auto rounded-[26px] border shadow-inner ${
               isDark
@@ -489,7 +489,7 @@ const SalesPerProductModal = ({ isOpen, onClose }) => {
                 : "border-slate-200 bg-white"
             }`}
           >
-            <table className="w-full border-separate border-spacing-0 text-left">
+            <table className="w-full text-left border-separate border-spacing-0">
               <thead className="sticky top-0 z-[50]">
                 <tr
                   className={`text-[11px] font-semibold backdrop-blur-md ${
@@ -647,19 +647,19 @@ const SalesPerProductModal = ({ isOpen, onClose }) => {
                     isDark ? "text-slate-500" : "text-slate-400"
                   }`}
                 >
-                  Branch
+                  SALES
                 </p>
                 <p
                   className={`text-2xl font-bold ${
                     isDark ? "text-slate-100" : "text-slate-900"
                   }`}
                 >
-                  Sta. Maria
+                  Per Item
                 </p>
               </div>
             </div>
 
-            <div className="rounded-2xl bg-blue-600 px-7 py-4 text-right shadow-lg shadow-blue-950/20">
+            <div className="py-4 text-right bg-blue-600 shadow-lg rounded-2xl px-7 shadow-blue-950/20">
               <span className="text-xs font-medium text-white/70">
                 Grand Total Sales
               </span>
@@ -678,7 +678,7 @@ const SalesPerProductModal = ({ isOpen, onClose }) => {
                 : "border-slate-200 bg-white"
             }`}
           >
-            <div className="mb-8 flex shrink-0 items-center justify-between">
+            <div className="flex items-center justify-between mb-8 shrink-0">
               <h3
                 className={`text-2xl font-bold ${
                   isDark ? "text-white" : "text-slate-900"
@@ -778,7 +778,7 @@ const SalesPerProductModal = ({ isOpen, onClose }) => {
                 fetchSales();
                 setShowFilter(false);
               }}
-              className="mt-8 rounded-2xl bg-blue-600 py-4 text-sm font-semibold text-white transition hover:bg-blue-700"
+              className="py-4 mt-8 text-sm font-semibold text-white transition bg-blue-600 rounded-2xl hover:bg-blue-700"
             >
               Apply Filters
             </button>
@@ -789,7 +789,7 @@ const SalesPerProductModal = ({ isOpen, onClose }) => {
       <div id="thermal-receipt">
         <div style={{ textAlign: "center", marginBottom: "8px" }}>
           <h2 style={{ fontSize: "16px", margin: 0, fontWeight: "bold" }}>
-            CNC - STA MARIA
+            REPORT
           </h2>
           <p
             style={{

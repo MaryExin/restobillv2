@@ -9,6 +9,7 @@ import {
   FaUserCheck,
   FaCheckCircle,
   FaDatabase,
+  FaSyncAlt, // Added a sync icon for the refresh button
 } from "react-icons/fa";
 
 const peso = (value) =>
@@ -28,11 +29,12 @@ const DashboardModal = ({ isOpen, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [viewMode, setViewMode] = useState("graph");
 
+  // Auto-fetch when modal opens or dates change
   useEffect(() => {
     if (isOpen) {
       fetchData();
     }
-  }, [isOpen]);
+  }, [isOpen, dateFrom, dateTo]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -47,7 +49,7 @@ const DashboardModal = ({ isOpen, onClose }) => {
             dateto: dateTo,
             includeVoided: false,
           }),
-        },
+        }
       );
 
       const result = await response.json();
@@ -76,7 +78,7 @@ const DashboardModal = ({ isOpen, onClose }) => {
   const sortedByQty = useMemo(() => {
     if (!Array.isArray(data?.salesPerProduct)) return [];
     return [...data.salesPerProduct].sort(
-      (a, b) => toNum(b["Total Qty Sold"]) - toNum(a["Total Qty Sold"]),
+      (a, b) => toNum(b["Total Qty Sold"]) - toNum(a["Total Qty Sold"])
     );
   }, [data]);
 
@@ -84,7 +86,7 @@ const DashboardModal = ({ isOpen, onClose }) => {
     if (!sortedByQty.length) return 1;
     return Math.max(
       ...sortedByQty.map((item) => toNum(item["Total Qty Sold"])),
-      1,
+      1
     );
   }, [sortedByQty]);
 
@@ -93,7 +95,7 @@ const DashboardModal = ({ isOpen, onClose }) => {
   return (
     <div className="fixed inset-0 z-[200000] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-md">
       <div className="flex max-h-[95vh] w-full max-w-[1400px] flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white text-slate-900 shadow-[0_30px_100px_rgba(15,23,42,0.20)]">
-        <div className="border-b border-slate-200 bg-white px-6 py-5 sm:px-8">
+        <div className="px-6 py-5 bg-white border-b border-slate-200 sm:px-8">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
             <div>
               <div className="text-sm font-semibold text-blue-600">
@@ -103,12 +105,12 @@ const DashboardModal = ({ isOpen, onClose }) => {
                 Branch Report
               </h2>
               <p className="mt-2 text-sm text-slate-500">
-                Sta. Maria sales summary and product performance overview.
+                Sales summary and product performance overview.
               </p>
             </div>
 
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-              <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+              <div className="flex flex-wrap items-end gap-3 p-3 border rounded-2xl border-slate-200 bg-slate-50">
                 <div className="flex flex-col">
                   <span className="mb-1 text-xs font-medium text-slate-500">
                     Start Date
@@ -117,7 +119,7 @@ const DashboardModal = ({ isOpen, onClose }) => {
                     type="date"
                     value={dateFrom}
                     onChange={(e) => setDateFrom(e.target.value)}
-                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-blue-400"
+                    className="px-3 py-2 text-sm bg-white border outline-none rounded-xl border-slate-200 text-slate-700 focus:border-blue-400"
                   />
                 </div>
 
@@ -129,23 +131,24 @@ const DashboardModal = ({ isOpen, onClose }) => {
                     type="date"
                     value={dateTo}
                     onChange={(e) => setDateTo(e.target.value)}
-                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-blue-400"
+                    className="px-3 py-2 text-sm bg-white border outline-none rounded-xl border-slate-200 text-slate-700 focus:border-blue-400"
                   />
                 </div>
 
                 <button
                   onClick={fetchData}
-                  className="mt-5 flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500"
+                  disabled={loading}
+                  className="flex h-[38px] w-[38px] items-center justify-center rounded-xl bg-blue-600 text-white transition hover:bg-blue-500 disabled:opacity-50"
+                  title="Refresh Data"
                 >
-                  <FaFilter
+                  <FaSyncAlt
                     className={loading ? "animate-spin" : ""}
-                    size={12}
+                    size={14}
                   />
-                  {loading ? "Loading..." : "Refresh"}
                 </button>
               </div>
 
-              <div className="flex rounded-2xl border border-slate-200 bg-slate-50 p-1">
+              <div className="flex p-1 border rounded-2xl border-slate-200 bg-slate-50">
                 <button
                   onClick={() => setViewMode("graph")}
                   className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
@@ -173,7 +176,7 @@ const DashboardModal = ({ isOpen, onClose }) => {
 
               <button
                 onClick={onClose}
-                className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 transition hover:bg-red-50 hover:text-red-500"
+                className="flex items-center justify-center transition bg-white border h-11 w-11 rounded-2xl border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-500"
               >
                 <FaTimes size={16} />
               </button>
@@ -181,7 +184,8 @@ const DashboardModal = ({ isOpen, onClose }) => {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto bg-slate-50 px-6 py-6 sm:px-8">
+        {/* ... Rest of the component remains the same ... */}
+        <div className="flex-1 px-6 py-6 overflow-y-auto bg-slate-50 sm:px-8">
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
             <div className="space-y-6">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -258,7 +262,7 @@ const DashboardModal = ({ isOpen, onClose }) => {
                       <div className="mb-3 text-sm font-semibold text-slate-900">
                         Daily Velocity
                       </div>
-                      <div className="flex h-24 items-end gap-2">
+                      <div className="flex items-end h-24 gap-2">
                         {[30, 60, 45, 90, 100, 70, 40, 20].map((h, i) => (
                           <div
                             key={i}
@@ -287,20 +291,20 @@ const DashboardModal = ({ isOpen, onClose }) => {
 
                         return (
                           <div key={`${item["Product Name"]}-${idx}`}>
-                            <div className="mb-2 flex items-center justify-between gap-4">
+                            <div className="flex items-center justify-between gap-4 mb-2">
                               <div className="min-w-0">
-                                <div className="truncate text-sm font-semibold text-slate-900">
+                                <div className="text-sm font-semibold truncate text-slate-900">
                                   {item["Product Name"]}
                                 </div>
                               </div>
-                              <div className="shrink-0 text-sm font-semibold text-blue-600">
+                              <div className="text-sm font-semibold text-blue-600 shrink-0">
                                 {qty} pcs
                               </div>
                             </div>
 
-                            <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100">
+                            <div className="w-full h-3 overflow-hidden rounded-full bg-slate-100">
                               <div
-                                className="h-full rounded-full bg-blue-600 transition-all duration-700"
+                                className="h-full transition-all duration-700 bg-blue-600 rounded-full"
                                 style={{ width: `${width}%` }}
                               />
                             </div>
@@ -309,7 +313,7 @@ const DashboardModal = ({ isOpen, onClose }) => {
                       })}
 
                       {sortedByQty.length === 0 && (
-                        <div className="py-12 text-center text-sm text-slate-400">
+                        <div className="py-12 text-sm text-center text-slate-400">
                           No product sales data available.
                         </div>
                       )}
@@ -328,10 +332,10 @@ const DashboardModal = ({ isOpen, onClose }) => {
                           <th className="px-5 py-4 text-sm font-semibold text-slate-600">
                             Product
                           </th>
-                          <th className="px-5 py-4 text-center text-sm font-semibold text-slate-600">
+                          <th className="px-5 py-4 text-sm font-semibold text-center text-slate-600">
                             Qty Sold
                           </th>
-                          <th className="px-5 py-4 text-right text-sm font-semibold text-slate-600">
+                          <th className="px-5 py-4 text-sm font-semibold text-right text-slate-600">
                             Gross Sales
                           </th>
                         </tr>
@@ -342,7 +346,7 @@ const DashboardModal = ({ isOpen, onClose }) => {
                           sortedByQty.map((item, idx) => (
                             <tr
                               key={`${item["Product Name"]}-${idx}`}
-                              className="border-b border-slate-100 transition hover:bg-slate-50"
+                              className="transition border-b border-slate-100 hover:bg-slate-50"
                             >
                               <td className="px-5 py-4 text-sm font-semibold text-blue-600">
                                 #{idx + 1}
@@ -350,10 +354,10 @@ const DashboardModal = ({ isOpen, onClose }) => {
                               <td className="px-5 py-4 text-sm font-medium text-slate-900">
                                 {item["Product Name"]}
                               </td>
-                              <td className="px-5 py-4 text-center text-sm text-slate-600">
+                              <td className="px-5 py-4 text-sm text-center text-slate-600">
                                 {toNum(item["Total Qty Sold"])} units
                               </td>
-                              <td className="px-5 py-4 text-right text-sm font-semibold text-slate-900">
+                              <td className="px-5 py-4 text-sm font-semibold text-right text-slate-900">
                                 {peso(item["Gross Sales"] || 0)}
                               </td>
                             </tr>
@@ -362,7 +366,7 @@ const DashboardModal = ({ isOpen, onClose }) => {
                           <tr>
                             <td
                               colSpan={4}
-                              className="px-5 py-16 text-center text-sm text-slate-400"
+                              className="px-5 py-16 text-sm text-center text-slate-400"
                             >
                               No table data available.
                             </td>
@@ -406,7 +410,7 @@ const DashboardModal = ({ isOpen, onClose }) => {
                       System Live
                     </div>
                     <p className="text-sm text-slate-500">
-                      CNC Sta. Maria branch reporting is active.
+                      Branch reporting is active.
                     </p>
                   </div>
                 </div>
@@ -415,8 +419,8 @@ const DashboardModal = ({ isOpen, onClose }) => {
           </div>
         </div>
 
-        <div className="flex items-center justify-between border-t border-slate-200 bg-white px-6 py-4 sm:px-8">
-          <p className="text-sm text-slate-500">CNC Sta. Maria</p>
+        <div className="flex items-center justify-between px-6 py-4 bg-white border-t border-slate-200 sm:px-8">
+          <p className="text-sm text-slate-500"></p>
           <p className="text-sm text-slate-500">Sales Dashboard</p>
         </div>
       </div>
@@ -424,6 +428,7 @@ const DashboardModal = ({ isOpen, onClose }) => {
   );
 };
 
+// ... Sub-components (StatCard, InsightRow, SummaryCard) remain exactly the same as your original ...
 function StatCard({ label, value, subText, icon: Icon, tone = "blue" }) {
   const tones = {
     blue: "bg-blue-50 text-blue-600",
@@ -434,7 +439,7 @@ function StatCard({ label, value, subText, icon: Icon, tone = "blue" }) {
 
   return (
     <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="mb-4 flex items-start justify-between">
+      <div className="flex items-start justify-between mb-4">
         <div
           className={`flex h-11 w-11 items-center justify-center rounded-2xl ${tones[tone]}`}
         >
