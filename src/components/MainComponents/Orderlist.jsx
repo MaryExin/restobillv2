@@ -104,8 +104,6 @@ const Orderlist = ({
   const [salesTypeList, setSalesTypeList] = useState([]);
   const [selectedSalesType, setSelectedSalesType] = useState("");
 
-  
-
   const [newtransaction, setNewTransaction] = useState({
     business_info: {},
     inventory_types: [],
@@ -779,25 +777,27 @@ const Orderlist = ({
     setItemInstructionText("");
   };
 
-const buildShortQrValue = () => {
-  const refTx = transactionId || `NEW-${Date.now()}`;
-  const tableRef = tableselected || "NA";
-  return `ORDER|TABLE:${tableRef}|TX:${refTx}`;
-};
+  const buildShortQrValue = () => {
+    const refTx = transactionId || `NEW-${Date.now()}`;
+    const tableRef = tableselected || "NA";
+    return `ORDER|TABLE:${tableRef}|TX:${refTx}`;
+  };
 
-const handleGenerateQR = () => {
-  const sourceItems = cartSummaryItems?.length ? cartSummaryItems : productcart.items;
+  const handleGenerateQR = () => {
+    const sourceItems = cartSummaryItems?.length
+      ? cartSummaryItems
+      : productcart.items;
 
-  if (!sourceItems || sourceItems.length === 0) {
-    alert("Cart is empty");
-    return;
-  }
+    if (!sourceItems || sourceItems.length === 0) {
+      alert("Cart is empty");
+      return;
+    }
 
-  const shortQr = buildShortQrValue();
+    const shortQr = buildShortQrValue();
 
-  setQrValue(shortQr);
-  setShowqrModal(true);
-};
+    setQrValue(shortQr);
+    setShowqrModal(true);
+  };
 
   const openBillingModal = () => {
     if (!apiHost || !tableselected) return;
@@ -2224,21 +2224,21 @@ const handleGenerateQR = () => {
                 </p>
               </div>
 
-            <div className="bg-white p-6 rounded-[2rem] inline-block mb-8 shadow-inner ring-8 ring-white/5">
-              {qrValue && qrValue.length <= 300 ? (
-                <QRCode value={qrValue} size={180} level="M" />
-              ) : (
-                <div className="w-[180px] h-[180px] flex items-center justify-center text-center text-sm font-semibold text-red-500">
-                  QR data is too long to generate.
-                </div>
-              )}
-            </div>
+              <div className="bg-white p-6 rounded-[2rem] inline-block mb-8 shadow-inner ring-8 ring-white/5">
+                {qrValue && qrValue.length <= 300 ? (
+                  <QRCode value={qrValue} size={180} level="M" />
+                ) : (
+                  <div className="w-[180px] h-[180px] flex items-center justify-center text-center text-sm font-semibold text-red-500">
+                    QR data is too long to generate.
+                  </div>
+                )}
+              </div>
 
               <button
                 onClick={() => setShowConfirmModal(true)}
                 className="w-full py-4 mb-3 bg-blue-600 text-white font-black rounded-2xl flex items-center justify-center gap-2 shadow-lg"
               >
-                <FaReceipt /> Print & Save Receipt
+                <FaReceipt /> Save & Print Receipt
               </button>
 
               <button
