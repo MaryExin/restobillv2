@@ -1482,6 +1482,20 @@ const InputPaymentsModal = ({
     });
   };
 
+  const handleAddPaymentMethod = () => {
+    if (readOnly) return;
+
+    const previousLength = payments.length;
+
+    if (typeof onAddPaymentMethod === "function") {
+      onAddPaymentMethod();
+    }
+
+    setTimeout(() => {
+      setActivePaymentIndex(previousLength);
+    }, 0);
+  };
+
   const setExactAmountForActiveRow = () => {
     if (payments.length === 0) return;
     if (activePaymentIndex < 0 || activePaymentIndex >= payments.length) return;
@@ -1613,7 +1627,7 @@ const InputPaymentsModal = ({
             {!readOnly ? (
               <button
                 type="button"
-                onClick={onAddPaymentMethod}
+                onClick={handleAddPaymentMethod}
                 className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-xs font-bold text-white transition hover:bg-blue-500"
               >
                 <FiPlus size={14} />
@@ -1776,13 +1790,14 @@ const InputPaymentsModal = ({
                 </p>
               </div>
             </div>
+
             <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
                   Shared Quick Amount Input
                 </p>
 
-                <p className="mt-1 text-[11px] text-slate-500 font-black ">
+                <p className="mt-1 text-[11px] font-black text-slate-500">
                   Active Payment Method:{" "}
                   <span className="text-blue-600">{activePaymentMethod}</span>
                 </p>
@@ -1823,7 +1838,7 @@ const InputPaymentsModal = ({
                 type="button"
                 disabled={readOnly || payments.length === 0}
                 onClick={setExactAmountForActiveRow}
-                className="rounded-2xl bg-emerald-500 col-span-2 px-8 py-5 text-lg font-black tracking-wide text-emerald-100 shadow-lg transition hover:bg-emerald-700 disabled:opacity-50"
+                className="col-span-2 rounded-2xl bg-emerald-500 px-8 py-5 text-lg font-black tracking-wide text-emerald-100 shadow-lg transition hover:bg-emerald-700 disabled:opacity-50"
               >
                 Exact
               </button>
@@ -1843,7 +1858,6 @@ const InputPaymentsModal = ({
     </ModalShell>
   );
 };
-
 export default function TransactionPaymentModal({
   isOpen,
   onClose,
