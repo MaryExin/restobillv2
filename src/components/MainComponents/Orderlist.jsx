@@ -1030,22 +1030,34 @@ const Orderlist = ({
     }
   };
 
+  const [isConfirmingTransaction, setIsConfirmingTransaction] = useState(false);
+
   const confirmTransactionAndPrint = async () => {
+    if (isConfirmingTransaction) return;
+
     if (additionalCartItems.length === 0) {
       alert("No additional items to print.");
       return;
     }
 
-    const result = await saveOrderToServer();
-    if (!result.ok) return;
+    try {
+      setIsConfirmingTransaction(true);
 
-    setShowConfirmModal(false);
+      const result = await saveOrderToServer();
+      if (!result.ok) return;
 
-    setTimeout(() => {
-      if (printRef.current) {
-        handlePrint();
-      }
-    }, 150);
+      setShowConfirmModal(false);
+
+      setTimeout(() => {
+        if (printRef.current) {
+          handlePrint();
+        }
+      }, 150);
+    } catch (error) {
+      console.error("Confirm transaction error:", error);
+    } finally {
+      setIsConfirmingTransaction(false);
+    }
   };
 
   const handlePrintOnly = () => {
@@ -2300,17 +2312,34 @@ const Orderlist = ({
               <div className="flex gap-3">
                 <button
                   onClick={confirmTransactionAndPrint}
-                  className="flex-1 py-3 rounded-2xl bg-blue-600 text-white font-bold hover:bg-blue-500"
+                  disabled={isConfirmingTransaction}
+                  className={`flex-1 py-3 rounded-2xl text-white font-bold transition flex items-center justify-center gap-2 ${
+                    isConfirmingTransaction
+                      ? "bg-blue-400 cursor-not-allowed opacity-80"
+                      : "bg-blue-600 hover:bg-blue-500"
+                  }`}
                 >
-                  Yes
+                  {isConfirmingTransaction ? (
+                    <>
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                      Processing...
+                    </>
+                  ) : (
+                    "Yes"
+                  )}
                 </button>
 
                 <button
                   onClick={() => setShowConfirmModal(false)}
+                  disabled={isConfirmingTransaction}
                   className={`flex-1 py-3 rounded-2xl font-bold transition-colors ${
-                    isDark
-                      ? "bg-white/10 text-white hover:bg-white/20"
-                      : "bg-slate-200 text-slate-800 hover:bg-slate-300"
+                    isConfirmingTransaction
+                      ? isDark
+                        ? "bg-white/5 text-slate-500 cursor-not-allowed"
+                        : "bg-slate-100 text-slate-400 cursor-not-allowed"
+                      : isDark
+                        ? "bg-white/10 text-white hover:bg-white/20"
+                        : "bg-slate-200 text-slate-800 hover:bg-slate-300"
                   }`}
                 >
                   No
