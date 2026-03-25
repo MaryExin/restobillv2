@@ -5,6 +5,7 @@ import {
   FaSearch,
   FaShoppingCart,
   FaTrash,
+  FaCheck,
   FaPlus,
   FaMinus,
   FaFilter,
@@ -34,6 +35,7 @@ import useApiHost from "../../hooks/useApiHost";
 import { useTheme } from "../../context/ThemeContext";
 import ModalDiscountTransaction from "./ModalDiscountTransaction";
 import useZustandLoginCred from "../../context/useZustandLoginCred";
+import ModalYesNoReusable from "../Modals/ModalYesNoReusable";
 const Orderlist = ({
   tableselected,
   setshoworderlist,
@@ -104,6 +106,14 @@ const Orderlist = ({
   const unit_code = localStorage.getItem("posBusinessUnitCode") || "";
   const [salesTypeList, setSalesTypeList] = useState([]);
   const [selectedSalesType, setSelectedSalesType] = useState("");
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferTableList, setTransferTableList] = useState([]);
+  const [transferSearch, setTransferSearch] = useState("");
+  const [selectedTransferTable, setSelectedTransferTable] = useState("");
+  const [transferLoading, setTransferLoading] = useState(false);
+  const [showTransferConfirmModal, setShowTransferConfirmModal] =
+    useState(false);
+  const [isTransferringTable, setIsTransferringTable] = useState(false);
 
   const [newtransaction, setNewTransaction] = useState({
     business_info: {},
@@ -501,6 +511,19 @@ const Orderlist = ({
     );
   }, [billingData, billingTab]);
 
+    const filteredTransferTables = useMemo(() => {
+    const currentTable = String(tableselected || "").toLowerCase();
+
+    return (transferTableList || []).filter((table) => {
+      const tableName = String(table.table_name || "").toLowerCase();
+
+      return (
+        tableName.includes(transferSearch.toLowerCase()) &&
+        tableName !== currentTable
+      );
+    });
+  }, [transferTableList, transferSearch, tableselected]);
+
   const cartSummaryItems = productcart.items;
   const isCartFromDB = false;
 
@@ -842,7 +865,7 @@ const Orderlist = ({
         transaction.category_code ||
         "Crab & Crack",
       unit_code:
-        transaction.Unit_Code || transaction.unit_code || "BU-247001cd32f1",
+        transaction.Unit_Code || transaction.unit_code || "",
 
       TotalSales: Number(transaction.TotalSales || 0),
       Discount: Number(transaction.Discount || 0),
@@ -1159,6 +1182,107 @@ const Orderlist = ({
     0,
   );
 
+    const resetTransferState = () => {
+    setShowTransferModal(false);
+    setTransferSearch("");
+    setSelectedTransferTable("");
+    setTransferTableList([]);
+    setTransferLoading(false);
+    setShowTransferConfirmModal(false);
+    setIsTransferringTable(false);
+  };
+
+  const openTransferModal = async () => {
+    if (!apiHost) return;
+
+    try {
+      setTransferLoading(true);
+      setShowTransferModal(true);
+      setTransferSearch("");
+      setSelectedTransferTable("");
+
+      const response = await fetch(`${apiHost}/api/master_table_list.php`);
+      const data = await response.json();
+
+      setTransferTableList(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Failed to load transfer tables:", error);
+      setTransferTableList([]);
+    } finally {
+      setTransferLoading(false);
+    }
+  };
+
+  const requestTransferConfirm = () => {
+    if (!transactionId) {
+      alert("No transaction selected for transfer.");
+      return;
+    }
+
+    if (!selectedTransferTable) {
+      alert("Please select a table to transfer to.");
+      return;
+    }
+
+    setShowTransferConfirmModal(true);
+  };
+
+  const handleConfirmTransferTable = async () => {
+    if (isTransferringTable) return;
+    if (!apiHost || !transactionId || !selectedTransferTable) return;
+
+    try {
+      setIsTransferringTable(true);
+
+      const now = new Date();
+      const formData = new FormData();
+
+      formData.append("Category_Code", "Crab & Crack");
+      formData.append("Unit_Code", unit_code);
+      formData.append("transaction_id", transactionId);
+      formData.append("old_table_number", tableselected || "");
+      formData.append("new_table_number", selectedTransferTable);
+      formData.append(
+        "remarks",
+        `Transferred from table ${tableselected} to ${selectedTransferTable}`,
+      );
+      formData.append("cashier", userName);
+      formData.append("transaction_date", dateSelected || "");
+      formData.append("terminal_number", "1");
+      formData.append("order_slip_no", transactionId);
+      formData.append("transaction_type", "TRANSFER TABLE");
+      formData.append("user_id", userId);
+      formData.append("user_name", email);
+
+      const response = await fetch(`${apiHost}/api/transfer_table.php`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || result?.status !== "success") {
+        throw new Error(result?.message || "Failed to transfer table.");
+      }
+
+      setShowTransferConfirmModal(false);
+      setShowTransferModal(false);
+      setSaveSuccessMessage(
+        `Table transferred from ${tableselected} to ${selectedTransferTable}.`,
+      );
+      setShowSaveSuccessModal(true);
+
+      setTimeout(() => {
+        setshoworderlist(false);
+      }, 1200);
+    } catch (error) {
+      console.error("Transfer table error:", error);
+      alert(error.message || "Failed to transfer table.");
+    } finally {
+      setIsTransferringTable(false);
+    }
+  };
+
   return (
     <>
       <motion.div
@@ -1194,21 +1318,56 @@ const Orderlist = ({
                 <FaFilter />
               </button>
 
-              <div>
-                <h2
-                  className={`text-xl font-bold ${
-                    isDark ? "text-white" : "text-slate-900"
-                  }`}
-                >
-                  Table <span className="text-blue-500">{tableselected}</span>
-                </h2>
-                <p
-                  className={`text-xs uppercase tracking-widest ${
-                    isDark ? "text-slate-400" : "text-slate-500"
-                  }`}
-                >
-                  Digital Menu
-                </p>
+              <div className="flex items-center justify-between gap-4">
+                {/* Left Side: Table Info */}
+                <div>
+                  <h2
+                    className={`text-xl font-bold ${
+                      isDark ? "text-white" : "text-slate-900"
+                    }`}
+                  >
+                    <span className="text-blue-500">{tableselected || "Select Table"}</span>
+                  </h2>
+                  <p
+                    className={`text-xs uppercase tracking-widest ${
+                      isDark ? "text-slate-400" : "text-slate-500"
+                    }`}
+                  >
+                    Digital Menu
+                  </p>
+                </div>
+
+                {/* Right Side: Transfer Table Action */}
+                {transactionId && loadedCartItems.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={openTransferModal}
+                    className={`group flex items-center gap-2 rounded-lg px-3 py-2 transition-all duration-200 ${
+                      isDark
+                        ? "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                        : "bg-slate-100 text-slate-600 hover:bg-teal-50 hover:text-teal-600"
+                    }`}
+                    title="Transfer Table"
+                  >
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="transition-transform group-hover:translate-x-1"
+                    >
+                      <path d="M16 3L21 8L16 13" />
+                      <path d="M21 8H9C6.23858 8 4 10.2386 4 13V19" />
+                    </svg>
+                    <span className="text-xs font-semibold uppercase tracking-wider">
+                      Transfer
+                    </span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1689,6 +1848,194 @@ const Orderlist = ({
                   </motion.div>
                 )}
               </AnimatePresence>
+
+                    <AnimatePresence>
+                      {showTransferModal && (
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className={`fixed inset-0 z-[420] flex items-center justify-center p-4 ${
+                            isDark ? "bg-black/70" : "bg-slate-900/40"
+                          }`}
+                        >
+                          <motion.div
+                            initial={{ scale: 0.95, y: 10 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0.95, y: 10 }}
+                            className={`w-full max-w-xl rounded-[2rem] p-6 shadow-2xl ${
+                              isDark
+                                ? "border border-white/10 bg-slate-900"
+                                : "border border-slate-200 bg-white"
+                            }`}
+                          >
+                            <div className="mb-5 flex items-center justify-between">
+                              <div>
+                                <h3
+                                  className={`text-xl font-black ${
+                                    isDark ? "text-white" : "text-slate-900"
+                                  }`}
+                                >
+                                  Transfer Table
+                                </h3>
+                                <p
+                                  className={`mt-1 text-sm ${
+                                    isDark ? "text-slate-400" : "text-slate-500"
+                                  }`}
+                                >
+                                  Select the new table for transaction{" "}
+                                  <span className="font-bold">{transactionId}</span>
+                                </p>
+                              </div>
+
+                              <button
+                                onClick={resetTransferState}
+                                className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors ${
+                                  isDark
+                                    ? "bg-white/10 text-slate-300 hover:bg-white/20"
+                                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                                }`}
+                              >
+                                <FiX size={18} />
+                              </button>
+                            </div>
+
+                            <div className="mb-4">
+                              <div className="relative">
+                                <FaSearch
+                                  className={`absolute left-4 top-1/2 -translate-y-1/2 ${
+                                    isDark ? "text-slate-500" : "text-slate-400"
+                                  }`}
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="Search available table..."
+                                  value={transferSearch}
+                                  onChange={(e) => setTransferSearch(e.target.value)}
+                                  className={`w-full rounded-2xl border py-3 pl-12 pr-4 outline-none transition-colors ${
+                                    isDark
+                                      ? "border-slate-700 bg-slate-800/40 text-white focus:border-blue-500/50"
+                                      : "border-slate-300 bg-white text-slate-900 focus:border-blue-400"
+                                  }`}
+                                />
+                              </div>
+                            </div>
+
+                            <div
+                              className={`max-h-72 overflow-y-auto rounded-2xl ${
+                                isDark
+                                  ? "border border-white/10 bg-slate-950/40"
+                                  : "border border-slate-200 bg-slate-50"
+                              }`}
+                            >
+                              {transferLoading ? (
+                                <div className="px-5 py-10 text-center">
+                                  <p
+                                    className={`text-sm ${
+                                      isDark ? "text-slate-400" : "text-slate-500"
+                                    }`}
+                                  >
+                                    Loading available tables...
+                                  </p>
+                                </div>
+                              ) : filteredTransferTables.length > 0 ? (
+                                filteredTransferTables.map((table) => {
+                                  const tableName = table.table_name || "";
+                                  const isSelected =
+                                    String(selectedTransferTable) === String(tableName);
+
+                                  return (
+                                    <button
+                                      key={table.ID ?? tableName}
+                                      type="button"
+                                      onClick={() => setSelectedTransferTable(tableName)}
+                                      className={`flex w-full items-center justify-between px-5 py-4 text-left transition-all last:border-b-0 ${
+                                        isSelected
+                                          ? "bg-blue-600/20 text-blue-500"
+                                          : isDark
+                                            ? "border-b border-white/5 text-slate-300 hover:bg-white/5"
+                                            : "border-b border-slate-200 text-slate-700 hover:bg-slate-100"
+                                      }`}
+                                    >
+                                      <span className="font-semibold">{tableName}</span>
+                                      {isSelected && <FaCheck size={12} />}
+                                    </button>
+                                  );
+                                })
+                              ) : (
+                                <div className="px-5 py-10 text-center">
+                                  <p
+                                    className={`text-sm ${
+                                      isDark ? "text-slate-400" : "text-slate-500"
+                                    }`}
+                                  >
+                                    No available table found.
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+
+                            <div
+                              className={`mt-4 rounded-2xl px-5 py-4 ${
+                                isDark
+                                  ? "border border-white/10 bg-white/5"
+                                  : "border border-slate-200 bg-slate-50"
+                              }`}
+                            >
+                              <p
+                                className={`mb-1 text-[10px] font-black uppercase tracking-[0.3em] ${
+                                  isDark ? "text-slate-500" : "text-slate-500"
+                                }`}
+                              >
+                                Selected Table
+                              </p>
+                              <p
+                                className={`text-lg font-bold ${
+                                  isDark ? "text-white" : "text-slate-900"
+                                }`}
+                              >
+                                {selectedTransferTable || "None"}
+                              </p>
+                            </div>
+
+                            <div className="mt-5 grid grid-cols-2 gap-3">
+                              <button
+                                onClick={resetTransferState}
+                                className={`w-full rounded-2xl py-3 font-bold transition-colors ${
+                                  isDark
+                                    ? "bg-white/10 text-white hover:bg-white/20"
+                                    : "bg-slate-200 text-slate-800 hover:bg-slate-300"
+                                }`}
+                              >
+                                Cancel
+                              </button>
+
+                              <button
+                                onClick={requestTransferConfirm}
+                                disabled={!selectedTransferTable}
+                                className={`w-full rounded-2xl py-3 font-bold text-white transition-colors ${
+                                  !selectedTransferTable
+                                    ? "cursor-not-allowed bg-blue-300"
+                                    : "bg-blue-600 hover:bg-blue-500"
+                                }`}
+                              >
+                                Confirm
+                              </button>
+                            </div>
+                          </motion.div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                          <AnimatePresence>
+                            {showTransferConfirmModal && (
+                              <ModalYesNoReusable
+                                header="Confirm Table Transfer"
+                                message={`Are you sure you want to transfer this order from ${tableselected} to ${selectedTransferTable}?`}
+                                setYesNoModalOpen={setShowTransferConfirmModal}
+                                triggerYesNoEvent={handleConfirmTransferTable}
+                              />
+                            )}
+                          </AnimatePresence>
             </aside>
           </div>
 
