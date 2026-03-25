@@ -1466,6 +1466,7 @@ const InputPaymentsModal = ({
       prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)),
     );
 
+  console.log("this", payments);
   const removeRow = (index) => {
     setPayments((prev) => {
       const next = prev.filter((_, i) => i !== index);
@@ -1703,14 +1704,23 @@ const InputPaymentsModal = ({
                             Amount
                           </label>
                           <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={row.payment_amount}
-                            disabled={readOnly}
-                            onChange={(e) =>
-                              updateRow(index, "payment_amount", e.target.value)
+                            type="text"
+                            inputMode="decimal"
+                            value={
+                              row.payment_amount === "" ||
+                              row.payment_amount === null ||
+                              row.payment_amount === undefined
+                                ? ""
+                                : Number(row.payment_amount).toFixed(2)
                             }
+                            disabled={readOnly}
+                            onChange={(e) => {
+                              const rawValue = e.target.value;
+
+                              if (/^\d*\.?\d*$/.test(rawValue)) {
+                                updateRow(index, "payment_amount", rawValue);
+                              }
+                            }}
                             onFocus={(e) => {
                               setActivePaymentIndex(index);
                               handleSelectAllOnFocus(e);
