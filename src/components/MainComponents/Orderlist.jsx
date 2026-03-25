@@ -101,6 +101,7 @@ const Orderlist = ({
   const userId = localStorage.getItem("user_id") || "0";
   const userName = localStorage.getItem("Cashier") || "Store Crew";
   const email = localStorage.getItem("email") || "Store Crew";
+  const unit_code = localStorage.getItem("posBusinessUnitCode") || "";
   const [salesTypeList, setSalesTypeList] = useState([]);
   const [selectedSalesType, setSelectedSalesType] = useState("");
 
@@ -956,7 +957,7 @@ const Orderlist = ({
 
       formData.append("transaction_id", txId);
       formData.append("Category_Code", "Crab & Crack");
-      formData.append("Unit_Code", "BU-247001cd32f1");
+      formData.append("Unit_Code", unit_code);
       formData.append("transaction_type", "PRODUCT");
       formData.append("transaction_date", dateSelected);
       formData.append(

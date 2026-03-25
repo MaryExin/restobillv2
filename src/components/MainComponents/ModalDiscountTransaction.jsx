@@ -1252,7 +1252,7 @@ const ModalDiscountTransaction = ({
         transaction?.category_code ||
         "Crab & Crack",
       unit_code:
-        transaction?.Unit_Code || transaction?.unit_code || "BU-247001cd32f1",
+        transaction?.Unit_Code || transaction?.unit_code || "",
 
       user_id: loggedUserId,
       user_name: loggedUserName,

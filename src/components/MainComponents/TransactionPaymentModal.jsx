@@ -1427,6 +1427,8 @@ const DiscountSetupModal = ({
 //   );
 // };
 
+
+
 const InputPaymentsModal = ({
   isOpen,
   onClose,
@@ -1466,7 +1468,6 @@ const InputPaymentsModal = ({
       prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)),
     );
 
-  console.log("this", payments);
   const removeRow = (index) => {
     setPayments((prev) => {
       const next = prev.filter((_, i) => i !== index);
@@ -1514,7 +1515,7 @@ const InputPaymentsModal = ({
 
         return {
           ...row,
-          payment_amount: formatAmountInput(exactNeeded),
+          payment_amount: Number(exactNeeded).toFixed(2),
         };
       }),
     );
@@ -1531,7 +1532,9 @@ const InputPaymentsModal = ({
         const current = toNum(row.payment_amount);
         return {
           ...row,
-          payment_amount: formatAmountInput(current + Number(amountToAdd || 0)),
+          payment_amount: Number(
+            current + Number(amountToAdd || 0),
+          ).toFixed(2),
         };
       }),
     );
@@ -1546,6 +1549,23 @@ const InputPaymentsModal = ({
         i === activePaymentIndex ? { ...row, payment_amount: "" } : row,
       ),
     );
+  };
+
+  const handleAmountChange = (index, rawValue) => {
+    if (/^\d*\.?\d{0,2}$/.test(rawValue)) {
+      updateRow(index, "payment_amount", rawValue);
+    }
+  };
+
+  const handleAmountBlur = (index, currentValue) => {
+    if (
+      currentValue !== "" &&
+      currentValue !== null &&
+      currentValue !== undefined &&
+      !isNaN(currentValue)
+    ) {
+      updateRow(index, "payment_amount", Number(currentValue).toFixed(2));
+    }
   };
 
   const getDenominationColor = (amount, isDark) => {
@@ -1650,7 +1670,8 @@ const InputPaymentsModal = ({
               payments.map((row, index) => (
                 <div
                   key={`${row.payment_method}-${index}`}
-                  className={`rounded-[22px] border p-4 transition ${
+                  onClick={() => setActivePaymentIndex(index)}
+                  className={`cursor-pointer rounded-[22px] border p-4 transition ${
                     index === activePaymentIndex
                       ? isDark
                         ? "border-blue-500/60 bg-slate-950 shadow-[0_0_0_1px_rgba(59,130,246,0.35)]"
@@ -1663,7 +1684,10 @@ const InputPaymentsModal = ({
                   <div className="grid gap-3 md:grid-cols-[60px_170px_minmax(0,1fr)]">
                     <button
                       type="button"
-                      onClick={() => removeRow(index)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeRow(index);
+                      }}
                       disabled={readOnly}
                       className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white transition hover:bg-blue-500 disabled:opacity-50"
                     >
@@ -1711,20 +1735,20 @@ const InputPaymentsModal = ({
                               row.payment_amount === null ||
                               row.payment_amount === undefined
                                 ? ""
-                                : Number(row.payment_amount).toFixed(2)
+                                : row.payment_amount
                             }
                             disabled={readOnly}
-                            onChange={(e) => {
-                              const rawValue = e.target.value;
-
-                              if (/^\d*\.?\d*$/.test(rawValue)) {
-                                updateRow(index, "payment_amount", rawValue);
-                              }
-                            }}
+                            onChange={(e) =>
+                              handleAmountChange(index, e.target.value)
+                            }
                             onFocus={(e) => {
                               setActivePaymentIndex(index);
                               handleSelectAllOnFocus(e);
                             }}
+                            onClick={(e) => e.stopPropagation()}
+                            onBlur={() =>
+                              handleAmountBlur(index, row.payment_amount)
+                            }
                             placeholder="0.00"
                             className={`h-12 w-full rounded-2xl px-4 text-base font-bold outline-none transition ${
                               index === activePaymentIndex
@@ -1750,6 +1774,7 @@ const InputPaymentsModal = ({
                               )
                             }
                             onFocus={() => setActivePaymentIndex(index)}
+                            onClick={(e) => e.stopPropagation()}
                             placeholder="Reference"
                             className={`h-12 w-full rounded-2xl px-4 text-sm outline-none ${inputClass}`}
                           />
@@ -1817,7 +1842,10 @@ const InputPaymentsModal = ({
                 <button
                   type="button"
                   disabled={readOnly || payments.length === 0}
-                  onClick={clearAmountForActiveRow}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    clearAmountForActiveRow();
+                  }}
                   className={`rounded-xl px-4 py-3 text-xs font-black transition disabled:opacity-50 ${
                     isDark
                       ? "bg-slate-800 text-slate-200 hover:bg-slate-700"
@@ -1835,7 +1863,10 @@ const InputPaymentsModal = ({
                   key={amount}
                   type="button"
                   disabled={readOnly || payments.length === 0}
-                  onClick={() => addDenominationToActiveRow(amount)}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    addDenominationToActiveRow(amount);
+                  }}
                   className={`rounded-2xl border px-3 py-6 text-lg font-black transition disabled:opacity-50 ${getDenominationColor(
                     amount,
                     isDark,
@@ -1844,10 +1875,14 @@ const InputPaymentsModal = ({
                   ₱{amount.toLocaleString("en-PH")}
                 </button>
               ))}
+
               <button
                 type="button"
                 disabled={readOnly || payments.length === 0}
-                onClick={setExactAmountForActiveRow}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setExactAmountForActiveRow();
+                }}
                 className="col-span-2 rounded-2xl bg-emerald-500 px-8 py-5 text-lg font-black tracking-wide text-emerald-100 shadow-lg transition hover:bg-emerald-700 disabled:opacity-50"
               >
                 Exact
@@ -1868,6 +1903,8 @@ const InputPaymentsModal = ({
     </ModalShell>
   );
 };
+
+
 export default function TransactionPaymentModal({
   isOpen,
   onClose,
