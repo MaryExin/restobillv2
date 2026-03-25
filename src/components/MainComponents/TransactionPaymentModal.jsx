@@ -1745,6 +1745,37 @@ const InputPaymentsModal = ({
                 : "border-slate-200 bg-white"
             }`}
           >
+            <div className="my-4 grid gap-3 md:grid-cols-2">
+              <div
+                className={`rounded-2xl border p-4 ${
+                  isDark
+                    ? "border-white/5 bg-slate-950"
+                    : "border-slate-200 bg-white"
+                }`}
+              >
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+                  Total Paid
+                </p>
+                <p className="mt-1 text-lg font-black text-blue-500">
+                  {peso(totalPaid)}
+                </p>
+              </div>
+
+              <div
+                className={`rounded-2xl border p-4 ${
+                  isDark
+                    ? "border-white/5 bg-slate-950"
+                    : "border-slate-200 bg-white"
+                }`}
+              >
+                <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+                  Remaining
+                </p>
+                <p className="mt-1 text-lg font-black text-blue-500">
+                  {peso(remaining)}
+                </p>
+              </div>
+            </div>
             <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
@@ -1796,38 +1827,6 @@ const InputPaymentsModal = ({
               >
                 Exact
               </button>
-            </div>
-          </div>
-
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
-            <div
-              className={`rounded-2xl border p-4 ${
-                isDark
-                  ? "border-white/5 bg-slate-950"
-                  : "border-slate-200 bg-white"
-              }`}
-            >
-              <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
-                Total Paid
-              </p>
-              <p className="mt-1 text-lg font-black text-blue-500">
-                {peso(totalPaid)}
-              </p>
-            </div>
-
-            <div
-              className={`rounded-2xl border p-4 ${
-                isDark
-                  ? "border-white/5 bg-slate-950"
-                  : "border-slate-200 bg-white"
-              }`}
-            >
-              <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
-                Remaining
-              </p>
-              <p className="mt-1 text-lg font-black text-blue-500">
-                {peso(remaining)}
-              </p>
             </div>
           </div>
         </div>
