@@ -101,19 +101,23 @@
       "electron/**/*",
       "package.json"
     ],
-    "extraResources": [
-      {
-        "from": "public",
-        "to": "images",
-        "filter": [
-          "**/*"
-        ]
-      },
-      {
-        "from": "public/ip.txt",
-        "to": "ip.txt"
-      }
-    ],
+"extraResources": [
+  {
+    "from": "public",
+    "to": "images",
+    "filter": [
+      "**/*"
+    ]
+  },
+  {
+    "from": "public/ip.txt",
+    "to": "ip.txt"
+  },
+  {
+    "from": "public/pos-config.json",
+    "to": "pos-config.json"
+  }
+],
     "win": {
       "target": "nsis"
     }

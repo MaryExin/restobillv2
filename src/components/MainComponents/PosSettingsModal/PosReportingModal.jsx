@@ -146,7 +146,7 @@ const PosReportingModal = ({ isDark, accent = "#2563eb" }) => {
                 <h2 className="text-4xl font-black leading-none tracking-tighter uppercase">
                   Review <span style={{ color: accent }}>Registry</span>
                 </h2>
-                <p className="text-[11px] font-black opacity-30 tracking-[0.3em] mt-2 uppercase">Target: Silverioj824@gmail.com</p>
+                <p className="text-[11px] font-black opacity-30 tracking-[0.3em] mt-2 uppercase">Target: MAIN OFFICE</p>
               </div>
             </div>
             <div className="space-y-2">

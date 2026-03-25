@@ -126,6 +126,7 @@ const LayoutPos = ({ children }) => {
   const handleLogoutConfirm = () => {
     setIsLogoutConfirmOpen(false);
     localStorage.removeItem("posTerminalNumber");
+    localStorage.clear();
     navigate("/");
   };
   const handleLogoutCancel = () => {
