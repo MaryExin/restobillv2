@@ -1047,6 +1047,7 @@ const Orderlist = ({
       if (!result.ok) return;
 
       setShowConfirmModal(false);
+      setShowqrModal(false);
 
       setTimeout(() => {
         if (printRef.current) {
@@ -1097,6 +1098,7 @@ const Orderlist = ({
 
   const requestSaveOnly = () => {
     setShowSaveConfirmModal(true);
+    setShowqrModal(false);
   };
 
   const handleSaveOnly = async () => {
@@ -1833,6 +1835,7 @@ const Orderlist = ({
               </button>
 
               <button
+                disabled={isConfirmingTransaction}
                 onClick={requestSaveOnly}
                 className="w-full mt-3 bg-emerald-600 text-gray-100 font-bold py-5 rounded-2xl flex items-center justify-center gap-3 text-lg shadow-lg shadow-emerald-600/20"
               >
@@ -2189,7 +2192,7 @@ const Orderlist = ({
       </AnimatePresence>
 
       <AnimatePresence>
-        {showqrModal && (
+        {showqrModal && !showConfirmModal && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -2248,6 +2251,7 @@ const Orderlist = ({
 
               <button
                 onClick={() => setShowConfirmModal(true)}
+                disabled={isConfirmingTransaction}
                 className="w-full py-4 mb-3 bg-blue-600 text-white font-black rounded-2xl flex items-center justify-center gap-2 shadow-lg"
               >
                 <FaReceipt /> Save & Print Receipt
@@ -2255,6 +2259,7 @@ const Orderlist = ({
 
               <button
                 onClick={requestSaveOnly}
+                disabled={isConfirmingTransaction}
                 className="w-full mb-3 bg-emerald-600 hover:bg-emerald-500 text-gray-100 font-bold py-4 rounded-2xl flex items-center justify-center gap-2 shadow-xl shadow-emerald-600/20"
               >
                 <FaCheckCircle /> Save Only
