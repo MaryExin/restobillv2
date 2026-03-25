@@ -11,6 +11,7 @@ import { useTheme } from "../../context/ThemeContext";
 
 // Import Components
 import PosUserRolesSetUp from "./PosSettingsModal/PosUserRolesSetUp";
+import UserRoles from "./PosSettingsModal/UserRoles";
 import PosMyAccount from "./PosSettingsModal/PosMyAccount";
 import PosAppearance from "./PosSettingsModal/PosAppearance";
 import PosUserAccounts from "./PosSettingsModal/PosUserAccounts";
@@ -140,7 +141,7 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
                   transition={{ duration: 0.2 }}
                 >
                   {activeTab === "My Account" && <PosMyAccount isDark={isDark} accent={accentColor} branchInfo={branchInfo} />}
-                  {activeTab === "User Roles" && <PosUserRolesSetUp isDark={isDark} accent={accentColor} textColor={getContrastText()} />}
+                  {activeTab === "User Role" && <UserRoles isDark={isDark} accent={accentColor} textColor={getContrastText()} />}
                   {activeTab === "User Accounts" && <PosUserAccounts isDark={isDark} accent={accentColor} getContrastText={getContrastText} />}
                   {activeTab === "Registry Sales" && <PosSystemLogs isDark={isDark} accent={accentColor} />}
                   {activeTab === "Expenses & Petty" && <PosExpenses isDark={isDark} accent={accentColor} getContrastText={getContrastText} />}
