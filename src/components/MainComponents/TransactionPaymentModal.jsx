@@ -1427,8 +1427,6 @@ const DiscountSetupModal = ({
 //   );
 // };
 
-
-
 const InputPaymentsModal = ({
   isOpen,
   onClose,
@@ -1448,6 +1446,39 @@ const InputPaymentsModal = ({
   const activeInputClass = isDark
     ? "bg-slate-950 border-2 border-blue-500 text-white placeholder:text-slate-500"
     : "bg-white border-2 border-blue-500 text-slate-900 placeholder:text-slate-400";
+
+  const toNum = (value) => {
+    const parsed = parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  const peso = (value) => {
+    return new Intl.NumberFormat("en-PH", {
+      style: "currency",
+      currency: "PHP",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(toNum(value));
+  };
+
+  const buildImagePath = (paymentMethod) => {
+    if (!paymentMethod) return "";
+
+    const fileName = String(paymentMethod)
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-_]/g, "");
+
+    return `/payments/${fileName}.png`;
+  };
+
+  const handleSelectAllOnFocus = (e) => {
+    requestAnimationFrame(() => {
+      try {
+        e.target.select();
+      } catch {}
+    });
+  };
 
   const totalPaid = payments.reduce(
     (sum, row) => sum + toNum(row.payment_amount),
@@ -1515,7 +1546,7 @@ const InputPaymentsModal = ({
 
         return {
           ...row,
-          payment_amount: Number(exactNeeded).toFixed(2),
+          payment_amount: String(exactNeeded),
         };
       }),
     );
@@ -1532,9 +1563,7 @@ const InputPaymentsModal = ({
         const current = toNum(row.payment_amount);
         return {
           ...row,
-          payment_amount: Number(
-            current + Number(amountToAdd || 0),
-          ).toFixed(2),
+          payment_amount: String(current + Number(amountToAdd || 0)),
         };
       }),
     );
@@ -1552,7 +1581,7 @@ const InputPaymentsModal = ({
   };
 
   const handleAmountChange = (index, rawValue) => {
-    if (/^\d*\.?\d{0,2}$/.test(rawValue)) {
+    if (/^\d*\.?\d*$/.test(rawValue)) {
       updateRow(index, "payment_amount", rawValue);
     }
   };
@@ -1564,346 +1593,368 @@ const InputPaymentsModal = ({
       currentValue !== undefined &&
       !isNaN(currentValue)
     ) {
-      updateRow(index, "payment_amount", Number(currentValue).toFixed(2));
+      updateRow(index, "payment_amount", currentValue);
     }
   };
 
-  const getDenominationColor = (amount, isDark) => {
+  const getDenominationColor = (amount, isDarkMode) => {
     if (amount === 20) {
-      return isDark
+      return isDarkMode
         ? "border-orange-500/30 bg-orange-500/10 text-orange-300 hover:bg-orange-500/20"
         : "border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100";
     }
 
     if (amount === 50) {
-      return isDark
+      return isDarkMode
         ? "border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20"
         : "border-red-200 bg-red-50 text-red-700 hover:bg-red-100";
     }
 
     if (amount === 100) {
-      return isDark
+      return isDarkMode
         ? "border-violet-500/30 bg-violet-500/10 text-violet-300 hover:bg-violet-500/20"
         : "border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100";
     }
 
     if (amount === 200) {
-      return isDark
+      return isDarkMode
         ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
         : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100";
     }
 
     if (amount === 500) {
-      return isDark
+      return isDarkMode
         ? "border-yellow-500/30 bg-yellow-500/10 text-yellow-300 hover:bg-yellow-500/20"
         : "border-yellow-200 bg-yellow-50 text-yellow-700 hover:bg-yellow-100";
     }
 
-    return isDark
+    return isDarkMode
       ? "border-sky-500/30 bg-sky-500/10 text-sky-300 hover:bg-sky-500/20"
       : "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100";
   };
 
   return (
-    <ModalShell
-      isOpen={isOpen}
-      onClose={onClose}
-      isDark={isDark}
-      maxWidth="max-w-[980px]"
-      zIndex="z-[100001]"
-    >
-      <div
-        className={`px-5 py-3 ${
-          isDark
-            ? "border-b border-white/5 bg-white/[0.03]"
-            : "border-b border-slate-200 bg-slate-50"
-        }`}
-      >
-        <h2 className="text-xl font-black">Input Payments</h2>
-        <p className="mt-1 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
-          Allocate payment amounts and references
-        </p>
-      </div>
-
-      <div className="space-y-4 px-5 py-2 md:px-6">
-        <div className="grid gap-3 md:grid-cols-2 md:items-center">
-          <div className="text-xl font-black text-slate-700 dark:text-slate-200">
-            TOTAL AMOUNT DUE
-          </div>
-          <div className="text-right text-2xl font-black text-emerald-500">
-            {peso(totalAmountDue)}
-          </div>
-        </div>
-
-        <div
-          className={`rounded-[24px] border px-4 py-2 ${
-            isDark
-              ? "border-white/5 bg-white/[0.03]"
-              : "border-slate-200 bg-slate-50"
-          }`}
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className={`fixed inset-0 z-[100001] flex items-center justify-center bg-black/50 p-4`}
         >
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <p className="text-sm font-bold text-slate-500">Payments</p>
+          <motion.div
+            initial={{ opacity: 0, y: 18, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 18, scale: 0.98 }}
+            className={`max-h-[92vh] w-full max-w-[980px] overflow-hidden rounded-[30px] shadow-2xl ${
+              isDark
+                ? "border border-white/10 bg-slate-900 text-white"
+                : "border border-slate-200 bg-white text-slate-900"
+            }`}
+          >
+            <div
+              className={`px-5 py-3 ${
+                isDark
+                  ? "border-b border-white/5 bg-white/[0.03]"
+                  : "border-b border-slate-200 bg-slate-50"
+              }`}
+            >
+              <h2 className="text-xl font-black">Input Payments</h2>
+              <p className="mt-1 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+                Allocate payment amounts and references
+              </p>
+            </div>
 
-            {!readOnly ? (
-              <button
-                type="button"
-                onClick={handleAddPaymentMethod}
-                className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-xs font-bold text-white transition hover:bg-blue-500"
-              >
-                <FiPlus size={14} />
-                Add Payment Method
-              </button>
-            ) : null}
-          </div>
+            <div className="max-h-[calc(92vh-72px)] overflow-y-auto">
+              <div className="space-y-4 px-5 py-2 md:px-6">
+                <div className="grid gap-3 md:grid-cols-2 md:items-center">
+                  <div className="text-xl font-black text-slate-700 dark:text-slate-200">
+                    TOTAL AMOUNT DUE
+                  </div>
+                  <div className="text-right text-2xl font-black text-emerald-500">
+                    {peso(totalAmountDue)}
+                  </div>
+                </div>
 
-          <div className="space-y-4">
-            {payments.length === 0 ? (
-              <div
-                className={`flex min-h-[120px] items-center justify-center rounded-2xl border border-dashed ${
-                  isDark ? "border-white/10" : "border-slate-300"
-                }`}
-              >
-                <p className="text-sm text-slate-500">No payment rows.</p>
-              </div>
-            ) : (
-              payments.map((row, index) => (
                 <div
-                  key={`${row.payment_method}-${index}`}
-                  onClick={() => setActivePaymentIndex(index)}
-                  className={`cursor-pointer rounded-[22px] border p-4 transition ${
-                    index === activePaymentIndex
-                      ? isDark
-                        ? "border-blue-500/60 bg-slate-950 shadow-[0_0_0_1px_rgba(59,130,246,0.35)]"
-                        : "border-blue-300 bg-white shadow-[0_0_0_1px_rgba(59,130,246,0.18)]"
-                      : isDark
-                        ? "border-white/5 bg-slate-950"
-                        : "border-slate-200 bg-white"
+                  className={`rounded-[24px] border px-4 py-2 ${
+                    isDark
+                      ? "border-white/5 bg-white/[0.03]"
+                      : "border-slate-200 bg-slate-50"
                   }`}
                 >
-                  <div className="grid gap-3 md:grid-cols-[60px_170px_minmax(0,1fr)]">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeRow(index);
-                      }}
-                      disabled={readOnly}
-                      className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white transition hover:bg-blue-500 disabled:opacity-50"
-                    >
-                      <FiTrash2 size={16} />
-                    </button>
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <p className="text-sm font-bold text-slate-500">Payments</p>
 
-                    <div
-                      className={`flex items-center gap-3 rounded-2xl border px-3 py-2 ${
-                        isDark
-                          ? "border-white/5 bg-slate-900"
-                          : "border-slate-200 bg-slate-50"
-                      }`}
-                    >
-                      <img
-                        src={buildImagePath(row.payment_method)}
-                        alt={row.payment_method}
-                        className="h-10 w-10 object-contain"
-                        onError={(e) => {
-                          e.currentTarget.style.display = "none";
-                        }}
-                      />
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-black">
-                          {row.payment_method || "No method"}
+                    {!readOnly ? (
+                      <button
+                        type="button"
+                        onClick={handleAddPaymentMethod}
+                        className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-xs font-bold text-white transition hover:bg-blue-500"
+                      >
+                        <FiPlus size={14} />
+                        Add Payment Method
+                      </button>
+                    ) : null}
+                  </div>
+
+                  <div className="space-y-4">
+                    {payments.length === 0 ? (
+                      <div
+                        className={`flex min-h-[120px] items-center justify-center rounded-2xl border border-dashed ${
+                          isDark ? "border-white/10" : "border-slate-300"
+                        }`}
+                      >
+                        <p className="text-sm text-slate-500">
+                          No payment rows.
                         </p>
-                        <p className="text-[11px] text-slate-500">
-                          {index === activePaymentIndex
-                            ? "Active amount field"
-                            : "Tap amount field to activate"}
+                      </div>
+                    ) : (
+                      payments.map((row, index) => (
+                        <div
+                          key={`${row.payment_method}-${index}`}
+                          onClick={() => setActivePaymentIndex(index)}
+                          className={`cursor-pointer rounded-[22px] border p-4 transition ${
+                            index === activePaymentIndex
+                              ? isDark
+                                ? "border-blue-500/60 bg-slate-950 shadow-[0_0_0_1px_rgba(59,130,246,0.35)]"
+                                : "border-blue-300 bg-white shadow-[0_0_0_1px_rgba(59,130,246,0.18)]"
+                              : isDark
+                                ? "border-white/5 bg-slate-950"
+                                : "border-slate-200 bg-white"
+                          }`}
+                        >
+                          <div className="grid gap-3 md:grid-cols-[60px_170px_minmax(0,1fr)]">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeRow(index);
+                              }}
+                              disabled={readOnly}
+                              className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white transition hover:bg-blue-500 disabled:opacity-50"
+                            >
+                              <FiTrash2 size={16} />
+                            </button>
+
+                            <div
+                              className={`flex items-center gap-3 rounded-2xl border px-3 py-2 ${
+                                isDark
+                                  ? "border-white/5 bg-slate-900"
+                                  : "border-slate-200 bg-slate-50"
+                              }`}
+                            >
+                              <img
+                                src={buildImagePath(row.payment_method)}
+                                alt={row.payment_method}
+                                className="h-10 w-10 object-contain"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = "none";
+                                }}
+                              />
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-black">
+                                  {row.payment_method || "No method"}
+                                </p>
+                                <p className="text-[11px] text-slate-500">
+                                  {index === activePaymentIndex
+                                    ? "Active amount field"
+                                    : "Tap amount field to activate"}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="space-y-3">
+                              <div className="grid gap-3 md:grid-cols-2">
+                                <div>
+                                  <label className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
+                                    Amount
+                                  </label>
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={
+                                      row.payment_amount === "" ||
+                                      row.payment_amount === null ||
+                                      row.payment_amount === undefined
+                                        ? ""
+                                        : row.payment_amount
+                                    }
+                                    disabled={readOnly}
+                                    onChange={(e) =>
+                                      handleAmountChange(index, e.target.value)
+                                    }
+                                    onFocus={(e) => {
+                                      setActivePaymentIndex(index);
+                                      handleSelectAllOnFocus(e);
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onBlur={() =>
+                                      handleAmountBlur(
+                                        index,
+                                        row.payment_amount,
+                                      )
+                                    }
+                                    placeholder="0.00"
+                                    className={`h-12 w-full rounded-2xl px-4 text-base font-bold outline-none transition ${
+                                      index === activePaymentIndex
+                                        ? activeInputClass
+                                        : inputClass
+                                    }`}
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
+                                    Reference
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={row.payment_reference ?? ""}
+                                    disabled={readOnly}
+                                    onChange={(e) =>
+                                      updateRow(
+                                        index,
+                                        "payment_reference",
+                                        e.target.value,
+                                      )
+                                    }
+                                    onFocus={() => setActivePaymentIndex(index)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    placeholder="Reference"
+                                    className={`h-12 w-full rounded-2xl px-4 text-sm outline-none ${inputClass}`}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <div
+                    className={`mt-4 rounded-[22px] border p-4 ${
+                      isDark
+                        ? "border-white/5 bg-slate-950"
+                        : "border-slate-200 bg-white"
+                    }`}
+                  >
+                    <div className="my-4 grid gap-3 md:grid-cols-2">
+                      <div
+                        className={`rounded-2xl border p-4 ${
+                          isDark
+                            ? "border-white/5 bg-slate-950"
+                            : "border-slate-200 bg-white"
+                        }`}
+                      >
+                        <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+                          Total Paid
+                        </p>
+                        <p className="mt-1 text-lg font-black text-blue-500">
+                          {peso(totalPaid)}
+                        </p>
+                      </div>
+
+                      <div
+                        className={`rounded-2xl border p-4 ${
+                          isDark
+                            ? "border-white/5 bg-slate-950"
+                            : "border-slate-200 bg-white"
+                        }`}
+                      >
+                        <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+                          Remaining
+                        </p>
+                        <p className="mt-1 text-lg font-black text-blue-500">
+                          {peso(remaining)}
                         </p>
                       </div>
                     </div>
 
-                    <div className="space-y-3">
-                      <div className="grid gap-3 md:grid-cols-2">
-                        <div>
-                          <label className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
-                            Amount
-                          </label>
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            value={
-                              row.payment_amount === "" ||
-                              row.payment_amount === null ||
-                              row.payment_amount === undefined
-                                ? ""
-                                : row.payment_amount
-                            }
-                            disabled={readOnly}
-                            onChange={(e) =>
-                              handleAmountChange(index, e.target.value)
-                            }
-                            onFocus={(e) => {
-                              setActivePaymentIndex(index);
-                              handleSelectAllOnFocus(e);
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            onBlur={() =>
-                              handleAmountBlur(index, row.payment_amount)
-                            }
-                            placeholder="0.00"
-                            className={`h-12 w-full rounded-2xl px-4 text-base font-bold outline-none transition ${
-                              index === activePaymentIndex
-                                ? activeInputClass
-                                : inputClass
-                            }`}
-                          />
-                        </div>
+                    <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
+                          Shared Quick Amount Input
+                        </p>
 
-                        <div>
-                          <label className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
-                            Reference
-                          </label>
-                          <input
-                            type="text"
-                            value={row.payment_reference}
-                            disabled={readOnly}
-                            onChange={(e) =>
-                              updateRow(
-                                index,
-                                "payment_reference",
-                                e.target.value,
-                              )
-                            }
-                            onFocus={() => setActivePaymentIndex(index)}
-                            onClick={(e) => e.stopPropagation()}
-                            placeholder="Reference"
-                            className={`h-12 w-full rounded-2xl px-4 text-sm outline-none ${inputClass}`}
-                          />
-                        </div>
+                        <p className="mt-1 text-[11px] font-black text-slate-500">
+                          Active Payment Method:{" "}
+                          <span className="text-blue-600">
+                            {activePaymentMethod}
+                          </span>
+                        </p>
                       </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          disabled={readOnly || payments.length === 0}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            clearAmountForActiveRow();
+                          }}
+                          className={`rounded-xl px-4 py-3 text-xs font-black transition disabled:opacity-50 ${
+                            isDark
+                              ? "bg-slate-800 text-slate-200 hover:bg-slate-700"
+                              : "bg-slate-200 text-slate-700 hover:bg-slate-300"
+                          }`}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+                      {QUICK_DENOMINATIONS.map((amount) => (
+                        <button
+                          key={amount}
+                          type="button"
+                          disabled={readOnly || payments.length === 0}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            addDenominationToActiveRow(amount);
+                          }}
+                          className={`rounded-2xl border px-3 py-6 text-lg font-black transition disabled:opacity-50 ${getDenominationColor(
+                            amount,
+                            isDark,
+                          )}`}
+                        >
+                          ₱{amount.toLocaleString("en-PH")}
+                        </button>
+                      ))}
+
+                      <button
+                        type="button"
+                        disabled={readOnly || payments.length === 0}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setExactAmountForActiveRow();
+                        }}
+                        className="col-span-2 rounded-2xl bg-emerald-500 px-8 py-5 text-lg font-black tracking-wide text-emerald-100 shadow-lg transition hover:bg-emerald-700 disabled:opacity-50"
+                      >
+                        Exact
+                      </button>
                     </div>
                   </div>
                 </div>
-              ))
-            )}
-          </div>
 
-          <div
-            className={`mt-4 rounded-[22px] border p-4 ${
-              isDark
-                ? "border-white/5 bg-slate-950"
-                : "border-slate-200 bg-white"
-            }`}
-          >
-            <div className="my-4 grid gap-3 md:grid-cols-2">
-              <div
-                className={`rounded-2xl border p-4 ${
-                  isDark
-                    ? "border-white/5 bg-slate-950"
-                    : "border-slate-200 bg-white"
-                }`}
-              >
-                <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
-                  Total Paid
-                </p>
-                <p className="mt-1 text-lg font-black text-blue-500">
-                  {peso(totalPaid)}
-                </p>
-              </div>
-
-              <div
-                className={`rounded-2xl border p-4 ${
-                  isDark
-                    ? "border-white/5 bg-slate-950"
-                    : "border-slate-200 bg-white"
-                }`}
-              >
-                <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
-                  Remaining
-                </p>
-                <p className="mt-1 text-lg font-black text-blue-500">
-                  {peso(remaining)}
-                </p>
+                <div className="flex justify-center pb-5">
+                  <button
+                    onClick={onClose}
+                    className="rounded-2xl bg-blue-600 px-10 py-3 text-sm font-black text-white transition hover:bg-blue-500"
+                  >
+                    Continue
+                  </button>
+                </div>
               </div>
             </div>
-
-            <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
-                  Shared Quick Amount Input
-                </p>
-
-                <p className="mt-1 text-[11px] font-black text-slate-500">
-                  Active Payment Method:{" "}
-                  <span className="text-blue-600">{activePaymentMethod}</span>
-                </p>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={readOnly || payments.length === 0}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    clearAmountForActiveRow();
-                  }}
-                  className={`rounded-xl px-4 py-3 text-xs font-black transition disabled:opacity-50 ${
-                    isDark
-                      ? "bg-slate-800 text-slate-200 hover:bg-slate-700"
-                      : "bg-slate-200 text-slate-700 hover:bg-slate-300"
-                  }`}
-                >
-                  Clear
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
-              {QUICK_DENOMINATIONS.map((amount) => (
-                <button
-                  key={amount}
-                  type="button"
-                  disabled={readOnly || payments.length === 0}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    addDenominationToActiveRow(amount);
-                  }}
-                  className={`rounded-2xl border px-3 py-6 text-lg font-black transition disabled:opacity-50 ${getDenominationColor(
-                    amount,
-                    isDark,
-                  )}`}
-                >
-                  ₱{amount.toLocaleString("en-PH")}
-                </button>
-              ))}
-
-              <button
-                type="button"
-                disabled={readOnly || payments.length === 0}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  setExactAmountForActiveRow();
-                }}
-                className="col-span-2 rounded-2xl bg-emerald-500 px-8 py-5 text-lg font-black tracking-wide text-emerald-100 shadow-lg transition hover:bg-emerald-700 disabled:opacity-50"
-              >
-                Exact
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex justify-center">
-          <button
-            onClick={onClose}
-            className="rounded-2xl bg-blue-600 px-10 py-3 text-sm font-black text-white transition hover:bg-blue-500"
-          >
-            Continue
-          </button>
-        </div>
-      </div>
-    </ModalShell>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 };
-
 
 export default function TransactionPaymentModal({
   isOpen,
