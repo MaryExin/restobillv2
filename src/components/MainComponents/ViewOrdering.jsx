@@ -138,29 +138,32 @@ const ViewOrdering = () => {
     );
   }, [fixedSearch, masterTableList]);
 
-  const openOrderList = (tableValue) => {
+  const openOrderList = (tableValue, txId = "") => {
     settableselected(tableValue);
+    setTransactionId(txId || "");
     setshoworderlist(true);
   };
 
   const handleTableSelect = (table) => {
     const tableValue = table.table_number;
     const status = String(table.status_label || "").toLowerCase();
-    const transaction_id = table.transaction_id;
+    const txId = table.transaction_id || "";
 
     if (status === "pending") {
       setPendingTableToOpen(tableValue);
+      setTransactionId(txId);
       setShowPendingConfirmModal(true);
-      setTransactionId(transaction_id);
       return;
     }
 
-    openOrderList(tableValue);
+    openOrderList(tableValue, "");
   };
 
   const handleConfirmPendingOrder = () => {
     if (!pendingTableToOpen) return;
-    openOrderList(pendingTableToOpen);
+
+    openOrderList(pendingTableToOpen, transactionId);
+
     setPendingTableToOpen("");
     setShowPendingConfirmModal(false);
   };
@@ -207,7 +210,7 @@ const ViewOrdering = () => {
 
     if (!value) return;
 
-    openOrderList(value);
+    openOrderList(value, "");
     resetOrderModal();
   };
 
