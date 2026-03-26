@@ -36,6 +36,7 @@ import { useTheme } from "../../context/ThemeContext";
 import ModalDiscountTransaction from "./ModalDiscountTransaction";
 import useZustandLoginCred from "../../context/useZustandLoginCred";
 import ModalYesNoReusable from "../Modals/ModalYesNoReusable";
+import ButtonComponent from "./Common/ButtonComponent";
 const Orderlist = ({
   tableselected,
   setshoworderlist,
@@ -111,11 +112,13 @@ const Orderlist = ({
   const [transferSearch, setTransferSearch] = useState("");
   const [selectedTransferTable, setSelectedTransferTable] = useState("");
   const [transferLoading, setTransferLoading] = useState(false);
-  const [showTransferConfirmModal, setShowTransferConfirmModal] = useState(false);
+  const [showTransferConfirmModal, setShowTransferConfirmModal] =
+    useState(false);
   const [isTransferringTable, setIsTransferringTable] = useState(false);
-  const [transferMode, setTransferMode] = useState("transfer"); 
+  const [transferMode, setTransferMode] = useState("transfer");
   const [selectedMergeTables, setSelectedMergeTables] = useState([]);
-  const [includeCurrentTableInMerge, setIncludeCurrentTableInMerge] = useState(false);
+  const [includeCurrentTableInMerge, setIncludeCurrentTableInMerge] =
+    useState(false);
 
   const [newtransaction, setNewTransaction] = useState({
     business_info: {},
@@ -903,8 +906,7 @@ const Orderlist = ({
         transaction.Category_Code ||
         transaction.category_code ||
         "Crab & Crack",
-      unit_code:
-        transaction.Unit_Code || transaction.unit_code || "",
+      unit_code: transaction.Unit_Code || transaction.unit_code || "",
 
       TotalSales: Number(transaction.TotalSales || 0),
       Discount: Number(transaction.Discount || 0),
@@ -1425,7 +1427,9 @@ const Orderlist = ({
                       isDark ? "text-white" : "text-slate-900"
                     }`}
                   >
-                    <span className="text-blue-500">{tableselected || "Select Table"}</span>
+                    <span className="text-blue-500">
+                      {tableselected || "Select Table"}
+                    </span>
                   </h2>
                   <p
                     className={`text-xs uppercase tracking-widest ${
@@ -1437,36 +1441,36 @@ const Orderlist = ({
                 </div>
 
                 {/* Right Side: Transfer Table Action */}
-              {transactionId && loadedCartItems.length > 0 && (
-                <button
-                  type="button"
-                  onClick={openTransferModal}
-                  className={`group flex items-center gap-2 rounded-lg px-3 py-2 transition-all duration-200 ${
-                    isDark
-                      ? "bg-slate-800 text-slate-300 hover:bg-slate-700"
-                      : "bg-slate-100 text-slate-600 hover:bg-teal-50 hover:text-teal-600"
-                  }`}
-                  title="Manage Table"
-                >
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="transition-transform group-hover:translate-x-1"
+                {transactionId && loadedCartItems.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={openTransferModal}
+                    className={`group flex items-center gap-2 rounded-lg px-3 py-2 transition-all duration-200 ${
+                      isDark
+                        ? "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                        : "bg-slate-100 text-slate-600 hover:bg-teal-50 hover:text-teal-600"
+                    }`}
+                    title="Manage Table"
                   >
-                    <path d="M16 3L21 8L16 13" />
-                    <path d="M21 8H9C6.23858 8 4 10.2386 4 13V19" />
-                  </svg>
-                  <span className="text-xs font-semibold uppercase tracking-wider">
-                    Manage Table
-                  </span>
-                </button>
-              )}
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="transition-transform group-hover:translate-x-1"
+                    >
+                      <path d="M16 3L21 8L16 13" />
+                      <path d="M21 8H9C6.23858 8 4 10.2386 4 13V19" />
+                    </svg>
+                    <span className="text-xs font-semibold uppercase tracking-wider">
+                      Manage Table
+                    </span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1982,7 +1986,8 @@ const Orderlist = ({
                               isDark ? "text-slate-400" : "text-slate-500"
                             }`}
                           >
-                            Transfer this transaction or merge this table with another table.
+                            Transfer this transaction or merge this table with
+                            another table.
                           </p>
                         </div>
 
@@ -2053,7 +2058,9 @@ const Orderlist = ({
                               type="text"
                               placeholder="Search available table..."
                               value={transferSearch}
-                              onChange={(e) => setTransferSearch(e.target.value)}
+                              onChange={(e) =>
+                                setTransferSearch(e.target.value)
+                              }
                               className={`w-full rounded-2xl py-4 pl-14 pr-5 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${
                                 isDark
                                   ? "bg-slate-900/50 border border-slate-800 text-white focus:border-blue-500/40"
@@ -2095,13 +2102,16 @@ const Orderlist = ({
                                     .map((table) => {
                                       const tableName = table.table_name || "";
                                       const isSelected =
-                                        String(selectedTransferTable) === String(tableName);
+                                        String(selectedTransferTable) ===
+                                        String(tableName);
 
                                       return (
                                         <button
                                           key={table.ID ?? tableName}
                                           type="button"
-                                          onClick={() => setSelectedTransferTable(tableName)}
+                                          onClick={() =>
+                                            setSelectedTransferTable(tableName)
+                                          }
                                           className={`group relative rounded-2xl px-4 py-4 text-left transition-all duration-200 border shadow-sm hover:scale-[1.02] active:scale-[0.98] ${
                                             isSelected
                                               ? isDark
@@ -2146,7 +2156,9 @@ const Orderlist = ({
                                               {isSelected ? (
                                                 <FaCheck size={11} />
                                               ) : (
-                                                <span className="text-[10px] font-bold">+</span>
+                                                <span className="text-[10px] font-bold">
+                                                  +
+                                                </span>
                                               )}
                                             </div>
                                           </div>
@@ -2212,7 +2224,9 @@ const Orderlist = ({
                               type="text"
                               placeholder="Search tables to merge..."
                               value={transferSearch}
-                              onChange={(e) => setTransferSearch(e.target.value)}
+                              onChange={(e) =>
+                                setTransferSearch(e.target.value)
+                              }
                               className={`w-full rounded-2xl py-4 pl-14 pr-5 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${
                                 isDark
                                   ? "bg-slate-900/50 border border-slate-800 text-white focus:border-blue-500/40"
@@ -2221,50 +2235,52 @@ const Orderlist = ({
                             />
                           </div>
                           <div
-                              className={`rounded-2xl p-2 ${
-                                isDark
-                                  ? "bg-slate-900/40 border border-white/5"
-                                  : "bg-slate-100 border border-slate-200"
+                            className={`rounded-2xl p-2 ${
+                              isDark
+                                ? "bg-slate-900/40 border border-white/5"
+                                : "bg-slate-100 border border-slate-200"
+                            }`}
+                          >
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setIncludeCurrentTableInMerge((prev) => !prev)
+                              }
+                              className={`w-full flex items-center justify-between rounded-2xl px-4 py-3 font-bold transition-all ${
+                                includeCurrentTableInMerge
+                                  ? "bg-blue-600 text-white"
+                                  : isDark
+                                    ? "text-slate-300 hover:bg-white/5"
+                                    : "text-slate-700 hover:bg-white"
                               }`}
                             >
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setIncludeCurrentTableInMerge((prev) => !prev)
-                                }
-                                className={`w-full flex items-center justify-between rounded-2xl px-4 py-3 font-bold transition-all ${
+                              <div className="text-left">
+                                <p className="text-[10px] uppercase tracking-[0.25em] opacity-80">
+                                  Current Table
+                                </p>
+                                <p className="text-sm font-extrabold">
+                                  {tableselected || "None"}
+                                </p>
+                              </div>
+
+                              <div
+                                className={`h-6 w-6 rounded-full flex items-center justify-center ${
                                   includeCurrentTableInMerge
-                                    ? "bg-blue-600 text-white"
+                                    ? "bg-white/20 text-white"
                                     : isDark
-                                      ? "text-slate-300 hover:bg-white/5"
-                                      : "text-slate-700 hover:bg-white"
+                                      ? "bg-slate-700 text-slate-300"
+                                      : "bg-slate-200 text-slate-500"
                                 }`}
                               >
-                                <div className="text-left">
-                                  <p className="text-[10px] uppercase tracking-[0.25em] opacity-80">
-                                    Current Table
-                                  </p>
-                                  <p className="text-sm font-extrabold">
-                                    {tableselected || "None"}
-                                  </p>
-                                </div>
-
-                                <div
-                                  className={`h-6 w-6 rounded-full flex items-center justify-center ${
-                                    includeCurrentTableInMerge
-                                      ? "bg-white/20 text-white"
-                                      : isDark
-                                        ? "bg-slate-700 text-slate-300"
-                                        : "bg-slate-200 text-slate-500"
-                                  }`}
-                                >
-                                  {includeCurrentTableInMerge ? (
-                                    <FaCheck size={11} />
-                                  ) : (
-                                    <span className="text-[10px] font-bold">+</span>
-                                  )}
-                                </div>
-                              </button>
+                                {includeCurrentTableInMerge ? (
+                                  <FaCheck size={11} />
+                                ) : (
+                                  <span className="text-[10px] font-bold">
+                                    +
+                                  </span>
+                                )}
+                              </div>
+                            </button>
                           </div>
 
                           <div>
@@ -2306,7 +2322,9 @@ const Orderlist = ({
                                         <button
                                           key={table.ID ?? tableName}
                                           type="button"
-                                          onClick={() => toggleMergeTable(tableName)}
+                                          onClick={() =>
+                                            toggleMergeTable(tableName)
+                                          }
                                           className={`group relative rounded-2xl px-4 py-4 text-left transition-all duration-200 border shadow-sm hover:scale-[1.02] active:scale-[0.98] ${
                                             isSelected
                                               ? isDark
@@ -2351,7 +2369,9 @@ const Orderlist = ({
                                               {isSelected ? (
                                                 <FaCheck size={11} />
                                               ) : (
-                                                <span className="text-[10px] font-bold">+</span>
+                                                <span className="text-[10px] font-bold">
+                                                  +
+                                                </span>
                                               )}
                                             </div>
                                           </div>
@@ -3010,35 +3030,36 @@ const Orderlist = ({
                 )}
               </div>
 
-              <button
+              <ButtonComponent
                 onClick={() => setShowConfirmModal(true)}
-                disabled={isConfirmingTransaction}
-                className="w-full py-4 mb-3 bg-blue-600 text-white font-black rounded-2xl flex items-center justify-center gap-2 shadow-lg"
+                isLoading={isConfirmingTransaction}
+                icon={<FaReceipt />}
+                loadingText="Saving..."
               >
-                <FaReceipt /> Save & Print Receipt
-              </button>
+                Save & Print Receipt
+              </ButtonComponent>
 
-              <button
+              <ButtonComponent
                 onClick={requestSaveOnly}
-                disabled={isConfirmingTransaction}
-                className="w-full mb-3 bg-emerald-600 hover:bg-emerald-500 text-gray-100 font-bold py-4 rounded-2xl flex items-center justify-center gap-2 shadow-xl shadow-emerald-600/20"
+                isLoading={isConfirmingTransaction}
+                icon={<FaCheckCircle />}
+                loadingText="Saving..."
+                variant={"success"}
               >
-                <FaCheckCircle /> Save Only
-              </button>
+                Save Only
+              </ButtonComponent>
 
-              <button
+              <ButtonComponent
                 onClick={() => setShowqrModal(false)}
-                className={`w-full py-4 font-black rounded-2xl transition-colors ${
-                  isDark ? "bg-white text-slate-900" : "bg-slate-900 text-white"
-                }`}
+                loadingText="Saving..."
+                variant={"secondary"}
               >
                 Close
-              </button>
+              </ButtonComponent>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
-
       <AnimatePresence>
         {showConfirmModal && (
           <motion.div
@@ -3076,40 +3097,23 @@ const Orderlist = ({
               </p>
 
               <div className="flex gap-3">
-                <button
+                <ButtonComponent
                   onClick={confirmTransactionAndPrint}
-                  disabled={isConfirmingTransaction}
-                  className={`flex-1 py-3 rounded-2xl text-white font-bold transition flex items-center justify-center gap-2 ${
-                    isConfirmingTransaction
-                      ? "bg-blue-400 cursor-not-allowed opacity-80"
-                      : "bg-blue-600 hover:bg-blue-500"
-                  }`}
+                  isLoading={isConfirmingTransaction}
+                  loadingText="Saving..."
+                  variant="success"
                 >
-                  {isConfirmingTransaction ? (
-                    <>
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                      Processing...
-                    </>
-                  ) : (
-                    "Yes"
-                  )}
-                </button>
+                  Yes
+                </ButtonComponent>
 
-                <button
+                <ButtonComponent
                   onClick={() => setShowConfirmModal(false)}
-                  disabled={isConfirmingTransaction}
-                  className={`flex-1 py-3 rounded-2xl font-bold transition-colors ${
-                    isConfirmingTransaction
-                      ? isDark
-                        ? "bg-white/5 text-slate-500 cursor-not-allowed"
-                        : "bg-slate-100 text-slate-400 cursor-not-allowed"
-                      : isDark
-                        ? "bg-white/10 text-white hover:bg-white/20"
-                        : "bg-slate-200 text-slate-800 hover:bg-slate-300"
-                  }`}
+                  isLoading={isConfirmingTransaction}
+                  loadingText="Closing..."
+                  variant="secondary"
                 >
                   No
-                </button>
+                </ButtonComponent>
               </div>
             </motion.div>
           </motion.div>

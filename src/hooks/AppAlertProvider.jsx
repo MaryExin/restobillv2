@@ -22,7 +22,7 @@ const AppAlertProvider = ({ children }) => {
       {children}
 
       {open && (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/40 px-4">
+        <div className="fixed inset-0 z-[110000] flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <h2 className="mb-3 text-lg font-bold text-slate-800">Notice</h2>
 

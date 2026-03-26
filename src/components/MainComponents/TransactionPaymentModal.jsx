@@ -11,8 +11,9 @@ import {
   FiTrash2,
   FiPrinter,
 } from "react-icons/fi";
-import { FaMoneyBill } from "react-icons/fa";
+import { FaMoneyBill, FaRegSave } from "react-icons/fa";
 import PosPaymentReceipt from "./PosPaymentReceipt";
+import ButtonComponent from "./Common/ButtonComponent";
 
 const loggedUserId = localStorage.getItem("user_id") || "";
 const loggedUserName =
@@ -2892,36 +2893,34 @@ export default function TransactionPaymentModal({
               ) : null}
 
               <div className="grid grid-cols-2 gap-3">
-                <button
+                <ButtonComponent
                   onClick={onClose}
-                  className={`rounded-2xl px-4 py-3 text-sm font-black transition ${
-                    isDark
-                      ? "border border-slate-700 bg-slate-800 text-slate-200 hover:text-white"
-                      : "border border-slate-200 bg-slate-100 text-slate-700 hover:text-slate-900"
-                  }`}
+                  isLoading={isSubmitting}
+                  loadingText="Close"
+                  variant="danger"
                 >
                   Close
-                </button>
+                </ButtonComponent>
 
                 {isPaidMode ? (
-                  <button
+                  <ButtonComponent
                     onClick={handlePrintDuplicate}
-                    className="rounded-2xl px-4 py-3 text-sm font-black text-white transition bg-blue-600 hover:bg-blue-500"
+                    isLoading={handlePrintDuplicate}
+                    loadingText="Duplicating..."
+                    variant="secondary"
                   >
                     Print Duplicate Invoice
-                  </button>
+                  </ButtonComponent>
                 ) : (
-                  <button
+                  <ButtonComponent
                     onClick={() => setShowConfirmSaveModal(true)}
+                    isLoading={isSubmitting}
                     disabled={!canSave || isSubmitting}
-                    className={`rounded-2xl px-4 py-3 text-sm font-black text-white transition ${
-                      !canSave || isSubmitting
-                        ? "cursor-not-allowed bg-slate-400"
-                        : "bg-blue-600 hover:bg-blue-500"
-                    }`}
+                    loadingText="Saving..."
+                    variant="primary"
                   >
-                    {isSubmitting ? "Saving..." : "Save Payment"}
-                  </button>
+                    Save Payment
+                  </ButtonComponent>
                 )}
               </div>
             </div>

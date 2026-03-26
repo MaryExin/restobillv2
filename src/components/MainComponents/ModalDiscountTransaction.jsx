@@ -11,6 +11,7 @@ import {
   FiEye,
   FiAlertTriangle,
 } from "react-icons/fi";
+import ButtonComponent from "./Common/ButtonComponent";
 
 const peso = (value) =>
   Number(value || 0).toLocaleString("en-PH", {
@@ -1251,8 +1252,7 @@ const ModalDiscountTransaction = ({
         transaction?.Category_Code ||
         transaction?.category_code ||
         "Crab & Crack",
-      unit_code:
-        transaction?.Unit_Code || transaction?.unit_code || "",
+      unit_code: transaction?.Unit_Code || transaction?.unit_code || "",
 
       user_id: loggedUserId,
       user_name: loggedUserName,
@@ -1653,18 +1653,18 @@ const ModalDiscountTransaction = ({
               </div>
 
               <div className="grid grid-cols-2 gap-2.5">
-                <button
+                <ButtonComponent
                   onClick={onClose}
-                  className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition-all ${
-                    isDark
-                      ? "bg-slate-800 text-slate-300 hover:text-white"
-                      : "bg-slate-200 text-slate-700 hover:text-slate-900"
-                  }`}
+                  isLoading={isPrintDisabled}
+                  disabled={isPrintDisabled}
+                  loadingText="Cancel..."
+                  variant="secondary"
+                  icon={<FiPrinter size={14} />}
                 >
                   Cancel
-                </button>
+                </ButtonComponent>
 
-                <button
+                <ButtonComponent
                   onClick={async () => {
                     try {
                       await saveBillingBeforePrint();
@@ -1679,16 +1679,14 @@ const ModalDiscountTransaction = ({
                       );
                     }
                   }}
+                  isLoading={isPrintDisabled}
                   disabled={isPrintDisabled}
-                  className={`flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-bold text-white transition-all ${
-                    isPrintDisabled
-                      ? "bg-slate-400 cursor-not-allowed"
-                      : "bg-blue-600 hover:bg-blue-500"
-                  }`}
+                  loadingText="Print..."
+                  variant="primary"
+                  icon={<FiPrinter size={14} />}
                 >
-                  <FiPrinter size={14} />
                   Print Billing
-                </button>
+                </ButtonComponent>
               </div>
             </div>
           </motion.div>

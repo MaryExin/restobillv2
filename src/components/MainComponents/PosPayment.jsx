@@ -23,6 +23,9 @@ import useApiHost from "../../hooks/useApiHost";
 import { useNavigate } from "react-router-dom";
 import TransactionPaymentModal from "./TransactionPaymentModal";
 import ModalSuccessNavToSelf from "../Modals/ModalSuccessNavToSelf";
+import ButtonComponent from "./Common/ButtonComponent";
+import ModalYesNoReusable from "../Modals/ModalYesNoReusable";
+
 
 const peso = (value) =>
   `₱ ${Number(value || 0).toLocaleString("en-PH", {
@@ -89,7 +92,6 @@ const ModalShell = ({
   zIndex = "z-[100000]",
 }) => {
   if (!isOpen) return null;
-
   return (
     <AnimatePresence>
       <motion.div
@@ -350,6 +352,8 @@ function ActionRemarksModal({
   isSubmitting,
   remarksInputRef,
 }) {
+  const [isYesNoModalOpen, setIsYesNoModalOpen] = useState(false);
+
   const title =
     actionType === "refund" ? "Refund Transaction" : "Void Transaction";
 
@@ -470,33 +474,43 @@ function ActionRemarksModal({
         </div>
 
         <div className="mt-6 flex flex-wrap justify-end gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isSubmitting}
-            className={`rounded-2xl px-5 py-3 font-bold transition ${
-              isDark
-                ? "bg-slate-800 text-slate-200 hover:bg-slate-700 disabled:opacity-60"
-                : "bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-60"
-            }`}
-          >
-            Cancel
-          </button>
-
-          <button
-            type="button"
-            onClick={onSubmit}
-            disabled={isSubmitting}
-            className={`rounded-2xl px-5 py-3 font-bold transition disabled:opacity-60 ${buttonClass}`}
+          <ButtonComponent
+            onClick={() => setIsYesNoModalOpen(true)}
+            isLoading={isSubmitting}
+            loadingText={
+              isSubmitting
+                ? actionType === "refund"
+                  ? "Processing Refund..."
+                  : "Processing Void..."
+                : ""
+            }
+            className={buttonClass}
           >
             {isSubmitting
               ? actionType === "refund"
                 ? "Processing Refund..."
                 : "Processing Void..."
               : title}
-          </button>
+          </ButtonComponent>
+          <ButtonComponent
+            onClick={onClose}
+            isLoading={isSubmitting}
+            loadingText="Cancel..."
+            variant="secondary"
+          >
+            Cancel
+          </ButtonComponent>
         </div>
       </div>
+      {isYesNoModalOpen && (
+        <ModalYesNoReusable
+          header="Submit Confirmation"
+          message={`Are you sure you want to Submit this ${actionType === "refund" ? "refund" : "void"}?`}
+          setYesNoModalOpen={setIsYesNoModalOpen}
+          triggerYesNoEvent={onSubmit}
+          isLoading={isSubmitting}
+        />
+      )}
     </ModalShell>
   );
 }

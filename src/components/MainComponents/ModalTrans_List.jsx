@@ -225,6 +225,7 @@ const ModalTrans_List = ({
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: index * 0.05 }}
+                      onClick={(e) => onOpenDiscountModal(item, e)}
                       className={`group flex items-center justify-between p-4 rounded-2xl transition-all cursor-pointer ${
                         isDark
                           ? "bg-slate-800/40 border border-white/5 hover:border-blue-500/50 hover:bg-slate-800"
