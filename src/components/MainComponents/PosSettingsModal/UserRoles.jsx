@@ -1,34 +1,20 @@
+"use client";
 
 import React, { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { FaUserShield } from "react-icons/fa6";
 import { FiEye, FiX } from "react-icons/fi";
+import { FaUserShield } from "react-icons/fa6";
 
-// Read modal deps
+import InfiniteScrollComponent from "../../../components/InfiniteScrolling/InfiniteScrollComponent";
+import CmpUserRolesSetup from "../../../components/Setup/CmpUserRolesSetup";
+
 import { useQueryClient } from "@tanstack/react-query";
-// // import { useSecuredMutation } from "../../hooks/useSecuredMutation";
-// // import ModalYesNoReusable from "../../components/Modals/ModalYesNoReusable";
-// import InfiniteScrollComponent from "../../components/InfiniteScrolling/InfiniteScrollComponent";
-// import { supabase } from "../../context/supaBaseClient";
+import useCustomInfiniteQuery from "../../../hooks/useCustomInfiniteQuery";
+import { useSecuredMutation } from "../../../hooks/useSecuredMutation";
 
-/* ------------------------- Exinnov tokens ------------------------- */
-const PAGE_BG =
-  "relative w-full min-h-screen overflow-x-clip overflow-y-auto mt-[6vh]";
-const BG_BLOBS = (
-  <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-    <div className="absolute inset-0 bg-gradient-to-b from-white via-white to-[#faf7f5]" />
-    <div className="absolute -top-36 -left-40 h-[520px] w-[520px] rounded-full bg-[radial-gradient(circle_at_30%_30%,rgba(215,85,41,0.14),transparent_55%)] blur-2xl" />
-    <div className="absolute -bottom-44 -right-44 h-[600px] w-[600px] rounded-full bg-[radial-gradient(circle_at_70%_70%,rgba(168,85,247,0.12),transparent_58%)] blur-2xl" />
-    <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_10%,rgba(0,0,0,0.03),transparent_35%),radial-gradient(circle_at_90%_90%,rgba(0,0,0,0.02),transparent_35%)]" />
-  </div>
-);
-
-const GLASS_CARD =
-  "rounded-3xl border border-slate-200/80 bg-white/65 backdrop-blur-xl shadow-[0_22px_70px_rgba(15,23,42,0.08)]";
-const HAIRLINE =
-  "pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-slate-900/10 to-transparent";
-
-/* ------------------------- Rainbow loader (template) ------------------------- */
+/* -------------------------------------------------------------------------- */
+/* UI Helpers                                                                  */
+/* -------------------------------------------------------------------------- */
 const ModernLoader = ({ size = 18, className = "" }) => {
   const s = Number(size) || 18;
 
@@ -67,111 +53,99 @@ const ModernLoader = ({ size = 18, className = "" }) => {
   );
 };
 
-/* ------------------------- Floating Read Button ------------------------- */
-const FloatingReadButton = ({ onOpen, disabled }) => (
-  <motion.button
-    type="button"
-    onClick={onOpen}
-    disabled={disabled}
-    whileHover={disabled ? {} : { y: -2, scale: 1.02 }}
-    whileTap={disabled ? {} : { scale: 0.98 }}
-    className={[
-      "fixed z-[9998] bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-5",
-      "group flex items-center gap-3",
-      "rounded-3xl border border-slate-200/80 bg-white/70 backdrop-blur-xl",
-      "px-4 py-3 shadow-[0_18px_50px_rgba(15,23,42,0.16)]",
-      "transition",
-      disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-white",
-    ].join(" ")}
-    title="Read assigned roles"
-  >
-    <span className="relative">
-      <span className="pointer-events-none absolute -inset-3 rounded-2xl bg-gradient-to-br from-colorBrand/18 via-redAccent to-purple-500/10 blur-xl opacity-80" />
-      <span className="relative grid h-11 w-11 place-items-center rounded-2xl border border-slate-200/70 bg-white/75">
-        <FiEye className="text-colorBrand" size={20} />
+const FloatingReadButton = ({ onOpen, disabled = false }) => {
+  return (
+    <motion.button
+      type="button"
+      onClick={onOpen}
+      disabled={disabled}
+      whileHover={disabled ? {} : { y: -2, scale: 1.02 }}
+      whileTap={disabled ? {} : { scale: 0.98 }}
+      className={[
+        "fixed z-[9998] bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-5",
+        "group flex items-center gap-3 rounded-3xl border border-slate-200/80 bg-white/80 backdrop-blur-xl",
+        "px-4 py-3 shadow-[0_18px_50px_rgba(15,23,42,0.16)] transition",
+        disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-white",
+      ].join(" ")}
+    >
+      <span className="relative">
+        <span className="pointer-events-none absolute -inset-3 rounded-2xl bg-gradient-to-br from-orange-500/20 via-red-400/15 to-purple-500/10 blur-xl opacity-80" />
+        <span className="relative grid h-11 w-11 place-items-center rounded-2xl border border-slate-200/70 bg-white/75">
+          <FiEye className="text-orange-600" size={20} />
+        </span>
       </span>
-    </span>
 
-    <span className="text-left leading-tight">
-      <span className="block text-sm font-semibold text-slate-900">
-        Read Roles
+      <span className="text-left leading-tight">
+        <span className="block text-sm font-semibold text-slate-900">
+          Read Roles
+        </span>
+        <span className="block text-[11px] text-slate-600">
+          View / search / delete
+        </span>
       </span>
-      <span className="block text-[11px] text-slate-600">
-        View / search / delete
+
+      <span className="ml-1 text-[11px] font-semibold text-slate-500">
+        Open →
       </span>
-    </span>
+    </motion.button>
+  );
+};
 
-    <span className="ml-1 text-[11px] font-semibold text-slate-500">
-      Open →
-    </span>
-  </motion.button>
-);
-
-/* ===================================================================== */
-/* Page Component */
-/* ===================================================================== */
+/* -------------------------------------------------------------------------- */
+/* Main Page                                                                    */
+/* -------------------------------------------------------------------------- */
 const UserRoles = () => {
-  const [returnmessage, setReturnmessage] = useState([]);
 
-//   const { isMobile, toggleIsMobile } = useZustandMobile();
-//   const { isDekstopSideMenu } = useZustandSideMenu();
 
   const [isReadModalOpen, setIsReadModalOpen] = useState(false);
 
   return (
     <>
 
+      <div className="relative w-full min-h-screen overflow-x-hidden overflow-y-auto mt-[6vh] bg-slate-50 pb-10">
+        <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-b from-white via-white to-[#faf7f5]" />
+          <div className="absolute -top-36 -left-40 h-[520px] w-[520px] rounded-full bg-[radial-gradient(circle_at_30%_30%,rgba(215,85,41,0.14),transparent_55%)] blur-2xl" />
+          <div className="absolute -bottom-44 -right-44 h-[600px] w-[600px] rounded-full bg-[radial-gradient(circle_at_70%_70%,rgba(168,85,247,0.12),transparent_58%)] blur-2xl" />
+        </div>
 
-
-
-      <div className={PAGE_BG}>
-        {BG_BLOBS}
-
-        <div className="mx-auto w-full max-w-7xl px-4 lg:px-10 pb-10">
-          {/* Header */}
+        <div className="mx-auto w-full max-w-7xl px-4 lg:px-10">
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, ease: "easeOut" }}
-            className={`mt-8 overflow-hidden relative ${GLASS_CARD}`}
+            className="mt-8 rounded-[2rem] border border-slate-200 bg-white/80 backdrop-blur-xl shadow-sm overflow-hidden"
           >
             <div className="relative p-6 sm:p-8">
-              <span className={HAIRLINE} />
-              <div className="pointer-events-none absolute -top-24 -right-24 h-64 w-64 rounded-full bg-gradient-to-br from-colorBrand/10 via-redAccent/8 to-purple-500/6 blur-3xl" />
-
               <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 <div className="space-y-2">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-slate-200/70 bg-white/70 px-3 py-1 text-xs text-slate-600">
-                    <span className="h-2 w-2 rounded-full bg-colorBrand" />
+                  <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600">
+                    <span className="h-2 w-2 rounded-full bg-orange-600" />
                     Exinnov • User Access Control
                   </div>
 
-                  <h1 className="text-3xl sm:text-4xl font-[Poppins-Black] tracking-tight text-slate-900">
-                    <span className="bg-gradient-to-r from-colorBrand via-redAccent to-colorBrandSecondary bg-clip-text text-transparent">
+                  <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-slate-900">
+                    <span className="bg-gradient-to-r from-orange-600 via-red-500 to-purple-600 bg-clip-text text-transparent">
                       User Roles
                     </span>
                   </h1>
 
                   <p className="text-sm text-slate-600">
                     Assign access faster: choose the user, pick a{" "}
-                    <b>Function</b>, then fine-tune Routes, Business Units, and
-                    Teams.
+                    <b>Function</b>, then fine-tune routes, business units, and
+                    teams.
                   </p>
                 </div>
 
-                <div className="hidden sm:flex items-center gap-2 rounded-2xl border border-slate-200/80 bg-white/70 px-3 py-2 text-xs text-slate-600">
-                  <FaUserShield className="text-colorBrand" />
+                <div className="hidden sm:flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+                  <FaUserShield className="text-orange-600" />
                   Tip: Use <b>Function</b> to auto-select related routes.
                 </div>
               </div>
             </div>
           </motion.div>
 
-          {/* Main Assign Panel */}
           <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-5">
-            {/* Left: Assign Roles */}
-            <div className={`relative ${GLASS_CARD} lg:col-span-2`}>
-              <span className={HAIRLINE} />
+            <div className="relative lg:col-span-2 rounded-[2rem] border border-slate-200 bg-white/80 backdrop-blur-xl shadow-sm">
               <div className="p-5 sm:p-6">
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -187,8 +161,7 @@ const UserRoles = () => {
                   <button
                     type="button"
                     onClick={() => setIsReadModalOpen(true)}
-                    className="hidden sm:inline-flex items-center gap-2 rounded-2xl border border-slate-200/80 bg-white/70 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-white transition"
-                    title="Open read roles"
+                    className="hidden sm:inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
                   >
                     <FiEye />
                     Read Roles
@@ -196,24 +169,23 @@ const UserRoles = () => {
                 </div>
 
                 <div className="mt-4">
-                  {/* <CmpUserRolesSetup
+                  <CmpUserRolesSetup
                     mode="assign"
                     onOpenRead={() => setIsReadModalOpen(true)}
-                  /> */}
+                  />
                 </div>
               </div>
             </div>
 
-            {/* Right: Guide tiles */}
             <div className="space-y-4">
-              <div className={`${GLASS_CARD} relative`}>
-                <span className={HAIRLINE} />
+              <div className="rounded-[2rem] border border-slate-200 bg-white/80 backdrop-blur-xl shadow-sm">
                 <div className="p-5 sm:p-6">
                   <div className="text-sm font-semibold text-slate-900">
                     What to do here
                   </div>
+
                   <div className="mt-2 space-y-3 text-sm text-slate-600">
-                    <div className="rounded-2xl border border-slate-200/80 bg-white/60 p-4">
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4">
                       <div className="text-xs font-semibold text-slate-800">
                         1) Select Employee
                       </div>
@@ -221,23 +193,26 @@ const UserRoles = () => {
                         Choose who will receive roles.
                       </div>
                     </div>
-                    <div className="rounded-2xl border border-slate-200/80 bg-white/60 p-4">
+
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4">
                       <div className="text-xs font-semibold text-slate-800">
-                        2) Pick Function (recommended)
+                        2) Pick Function
                       </div>
                       <div className="mt-1 text-xs">
                         Selecting a function automatically adds its routes.
                       </div>
                     </div>
-                    <div className="rounded-2xl border border-slate-200/80 bg-white/60 p-4">
+
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4">
                       <div className="text-xs font-semibold text-slate-800">
                         3) Fine-tune
                       </div>
                       <div className="mt-1 text-xs">
-                        Add/remove specific routes, business units, or teams.
+                        Add or remove specific routes, business units, or teams.
                       </div>
                     </div>
-                    <div className="rounded-2xl border border-[#D75529]/20 bg-colorBrand/5 p-4">
+
+                    <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4">
                       <div className="text-xs font-semibold text-slate-800">
                         Read roles anytime
                       </div>
@@ -250,16 +225,15 @@ const UserRoles = () => {
                 </div>
               </div>
 
-              <div className={`${GLASS_CARD} relative`}>
-                <span className={HAIRLINE} />
+              <div className="rounded-[2rem] border border-slate-200 bg-white/80 backdrop-blur-xl shadow-sm">
                 <div className="p-5 sm:p-6">
                   <div className="text-sm font-semibold text-slate-900">
                     Quick rule
                   </div>
                   <div className="mt-2 text-xs text-slate-600">
                     If you want a user to access a module, ensure they have its{" "}
-                    <b>route role</b> (e.g. <code>/accounting</code>) plus any
-                    business unit/team restrictions your system requires.
+                    <b>route role</b> plus any business unit or team
+                    restrictions your system requires.
                   </div>
                 </div>
               </div>
@@ -280,42 +254,32 @@ const UserRoles = () => {
 
 export default UserRoles;
 
-/* ===================================================================== */
-/* Read Modal (Stable component OUTSIDE parent) */
-/* ===================================================================== */
+/* -------------------------------------------------------------------------- */
+/* Read Modal                                                                   */
+/* -------------------------------------------------------------------------- */
 const ReadUserRolesModal = ({ isOpen, onClose }) => {
   const queryClient = useQueryClient();
 
   const [localSearch, setLocalSearch] = useState("");
   const [searchRole, setSearchRole] = useState("");
   const [pageItems, setPageItems] = useState("25");
-
-  // ✅ NEW: class filter (client-side)
   const [roleClassFilter, setRoleClassFilter] = useState("");
 
   const [deleteId, setDeleteId] = useState("");
-  const [isDeleteYesNoModalOpen, setDeleteYesNoModalOpen] = useState(false);
-
-  // ✅ NEW: store the row being deleted so we can post correct email to Supabase
   const [deleteRow, setDeleteRow] = useState(null);
-
-  // optional: track supabase insert status (debug)
+  const [isDeleteYesNoModalOpen, setDeleteYesNoModalOpen] = useState(false);
   const [supabasePostMsg, setSupabasePostMsg] = useState("");
 
-  // debounce typing -> actual search param
   useEffect(() => {
-    const t = setTimeout(() => setSearchRole(localSearch.trim()), 250);
+    const t = setTimeout(() => {
+      setSearchRole(localSearch.trim());
+    }, 250);
+
     return () => clearTimeout(t);
   }, [localSearch]);
 
-  // ✅ IMPORTANT: Query key includes variables so search + page size actually update the data.
-  const queryKeyArr = useMemo(
+  const queryKey = useMemo(
     () => ["readuserroledata", searchRole, pageItems],
-    [searchRole, pageItems],
-  );
-
-  const queryKeyStr = useMemo(
-    () => `readuserroledata:${searchRole}:${pageItems}`,
     [searchRole, pageItems],
   );
 
@@ -323,57 +287,46 @@ const ReadUserRolesModal = ({ isOpen, onClose }) => {
     localStorage.getItem("apiendpoint") +
     import.meta.env.VITE_INFINITE_USER_ROLE_ENDPOINT;
 
-  const queryKey = queryKeyArr; // <-- change to queryKeyStr if needed
+  const {
+    data: readUserRoleData,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    refetch,
+    isFetching,
+  } = useCustomInfiniteQuery(infiniteUrl, queryKey, searchRole, pageItems);
 
-//   const {
-//     data: readUserRoleData,
-//     fetchNextPage,
-//     hasNextPage,
-//     isFetchingNextPage,
-//     refetch,
-//     isFetching,
-//   } = useCustomInfiniteQuery(infiniteUrl, queryKey, searchRole, pageItems);
+  const { data: deleteRoleData, isLoading: deleteRoleIsLoading, mutate: deleteRole } =
+    useSecuredMutation(
+      localStorage.getItem("apiendpoint") +
+        import.meta.env.VITE_MUTATE_USER_ROLES_ENDPOINT,
+      "DELETE",
+    );
 
-//   const {
-//     data: deleteRoleData,
-//     isLoading: deleteRoleIsLoading,
-//     mutate: deleteRole,
-//   } = useSecuredMutation(
-//     localStorage.getItem("apiendpoint") +
-//       import.meta.env.VITE_MUTATE_USER_ROLES_ENDPOINT,
-//     "DELETE",
-//   );
+  const classOptions = useMemo(() => {
+    const values = new Set();
 
-  // ✅ NEW: build Class options from loaded pages (no backend changes)
-//   const classOptions = useMemo(() => {
-//     const set = new Set();
-//     const pages = readUserRoleData?.pages || [];
-//     for (const p of pages) {
-//       const items = p?.items || [];
-//       for (const it of items) {
-//         const v = (it?.roleclass || "").trim();
-//         if (v) set.add(v);
-//       }
-//     }
-//     return Array.from(set).sort((a, b) => a.localeCompare(b));
-//   }, [readUserRoleData]);
+    (readUserRoleData?.pages || []).forEach((page) => {
+      (page?.items || []).forEach((item) => {
+        const roleClass = String(item?.roleclass || "").trim();
+        if (roleClass) values.add(roleClass);
+      });
+    });
 
-  // fetch when opening
-//   useEffect(() => {
-//     if (!isOpen) return;
-//     refetch();
-//   }, [isOpen, refetch]);
+    return Array.from(values).sort((a, b) => a.localeCompare(b));
+  }, [readUserRoleData]);
 
-  // ✅ NEW: Supabase post helper (same pattern as in CmpUserRolesSetup)
+  useEffect(() => {
+    if (!isOpen) return;
+    refetch();
+  }, [isOpen, refetch]);
+
   const postResetToSupabase = async (rowForEmail) => {
     try {
       const companycode = localStorage.getItem("companycode") || "";
-
-      // Prefer the deleted row email; fallback to localStorage email if you store it
-      const emailFromRow = rowForEmail?.email;
-      (""); // tolerant field guesses
+      const emailFromRow = rowForEmail?.email || "";
       const emailFallback = localStorage.getItem("email") || "";
-      const email = String(emailFromRow || emailFallback || "").trim();
+      const email = String(emailFromRow || emailFallback).trim();
 
       if (!companycode || !email) {
         setSupabasePostMsg(
@@ -382,42 +335,36 @@ const ReadUserRolesModal = ({ isOpen, onClose }) => {
         return;
       }
 
-      const { error: insErr } = await supabase
+      const { error } = await supabase
         .from("tbl_user_roles_reset")
-        .insert([{ companycode, email }]); // ✅ duplicates allowed (no pre-check)
+        .insert([{ companycode, email }]);
 
-      if (insErr) throw insErr;
+      if (error) throw error;
 
       setSupabasePostMsg("Inserted to Supabase (roles reset trigger)");
-    } catch (e) {
-      console.error("Supabase insert error:", e);
+    } catch (error) {
+      console.error("Supabase insert error:", error);
       setSupabasePostMsg(
-        e?.message
-          ? `Supabase insert failed: ${e.message}`
+        error?.message
+          ? `Supabase insert failed: ${error.message}`
           : "Supabase insert failed",
       );
     }
   };
 
-  // after delete -> refresh list WITHOUT wiping cache
-//   useEffect(() => {
-//     if (deleteRoleData?.message === "Success") {
-//       setDeleteYesNoModalOpen(false);
-//       setDeleteId("");
+  useEffect(() => {
+    if (deleteRoleData?.message !== "Success") return;
 
-//       // ✅ NEW: trigger roles refresh by posting to Supabase AFTER delete success
-//       // uses captured deleteRow (so we post the correct email if available)
-//       postResetToSupabase(deleteRow);
+    setDeleteYesNoModalOpen(false);
+    setDeleteId("");
 
-//       // ✅ invalidate instead of reset = no flicker
-//       queryClient.invalidateQueries({ queryKey: ["readuserroledata"] });
-//       refetch();
+    postResetToSupabase(deleteRow);
 
-//       // cleanup
-//       setDeleteRow(null);
-//     }
-//     // eslint-disable-next-line react-hooks/exhaustive-deps
-//   }, [deleteRoleData, queryClient, refetch]);
+    queryClient.invalidateQueries({ queryKey: ["readuserroledata"] });
+    refetch();
+
+    setDeleteRow(null);
+  }, [deleteRoleData, deleteRow, queryClient, refetch]);
 
   const handleReset = () => {
     setLocalSearch("");
@@ -425,12 +372,14 @@ const ReadUserRolesModal = ({ isOpen, onClose }) => {
     setPageItems("25");
     setRoleClassFilter("");
 
-    // ✅ invalidate instead of reset = no flicker
     queryClient.invalidateQueries({ queryKey: ["readuserroledata"] });
     refetch();
   };
 
-  const handleDelete = () => deleteRole({ id: deleteId });
+  const handleDelete = () => {
+    if (!deleteId) return;
+    deleteRole({ id: deleteId });
+  };
 
   return (
     <AnimatePresence>
@@ -438,15 +387,14 @@ const ReadUserRolesModal = ({ isOpen, onClose }) => {
         <>
           {isDeleteYesNoModalOpen && (
             <ModalYesNoReusable
-              header={"Confirmation"}
-              message={"Delete this role assignment?"}
+              header="Confirmation"
+              message="Delete this role assignment?"
               setYesNoModalOpen={setDeleteYesNoModalOpen}
               triggerYesNoEvent={handleDelete}
               isLoading={deleteRoleIsLoading}
             />
           )}
 
-          {/* Backdrop */}
           <motion.button
             type="button"
             onClick={onClose}
@@ -457,33 +405,23 @@ const ReadUserRolesModal = ({ isOpen, onClose }) => {
             aria-label="Close"
           />
 
-          {/* Shell */}
           <motion.div
             className="fixed inset-0 z-[10000] grid place-items-center px-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            {/* Panel */}
             <motion.div
               initial={{ opacity: 0, y: 18, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 18, scale: 0.98 }}
               transition={{ duration: 0.22, ease: "easeOut" }}
-              className={[
-                "w-full max-w-5xl overflow-hidden rounded-3xl",
-                "border border-slate-200/40 bg-white/85 backdrop-blur-xl",
-                "shadow-[0_28px_90px_rgba(0,0,0,0.30)]",
-                "relative",
-                "h-[85svh] sm:h-[90vh]",
-              ].join(" ")}
+              className="relative w-full max-w-5xl h-[85svh] sm:h-[90vh] overflow-hidden rounded-[2rem] border border-slate-200 bg-white/90 backdrop-blur-xl shadow-[0_28px_90px_rgba(0,0,0,0.30)]"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-colorBrand via-redAccent to-colorBrandSecondary" />
-              <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-slate-900/10 to-transparent" />
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-orange-600 via-red-500 to-purple-600" />
 
               <div className="flex h-full flex-col">
-                {/* Sync badge (keep mounted; animate opacity to avoid visual “jump”) */}
                 <div className="mt-3 ms-3">
                   <motion.div
                     initial={false}
@@ -492,7 +430,7 @@ const ReadUserRolesModal = ({ isOpen, onClose }) => {
                       y: isFetching || isFetchingNextPage ? 0 : -4,
                     }}
                     transition={{ duration: 0.18 }}
-                    className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-3 py-1 text-[11px] font-semibold text-slate-600"
+                    className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-600"
                     style={{ pointerEvents: "none" }}
                   >
                     <ModernLoader size={18} />
@@ -504,7 +442,6 @@ const ReadUserRolesModal = ({ isOpen, onClose }) => {
                   </div>
                 </div>
 
-                {/* Header */}
                 <div className="shrink-0 p-5 sm:p-6">
                   <div className="flex items-start justify-between gap-4">
                     <div>
@@ -514,7 +451,7 @@ const ReadUserRolesModal = ({ isOpen, onClose }) => {
                       <div className="mt-1 text-xs text-slate-600">
                         Search, review, and delete role assignments.
                       </div>
-                      {/* optional debug */}
+
                       {supabasePostMsg ? (
                         <div className="mt-1 text-[11px] text-slate-500">
                           {supabasePostMsg}
@@ -525,16 +462,15 @@ const ReadUserRolesModal = ({ isOpen, onClose }) => {
                     <button
                       type="button"
                       onClick={onClose}
-                      className="inline-flex items-center gap-2 rounded-2xl border border-slate-200/80 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                      className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
                     >
                       <FiX />
                       Close
                     </button>
                   </div>
 
-                  {/* Controls */}
                   <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
-                    <div className="rounded-2xl border border-slate-200/80 bg-white/70 px-3 py-2">
+                    <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2">
                       <div className="text-[11px] font-semibold text-slate-500">
                         Search user / role
                       </div>
@@ -546,8 +482,7 @@ const ReadUserRolesModal = ({ isOpen, onClose }) => {
                       />
                     </div>
 
-                    {/* ✅ Class filter */}
-                    <div className="rounded-2xl border border-slate-200/80 bg-white/70 px-3 py-2">
+                    <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2">
                       <div className="text-[11px] font-semibold text-slate-500">
                         Class
                       </div>
@@ -557,15 +492,15 @@ const ReadUserRolesModal = ({ isOpen, onClose }) => {
                         className="mt-1 w-full bg-transparent text-sm text-slate-800 outline-none"
                       >
                         <option value="">All</option>
-                        {classOptions.map((c) => (
-                          <option key={c} value={c}>
-                            {c}
+                        {classOptions.map((roleClass) => (
+                          <option key={roleClass} value={roleClass}>
+                            {roleClass}
                           </option>
                         ))}
                       </select>
                     </div>
 
-                    <div className="rounded-2xl border border-slate-200/80 bg-white/70 px-3 py-2">
+                    <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2">
                       <div className="text-[11px] font-semibold text-slate-500">
                         Page size
                       </div>
@@ -586,18 +521,17 @@ const ReadUserRolesModal = ({ isOpen, onClose }) => {
                     <button
                       type="button"
                       onClick={handleReset}
-                      className="rounded-2xl border border-slate-200/80 bg-white/70 px-4 py-3 text-sm font-semibold text-slate-800 hover:bg-white transition"
+                      className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 hover:bg-slate-50 transition"
                     >
                       Reset
                     </button>
                   </div>
                 </div>
 
-                {/* Table wrapper */}
                 <div className="px-5 sm:px-6 pb-5 flex-1 min-h-0">
-                  <div className="h-full overflow-auto rounded-3xl border border-slate-200/80 bg-white/70">
-                    <table className="min-w-full divide-y divide-slate-200/70">
-                      <thead className="sticky top-0 bg-colorBrand/10 backdrop-blur">
+                  <div className="h-full overflow-auto rounded-[2rem] border border-slate-200 bg-white">
+                    <table className="min-w-full divide-y divide-slate-200">
+                      <thead className="sticky top-0 bg-orange-50 backdrop-blur">
                         <tr>
                           <th className="px-5 py-3 text-left text-xs font-semibold text-slate-700">
                             User
@@ -617,20 +551,20 @@ const ReadUserRolesModal = ({ isOpen, onClose }) => {
                         </tr>
                       </thead>
 
-                      <tbody className="divide-y divide-slate-200/70 bg-white/70">
+                      <tbody className="divide-y divide-slate-200 bg-white">
                         {readUserRoleData?.pages?.map((page) =>
-                          (page.items || [])
+                          (page?.items || [])
                             .filter((item) => {
                               if (!roleClassFilter) return true;
                               return (
-                                String(item.roleclass || "") ===
+                                String(item?.roleclass || "") ===
                                 String(roleClassFilter)
                               );
                             })
                             .map((item) => (
                               <tr
                                 key={item.uuid}
-                                className="hover:bg-white/80 transition"
+                                className="hover:bg-slate-50 transition"
                               >
                                 <td className="px-5 py-3 text-sm text-slate-900">
                                   {item.username}
@@ -649,7 +583,7 @@ const ReadUserRolesModal = ({ isOpen, onClose }) => {
                                     type="button"
                                     onClick={() => {
                                       setDeleteId(item.uuid);
-                                      setDeleteRow(item); // ✅ capture row for email/companycode context
+                                      setDeleteRow(item);
                                       setDeleteYesNoModalOpen(true);
                                     }}
                                     className="inline-flex items-center justify-center rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-100 transition"
@@ -664,7 +598,6 @@ const ReadUserRolesModal = ({ isOpen, onClose }) => {
                     </table>
                   </div>
 
-                  {/* Infinite scroll */}
                   <div className="mt-4">
                     <InfiniteScrollComponent
                       fetchNextPage={fetchNextPage}

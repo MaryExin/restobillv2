@@ -65,9 +65,6 @@ const PosMyAccount = ({ isDark, accent }) => {
             alt="Default Profile"
           />
         )}
-          <div className={`${profile?.profile_pic_url ? 'hidden' : 'flex'} items-center justify-center w-full h-full`}>
-             <FiUser size={80} style={{ color: accent }} className="opacity-20" />
-          </div>
         </div>
 
         <div className="flex-1 text-center md:text-left">

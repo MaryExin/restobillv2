@@ -46,6 +46,7 @@ const ViewOrdering = () => {
   const [selectedCustomTables, setSelectedCustomTables] = useState([]);
   const [transactionId, setTransactionId] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [specialTableName, setSpecialTableName] = useState("");
 
   const itemsPerPage = 15;
   const apiHost = useApiHost();
@@ -174,14 +175,15 @@ const ViewOrdering = () => {
     setShowPendingConfirmModal(false);
   };
 
-  const resetOrderModal = () => {
-    setShowOrderModal(false);
-    setTableMode("fixed");
-    setFixedSearch("");
-    setSelectedFixedTable("");
-    setSelectedCustomTables([]);
-    setTransactionId("");
-  };
+const resetOrderModal = () => {
+  setShowOrderModal(false);
+  setTableMode("fixed");
+  setSelectedFixedTable("");
+  setSelectedCustomTables([]);
+  setFixedSearch("");
+  setMergeSearch("");
+  setSpecialTableName("");
+};
 
   const toggleCustomTableSelection = (tableName) => {
     setSelectedCustomTables((prev) => {
@@ -221,21 +223,36 @@ const ViewOrdering = () => {
       });
   };
 
-  const handleOpenOrder = () => {
-    let value = "";
+const handleOpenOrder = () => {
+  let value = "";
 
-    if (tableMode === "fixed") {
-      value = selectedFixedTable;
-    } else {
-      if (selectedCustomTables.length === 0) return;
-      value = selectedCustomTables.join(" & ");
+  if (tableMode === "fixed") {
+    if (!selectedFixedTable) {
+      alert("Please select a fixed table.");
+      return;
     }
+    value = selectedFixedTable;
+  }
 
-    if (!value) return;
+  else if (tableMode === "custom") {
+    if (selectedCustomTables.length === 0) {
+      alert("Please select at least 1 table to merge.");
+      return;
+    }
+    value = selectedCustomTables.join(" & ");
+  }
 
-    openOrderList(value, "");
-    resetOrderModal();
-  };
+  else if (tableMode === "special") {
+    if (!specialTableName.trim()) {
+      alert("Please enter a special table name.");
+      return;
+    }
+    value = specialTableName.trim();
+  }
+
+  openOrderList(value, "");
+  resetOrderModal();
+};
 
   return (
     <div
@@ -329,453 +346,523 @@ const ViewOrdering = () => {
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {showOrderModal && (
-          <motion.div
-            className={`fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm px-4 sm:px-6 py-4 ${
-              isDark ? "bg-black/60" : "bg-slate-900/30"
-            }`}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className={`w-full max-w-[900px] rounded-[2rem] p-5 sm:p-6 shadow-2xl ${
-                isDark
-                  ? "bg-slate-950 border border-white/10"
-                  : "bg-white border border-slate-200"
+<AnimatePresence>
+  {showOrderModal && (
+    <motion.div
+      className={`fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm px-4 sm:px-6 py-4 ${
+        isDark ? "bg-black/60" : "bg-slate-900/30"
+      }`}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 10 }}
+        className={`w-full max-w-[900px] rounded-[2rem] p-5 sm:p-6 shadow-2xl ${
+          isDark
+            ? "bg-slate-950 border border-white/10"
+            : "bg-white border border-slate-200"
+        }`}
+      >
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2
+              className={`text-xl font-black ${
+                isDark ? "text-white" : "text-slate-900"
               }`}
             >
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2
-                    className={`text-xl font-black ${
-                      isDark ? "text-white" : "text-slate-900"
-                    }`}
-                  >
-                    Add Order
-                  </h2>
-                  <p
-                    className={`text-sm ${
-                      isDark ? "text-slate-400" : "text-slate-500"
-                    }`}
-                  >
-                    Choose fixed table or enter custom table.
-                  </p>
-                </div>
+              Add Order
+            </h2>
+            <p
+              className={`text-sm ${
+                isDark ? "text-slate-400" : "text-slate-500"
+              }`}
+            >
+              Choose fixed table, merge tables, or type a special table name.
+            </p>
+          </div>
 
-                <button
-                  onClick={resetOrderModal}
-                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
-                    isDark
-                      ? "text-slate-400 hover:text-white hover:bg-slate-800"
-                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
-                  }`}
-                >
-                  <FiX size={18} />
-                </button>
-              </div>
+          <button
+            onClick={resetOrderModal}
+            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+              isDark
+                ? "text-slate-400 hover:text-white hover:bg-slate-800"
+                : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+            }`}
+          >
+            <FiX size={18} />
+          </button>
+        </div>
 
-              <div
-                className={`grid grid-cols-2 gap-2 mb-5 p-1.5 rounded-2xl ${
+        <div
+          className={`grid grid-cols-3 gap-2 mb-5 p-1.5 rounded-2xl ${
+            isDark
+              ? "bg-slate-900/40 border border-white/5"
+              : "bg-slate-100 border border-slate-200"
+          }`}
+        >
+          <button
+            onClick={() => setTableMode("fixed")}
+            className={`rounded-2xl px-4 py-3 font-bold transition-all ${
+              tableMode === "fixed"
+                ? "bg-blue-600 text-white"
+                : isDark
+                  ? "text-slate-400 hover:text-white"
+                  : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            Fixed Table
+          </button>
+
+          <button
+            onClick={() => setTableMode("custom")}
+            className={`rounded-2xl px-4 py-3 font-bold transition-all ${
+              tableMode === "custom"
+                ? "bg-blue-600 text-white"
+                : isDark
+                  ? "text-slate-400 hover:text-white"
+                  : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            Merge Table
+          </button>
+
+          <button
+            onClick={() => setTableMode("special")}
+            className={`rounded-2xl px-4 py-3 font-bold transition-all ${
+              tableMode === "special"
+                ? "bg-blue-600 text-white"
+                : isDark
+                  ? "text-slate-400 hover:text-white"
+                  : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            Special Table
+          </button>
+        </div>
+
+        {tableMode === "fixed" ? (
+          <div className="space-y-5">
+            <div className="relative group">
+              <FaSearch
+                className={`absolute left-5 top-1/2 -translate-y-1/2 ${
+                  isDark ? "text-slate-600" : "text-slate-400"
+                }`}
+              />
+              <input
+                type="text"
+                placeholder="Search fixed table..."
+                value={fixedSearch}
+                onChange={(e) => setFixedSearch(e.target.value)}
+                className={`w-full rounded-2xl py-4 pl-14 pr-5 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${
                   isDark
-                    ? "bg-slate-900/40 border border-white/5"
-                    : "bg-slate-100 border border-slate-200"
+                    ? "bg-slate-900/50 border border-slate-800 text-white focus:border-blue-500/40"
+                    : "bg-slate-50 border border-slate-300 text-slate-900 focus:border-blue-400"
+                }`}
+              />
+            </div>
+
+            <div>
+              <label
+                className={`block text-[10px] font-black uppercase tracking-[0.3em] mb-3 ${
+                  isDark ? "text-slate-500" : "text-slate-500"
                 }`}
               >
-                <button
-                  onClick={() => setTableMode("fixed")}
-                  className={`rounded-2xl px-4 py-3 font-bold transition-all ${
-                    tableMode === "fixed"
-                      ? "bg-blue-600 text-white"
-                      : isDark
-                        ? "text-slate-400 hover:text-white"
-                        : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  Fixed Table
-                </button>
-                <button
-                  onClick={() => setTableMode("custom")}
-                  className={`rounded-2xl px-4 py-3 font-bold transition-all ${
-                    tableMode === "custom"
-                      ? "bg-blue-600 text-white"
-                      : isDark
-                        ? "text-slate-400 hover:text-white"
-                        : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  Custom Table
-                </button>
-              </div>
+                Select Fixed Table
+              </label>
 
-              {tableMode === "fixed" ? (
-                <div className="space-y-5">
-                  <div className="relative group">
-                    <FaSearch
-                      className={`absolute left-5 top-1/2 -translate-y-1/2 ${
-                        isDark ? "text-slate-600" : "text-slate-400"
-                      }`}
-                    />
-                    <input
-                      type="text"
-                      placeholder="Search fixed table..."
-                      value={fixedSearch}
-                      onChange={(e) => setFixedSearch(e.target.value)}
-                      className={`w-full rounded-2xl py-4 pl-14 pr-5 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${
-                        isDark
-                          ? "bg-slate-900/50 border border-slate-800 text-white focus:border-blue-500/40"
-                          : "bg-slate-50 border border-slate-300 text-slate-900 focus:border-blue-400"
-                      }`}
-                    />
-                  </div>
+              <div
+                className={`max-h-[300px] overflow-y-auto rounded-3xl p-3 ${
+                  isDark
+                    ? "border border-white/5 bg-slate-900/30"
+                    : "border border-slate-200 bg-slate-50"
+                }`}
+              >
+                {sortFloorTables(
+                  filteredMasterTables
+                    .filter((table) =>
+                      String(table.table_name || "")
+                        .toLowerCase()
+                        .includes(fixedSearch.toLowerCase()),
+                    )
+                    .map((table) => ({
+                      table_number: table.table_name,
+                      raw: table,
+                    })),
+                ).length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {sortFloorTables(
+                      filteredMasterTables
+                        .filter((table) =>
+                          String(table.table_name || "")
+                            .toLowerCase()
+                            .includes(fixedSearch.toLowerCase()),
+                        )
+                        .map((table) => ({
+                          table_number: table.table_name,
+                          raw: table,
+                        })),
+                    ).map((tableObj) => {
+                      const table = tableObj.raw;
+                      const tableName = tableObj.table_number;
+                      const isSelected =
+                        String(selectedFixedTable) === String(tableName);
 
-                  <div>
-                    <label
-                      className={`block text-[10px] font-black uppercase tracking-[0.3em] mb-3 ${
-                        isDark ? "text-slate-500" : "text-slate-500"
-                      }`}
-                    >
-                      Select Fixed Table
-                    </label>
-
-                    <div
-                      className={`max-h-[300px] overflow-y-auto rounded-3xl p-3 ${
-                        isDark
-                          ? "border border-white/5 bg-slate-900/30"
-                          : "border border-slate-200 bg-slate-50"
-                      }`}
-                    >
-                      {sortFloorTables(
-                        filteredMasterTables
-                          .filter((table) =>
-                            String(table.table_name || "")
-                              .toLowerCase()
-                              .includes(fixedSearch.toLowerCase()),
-                          )
-                          .map((table) => ({
-                            table_number: table.table_name,
-                            raw: table,
-                          })),
-                      ).length > 0 ? (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                          {sortFloorTables(
-                            filteredMasterTables
-                              .filter((table) =>
-                                String(table.table_name || "")
-                                  .toLowerCase()
-                                  .includes(fixedSearch.toLowerCase()),
-                              )
-                              .map((table) => ({
-                                table_number: table.table_name,
-                                raw: table,
-                              })),
-                          ).map((tableObj) => {
-                            const table = tableObj.raw;
-                            const tableName = tableObj.table_number;
-                            const isSelected =
-                              String(selectedFixedTable) === String(tableName);
-
-                            return (
-                              <button
-                                key={table.ID ?? tableName}
-                                type="button"
-                                onClick={() => setSelectedFixedTable(tableName)}
-                                className={`group relative rounded-2xl px-4 py-4 text-left transition-all duration-200 border shadow-sm hover:scale-[1.02] active:scale-[0.98] ${
-                                  isSelected
-                                    ? isDark
-                                      ? "bg-blue-500/15 border-blue-400/40 text-white shadow-blue-500/10"
-                                      : "bg-blue-50 border-blue-300 text-blue-700 shadow-blue-100"
-                                    : isDark
-                                      ? "bg-slate-800/70 border-white/5 text-slate-200 hover:bg-slate-800"
-                                      : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"
-                                }`}
-                              >
-                                <div className="flex items-start justify-between gap-3">
-                                  <div>
-                                    <p
-                                      className={`text-[10px] font-black uppercase tracking-[0.25em] mb-1 ${
-                                        isSelected
-                                          ? isDark
-                                            ? "text-blue-300"
-                                            : "text-blue-500"
-                                          : isDark
-                                            ? "text-slate-500"
-                                            : "text-slate-400"
-                                      }`}
-                                    >
-                                      Table
-                                    </p>
-                                    <p className="text-base font-extrabold leading-tight break-words">
-                                      {tableName}
-                                    </p>
-                                  </div>
-
-                                  <div
-                                    className={`shrink-0 mt-1 h-6 w-6 rounded-full flex items-center justify-center transition-all ${
-                                      isSelected
-                                        ? isDark
-                                          ? "bg-blue-500 text-white"
-                                          : "bg-blue-600 text-white"
-                                        : isDark
-                                          ? "bg-slate-700 text-slate-400"
-                                          : "bg-slate-100 text-slate-400"
-                                    }`}
-                                  >
-                                    {isSelected ? (
-                                      <FaCheck size={11} />
-                                    ) : (
-                                      <span className="text-[10px] font-bold">+</span>
-                                    )}
-                                  </div>
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div
-                          className={`rounded-2xl px-5 py-6 text-center text-sm ${
-                            isDark
-                              ? "bg-slate-800/50 text-slate-500"
-                              : "bg-white text-slate-500 border border-dashed border-slate-200"
+                      return (
+                        <button
+                          key={table.ID ?? tableName}
+                          type="button"
+                          onClick={() => setSelectedFixedTable(tableName)}
+                          className={`group relative rounded-2xl px-4 py-4 text-left transition-all duration-200 border shadow-sm hover:scale-[1.02] active:scale-[0.98] ${
+                            isSelected
+                              ? isDark
+                                ? "bg-blue-500/15 border-blue-400/40 text-white shadow-blue-500/10"
+                                : "bg-blue-50 border-blue-300 text-blue-700 shadow-blue-100"
+                              : isDark
+                                ? "bg-slate-800/70 border-white/5 text-slate-200 hover:bg-slate-800"
+                                : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"
                           }`}
                         >
-                          No fixed table found.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div
-                    className={`rounded-3xl px-5 py-5 ${
-                      isDark
-                        ? "bg-slate-900/40 border border-white/5"
-                        : "bg-slate-50 border border-slate-200"
-                    }`}
-                  >
-                    <p
-                      className={`text-[10px] font-black uppercase tracking-[0.3em] mb-3 ${
-                        isDark ? "text-slate-500" : "text-slate-500"
-                      }`}
-                    >
-                      Selected
-                    </p>
-
-                    <div
-                      className={`rounded-2xl px-4 py-4 ${
-                        isDark
-                          ? "bg-slate-950/70 border border-white/5"
-                          : "bg-white border border-slate-200"
-                      }`}
-                    >
-                      <p
-                        className={`text-lg font-bold leading-relaxed ${
-                          isDark ? "text-white" : "text-slate-900"
-                        }`}
-                      >
-                        {selectedFixedTable || "None"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-5">
-                  <div className="relative group">
-                    <FaSearch
-                      className={`absolute left-5 top-1/2 -translate-y-1/2 ${
-                        isDark ? "text-slate-600" : "text-slate-400"
-                      }`}
-                    />
-                    <input
-                      type="text"
-                      placeholder="Search tables to merge..."
-                      value={mergeSearch}
-                      onChange={(e) => setMergeSearch(e.target.value)}
-                      className={`w-full rounded-2xl py-4 pl-14 pr-5 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${
-                        isDark
-                          ? "bg-slate-900/50 border border-slate-800 text-white focus:border-blue-500/40"
-                          : "bg-slate-50 border border-slate-300 text-slate-900 focus:border-blue-400"
-                      }`}
-                    />
-                  </div>
-
-                  <div>
-                    <label
-                      className={`block text-[10px] font-black uppercase tracking-[0.3em] mb-3 ${
-                        isDark ? "text-slate-500" : "text-slate-500"
-                      }`}
-                    >
-                      Select Tables To Merge
-                    </label>
-
-                    <div
-                      className={`max-h-80 overflow-y-auto rounded-3xl p-3 ${
-                        isDark
-                          ? "border border-white/5 bg-slate-900/30"
-                          : "border border-slate-200 bg-slate-50"
-                      }`}
-                    >
-                      {sortFloorTables(
-                        masterTableList
-                          .filter((table) =>
-                            String(table.table_name || "")
-                              .toLowerCase()
-                              .includes(mergeSearch.toLowerCase()),
-                          )
-                          .map((table) => ({
-                            table_number: table.table_name,
-                            raw: table,
-                          })),
-                      ).length > 0 ? (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                          {sortFloorTables(
-                            masterTableList
-                              .filter((table) =>
-                                String(table.table_name || "")
-                                  .toLowerCase()
-                                  .includes(mergeSearch.toLowerCase()),
-                              )
-                              .map((table) => ({
-                                table_number: table.table_name,
-                                raw: table,
-                              })),
-                          ).map((tableObj) => {
-                            const tableName = tableObj.table_number;
-                            const isSelected =
-                              selectedCustomTables.includes(tableName);
-
-                            return (
-                              <button
-                                key={tableName}
-                                type="button"
-                                onClick={() => toggleCustomTableSelection(tableName)}
-                                className={`group relative rounded-2xl px-4 py-4 text-left transition-all duration-200 border shadow-sm hover:scale-[1.02] active:scale-[0.98] ${
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p
+                                className={`text-[10px] font-black uppercase tracking-[0.25em] mb-1 ${
                                   isSelected
                                     ? isDark
-                                      ? "bg-blue-500/15 border-blue-400/40 text-white shadow-blue-500/10"
-                                      : "bg-blue-50 border-blue-300 text-blue-700 shadow-blue-100"
+                                      ? "text-blue-300"
+                                      : "text-blue-500"
                                     : isDark
-                                      ? "bg-slate-800/70 border-white/5 text-slate-200 hover:bg-slate-800"
-                                      : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"
+                                      ? "text-slate-500"
+                                      : "text-slate-400"
                                 }`}
                               >
-                                <div className="flex items-start justify-between gap-3">
-                                  <div>
-                                    <p
-                                      className={`text-[10px] font-black uppercase tracking-[0.25em] mb-1 ${
-                                        isSelected
-                                          ? isDark
-                                            ? "text-blue-300"
-                                            : "text-blue-500"
-                                          : isDark
-                                            ? "text-slate-500"
-                                            : "text-slate-400"
-                                      }`}
-                                    >
-                                      Table
-                                    </p>
-                                    <p className="text-base font-extrabold leading-tight break-words">
-                                      {tableName}
-                                    </p>
-                                  </div>
+                                Table
+                              </p>
+                              <p className="text-base font-extrabold leading-tight break-words">
+                                {tableName}
+                              </p>
+                            </div>
 
-                                  <div
-                                    className={`shrink-0 mt-1 h-6 w-6 rounded-full flex items-center justify-center transition-all ${
-                                      isSelected
-                                        ? isDark
-                                          ? "bg-blue-500 text-white"
-                                          : "bg-blue-600 text-white"
-                                        : isDark
-                                          ? "bg-slate-700 text-slate-400"
-                                          : "bg-slate-100 text-slate-400"
-                                    }`}
-                                  >
-                                    {isSelected ? (
-                                      <FaCheck size={11} />
-                                    ) : (
-                                      <span className="text-[10px] font-bold">+</span>
-                                    )}
-                                  </div>
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div
-                          className={`rounded-2xl px-5 py-6 text-center text-sm ${
-                            isDark
-                              ? "bg-slate-800/50 text-slate-500"
-                              : "bg-white text-slate-500 border border-dashed border-slate-200"
-                          }`}
-                        >
-                          No tables found.
-                        </div>
-                      )}
-                    </div>
+                            <div
+                              className={`shrink-0 mt-1 h-6 w-6 rounded-full flex items-center justify-center transition-all ${
+                                isSelected
+                                  ? isDark
+                                    ? "bg-blue-500 text-white"
+                                    : "bg-blue-600 text-white"
+                                  : isDark
+                                    ? "bg-slate-700 text-slate-400"
+                                    : "bg-slate-100 text-slate-400"
+                              }`}
+                            >
+                              {isSelected ? (
+                                <FaCheck size={11} />
+                              ) : (
+                                <span className="text-[10px] font-bold">+</span>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
-
+                ) : (
                   <div
-                    className={`rounded-3xl px-5 py-5 ${
+                    className={`rounded-2xl px-5 py-6 text-center text-sm ${
                       isDark
-                        ? "bg-slate-900/40 border border-white/5"
-                        : "bg-slate-50 border border-slate-200"
+                        ? "bg-slate-800/50 text-slate-500"
+                        : "bg-white text-slate-500 border border-dashed border-slate-200"
                     }`}
                   >
-                    <p
-                      className={`text-[10px] font-black uppercase tracking-[0.3em] mb-3 ${
-                        isDark ? "text-slate-500" : "text-slate-500"
-                      }`}
-                    >
-                      Preview
-                    </p>
-
-                    <div
-                      className={`rounded-2xl px-4 py-4 ${
-                        isDark
-                          ? "bg-slate-950/70 border border-white/5"
-                          : "bg-white border border-slate-200"
-                      }`}
-                    >
-                      <p
-                        className={`text-lg font-bold leading-relaxed ${
-                          isDark ? "text-white" : "text-slate-900"
-                        }`}
-                      >
-                        {customTablePreview}
-                      </p>
-                    </div>
+                    No fixed table found.
                   </div>
-                </div>
-              )}
+                )}
+              </div>
+            </div>
 
-              <div className="flex gap-3 pt-5">
-                <button
-                  onClick={resetOrderModal}
-                  className={`flex-1 rounded-2xl px-5 py-4 transition-all ${
-                    isDark
-                      ? "bg-slate-800 text-slate-300 hover:text-white"
-                      : "bg-slate-200 text-slate-700 hover:text-slate-900"
+            <div
+              className={`rounded-3xl px-5 py-5 ${
+                isDark
+                  ? "bg-slate-900/40 border border-white/5"
+                  : "bg-slate-50 border border-slate-200"
+              }`}
+            >
+              <p
+                className={`text-[10px] font-black uppercase tracking-[0.3em] mb-3 ${
+                  isDark ? "text-slate-500" : "text-slate-500"
+                }`}
+              >
+                Selected
+              </p>
+
+              <div
+                className={`rounded-2xl px-4 py-4 ${
+                  isDark
+                    ? "bg-slate-950/70 border border-white/5"
+                    : "bg-white border border-slate-200"
+                }`}
+              >
+                <p
+                  className={`text-lg font-bold leading-relaxed ${
+                    isDark ? "text-white" : "text-slate-900"
                   }`}
                 >
-                  Cancel
-                </button>
-
-                <button
-                  onClick={handleOpenOrder}
-                  className="flex-1 px-5 py-4 font-bold text-white transition-all bg-blue-600 rounded-2xl hover:bg-blue-500"
-                >
-                  Open Order
-                </button>
+                  {selectedFixedTable || "None"}
+                </p>
               </div>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
+        ) : tableMode === "custom" ? (
+          <div className="space-y-5">
+            <div className="relative group">
+              <FaSearch
+                className={`absolute left-5 top-1/2 -translate-y-1/2 ${
+                  isDark ? "text-slate-600" : "text-slate-400"
+                }`}
+              />
+              <input
+                type="text"
+                placeholder="Search tables to merge..."
+                value={mergeSearch}
+                onChange={(e) => setMergeSearch(e.target.value)}
+                className={`w-full rounded-2xl py-4 pl-14 pr-5 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${
+                  isDark
+                    ? "bg-slate-900/50 border border-slate-800 text-white focus:border-blue-500/40"
+                    : "bg-slate-50 border border-slate-300 text-slate-900 focus:border-blue-400"
+                }`}
+              />
+            </div>
+
+            <div>
+              <label
+                className={`block text-[10px] font-black uppercase tracking-[0.3em] mb-3 ${
+                  isDark ? "text-slate-500" : "text-slate-500"
+                }`}
+              >
+                Select Tables To Merge
+              </label>
+
+              <div
+                className={`max-h-80 overflow-y-auto rounded-3xl p-3 ${
+                  isDark
+                    ? "border border-white/5 bg-slate-900/30"
+                    : "border border-slate-200 bg-slate-50"
+                }`}
+              >
+                {sortFloorTables(
+                  masterTableList
+                    .filter((table) =>
+                      String(table.table_name || "")
+                        .toLowerCase()
+                        .includes(mergeSearch.toLowerCase()),
+                    )
+                    .map((table) => ({
+                      table_number: table.table_name,
+                      raw: table,
+                    })),
+                ).length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {sortFloorTables(
+                      masterTableList
+                        .filter((table) =>
+                          String(table.table_name || "")
+                            .toLowerCase()
+                            .includes(mergeSearch.toLowerCase()),
+                        )
+                        .map((table) => ({
+                          table_number: table.table_name,
+                          raw: table,
+                        })),
+                    ).map((tableObj) => {
+                      const tableName = tableObj.table_number;
+                      const isSelected =
+                        selectedCustomTables.includes(tableName);
+
+                      return (
+                        <button
+                          key={tableName}
+                          type="button"
+                          onClick={() => toggleCustomTableSelection(tableName)}
+                          className={`group relative rounded-2xl px-4 py-4 text-left transition-all duration-200 border shadow-sm hover:scale-[1.02] active:scale-[0.98] ${
+                            isSelected
+                              ? isDark
+                                ? "bg-blue-500/15 border-blue-400/40 text-white shadow-blue-500/10"
+                                : "bg-blue-50 border-blue-300 text-blue-700 shadow-blue-100"
+                              : isDark
+                                ? "bg-slate-800/70 border-white/5 text-slate-200 hover:bg-slate-800"
+                                : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p
+                                className={`text-[10px] font-black uppercase tracking-[0.25em] mb-1 ${
+                                  isSelected
+                                    ? isDark
+                                      ? "text-blue-300"
+                                      : "text-blue-500"
+                                    : isDark
+                                      ? "text-slate-500"
+                                      : "text-slate-400"
+                                }`}
+                              >
+                                Table
+                              </p>
+                              <p className="text-base font-extrabold leading-tight break-words">
+                                {tableName}
+                              </p>
+                            </div>
+
+                            <div
+                              className={`shrink-0 mt-1 h-6 w-6 rounded-full flex items-center justify-center transition-all ${
+                                isSelected
+                                  ? isDark
+                                    ? "bg-blue-500 text-white"
+                                    : "bg-blue-600 text-white"
+                                  : isDark
+                                    ? "bg-slate-700 text-slate-400"
+                                    : "bg-slate-100 text-slate-400"
+                              }`}
+                            >
+                              {isSelected ? (
+                                <FaCheck size={11} />
+                              ) : (
+                                <span className="text-[10px] font-bold">+</span>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div
+                    className={`rounded-2xl px-5 py-6 text-center text-sm ${
+                      isDark
+                        ? "bg-slate-800/50 text-slate-500"
+                        : "bg-white text-slate-500 border border-dashed border-slate-200"
+                    }`}
+                  >
+                    No tables found.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div
+              className={`rounded-3xl px-5 py-5 ${
+                isDark
+                  ? "bg-slate-900/40 border border-white/5"
+                  : "bg-slate-50 border border-slate-200"
+              }`}
+            >
+              <p
+                className={`text-[10px] font-black uppercase tracking-[0.3em] mb-3 ${
+                  isDark ? "text-slate-500" : "text-slate-500"
+                }`}
+              >
+                Preview
+              </p>
+
+              <div
+                className={`rounded-2xl px-4 py-4 ${
+                  isDark
+                    ? "bg-slate-950/70 border border-white/5"
+                    : "bg-white border border-slate-200"
+                }`}
+              >
+                <p
+                  className={`text-lg font-bold leading-relaxed ${
+                    isDark ? "text-white" : "text-slate-900"
+                  }`}
+                >
+                  {customTablePreview}
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-5">
+            <div>
+              <label
+                className={`block text-[10px] font-black uppercase tracking-[0.3em] mb-3 ${
+                  isDark ? "text-slate-500" : "text-slate-500"
+                }`}
+              >
+                Special Table Name
+              </label>
+
+              <input
+                type="text"
+                placeholder="e.g. Special Table, VIP Table, Function Hall"
+                value={specialTableName}
+                onChange={(e) => setSpecialTableName(e.target.value)}
+                className={`w-full rounded-2xl py-4 px-5 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${
+                  isDark
+                    ? "bg-slate-900/50 border border-slate-800 text-white placeholder:text-slate-500 focus:border-blue-500/40"
+                    : "bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-blue-400"
+                }`}
+              />
+            </div>
+
+            <div
+              className={`rounded-3xl px-5 py-5 ${
+                isDark
+                  ? "bg-slate-900/40 border border-white/5"
+                  : "bg-slate-50 border border-slate-200"
+              }`}
+            >
+              <p
+                className={`text-[10px] font-black uppercase tracking-[0.3em] mb-3 ${
+                  isDark ? "text-slate-500" : "text-slate-500"
+                }`}
+              >
+                Preview
+              </p>
+
+              <div
+                className={`rounded-2xl px-4 py-4 ${
+                  isDark
+                    ? "bg-slate-950/70 border border-white/5"
+                    : "bg-white border border-slate-200"
+                }`}
+              >
+                <p
+                  className={`text-lg font-bold leading-relaxed ${
+                    isDark ? "text-white" : "text-slate-900"
+                  }`}
+                >
+                  {specialTableName || "None"}
+                </p>
+              </div>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
+
+        <div className="flex gap-3 pt-5">
+          <button
+            onClick={resetOrderModal}
+            className={`flex-1 rounded-2xl px-5 py-4 transition-all ${
+              isDark
+                ? "bg-slate-800 text-slate-300 hover:text-white"
+                : "bg-slate-200 text-slate-700 hover:text-slate-900"
+            }`}
+          >
+            Cancel
+          </button>
+
+          <button
+            onClick={handleOpenOrder}
+            className="flex-1 px-5 py-4 font-bold text-white transition-all bg-blue-600 rounded-2xl hover:bg-blue-500"
+          >
+            Open Order
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  )}
+</AnimatePresence>
 
       <nav
         className={`sticky top-0 z-40 backdrop-blur-xl px-4 py-4 mb-8 ${

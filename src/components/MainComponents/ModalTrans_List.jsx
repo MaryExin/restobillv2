@@ -159,7 +159,7 @@ const ModalTrans_List = ({
                   isDark ? "text-white" : "text-slate-900"
                 }`}
               >
-                Table {tableselected}
+                 {tableselected}
               </h2>
 
               <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">
