@@ -44,17 +44,27 @@ const PosMyAccount = ({ isDark, accent }) => {
       {/* HEADER SECTION */}
       <div className={`rounded-[40px] border p-12 flex flex-col md:flex-row items-center gap-10 ${theme.panel}`}>
         <div className="h-44 w-44 rounded-[40px] overflow-hidden border-4 border-white/5 bg-white/5 shadow-2xl flex items-center justify-center relative">
-          {profile?.profile_pic_url ? (
-            <img 
-              src={`${apiHost}/${profile.profile_pic_url}?t=${new Date().getTime()}`} 
-              className="object-cover w-full h-full"
-              alt="Profile"
-              onError={(e) => { 
-                e.target.style.display = 'none'; 
-                e.target.nextSibling.style.display = 'flex'; 
-              }}
-            />
-          ) : null}
+        {profile?.profile_pic_url ? (
+          <img 
+            src={`${apiHost}/${profile.profile_pic_url}?t=${new Date().getTime()}`} 
+            className="object-cover w-full h-full"
+            alt="Profile"
+            onError={(e) => { 
+              const defaultPath = `${apiHost}/item_pictures/Default.jpg`;
+              // Prevent infinite loops if the Default.jpg itself is missing
+              if (e.target.src !== defaultPath) {
+                e.target.src = defaultPath;
+              }
+            }}
+          />
+        ) : (
+          /* This handles the case where profile_pic_url is null/undefined from the start */
+          <img 
+            src={`${apiHost}/item_pictures/Default.jpg`} 
+            className="object-cover w-full h-full"
+            alt="Default Profile"
+          />
+        )}
           <div className={`${profile?.profile_pic_url ? 'hidden' : 'flex'} items-center justify-center w-full h-full`}>
              <FiUser size={80} style={{ color: accent }} className="opacity-20" />
           </div>
