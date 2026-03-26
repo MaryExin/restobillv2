@@ -131,19 +131,29 @@ const PrintBilling = () => {
   const currentItems = tablelist.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(tablelist.length / itemsPerPage);
 
-  const table_trasaction = (table_number) => {
-    if (!apiHost || !dateFrom) return;
-    fetch(
-      `${apiHost}/api/transactio_per_table.php?date=${dateFrom}&table_number=${table_number}`,
-    )
-      .then((res) => res.json())
-      .then((data) => {
-        settranspertable(data);
-        settableselected(table_number);
-        setshowtranslistpertable(true);
-      });
-  };
+const table_trasaction = (table_number) => {
+  if (!apiHost || !dateFrom) return;
 
+  const params = new URLSearchParams({
+    date: dateFrom,
+    table_number: table_number,
+  });
+
+  fetch(`${apiHost}/api/transactio_per_table.php?${params.toString()}`)
+    .then((res) => {
+      if (!res.ok) throw new Error("Failed to fetch transaction per table");
+      return res.json();
+    })
+    .then((data) => {
+      settranspertable(Array.isArray(data) ? data : data.data || []);
+      settableselected(table_number);
+      setshowtranslistpertable(true);
+    })
+    .catch((error) => {
+      console.error("table_trasaction fetch error:", error);
+      settranspertable([]);
+    });
+};
   const FilterChip = ({ label, value, icon: Icon }) => (
     <button
       onClick={() => setStatusFilter(value)}
@@ -328,7 +338,7 @@ const PrintBilling = () => {
                         isDark ? "text-white" : "text-slate-900"
                       }`}
                     >
-                      {String(table.table_number || "").replace(/^\D+/g, "")}
+                      {String(table.table_number || "")}
                     </span>
                     <div
                       className={`absolute top-4 right-4 w-3 h-3 rounded-full ${
