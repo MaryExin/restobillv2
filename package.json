@@ -9,8 +9,11 @@
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
     "electron": "electron .",
+    "dev:electron": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "dev:electron:debug": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron --inspect=5858 .\"",
+    "build": "vite build",
+    "pack": "npm run build && electron-builder --dir",
     "dist": "npm run build && electron-builder"
   },
   "dependencies": {
@@ -52,7 +55,7 @@
     "react-calendar": "^4.6.0",
     "react-chartjs-2": "^5.3.0",
     "react-countup": "^6.5.3",
-    "react-dom": "^18.2.0",
+    "react-dom": "^18.3.1",
     "react-draggable": "^4.4.6",
     "react-easy-crop": "^5.5.6",
     "react-helmet-async": "^2.0.4",
@@ -101,23 +104,23 @@
       "electron/**/*",
       "package.json"
     ],
-"extraResources": [
-  {
-    "from": "public",
-    "to": "images",
-    "filter": [
-      "**/*"
-    ]
-  },
-  {
-    "from": "public/ip.txt",
-    "to": "ip.txt"
-  },
-  {
-    "from": "public/pos-config.json",
-    "to": "pos-config.json"
-  }
-],
+    "extraResources": [
+      {
+        "from": "public",
+        "to": "images",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "public/ip.txt",
+        "to": "ip.txt"
+      },
+      {
+        "from": "public/pos-config.json",
+        "to": "pos-config.json"
+      }
+    ],
     "win": {
       "target": "nsis"
     }

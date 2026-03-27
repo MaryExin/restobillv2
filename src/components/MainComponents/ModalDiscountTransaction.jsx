@@ -1,6 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useReactToPrint } from "react-to-print";
 import {
   FiX,
   FiPrinter,
@@ -12,16 +11,13 @@ import {
   FiAlertTriangle,
 } from "react-icons/fi";
 import ButtonComponent from "./Common/ButtonComponent";
+import { BuildPrintableDiscountReceiptHtml } from "../../utils/buildPrintableDiscountReceiptHtml";
 
 const peso = (value) =>
   Number(value || 0).toLocaleString("en-PH", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
-
-const signedNegativePeso = (value) => `- ${peso(value)}`;
-
-const toNum = (value) => Number(value || 0);
 
 const yesNoToBool = (value) =>
   String(value || "")
@@ -70,413 +66,6 @@ const handleSelectAllOnFocus = (e) => {
     }
   });
 };
-
-const PrintableDiscountReceipt = React.forwardRef(
-  ({ transaction, dateFrom, computed, items }, ref) => {
-    const activeBreakdown = Array.isArray(computed?.discountBreakdown)
-      ? computed.discountBreakdown.filter(
-          (entry) =>
-            Number(entry?.qualifiedCount || 0) > 0 ||
-            Number(entry?.discountAmount || 0) > 0,
-        )
-      : [];
-
-    const totalQualifiedAll = Number(computed?.totalQualifiedAll || 0);
-    const statutoryQualifiedCount = Number(
-      computed?.statutoryQualifiedCount || 0,
-    );
-
-    return (
-      <div
-        ref={ref}
-        className="print-root"
-        style={{
-          width: "56mm",
-          minHeight: "100vh",
-          background: "#ffffff",
-          color: "#000000",
-          padding: "14px 29px",
-          fontFamily: "Arial, Helvetica, sans-serif",
-          fontSize: "11px",
-          lineHeight: 1.25,
-          WebkitPrintColorAdjust: "exact",
-          printColorAdjust: "exact",
-        }}
-      >
-        <div style={{ textAlign: "center" }}>
-          <div
-            style={{ fontWeight: "900", fontSize: "15px", lineHeight: 1.15 }}
-          >
-            {String("CRABS N CRACK SEAFOOD HOUSE").toUpperCase()}
-          </div>
-          <div
-            style={{ fontWeight: "700", fontSize: "12px", marginTop: "2px" }}
-          >
-            AND SHAKING CRABS - STA. MARIA
-          </div>
-          <div style={{ fontWeight: "700", fontSize: "12px" }}>
-            ARU FOOD CORP.
-          </div>
-        </div>
-
-        <div style={{ borderTop: "1px solid #000", margin: "10px 0 8px" }} />
-
-        <div
-          style={{
-            textAlign: "center",
-            fontWeight: "900",
-            fontSize: "14px",
-            marginBottom: "8px",
-          }}
-        >
-          BILLING
-        </div>
-
-        <table
-          style={{
-            width: "100%",
-            fontSize: "10px",
-            borderCollapse: "collapse",
-          }}
-        >
-          <tbody>
-            <tr>
-              <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                Trans. No.:
-              </td>
-              <td style={{ textAlign: "right", padding: "1px 0" }}>
-                {transaction?.transaction_id || "-"}
-              </td>
-            </tr>
-            <tr>
-              <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                Billing No.:
-              </td>
-              <td style={{ textAlign: "right", padding: "1px 0" }}>
-                {transaction?.billing_no || transaction?.billingNo || "-"}
-              </td>
-            </tr>
-            <tr>
-              <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                Invoice No.:
-              </td>
-              <td style={{ textAlign: "right", padding: "1px 0" }}>
-                {transaction?.invoice_no || transaction?.invoiceNo || "-"}
-              </td>
-            </tr>
-            <tr>
-              <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                Trans. Date:
-              </td>
-              <td style={{ textAlign: "right", padding: "1px 0" }}>
-                {transaction?.transaction_date || dateFrom || "-"}
-              </td>
-            </tr>
-            <tr>
-              <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                Trans. Time:
-              </td>
-              <td style={{ textAlign: "right", padding: "1px 0" }}>
-                {transaction?.transaction_time || "-"}
-              </td>
-            </tr>
-            <tr>
-              <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                Terminal No.:
-              </td>
-              <td style={{ textAlign: "right", padding: "1px 0" }}>
-                {transaction?.terminal_number || "-"}
-              </td>
-            </tr>
-            <tr>
-              <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                Order Type:
-              </td>
-              <td style={{ textAlign: "right", padding: "1px 0" }}>
-                {transaction?.order_type || "-"}
-              </td>
-            </tr>
-            <tr>
-              <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                Ref./Tag #:
-              </td>
-              <td style={{ textAlign: "right", padding: "1px 0" }}>
-                {transaction?.table_number || "-"}
-              </td>
-            </tr>
-            <tr>
-              <td style={{ fontWeight: "700", padding: "1px 0" }}>Cashier:</td>
-              <td style={{ textAlign: "right", padding: "1px 0" }}>
-                {transaction?.cashier || "-"}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-
-        <div style={{ borderTop: "1px solid #000", margin: "10px 0 6px" }} />
-
-        <table
-          style={{
-            width: "100%",
-            borderCollapse: "collapse",
-            fontSize: "10px",
-          }}
-        >
-          <thead>
-            <tr>
-              <th style={{ textAlign: "left", paddingBottom: "4px" }}>Item</th>
-              <th style={{ textAlign: "center", paddingBottom: "4px" }}>Qty</th>
-              <th style={{ textAlign: "right", paddingBottom: "4px" }}>Amt</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item, index) => {
-              const qty = Number(item.sales_quantity || 0);
-              const price = Number(item.selling_price || 0);
-              const lineTotal = qty * price;
-
-              return (
-                <tr key={item.ID || index}>
-                  <td style={{ padding: "2px 0", verticalAlign: "top" }}>
-                    •{" "}
-                    {String(
-                      item.item_name || item.product_id || "-",
-                    ).toUpperCase()}
-                  </td>
-                  <td
-                    style={{
-                      textAlign: "center",
-                      padding: "2px 0",
-                      verticalAlign: "top",
-                    }}
-                  >
-                    {qty} {item.unit_of_measure || ""}
-                  </td>
-                  <td
-                    style={{
-                      textAlign: "right",
-                      padding: "2px 0",
-                      verticalAlign: "top",
-                    }}
-                  >
-                    {peso(lineTotal)}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-
-        <div style={{ borderTop: "1px solid #000", margin: "10px 0 6px" }} />
-
-        <table
-          style={{
-            width: "100%",
-            fontSize: "10px",
-            borderCollapse: "collapse",
-          }}
-        >
-          <tbody>
-            <tr>
-              <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                TOTAL SALES:
-              </td>
-              <td style={{ textAlign: "right", padding: "1px 0" }}>
-                {peso(computed?.grossTotal)}
-              </td>
-            </tr>
-
-            {activeBreakdown.map((entry) =>
-              Number(entry?.discountAmount || 0) > 0 ? (
-                <tr key={`disc-${entry.key}`}>
-                  <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                    {String(entry?.label || "DISCOUNT").toUpperCase()}:
-                  </td>
-                  <td style={{ textAlign: "right", padding: "1px 0" }}>
-                    {signedNegativePeso(entry?.discountAmount)}
-                  </td>
-                </tr>
-              ) : null,
-            )}
-
-            {Number(computed?.totalVatExemption || 0) > 0 ? (
-              <tr>
-                <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                  VAT EXEMPTION:
-                </td>
-                <td style={{ textAlign: "right", padding: "1px 0" }}>
-                  {signedNegativePeso(computed?.totalVatExemption)}
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-
-        <div style={{ borderTop: "1px solid #000", margin: "8px 0 6px" }} />
-
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "baseline",
-            fontWeight: "900",
-            fontSize: "14px",
-            marginBottom: "8px",
-          }}
-        >
-          <span>AMOUNT DUE:</span>
-          <span>{peso(computed?.netAfterDiscount)}</span>
-        </div>
-
-        <div style={{ borderTop: "1px solid #000", margin: "8px 0 6px" }} />
-
-        <table
-          style={{
-            width: "100%",
-            fontSize: "10px",
-            borderCollapse: "collapse",
-          }}
-        >
-          <tbody>
-            <tr>
-              <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                VATABLE SALES:
-              </td>
-              <td style={{ textAlign: "right", padding: "1px 0" }}>
-                {peso(computed?.vatableSales)}
-              </td>
-            </tr>
-            <tr>
-              <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                VAT AMOUNT:
-              </td>
-              <td style={{ textAlign: "right", padding: "1px 0" }}>
-                {peso(computed?.vatableSalesVat)}
-              </td>
-            </tr>
-            <tr>
-              <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                VAT EXEMPT SALES:
-              </td>
-              <td style={{ textAlign: "right", padding: "1px 0" }}>
-                {peso(computed?.vatExemptSales)}
-              </td>
-            </tr>
-            <tr>
-              <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                VAT EXEMPTION:
-              </td>
-              <td style={{ textAlign: "right", padding: "1px 0" }}>
-                {peso(computed?.totalVatExemption)}
-              </td>
-            </tr>
-            <tr>
-              <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                ZERO RATED SALES:
-              </td>
-              <td style={{ textAlign: "right", padding: "1px 0" }}>
-                {peso(computed?.vatZeroRatedSales)}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-
-        <div style={{ borderTop: "1px solid #000", margin: "10px 0 8px" }} />
-
-        <table
-          style={{
-            width: "100%",
-            fontSize: "10px",
-            borderCollapse: "collapse",
-          }}
-        >
-          <tbody>
-            <tr>
-              <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                Total Customers:
-              </td>
-              <td style={{ textAlign: "right", padding: "1px 0" }}>
-                {computed?.safeCustomerCount ?? 0}
-              </td>
-            </tr>
-            <tr>
-              <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                Total Qualified:
-              </td>
-              <td style={{ textAlign: "right", padding: "1px 0" }}>
-                {totalQualifiedAll}
-              </td>
-            </tr>
-            <tr>
-              <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                Statutory Qualified:
-              </td>
-              <td style={{ textAlign: "right", padding: "1px 0" }}>
-                {statutoryQualifiedCount}
-              </td>
-            </tr>
-
-            {activeBreakdown.map((entry) => (
-              <React.Fragment key={`print-breakdown-${entry.key}`}>
-                <tr>
-                  <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                    {entry.label} Count:
-                  </td>
-                  <td style={{ textAlign: "right", padding: "1px 0" }}>
-                    {entry.qualifiedCount}
-                  </td>
-                </tr>
-                <tr>
-                  <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                    {entry.label} Amount:
-                  </td>
-                  <td style={{ textAlign: "right", padding: "1px 0" }}>
-                    {peso(entry.discountAmount)}
-                  </td>
-                </tr>
-              </React.Fragment>
-            ))}
-
-            <tr>
-              <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                Discountable Gross:
-              </td>
-              <td style={{ textAlign: "right", padding: "1px 0" }}>
-                {peso(computed?.discountableGross)}
-              </td>
-            </tr>
-            <tr>
-              <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                Discountable Base:
-              </td>
-              <td style={{ textAlign: "right", padding: "1px 0" }}>
-                {peso(computed?.discountableBase)}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-
-        <div style={{ marginTop: "12px", fontSize: "10px" }}>
-          <div style={{ fontWeight: "700" }}>Customer Signature:</div>
-          <div
-            style={{
-              borderBottom: "1px solid #000",
-              height: "18px",
-              marginTop: "3px",
-            }}
-          />
-        </div>
-
-        <div style={{ borderTop: "1px solid #000", margin: "10px 0 8px" }} />
-
-        <div style={{ textAlign: "center", fontSize: "10px" }}>
-          <div style={{ fontWeight: "700" }}>Thank you</div>
-          <div style={{ fontWeight: "700" }}>Please come again.</div>
-        </div>
-      </div>
-    );
-  },
-);
 
 const OrderedItemsSummaryModal = ({
   isOpen,
@@ -811,7 +400,8 @@ const ModalDiscountTransaction = ({
   isDark,
   billingNo,
 }) => {
-  const printRef = useRef(null);
+  const [printerName, setPrinterName] = useState("");
+  const [printers, setPrinters] = useState([]);
 
   const [items, setItems] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -831,6 +421,38 @@ const ModalDiscountTransaction = ({
     useState(false);
   const [initialLoadedSignature, setInitialLoadedSignature] = useState("");
   const [showOverrideWarning, setShowOverrideWarning] = useState(false);
+
+  const DEFAULT_PRINTER_NAME = "XP-80C";
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const loadPrinters = async () => {
+      try {
+        const list = await window.electronAPI?.getPrinters?.();
+        const safeList = Array.isArray(list) ? list : [];
+
+        setPrinters(safeList);
+
+        console.log("Electron printers:", safeList);
+        console.log("Printer count:", safeList.length);
+
+        const defaultPrinter = safeList.find((p) => p.isDefault);
+        const resolvedPrinterName =
+          defaultPrinter?.name || DEFAULT_PRINTER_NAME;
+
+        setPrinterName(resolvedPrinterName);
+
+        console.log("Default printer name:", defaultPrinter?.name || "(none)");
+        console.log("Resolved printer name:", resolvedPrinterName);
+      } catch (error) {
+        console.error("Failed to load printers:", error);
+        setPrinterName(DEFAULT_PRINTER_NAME);
+      }
+    };
+
+    loadPrinters();
+  }, [isOpen]);
 
   const handleChangeCount = (key, value) => {
     setDiscountState((prev) => ({
@@ -1306,41 +928,74 @@ const ModalDiscountTransaction = ({
     return result;
   };
 
-  const handlePrint = useReactToPrint({
-    content: () => printRef.current,
-    documentTitle: `${
-      latestBillingNo ||
-      billingNo ||
-      transaction?.billing_no ||
-      transaction?.transaction_id ||
-      "billing"
-    }-billing`,
-    pageStyle: `
-      @media print {
-        @page {
-          size: 80mm auto;
-          margin: 0;
-        }
+  const handleNativePrint = async () => {
+    if (!apiHost || !transaction?.transaction_id) {
+      alert("Missing transaction data.");
+      return;
+    }
 
+    if (!validateQualifiedCounts(customerCount, discountState)) {
+      alert("Please fix the discount validation first.");
+      return;
+    }
+
+    console.log("Selected printerName:", printerName);
+    console.log("Available printers:", printers);
+    console.log(
+      "Is aligned:",
+      printers.some((p) => p.name === printerName),
+    );
+
+    try {
+      const billingResult = await saveBillingBeforePrint();
+
+      const finalBillingNo =
+        billingResult?.billing_no ||
+        latestBillingNo ||
+        billingNo ||
+        transaction?.billing_no ||
+        transaction?.billingNo ||
+        "";
+
+      const finalInvoiceNo =
+        billingResult?.invoice_no ||
+        latestInvoiceNo ||
+        transaction?.invoice_no ||
+        "";
+
+      const html = BuildPrintableDiscountReceiptHtml({
+        transaction: {
+          ...transaction,
+          cashier:
+            localStorage.getItem("username") ||
+            transaction?.cashier ||
+            "System",
+          billing_no: finalBillingNo,
+          invoice_no: finalInvoiceNo,
+        },
+        dateFrom,
+        computed,
+        items,
+        scale: 1,
+      });
+
+      const result = await window.electronAPI.printReceipt({
         html,
-        body {
-          margin: 0 !important;
-          padding: 0 !important;
-          background: #ffffff !important;
-          color: #000000 !important;
-          font-family: Arial, Helvetica, sans-serif !important;
-          -webkit-print-color-adjust: exact !important;
-          print-color-adjust: exact !important;
-        }
+        printerName,
+        silent: true, // temporary test to false for preview
+        copies: 1,
+      });
 
-        .print-root {
-          width: 80mm !important;
-          min-height: auto !important;
-        }
+      console.log("Print result:", result);
+
+      if (!result?.success) {
+        throw new Error(result?.message || "Print failed.");
       }
-    `,
-  });
-
+    } catch (error) {
+      console.error(error);
+      alert(error.message || "Failed to print billing.");
+    }
+  };
   const containerClass = isDark
     ? "bg-slate-900 border border-white/10 text-white"
     : "bg-white border border-slate-200 text-slate-900";
@@ -1652,11 +1307,29 @@ const ModalDiscountTransaction = ({
                 </div>
               </div>
 
+              <div className={`rounded-[0.95rem] p-3 ${innerCardClass}`}>
+                <label className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
+                  Printer
+                </label>
+                <select
+                  value={printerName}
+                  onChange={(e) => setPrinterName(e.target.value)}
+                  className={`w-full rounded-lg px-3 py-2 text-sm outline-none ${inputClass}`}
+                >
+                  <option value="">Default Printer</option>
+                  {printers.map((printer) => (
+                    <option key={printer.name} value={printer.name}>
+                      {printer.displayName || printer.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div className="grid grid-cols-2 gap-2.5">
                 <ButtonComponent
                   onClick={onClose}
-                  isLoading={isPrintDisabled}
-                  disabled={isPrintDisabled}
+                  isLoading={false}
+                  disabled={false}
                   loadingText="Cancel..."
                   variant="secondary"
                   icon={<FiPrinter size={14} />}
@@ -1665,21 +1338,8 @@ const ModalDiscountTransaction = ({
                 </ButtonComponent>
 
                 <ButtonComponent
-                  onClick={async () => {
-                    try {
-                      await saveBillingBeforePrint();
-
-                      setTimeout(() => {
-                        if (!isPrintDisabled) handlePrint?.();
-                      }, 150);
-                    } catch (error) {
-                      console.error(error);
-                      alert(
-                        error.message || "Failed to save billing before print.",
-                      );
-                    }
-                  }}
-                  isLoading={isPrintDisabled}
+                  onClick={handleNativePrint}
+                  isLoading={false}
                   disabled={isPrintDisabled}
                   loadingText="Print..."
                   variant="primary"
@@ -1702,29 +1362,6 @@ const ModalDiscountTransaction = ({
         computed={computed}
         isDark={isDark}
       />
-
-      <div style={{ display: "none" }}>
-        <PrintableDiscountReceipt
-          ref={printRef}
-          transaction={{
-            ...transaction,
-            cashier:
-              localStorage.getItem("username") ||
-              transaction?.cashier ||
-              "System",
-            billing_no:
-              latestBillingNo ||
-              billingNo ||
-              transaction?.billing_no ||
-              transaction?.billingNo ||
-              "",
-            invoice_no: latestInvoiceNo || transaction?.invoice_no || "",
-          }}
-          dateFrom={dateFrom}
-          computed={computed}
-          items={items}
-        />
-      </div>
     </>
   );
 };
