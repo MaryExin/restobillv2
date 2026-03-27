@@ -187,6 +187,7 @@ const PosBackupModal = ({ isDark, accent }) => {
         <div className="absolute inset-0 transition-transform duration-700 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent group-hover:translate-x-full" />
       </button>
 
+
     </div>
   );
 };
