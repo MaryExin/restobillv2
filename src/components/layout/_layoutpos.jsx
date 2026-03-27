@@ -17,6 +17,8 @@ import {
   FaChartPie,
   FaPowerOff,
   FaMoneyBill,
+  FaGlobe,
+  FaCloudUploadAlt,
 } from "react-icons/fa";
 import { HiOutlineStatusOnline } from "react-icons/hi";
 import { IoMdClose } from "react-icons/io";
@@ -202,6 +204,13 @@ const LayoutPos = ({ children }) => {
         icon={<FaMoneyBill className="text-[28px] sm:text-[30px]" />}
         color="violet"
         onClick={() => navigate("/pricesyncing")} // Dapat pareho ito sa path sa App.js
+      />
+
+      <PosQuickActionTile
+        label="Sales Record Syncing"
+        icon={<FaCloudUploadAlt className="text-[28px] sm:text-[30px]" />}
+        color="violet"
+        onClick={() => navigate("/salesrecordssyncing")} // Dapat pareho ito sa path sa App.js
       />
 
       <OpenNewDay />
