@@ -2905,7 +2905,6 @@ export default function TransactionPaymentModal({
                 {isPaidMode ? (
                   <ButtonComponent
                     onClick={handlePrintDuplicate}
-                    isLoading={handlePrintDuplicate}
                     loadingText="Duplicating..."
                     variant="secondary"
                   >
