@@ -126,7 +126,14 @@ const StatCard = ({
   );
 };
 
-const FilterChip = ({ active, label, onClick, tone = "default", isDark }) => {
+const FilterChip = ({
+  active,
+  label,
+  onClick,
+  tone = "default",
+  isDark,
+  disabled = false,
+}) => {
   const activeCls =
     tone === "emerald"
       ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/20"
@@ -141,13 +148,14 @@ const FilterChip = ({ active, label, onClick, tone = "default", isDark }) => {
   return (
     <button
       onClick={onClick}
+      disabled={disabled}
       className={`rounded-full px-4 py-2 text-xs font-black uppercase tracking-wider transition-all ${
         active
           ? activeCls
           : isDark
             ? "bg-slate-900/40 text-slate-400 border border-white/5 hover:text-white"
             : "bg-white text-slate-600 border border-slate-200 hover:text-slate-900 hover:border-slate-300"
-      }`}
+      } ${disabled ? "opacity-50 cursor-not-allowed pointer-events-none" : ""}`}
     >
       {label}
     </button>
@@ -237,7 +245,14 @@ const InfoStrip = ({ isDark, title, message, tone = "blue" }) => {
   );
 };
 
-const ProductCard = ({ row, checked, onToggle, imageBaseUrl, isDark }) => {
+const ProductCard = ({
+  row,
+  checked,
+  onToggle,
+  imageBaseUrl,
+  isDark,
+  disabled = false,
+}) => {
   const badge = badgeMap[row.action] || badgeMap.no_price_change;
   const hasAction = row.action !== "no_price_change";
   const priceChanged = row.diff?.price_changed || row.diff?.cost_changed;
@@ -252,7 +267,7 @@ const ProductCard = ({ row, checked, onToggle, imageBaseUrl, isDark }) => {
         isDark
           ? "bg-slate-900/30 border-white/5"
           : "bg-white border-slate-200 shadow-sm"
-      }`}
+      } ${disabled ? "opacity-80" : ""}`}
     >
       <div className="p-4 md:p-5">
         <div className="flex flex-col gap-4 md:flex-row">
@@ -352,7 +367,7 @@ const ProductCard = ({ row, checked, onToggle, imageBaseUrl, isDark }) => {
               <div className="md:pl-4">
                 <button
                   type="button"
-                  disabled={!hasAction}
+                  disabled={!hasAction || disabled}
                   onClick={() => onToggle(row.row_key)}
                   className={`w-full md:w-auto rounded-2xl px-4 py-3 text-sm font-black transition-all ${
                     checked
@@ -364,6 +379,10 @@ const ProductCard = ({ row, checked, onToggle, imageBaseUrl, isDark }) => {
                         : isDark
                           ? "bg-slate-800/30 text-slate-500 cursor-not-allowed border border-white/5"
                           : "bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200"
+                  } ${
+                    disabled
+                      ? "opacity-60 cursor-not-allowed pointer-events-none"
+                      : ""
                   }`}
                 >
                   {checked ? "Selected" : hasAction ? "Select" : "No Action"}
@@ -458,6 +477,31 @@ const ProgressLoader = ({ isDark, text = "Loading sync details..." }) => {
   );
 };
 
+const SyncingOverlay = ({ isDark }) => {
+  return (
+    <div className="fixed inset-0 z-[120]">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+      <div className="absolute inset-0 flex items-center justify-center p-6">
+        <div
+          className={`w-full max-w-lg rounded-[2rem] border px-8 py-10 text-center shadow-2xl ${
+            isDark
+              ? "bg-slate-950/90 border-white/10 text-white"
+              : "bg-white/95 border-slate-200 text-slate-900"
+          }`}
+        >
+          <div className="mx-auto mb-5 h-20 w-20 rounded-full border-4 border-blue-500/20 border-t-blue-500 animate-spin" />
+          <div className="text-3xl font-black tracking-tight">
+            Syncing products and pricing...
+          </div>
+          <div className="mt-3 text-sm text-slate-500">
+            Please wait while selected changes are being applied.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const VirtualHeader = ({ isDark }) => {
   const cols = [
     "Product",
@@ -467,7 +511,6 @@ const VirtualHeader = ({ isDark }) => {
     "OFFLINE SRP",
     "ONLINE COST",
     "OFFLINE COST",
-    // "Presence",
     "Status",
     "Select",
   ];
@@ -494,7 +537,14 @@ const VirtualHeader = ({ isDark }) => {
 };
 
 const VirtualRow = ({ index, style, data }) => {
-  const { rows, selectedRowKeys, toggleSelect, imageBaseUrl, isDark } = data;
+  const {
+    rows,
+    selectedRowKeys,
+    toggleSelect,
+    imageBaseUrl,
+    isDark,
+    disabled,
+  } = data;
   const row = rows[index];
   const badge = badgeMap[row.action] || badgeMap.no_price_change;
   const checked = selectedRowKeys.includes(row.row_key);
@@ -512,7 +562,7 @@ const VirtualRow = ({ index, style, data }) => {
           isDark
             ? "border-white/5 hover:bg-white/5"
             : "border-slate-100 hover:bg-slate-50"
-        }`}
+        } ${disabled ? "opacity-80" : ""}`}
       >
         <div className="p-4">
           <div className="flex items-center gap-4 min-w-[220px]">
@@ -549,7 +599,6 @@ const VirtualRow = ({ index, style, data }) => {
 
         <div className="p-4">
           <div className="font-black">
-            {" "}
             {row.online?.pricing_label || row.pricing_label || row.pricing_code}
           </div>
           <div className="text-sm text-slate-500">{row.pricing_code}</div>
@@ -583,11 +632,6 @@ const VirtualRow = ({ index, style, data }) => {
           {row.offline?.unit_cost != null ? peso(row.offline?.unit_cost) : "—"}
         </div>
 
-        {/* <div className="p-4 text-sm">
-          <div>ONLINE: {row.online_presence ? "Yes" : "No"}</div>
-          <div>OFFLINE: {row.offline_presence ? "Yes" : "No"}</div>
-        </div> */}
-
         <div className="p-4">
           <span
             className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
@@ -615,7 +659,7 @@ const VirtualRow = ({ index, style, data }) => {
 
         <div className="p-4">
           <button
-            disabled={row.action === "no_price_change"}
+            disabled={row.action === "no_price_change" || disabled}
             onClick={() => toggleSelect(row.row_key)}
             className={`rounded-2xl px-4 py-2 font-bold transition-all ${
               checked
@@ -627,6 +671,10 @@ const VirtualRow = ({ index, style, data }) => {
                   : isDark
                     ? "bg-slate-900/70 border border-white/5 text-slate-300 hover:text-white"
                     : "bg-slate-100 border border-slate-200 text-slate-700 hover:text-slate-900"
+            } ${
+              disabled
+                ? "opacity-60 cursor-not-allowed pointer-events-none"
+                : ""
             }`}
           >
             {checked
@@ -664,6 +712,7 @@ const SyncProductsAndPricing = () => {
   const [isYesNoModalOpen, setYesNoModalOpen] = useState(false);
   const [showhidesuccess, setshowhidesuccess] = useState(false);
   const [returnmessage, setReturnmessage] = useState({ message: "" });
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const pricingQueryString = useMemo(() => {
     const params = new URLSearchParams();
@@ -757,8 +806,9 @@ const SyncProductsAndPricing = () => {
   ]);
 
   const runRefresh = useCallback(() => {
+    if (isSyncing) return;
     refetch?.();
-  }, [refetch]);
+  }, [refetch, isSyncing]);
 
   const rows = useMemo(() => readData?.rows || [], [readData]);
 
@@ -784,6 +834,8 @@ const SyncProductsAndPricing = () => {
 
   useEffect(() => {
     if (!productsQueueMutateData) return;
+
+    setIsSyncing(false);
 
     const message = productsQueueMutateData?.message || "";
     if (["Success", "Synced", "Completed"].includes(message)) {
@@ -866,15 +918,20 @@ const SyncProductsAndPricing = () => {
     );
   }, [rows, selectedRowKeys]);
 
-  const toggleSelect = useCallback((rowKey) => {
-    setSelectedRowKeys((prev) =>
-      prev.includes(rowKey)
-        ? prev.filter((id) => id !== rowKey)
-        : [...prev, rowKey],
-    );
-  }, []);
+  const toggleSelect = useCallback(
+    (rowKey) => {
+      if (isSyncing) return;
+      setSelectedRowKeys((prev) =>
+        prev.includes(rowKey)
+          ? prev.filter((id) => id !== rowKey)
+          : [...prev, rowKey],
+      );
+    },
+    [isSyncing],
+  );
 
   const selectAllVisibleChanges = () => {
+    if (isSyncing) return;
     const visibleChangeIds = filteredRows
       .filter((r) => r.action !== "no_price_change")
       .map((r) => r.row_key);
@@ -886,7 +943,10 @@ const SyncProductsAndPricing = () => {
     });
   };
 
-  const clearSelection = () => setSelectedRowKeys([]);
+  const clearSelection = () => {
+    if (isSyncing) return;
+    setSelectedRowKeys([]);
+  };
 
   const confirmWarningAndApplyPricingCodes = () => {
     const codes = [...pendingPricingCodes];
@@ -897,6 +957,7 @@ const SyncProductsAndPricing = () => {
   };
 
   const requestPricingCodeToggle = (pricingCode) => {
+    if (isSyncing) return;
     const next = selectedPricingCodes.includes(pricingCode)
       ? selectedPricingCodes.filter((c) => c !== pricingCode)
       : [...selectedPricingCodes, pricingCode];
@@ -918,6 +979,7 @@ const SyncProductsAndPricing = () => {
   };
 
   const requestCheckAllPricingCodes = () => {
+    if (isSyncing) return;
     const allCodes = pricingOptions.map((p) => p.pricing_code);
     const missingOffline = allCodes.filter(
       (code) => !offlineExistingPricingCodes.has(code),
@@ -934,11 +996,13 @@ const SyncProductsAndPricing = () => {
   };
 
   const clearPricingCodes = () => {
+    if (isSyncing) return;
     setSelectedPricingCodes([]);
     setSelectedRowKeys([]);
   };
 
   const openSyncConfirm = () => {
+    if (isSyncing) return;
     setWarningMode("sync_rows");
     setYesNoModalOpen(true);
   };
@@ -973,11 +1037,20 @@ const SyncProductsAndPricing = () => {
       return;
     }
 
-    productsQueueMutate({
-      busunitcode: readData.target.busunitcode,
-      rows: selectedRows,
-      selected_pricing_codes: selectedPricingCodes,
-    });
+    setIsSyncing(true);
+
+    productsQueueMutate(
+      {
+        busunitcode: readData.target.busunitcode,
+        rows: selectedRows,
+        selected_pricing_codes: selectedPricingCodes,
+      },
+      {
+        onError: () => {
+          setIsSyncing(false);
+        },
+      },
+    );
   };
 
   const modalMessage = useMemo(() => {
@@ -1032,8 +1105,16 @@ Set inactive: ${inactiveCount}`;
       toggleSelect,
       imageBaseUrl,
       isDark,
+      disabled: isSyncing,
     }),
-    [filteredRows, selectedRowKeys, toggleSelect, imageBaseUrl, isDark],
+    [
+      filteredRows,
+      selectedRowKeys,
+      toggleSelect,
+      imageBaseUrl,
+      isDark,
+      isSyncing,
+    ],
   );
 
   return (
@@ -1055,6 +1136,8 @@ Set inactive: ${inactiveCount}`;
         />
       </div>
 
+      {isSyncing && <SyncingOverlay isDark={isDark} />}
+
       <nav
         className={`sticky top-0 z-40 backdrop-blur-xl px-4 py-4 mb-8 ${
           isDark
@@ -1064,12 +1147,13 @@ Set inactive: ${inactiveCount}`;
       >
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => !isSyncing && navigate(-1)}
+            disabled={isSyncing}
             className={`flex items-center gap-3 px-6 py-3 rounded-full transition-all ${
               isDark
                 ? "bg-slate-900/50 border border-white/5 text-slate-400 hover:text-white"
                 : "bg-white border border-slate-200 text-slate-600 hover:text-slate-900 shadow-sm"
-            }`}
+            } ${isSyncing ? "opacity-50 cursor-not-allowed pointer-events-none" : ""}`}
           >
             <FaArrowLeft size={14} />
             <span className="text-xs font-bold tracking-wider uppercase">
@@ -1083,10 +1167,11 @@ Set inactive: ${inactiveCount}`;
                 isDark
                   ? "bg-slate-900/80 border border-white/5"
                   : "bg-slate-100 border border-slate-200"
-              }`}
+              } ${isSyncing ? "opacity-50 pointer-events-none" : ""}`}
             >
               <button
                 onClick={() => setViewMode("card")}
+                disabled={isSyncing}
                 className={`p-2.5 rounded-xl transition-all ${
                   viewMode === "card"
                     ? "bg-blue-600 text-white shadow-lg shadow-blue-900/20"
@@ -1097,6 +1182,7 @@ Set inactive: ${inactiveCount}`;
               </button>
               <button
                 onClick={() => setViewMode("table")}
+                disabled={isSyncing}
                 className={`p-2.5 rounded-xl transition-all ${
                   viewMode === "table"
                     ? "bg-blue-600 text-white shadow-lg shadow-blue-900/20"
@@ -1109,7 +1195,12 @@ Set inactive: ${inactiveCount}`;
 
             <button
               onClick={runRefresh}
-              className="rounded-2xl px-4 py-3 bg-blue-600 text-white font-bold hover:bg-blue-500 transition-all shadow-lg shadow-blue-900/20 flex items-center gap-2"
+              disabled={isSyncing}
+              className={`rounded-2xl px-4 py-3 bg-blue-600 text-white font-bold hover:bg-blue-500 transition-all shadow-lg shadow-blue-900/20 flex items-center gap-2 ${
+                isSyncing
+                  ? "opacity-50 cursor-not-allowed pointer-events-none"
+                  : ""
+              }`}
             >
               <FiRefreshCw size={16} />
               Refresh
@@ -1141,12 +1232,13 @@ Set inactive: ${inactiveCount}`;
                 type="text"
                 placeholder="Search product id / pricing / name / category..."
                 value={search}
+                disabled={isSyncing}
                 onChange={(e) => setSearch(e.target.value)}
                 className={`w-full rounded-[2rem] py-2 pl-14 pr-6 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500/40 transition-all backdrop-blur-sm ${
                   isDark
                     ? "bg-slate-900/30 border border-slate-800 hover:border-slate-700 text-white"
                     : "bg-white border border-slate-200 hover:border-slate-300 text-slate-900 shadow-sm"
-                }`}
+                } ${isSyncing ? "opacity-60 cursor-not-allowed" : ""}`}
               />
             </div>
 
@@ -1157,6 +1249,7 @@ Set inactive: ${inactiveCount}`;
                 tone="amber"
                 onClick={() => setFilter("price_change")}
                 isDark={isDark}
+                disabled={isSyncing}
               />
               <FilterChip
                 active={filter === "new_product"}
@@ -1164,6 +1257,7 @@ Set inactive: ${inactiveCount}`;
                 tone="emerald"
                 onClick={() => setFilter("new_product")}
                 isDark={isDark}
+                disabled={isSyncing}
               />
               <FilterChip
                 active={filter === "inactive_product"}
@@ -1171,6 +1265,7 @@ Set inactive: ${inactiveCount}`;
                 tone="rose"
                 onClick={() => setFilter("inactive_product")}
                 isDark={isDark}
+                disabled={isSyncing}
               />
               <FilterChip
                 active={filter === "no_price_change"}
@@ -1178,12 +1273,14 @@ Set inactive: ${inactiveCount}`;
                 tone="slate"
                 onClick={() => setFilter("no_price_change")}
                 isDark={isDark}
+                disabled={isSyncing}
               />
               <FilterChip
                 active={filter === "all"}
                 label="All"
                 onClick={() => setFilter("all")}
                 isDark={isDark}
+                disabled={isSyncing}
               />
             </div>
           </div>
@@ -1237,7 +1334,7 @@ Set inactive: ${inactiveCount}`;
               isDark
                 ? "bg-slate-900/30 border-white/5"
                 : "bg-white border-slate-200 shadow-sm"
-            }`}
+            } ${isSyncing ? "opacity-80" : ""}`}
           >
             <div className="flex flex-col gap-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1260,22 +1357,24 @@ Set inactive: ${inactiveCount}`;
                 <div className="flex flex-wrap gap-2">
                   <button
                     onClick={requestCheckAllPricingCodes}
+                    disabled={isSyncing}
                     className={`rounded-2xl px-4 py-3 font-bold transition-all ${
                       isDark
                         ? "bg-slate-900/70 border border-white/5 text-slate-300 hover:text-white"
                         : "bg-slate-100 border border-slate-200 text-slate-700 hover:text-slate-900"
-                    }`}
+                    } ${isSyncing ? "opacity-50 cursor-not-allowed pointer-events-none" : ""}`}
                   >
                     Check All
                   </button>
 
                   <button
                     onClick={clearPricingCodes}
+                    disabled={isSyncing}
                     className={`rounded-2xl px-4 py-3 font-bold transition-all ${
                       isDark
                         ? "bg-slate-900/70 border border-white/5 text-slate-300 hover:text-white"
                         : "bg-slate-100 border border-slate-200 text-slate-700 hover:text-slate-900"
-                    }`}
+                    } ${isSyncing ? "opacity-50 cursor-not-allowed pointer-events-none" : ""}`}
                   >
                     Clear Pricing
                   </button>
@@ -1295,6 +1394,7 @@ Set inactive: ${inactiveCount}`;
                     <button
                       key={opt.pricing_code}
                       type="button"
+                      disabled={isSyncing}
                       onClick={() => requestPricingCodeToggle(opt.pricing_code)}
                       className={`text-left rounded-2xl border px-4 py-4 transition-all ${
                         checked
@@ -1302,7 +1402,7 @@ Set inactive: ${inactiveCount}`;
                           : isDark
                             ? "bg-slate-900/60 border-white/5 text-slate-200 hover:border-blue-400/40"
                             : "bg-slate-50 border-slate-200 text-slate-900 hover:border-blue-300"
-                      }`}
+                      } ${isSyncing ? "opacity-50 cursor-not-allowed pointer-events-none" : ""}`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
@@ -1376,7 +1476,7 @@ Set inactive: ${inactiveCount}`;
                 isDark
                   ? "bg-slate-900/30 border-white/5"
                   : "bg-white border-slate-200 shadow-sm"
-              }`}
+              } ${isSyncing ? "opacity-80" : ""}`}
             >
               <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 mb-2">
                 Reconciliation Controls
@@ -1385,22 +1485,24 @@ Set inactive: ${inactiveCount}`;
               <div className="space-y-3">
                 <button
                   onClick={selectAllVisibleChanges}
+                  disabled={isSyncing}
                   className={`w-full rounded-2xl px-4 py-3 font-bold transition-all ${
                     isDark
                       ? "bg-slate-900/70 border border-white/5 text-slate-300 hover:text-white"
                       : "bg-slate-100 border border-slate-200 text-slate-700 hover:text-slate-900"
-                  }`}
+                  } ${isSyncing ? "opacity-50 cursor-not-allowed pointer-events-none" : ""}`}
                 >
                   Select Visible Changes
                 </button>
 
                 <button
                   onClick={clearSelection}
+                  disabled={isSyncing}
                   className={`w-full rounded-2xl px-4 py-3 font-bold transition-all ${
                     isDark
                       ? "bg-slate-900/70 border border-white/5 text-slate-300 hover:text-white"
                       : "bg-slate-100 border border-slate-200 text-slate-700 hover:text-slate-900"
-                  }`}
+                  } ${isSyncing ? "opacity-50 cursor-not-allowed pointer-events-none" : ""}`}
                 >
                   Clear Selected Rows
                 </button>
@@ -1408,12 +1510,14 @@ Set inactive: ${inactiveCount}`;
                 <button
                   onClick={openSyncConfirm}
                   disabled={
+                    isSyncing ||
                     !isOnline ||
                     isRemoteOffline ||
                     noBusinessUnit ||
                     selectedRows.length === 0
                   }
                   className={`w-full rounded-2xl px-5 py-3 font-bold transition-all ${
+                    isSyncing ||
                     !isOnline ||
                     isRemoteOffline ||
                     noBusinessUnit ||
@@ -1571,6 +1675,7 @@ Set inactive: ${inactiveCount}`;
                     onToggle={toggleSelect}
                     imageBaseUrl={imageBaseUrl}
                     isDark={isDark}
+                    disabled={isSyncing}
                   />
                 ))}
               </AnimatePresence>
@@ -1588,7 +1693,6 @@ Set inactive: ${inactiveCount}`;
                   className="overflow-y-auto overflow-x-hidden"
                   style={{
                     maxHeight: `${virtualHeight + 80}px`,
-                    // minWidth: "1640px",
                   }}
                 >
                   <VirtualHeader isDark={isDark} />
@@ -1597,7 +1701,6 @@ Set inactive: ${inactiveCount}`;
                       height={virtualHeight}
                       itemCount={filteredRows.length}
                       itemSize={92}
-                      //   width={1640}
                       itemData={listData}
                     >
                       {VirtualRow}
