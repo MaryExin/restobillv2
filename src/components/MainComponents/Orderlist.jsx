@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import QRCode from "qrcode.react";
 import {
@@ -21,7 +21,6 @@ import {
 } from "react-icons/fa";
 import { IoMdClose } from "react-icons/io";
 import { IoQrCode } from "react-icons/io5";
-import { useReactToPrint } from "react-to-print";
 import {
   FiX,
   FiPrinter,
@@ -29,7 +28,6 @@ import {
   FiCheckCircle,
   FiPercent,
 } from "react-icons/fi";
-import Receipt from "./Receipt";
 import { useNavigate } from "react-router-dom";
 import useApiHost from "../../hooks/useApiHost";
 import { useTheme } from "../../context/ThemeContext";
@@ -37,6 +35,10 @@ import ModalDiscountTransaction from "./ModalDiscountTransaction";
 import useZustandLoginCred from "../../context/useZustandLoginCred";
 import ModalYesNoReusable from "../Modals/ModalYesNoReusable";
 import ButtonComponent from "./Common/ButtonComponent";
+import {
+  BuildBillingReceiptHtml,
+  BuildOrderReceiptHtml,
+} from "../../utils/BuildOrderlistPrintHtml";
 const Orderlist = ({
   tableselected,
   setshoworderlist,
@@ -96,10 +98,11 @@ const Orderlist = ({
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [discountTransaction, setDiscountTransaction] = useState(null);
 
-  const printRef = useRef();
-  const printAllRef = useRef();
-  const billingPrintRef = useRef();
   const [isReprint, setIsReprint] = useState(false);
+
+  const [printerName, setPrinterName] = useState("");
+  const [printers, setPrinters] = useState([]);
+  const DEFAULT_PRINTER_NAME = "XP-80C";
 
   const userId = localStorage.getItem("user_id") || "0";
   const userName = localStorage.getItem("Cashier") || "Store Crew";
@@ -112,14 +115,13 @@ const Orderlist = ({
   const [showTransferConfirmModal, setShowTransferConfirmModal] =
     useState(false);
   const [isTransferringTable, setIsTransferringTable] = useState(false);
- const [transferMode, setTransferMode] = useState("fixed");
+  const [transferMode, setTransferMode] = useState("fixed");
   const [transferSearch, setTransferSearch] = useState("");
   const [selectedTransferTable, setSelectedTransferTable] = useState("");
   const [selectedMergeTables, setSelectedMergeTables] = useState([]);
   const [specialTransferTableName, setSpecialTransferTableName] = useState("");
   const [transferTableList, setTransferTableList] = useState([]);
   const [transferLoading, setTransferLoading] = useState(false);
-
 
   const [newtransaction, setNewTransaction] = useState({
     business_info: {},
@@ -206,103 +208,157 @@ const Orderlist = ({
     fetchNewTransaction();
   }, [apiHost, userId]);
 
-  const printPageStyle = `
-    @page {
-      size: 80mm auto;
-      margin: 0;
-    }
+  useEffect(() => {
+    const loadPrinters = async () => {
+      try {
+        const list = await window.electronAPI?.getPrinters?.();
+        const safeList = Array.isArray(list) ? list : [];
 
-    @media print {
+        setPrinters(safeList);
+
+        console.log("Electron printers:", safeList);
+        console.log("Printer count:", safeList.length);
+
+        const defaultPrinter = safeList.find((p) => p.isDefault);
+        const resolvedPrinterName =
+          defaultPrinter?.name || DEFAULT_PRINTER_NAME;
+
+        setPrinterName(resolvedPrinterName);
+
+        console.log("Default printer name:", defaultPrinter?.name || "(none)");
+        console.log("Resolved printer name:", resolvedPrinterName);
+      } catch (error) {
+        console.error("Failed to load printers:", error);
+        setPrinterName(DEFAULT_PRINTER_NAME);
+      }
+    };
+
+    loadPrinters();
+  }, []);
+
+  const printViaElectron = async ({
+    html,
+    fallbackDocumentName = "receipt",
+    afterSuccess,
+  }) => {
+    try {
+      if (!window.electronAPI?.printReceipt) {
+        throw new Error("Electron print API is not available.");
+      }
+
+      console.log("Selected printerName:", printerName);
+      console.log("Available printers:", printers);
+      console.log(
+        "Is aligned:",
+        printers.some((p) => p.name === printerName),
+      );
+
+      const result = await window.electronAPI.printReceipt({
+        html,
+        printerName: printerName || DEFAULT_PRINTER_NAME,
+        silent: true,
+        copies: 1,
+      });
+
+      console.log("Print result:", result);
+
+      if (!result?.success) {
+        throw new Error(
+          result?.message || `Failed to print ${fallbackDocumentName}.`,
+        );
+      }
+
+      if (typeof afterSuccess === "function") {
+        afterSuccess();
+      }
+
+      return { ok: true };
+    } catch (error) {
+      console.error(error);
+      alert(error.message || `Failed to print ${fallbackDocumentName}.`);
+      return { ok: false };
+    }
+  };
+
+  const handlePrintAdditionalOrderElectron = async () => {
+    const html = BuildOrderReceiptHtml({
+      productcart: {
+        customer: tableselected,
+        items: additionalCartItems,
+      },
+      totalPrice: additionalTotalPrice,
+      tableselected,
+      instructions,
+      transactionId,
+      isReprint: false,
+    });
+
+    return printViaElectron({
       html,
-      body {
-        margin: 0 !important;
-        padding: 0 !important;
-        background: #ffffff !important;
-        background-color: #ffffff !important;
-        color: #000000 !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
+      fallbackDocumentName: transactionId
+        ? `additional-order-${transactionId}`
+        : `new-order-${tableselected}`,
+      afterSuccess: () => {
+        setIsReprint(false);
+        setShowqrModal(false);
+        setShowCartMobile(false);
+        setShowDesktopCartActions(false);
+        setshoworderlist(false);
+      },
+    });
+  };
 
-      body {
-        display: block !important;
-        min-height: 100vh !important;
-      }
+  const handlePrintAllElectron = async () => {
+    const html = BuildOrderReceiptHtml({
+      productcart: {
+        customer: tableselected,
+        items: cartSummaryItems,
+      },
+      totalPrice,
+      tableselected,
+      instructions,
+      transactionId,
+      isReprint,
+    });
 
-      .print-root {
-        width: 80mm !important;
-        min-height: 100vh !important;
-        background: #ffffff !important;
-        background-color: #ffffff !important;
-        color: #000000 !important;
-        position: relative !important;
-        left: 0 !important;
-        top: 0 !important;
-        margin: 0 !important;
-        padding: 16px !important;
-        box-shadow: none !important;
-      }
+    return printViaElectron({
+      html,
+      fallbackDocumentName: transactionId
+        ? `full-order-${transactionId}`
+        : `full-order-${tableselected}`,
+      afterSuccess: () => {
+        setIsReprint(false);
+        setShowqrModal(false);
+        setShowCartMobile(false);
+        setShowDesktopCartActions(false);
+      },
+    });
+  };
 
-      .print-root * {
-        color: #000000 !important;
-      }
+  const handleBillingPrintElectron = async (transaction, detailedItems) => {
+    const html = BuildBillingReceiptHtml({
+      transaction,
+      detailedproduct: detailedItems,
+      title: transaction?.billing_no
+        ? `billing-${transaction.billing_no}`
+        : transaction?.transaction_id
+          ? `billing-${transaction.transaction_id}`
+          : `billing-${tableselected}`,
+    });
 
-      table {
-        width: 100% !important;
-        border-collapse: collapse !important;
-      }
-
-      img,
-      svg,
-      canvas {
-        background: transparent !important;
-        background-color: transparent !important;
-      }
-    }
-  `;
-
-  const handlePrint = useReactToPrint({
-    content: () => printRef.current,
-    documentTitle: transactionId
-      ? `additional-order-${transactionId}`
-      : `new-order-${tableselected}`,
-    pageStyle: printPageStyle,
-    onAfterPrint: () => {
-      setIsReprint(false);
-      setShowqrModal(false);
-      setShowCartMobile(false);
-      setShowDesktopCartActions(false);
-      setshoworderlist(false);
-    },
-  });
-
-  const handlePrintAll = useReactToPrint({
-    content: () => printAllRef.current,
-    documentTitle: transactionId
-      ? `full-order-${transactionId}`
-      : `full-order-${tableselected}`,
-    pageStyle: printPageStyle,
-    onAfterPrint: () => {
-      setIsReprint(false);
-      setShowqrModal(false);
-      setShowCartMobile(false);
-      setShowDesktopCartActions(false);
-    },
-  });
-
-  const handleBillingPrint = useReactToPrint({
-    content: () => billingPrintRef.current,
-    documentTitle: billingSelectedTransaction?.billing_no
-      ? `billing-${billingSelectedTransaction.billing_no}`
-      : billingSelectedTransaction?.transaction_id
-        ? `billing-${billingSelectedTransaction.transaction_id}`
-        : `billing-${tableselected}`,
-    pageStyle: printPageStyle,
-    onAfterPrint: () => {
-      setBillingSelectedTransaction(null);
-      setBillingDetailedProduct([]);
-    },
-  });
+    return printViaElectron({
+      html,
+      fallbackDocumentName: transaction?.billing_no
+        ? `billing-${transaction.billing_no}`
+        : transaction?.transaction_id
+          ? `billing-${transaction.transaction_id}`
+          : `billing-${tableselected}`,
+      afterSuccess: () => {
+        setBillingSelectedTransaction(null);
+        setBillingDetailedProduct([]);
+      },
+    });
+  };
 
   const getCategoryIcon = (name) => {
     const lower = (name || "").toLowerCase();
@@ -866,39 +922,39 @@ const Orderlist = ({
     setShowqrModal(true);
   };
 
-const openBillingModal = () => {
-  if (!apiHost || !tableselected) return;
+  const openBillingModal = () => {
+    if (!apiHost || !tableselected) return;
 
-  setShowBillingModal(true);
-  setBillingTab("pending");
-  setBillingLoading(true);
+    setShowBillingModal(true);
+    setBillingTab("pending");
+    setBillingLoading(true);
 
-  const params = new URLSearchParams({
-    date: dateSelected,
-    table_number: tableselected,
-  });
-
-  const url = `${apiHost}/api/transactio_per_table.php?${params.toString()}`;
-
-  console.log("tableselected:", tableselected);
-  console.log("billing url:", url);
-
-  fetch(url)
-    .then((res) => {
-      if (!res.ok) throw new Error("Failed to fetch transaction");
-      return res.json();
-    })
-    .then((data) => {
-      setBillingData(Array.isArray(data) ? data : data.data || []);
-    })
-    .catch((error) => {
-      console.error("Fetch billing error:", error);
-      setBillingData([]);
-    })
-    .finally(() => {
-      setBillingLoading(false);
+    const params = new URLSearchParams({
+      date: dateSelected,
+      table_number: tableselected,
     });
-};
+
+    const url = `${apiHost}/api/transactio_per_table.php?${params.toString()}`;
+
+    console.log("tableselected:", tableselected);
+    console.log("billing url:", url);
+
+    fetch(url)
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch transaction");
+        return res.json();
+      })
+      .then((data) => {
+        setBillingData(Array.isArray(data) ? data : data.data || []);
+      })
+      .catch((error) => {
+        console.error("Fetch billing error:", error);
+        setBillingData([]);
+      })
+      .finally(() => {
+        setBillingLoading(false);
+      });
+  };
 
   const saveBillingToServer = async (transaction, detailedItems) => {
     if (!apiHost || !transaction?.transaction_id) {
@@ -983,19 +1039,16 @@ const openBillingModal = () => {
       const billingResult = await saveBillingToServer(item, detailedItems);
 
       // 3. update state for printing
-      setBillingDetailedProduct(detailedItems);
-      setBillingSelectedTransaction({
+      const finalTransaction = {
         ...item,
         billing_no: billingResult.billing_no,
         invoice_no: billingResult.invoice_no,
-      });
+      };
 
-      // 4. trigger print
-      setTimeout(() => {
-        if (billingPrintRef.current) {
-          handleBillingPrint();
-        }
-      }, 200);
+      setBillingDetailedProduct(detailedItems);
+      setBillingSelectedTransaction(finalTransaction);
+
+      await handleBillingPrintElectron(finalTransaction, detailedItems);
     } catch (error) {
       console.error("Billing transaction click error:", error);
       alert(error.message || "Failed to process billing.");
@@ -1121,11 +1174,7 @@ const openBillingModal = () => {
       setShowConfirmModal(false);
       setShowqrModal(false);
 
-      setTimeout(() => {
-        if (printRef.current) {
-          handlePrint();
-        }
-      }, 150);
+      await handlePrintAdditionalOrderElectron();
     } catch (error) {
       console.error("Confirm transaction error:", error);
     } finally {
@@ -1133,7 +1182,7 @@ const openBillingModal = () => {
     }
   };
 
-  const handlePrintOnly = () => {
+  const handlePrintOnly = async () => {
     if (!canPrintOnly) {
       alert(
         "Print Only is available only when there are no new or edited items.",
@@ -1150,11 +1199,7 @@ const openBillingModal = () => {
     setShowqrModal(false);
     setShowConfirmModal(false);
 
-    setTimeout(() => {
-      if (printAllRef.current) {
-        handlePrintAll();
-      }
-    }, 150);
+    await handlePrintAllElectron();
   };
 
   const onOpenDiscountModal = (item, e) => {
@@ -1298,26 +1343,26 @@ const openBillingModal = () => {
   };
 
   const toggleMergeTableSelection = (tableName) => {
-  setSelectedMergeTables((prev) => {
-    const exists = prev.includes(tableName);
+    setSelectedMergeTables((prev) => {
+      const exists = prev.includes(tableName);
 
-    if (exists) {
-      return prev.filter((item) => item !== tableName);
-    }
+      if (exists) {
+        return prev.filter((item) => item !== tableName);
+      }
 
-    return [...prev, tableName].sort((a, b) =>
-      String(a).localeCompare(String(b), undefined, {
-        numeric: true,
-        sensitivity: "base",
-      }),
-    );
-  });
-};
+      return [...prev, tableName].sort((a, b) =>
+        String(a).localeCompare(String(b), undefined, {
+          numeric: true,
+          sensitivity: "base",
+        }),
+      );
+    });
+  };
 
-const mergeTablePreview = useMemo(() => {
-  if (selectedMergeTables.length === 0) return "None";
-  return selectedMergeTables.join(" & ");
-}, [selectedMergeTables]);
+  const mergeTablePreview = useMemo(() => {
+    if (selectedMergeTables.length === 0) return "None";
+    return selectedMergeTables.join(" & ");
+  }, [selectedMergeTables]);
 
   const toggleMergeTable = (tableName) => {
     const normalizedIncoming = normalizeTableName(tableName);
@@ -1356,28 +1401,28 @@ const mergeTablePreview = useMemo(() => {
     try {
       setIsTransferringTable(true);
 
-let finalTableValue = "";
-let finalRemarks = "";
-let finalTransactionType = "";
+      let finalTableValue = "";
+      let finalRemarks = "";
+      let finalTransactionType = "";
 
-if (transferMode === "fixed") {
-  finalTableValue = selectedTransferTable;
-  finalRemarks = `Transferred from table ${tableselected} to ${finalTableValue}`;
-  finalTransactionType = "TRANSFER TABLE";
-} else if (transferMode === "merge") {
-  finalTableValue = selectedMergeTables.join(" & ");
-  finalRemarks = `Merged table ${tableselected} to ${finalTableValue}`;
-  finalTransactionType = "MERGE TABLE";
-} else if (transferMode === "special") {
-  finalTableValue = specialTransferTableName.trim();
-  finalRemarks = `Transferred from table ${tableselected} to ${finalTableValue}`;
-  finalTransactionType = "TRANSFER TABLE";
-}
+      if (transferMode === "fixed") {
+        finalTableValue = selectedTransferTable;
+        finalRemarks = `Transferred from table ${tableselected} to ${finalTableValue}`;
+        finalTransactionType = "TRANSFER TABLE";
+      } else if (transferMode === "merge") {
+        finalTableValue = selectedMergeTables.join(" & ");
+        finalRemarks = `Merged table ${tableselected} to ${finalTableValue}`;
+        finalTransactionType = "MERGE TABLE";
+      } else if (transferMode === "special") {
+        finalTableValue = specialTransferTableName.trim();
+        finalRemarks = `Transferred from table ${tableselected} to ${finalTableValue}`;
+        finalTransactionType = "TRANSFER TABLE";
+      }
 
-if (!finalTableValue) {
-  alert("Invalid transfer table.");
-  return;
-}
+      if (!finalTableValue) {
+        alert("Invalid transfer table.");
+        return;
+      }
 
       const formData = new FormData();
 
@@ -1960,6 +2005,38 @@ if (!finalTableValue) {
                           {totalItems} item{totalItems !== 1 ? "s" : ""}
                         </p>
                       </div>
+                      <div
+                        className={`rounded-2xl p-3 transition-colors ${
+                          isDark
+                            ? "border border-white/10 bg-white/5"
+                            : "border border-slate-200 bg-slate-50"
+                        }`}
+                      >
+                        <label
+                          className={`mb-2 block text-[10px] font-bold uppercase tracking-[0.18em] ${
+                            isDark ? "text-slate-500" : "text-slate-500"
+                          }`}
+                        >
+                          Printer
+                        </label>
+
+                        <select
+                          value={printerName}
+                          onChange={(e) => setPrinterName(e.target.value)}
+                          className={`w-full rounded-xl px-3 py-3 text-sm outline-none ${
+                            isDark
+                              ? "border border-slate-700 bg-slate-900 text-white"
+                              : "border border-slate-300 bg-white text-slate-900"
+                          }`}
+                        >
+                          <option value="">Default Printer</option>
+                          {printers.map((printer) => (
+                            <option key={printer.name} value={printer.name}>
+                              {printer.displayName || printer.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
 
                     <div
@@ -2030,7 +2107,8 @@ if (!finalTableValue) {
                               isDark ? "text-slate-400" : "text-slate-500"
                             }`}
                           >
-                            Choose fixed table, merge tables, or type a special table name.
+                            Choose fixed table, merge tables, or type a special
+                            table name.
                           </p>
                         </div>
 
@@ -2105,7 +2183,9 @@ if (!finalTableValue) {
                               type="text"
                               placeholder="Search fixed table..."
                               value={transferSearch}
-                              onChange={(e) => setTransferSearch(e.target.value)}
+                              onChange={(e) =>
+                                setTransferSearch(e.target.value)
+                              }
                               className={`w-full rounded-2xl py-4 pl-14 pr-5 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${
                                 isDark
                                   ? "bg-slate-900/50 border border-slate-800 text-white focus:border-blue-500/40"
@@ -2130,13 +2210,11 @@ if (!finalTableValue) {
                                   : "border border-slate-200 bg-slate-50"
                               }`}
                             >
-                              {transferTableList
-                                .filter((table) =>
-                                  String(table.table_name || "")
-                                    .toLowerCase()
-                                    .includes(transferSearch.toLowerCase()),
-                                )
-                                .length > 0 ? (
+                              {transferTableList.filter((table) =>
+                                String(table.table_name || "")
+                                  .toLowerCase()
+                                  .includes(transferSearch.toLowerCase()),
+                              ).length > 0 ? (
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                                   {transferTableList
                                     .filter((table) =>
@@ -2147,13 +2225,16 @@ if (!finalTableValue) {
                                     .map((table) => {
                                       const tableName = table.table_name;
                                       const isSelected =
-                                        String(selectedTransferTable) === String(tableName);
+                                        String(selectedTransferTable) ===
+                                        String(tableName);
 
                                       return (
                                         <button
                                           key={table.ID ?? tableName}
                                           type="button"
-                                          onClick={() => setSelectedTransferTable(tableName)}
+                                          onClick={() =>
+                                            setSelectedTransferTable(tableName)
+                                          }
                                           className={`group relative rounded-2xl px-4 py-4 text-left transition-all duration-200 border shadow-sm hover:scale-[1.02] active:scale-[0.98] ${
                                             isSelected
                                               ? isDark
@@ -2198,7 +2279,9 @@ if (!finalTableValue) {
                                               {isSelected ? (
                                                 <FaCheck size={11} />
                                               ) : (
-                                                <span className="text-[10px] font-bold">+</span>
+                                                <span className="text-[10px] font-bold">
+                                                  +
+                                                </span>
                                               )}
                                             </div>
                                           </div>
@@ -2264,7 +2347,9 @@ if (!finalTableValue) {
                               type="text"
                               placeholder="Search tables to merge..."
                               value={transferSearch}
-                              onChange={(e) => setTransferSearch(e.target.value)}
+                              onChange={(e) =>
+                                setTransferSearch(e.target.value)
+                              }
                               className={`w-full rounded-2xl py-4 pl-14 pr-5 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${
                                 isDark
                                   ? "bg-slate-900/50 border border-slate-800 text-white focus:border-blue-500/40"
@@ -2289,13 +2374,11 @@ if (!finalTableValue) {
                                   : "border border-slate-200 bg-slate-50"
                               }`}
                             >
-                              {transferTableList
-                                .filter((table) =>
-                                  String(table.table_name || "")
-                                    .toLowerCase()
-                                    .includes(transferSearch.toLowerCase()),
-                                )
-                                .length > 0 ? (
+                              {transferTableList.filter((table) =>
+                                String(table.table_name || "")
+                                  .toLowerCase()
+                                  .includes(transferSearch.toLowerCase()),
+                              ).length > 0 ? (
                                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                                   {transferTableList
                                     .filter((table) =>
@@ -2305,13 +2388,16 @@ if (!finalTableValue) {
                                     )
                                     .map((table) => {
                                       const tableName = table.table_name;
-                                      const isSelected = selectedMergeTables.includes(tableName);
+                                      const isSelected =
+                                        selectedMergeTables.includes(tableName);
 
                                       return (
                                         <button
                                           key={table.ID ?? tableName}
                                           type="button"
-                                          onClick={() => toggleMergeTableSelection(tableName)}
+                                          onClick={() =>
+                                            toggleMergeTableSelection(tableName)
+                                          }
                                           className={`group relative rounded-2xl px-4 py-4 text-left transition-all duration-200 border shadow-sm hover:scale-[1.02] active:scale-[0.98] ${
                                             isSelected
                                               ? isDark
@@ -2356,7 +2442,9 @@ if (!finalTableValue) {
                                               {isSelected ? (
                                                 <FaCheck size={11} />
                                               ) : (
-                                                <span className="text-[10px] font-bold">+</span>
+                                                <span className="text-[10px] font-bold">
+                                                  +
+                                                </span>
                                               )}
                                             </div>
                                           </div>
@@ -2425,7 +2513,9 @@ if (!finalTableValue) {
                               type="text"
                               placeholder="e.g. VIP Table, Function Hall"
                               value={specialTransferTableName}
-                              onChange={(e) => setSpecialTransferTableName(e.target.value)}
+                              onChange={(e) =>
+                                setSpecialTransferTableName(e.target.value)
+                              }
                               className={`w-full rounded-2xl py-4 px-5 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${
                                 isDark
                                   ? "bg-slate-900/50 border border-slate-800 text-white placeholder:text-slate-500 focus:border-blue-500/40"
@@ -2491,7 +2581,6 @@ if (!finalTableValue) {
                   </motion.div>
                 )}
               </AnimatePresence>
-
 
               <AnimatePresence>
                 {showTransferConfirmModal && (
@@ -2648,6 +2737,33 @@ if (!finalTableValue) {
                 <span className="text-blue-500">
                   ₱{totalPrice.toLocaleString()}
                 </span>
+              </div>
+
+              <div className="mb-3">
+                <label
+                  className={`mb-2 block text-[10px] font-bold uppercase tracking-[0.18em] ${
+                    isDark ? "text-slate-500" : "text-slate-500"
+                  }`}
+                >
+                  Printer
+                </label>
+
+                <select
+                  value={printerName}
+                  onChange={(e) => setPrinterName(e.target.value)}
+                  className={`w-full rounded-xl px-3 py-3 text-sm outline-none ${
+                    isDark
+                      ? "border border-slate-700 bg-slate-900 text-white"
+                      : "border border-slate-300 bg-white text-slate-900"
+                  }`}
+                >
+                  <option value="">Default Printer</option>
+                  {printers.map((printer) => (
+                    <option key={printer.name} value={printer.name}>
+                      {printer.displayName || printer.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <button
@@ -3062,6 +3178,33 @@ if (!finalTableValue) {
                 </p>
               </div>
 
+              <div className="mb-4">
+                <label
+                  className={`mb-2 block text-[10px] font-bold uppercase tracking-[0.18em] ${
+                    isDark ? "text-slate-400" : "text-slate-500"
+                  }`}
+                >
+                  Printer
+                </label>
+
+                <select
+                  value={printerName}
+                  onChange={(e) => setPrinterName(e.target.value)}
+                  className={`w-full rounded-xl px-3 py-3 text-sm outline-none ${
+                    isDark
+                      ? "border border-slate-700 bg-slate-900 text-white"
+                      : "border border-slate-300 bg-white text-slate-900"
+                  }`}
+                >
+                  <option value="">Default Printer</option>
+                  {printers.map((printer) => (
+                    <option key={printer.name} value={printer.name}>
+                      {printer.displayName || printer.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div className="bg-white p-6 rounded-[2rem] inline-block mb-8 shadow-inner ring-8 ring-white/5">
                 {qrValue && qrValue.length <= 300 ? (
                   <QRCode value={qrValue} size={180} level="M" />
@@ -3439,6 +3582,32 @@ if (!finalTableValue) {
               </div>
 
               <div className="px-6 pb-8">
+                <div className="mb-4">
+                  <label
+                    className={`mb-2 block text-[10px] font-bold uppercase tracking-[0.18em] ${
+                      isDark ? "text-slate-500" : "text-slate-500"
+                    }`}
+                  >
+                    Printer
+                  </label>
+
+                  <select
+                    value={printerName}
+                    onChange={(e) => setPrinterName(e.target.value)}
+                    className={`w-full rounded-xl px-3 py-3 text-sm outline-none ${
+                      isDark
+                        ? "border border-slate-700 bg-slate-900 text-white"
+                        : "border border-slate-300 bg-white text-slate-900"
+                    }`}
+                  >
+                    <option value="">Default Printer</option>
+                    {printers.map((printer) => (
+                      <option key={printer.name} value={printer.name}>
+                        {printer.displayName || printer.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                   {billingLoading ? (
                     <div className="py-12 text-center">
@@ -3546,48 +3715,6 @@ if (!finalTableValue) {
           </motion.div>
         )}
       </AnimatePresence>
-
-      <div className="hidden">
-        <PrintableReceipt
-          ref={printRef}
-          productcart={{
-            customer: tableselected,
-            items: additionalCartItems,
-          }}
-          totalPrice={additionalTotalPrice}
-          tableselected={tableselected}
-          qrValue={qrValue}
-          instructions={instructions}
-          transactionId={transactionId}
-          isReprint={false}
-        />
-      </div>
-
-      <div className="hidden">
-        <PrintableReceipt
-          ref={printAllRef}
-          productcart={{
-            customer: tableselected,
-            items: cartSummaryItems,
-          }}
-          totalPrice={totalPrice}
-          tableselected={tableselected}
-          qrValue={qrValue}
-          instructions={instructions}
-          transactionId={transactionId}
-          isReprint={isReprint}
-        />
-      </div>
-
-      {billingSelectedTransaction && billingDetailedProduct.length > 0 && (
-        <div style={{ display: "none" }}>
-          <Receipt
-            transaction={billingSelectedTransaction}
-            detailedproduct={billingDetailedProduct}
-            ref={billingPrintRef}
-          />
-        </div>
-      )}
 
       <style jsx>{`
         .custom-scrollbar::-webkit-scrollbar {
@@ -3784,156 +3911,6 @@ const CartList = ({
       })
     )}
   </div>
-);
-
-const PrintableReceipt = React.forwardRef(
-  (
-    {
-      productcart,
-      totalPrice,
-      tableselected,
-      instructions,
-      transactionId,
-      isReprint,
-    },
-    ref,
-  ) => {
-    let cartItems = [];
-
-    if (productcart && productcart.items) {
-      cartItems = productcart.items;
-    } else if (Array.isArray(productcart)) {
-      if (typeof productcart[0] === "string") {
-        cartItems = productcart[1] || [];
-      } else {
-        cartItems = productcart;
-      }
-    }
-
-    return (
-      <div
-        ref={ref}
-        className="print-root"
-        style={{
-          width: "80mm",
-          minHeight: "100vh",
-          background: "#ffffff",
-          backgroundColor: "#ffffff",
-          color: "#000000",
-          padding: "16px",
-          fontFamily: "monospace",
-          fontSize: "12px",
-          WebkitPrintColorAdjust: "exact",
-          printColorAdjust: "exact",
-        }}
-      >
-        <div className="text-center mb-4">
-          <h2 className="text-xl font-bold uppercase underline">
-            Order Summary
-          </h2>
-          <p className="font-bold text-lg">Table: {tableselected}</p>
-          <p>{new Date().toLocaleString()}</p>
-          <div className="border-b border-dashed border-black my-2" />
-        </div>
-
-        <table className="w-full mb-4">
-          <thead>
-            <tr className="border-b border-black text-[10px]">
-              <th className="text-left py-1">Item</th>
-              <th className="text-center py-1">Qty</th>
-              <th className="text-right py-1">Price</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {cartItems.length === 0 ? (
-              <tr>
-                <td
-                  colSpan="3"
-                  className="text-center py-4 italic text-gray-500"
-                >
-                  Cart is empty
-                </td>
-              </tr>
-            ) : (
-              cartItems.map((item, index) => (
-                <tr
-                  key={item.code || index}
-                  className="border-b border-gray-100"
-                >
-                  <td className="py-2 leading-tight">
-                    <div className="font-bold uppercase">{item.name}</div>
-                    {item.itemInstruction && (
-                      <div className="text-[9px] text-black italic mt-1">
-                        Note: {item.itemInstruction}
-                      </div>
-                    )}
-                    <div className="text-[9px] text-gray-400">{item.code}</div>
-                  </td>
-                  <td className="text-center align-top pt-2">
-                    {item.quantity}
-                  </td>
-                  <td className="text-right align-top pt-2">
-                    ₱
-                    {(
-                      Number(item.price) * Number(item.quantity)
-                    ).toLocaleString()}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-
-        <div className="border-t-2 border-black pt-2 mb-4">
-          <div className="flex justify-between font-black text-sm">
-            <span>GRAND TOTAL</span>
-            <span>₱{Number(totalPrice || 0).toLocaleString()}</span>
-          </div>
-        </div>
-
-        {instructions && (
-          <div className="border-t border-dashed border-black pt-2 mt-2">
-            <p className="font-bold uppercase text-[10px] mb-1">Instructions</p>
-            <p className="text-[11px] whitespace-pre-wrap break-words">
-              {instructions}
-            </p>
-          </div>
-        )}
-
-        {isReprint ? (
-          <div className="mt-3 mb-2 text-center font-bold">
-            <div className="border-y border-dashed border-black py-1">
-              <p className="text-[25px] font-black uppercase tracking-widest">
-                Duplicate Copy
-              </p>
-            </div>
-          </div>
-        ) : transactionId ? (
-          <div className="mt-3 mb-2 text-center font-bold">
-            <div className="border-y border-dashed border-black py-1">
-              <p className="text-[30px] font-black uppercase tracking-widest">
-                Additional Order
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="mt-3 mb-2 text-center font-bold">
-            <div className="border-y border-dashed border-black py-1">
-              <p className="text-[30px] font-black uppercase tracking-widest">
-                New Order
-              </p>
-            </div>
-          </div>
-        )}
-
-        <div className="text-center mt-8 text-[9px] italic opacity-70">
-          <p>Thank you for your order!</p>
-          <p>Please present this to the counter.</p>
-        </div>
-      </div>
-    );
-  },
 );
 
 export default Orderlist;
