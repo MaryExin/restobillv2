@@ -1,6 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useReactToPrint } from "react-to-print";
 import {
   FiX,
   FiTag,
@@ -11,15 +10,14 @@ import {
   FiTrash2,
   FiPrinter,
 } from "react-icons/fi";
-import { FaMoneyBill, FaRegSave } from "react-icons/fa";
-import PosPaymentReceipt from "./PosPaymentReceipt";
+import { FaMoneyBill } from "react-icons/fa";
 import ButtonComponent from "./Common/ButtonComponent";
+import BuildPosPaymentReceiptHtml from "../../utils/BuildPosPaymentReceiptHtml";
 
 const loggedUserId = localStorage.getItem("user_id") || "";
 const loggedUserName =
   localStorage.getItem("username") ||
   localStorage.getItem("user_name") ||
-  (typeof transaction !== "undefined" ? transaction?.cashier : "") ||
   "Store Crew";
 
 const peso = (value) =>
@@ -33,11 +31,6 @@ const CASH_METHOD_KEYWORDS = ["cash", "salapi"];
 const QUICK_DENOMINATIONS = [
   20, 50, 100, 200, 500, 1000, 1500, 2000, 2500, 3000, 5000, 10000,
 ];
-
-const isCashMethod = (method = "") =>
-  CASH_METHOD_KEYWORDS.some((keyword) =>
-    String(method).toLowerCase().includes(keyword),
-  );
 
 const formatAmountInput = (value) => {
   const num = Number(value || 0);
@@ -1087,347 +1080,6 @@ const DiscountSetupModal = ({
   );
 };
 
-// const InputPaymentsModal = ({
-//   isOpen,
-//   onClose,
-//   isDark,
-//   totalAmountDue,
-//   payments,
-//   setPayments,
-//   onAddPaymentMethod,
-//   readOnly = false,
-// }) => {
-//   const inputClass = isDark
-//     ? "bg-slate-950 border border-slate-800 text-white placeholder:text-slate-500"
-//     : "bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400";
-
-//   const totalPaid = payments.reduce(
-//     (sum, row) => sum + toNum(row.payment_amount),
-//     0,
-//   );
-//   const remaining = Math.max(toNum(totalAmountDue) - totalPaid, 0);
-
-//   const updateRow = (index, field, value) =>
-//     setPayments((prev) =>
-//       prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)),
-//     );
-
-//   const removeRow = (index) =>
-//     setPayments((prev) => prev.filter((_, i) => i !== index));
-
-//   const setExactAmountForRow = (index) => {
-//     setPayments((prev) =>
-//       prev.map((row, i) => {
-//         if (i !== index) return row;
-
-//         const otherRowsTotal = prev.reduce((sum, item, rowIndex) => {
-//           if (rowIndex === index) return sum;
-//           return sum + toNum(item.payment_amount);
-//         }, 0);
-
-//         const exactNeeded = Math.max(toNum(totalAmountDue) - otherRowsTotal, 0);
-
-//         return {
-//           ...row,
-//           payment_amount: formatAmountInput(exactNeeded),
-//         };
-//       }),
-//     );
-//   };
-
-//   const addDenominationToRow = (index, amountToAdd) => {
-//     setPayments((prev) =>
-//       prev.map((row, i) => {
-//         if (i !== index) return row;
-
-//         const current = toNum(row.payment_amount);
-//         return {
-//           ...row,
-//           payment_amount: formatAmountInput(current + Number(amountToAdd || 0)),
-//         };
-//       }),
-//     );
-//   };
-
-//   const clearAmountForRow = (index) => {
-//     setPayments((prev) =>
-//       prev.map((row, i) =>
-//         i === index ? { ...row, payment_amount: "" } : row,
-//       ),
-//     );
-//   };
-
-//   return (
-//     <ModalShell
-//       isOpen={isOpen}
-//       onClose={onClose}
-//       isDark={isDark}
-//       maxWidth="max-w-[980px]"
-//       zIndex="z-[100001]"
-//     >
-//       <div
-//         className={`px-5 py-5 ${
-//           isDark
-//             ? "border-b border-white/5 bg-white/[0.03]"
-//             : "border-b border-slate-200 bg-slate-50"
-//         }`}
-//       >
-//         <h2 className="text-2xl font-black">Input Payments</h2>
-//         <p className="mt-1 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
-//           Allocate payment amounts and references
-//         </p>
-//       </div>
-
-//       <div className="space-y-4 p-5 md:p-6">
-//         <div className="grid gap-3 md:grid-cols-2 md:items-center">
-//           <div className="text-2xl font-black text-slate-700 dark:text-slate-200">
-//             TOTAL AMOUNT DUE
-//           </div>
-//           <div className="text-right text-3xl font-black text-emerald-500">
-//             {peso(totalAmountDue)}
-//           </div>
-//         </div>
-
-//         <div
-//           className={`rounded-[24px] border p-4 ${
-//             isDark
-//               ? "border-white/5 bg-white/[0.03]"
-//               : "border-slate-200 bg-slate-50"
-//           }`}
-//         >
-//           <div className="mb-3 flex items-center justify-between gap-3">
-//             <p className="text-sm font-bold text-slate-500">Payments</p>
-
-//             {!readOnly ? (
-//               <button
-//                 type="button"
-//                 onClick={onAddPaymentMethod}
-//                 className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-xs font-bold text-white transition hover:bg-blue-500"
-//               >
-//                 <FiPlus size={14} />
-//                 Add Payment Method
-//               </button>
-//             ) : null}
-//           </div>
-
-//           <div className="space-y-4">
-//             {payments.length === 0 ? (
-//               <div
-//                 className={`flex min-h-[120px] items-center justify-center rounded-2xl border border-dashed ${
-//                   isDark ? "border-white/10" : "border-slate-300"
-//                 }`}
-//               >
-//                 <p className="text-sm text-slate-500">No payment rows.</p>
-//               </div>
-//             ) : (
-//               payments.map((row, index) => {
-//                 const cashRow = isCashMethod(row.payment_method);
-
-//                 return (
-//                   <div
-//                     key={`${row.payment_method}-${index}`}
-//                     className={`rounded-[22px] border p-4 ${
-//                       isDark
-//                         ? "border-white/5 bg-slate-950"
-//                         : "border-slate-200 bg-white"
-//                     }`}
-//                   >
-//                     <div className="grid gap-3 md:grid-cols-[60px_170px_minmax(0,1fr)]">
-//                       <button
-//                         type="button"
-//                         onClick={() => removeRow(index)}
-//                         disabled={readOnly}
-//                         className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white transition hover:bg-blue-500 disabled:opacity-50"
-//                       >
-//                         <FiTrash2 size={16} />
-//                       </button>
-
-//                       <div
-//                         className={`flex items-center gap-3 rounded-2xl border px-3 py-2 ${
-//                           isDark
-//                             ? "border-white/5 bg-slate-900"
-//                             : "border-slate-200 bg-slate-50"
-//                         }`}
-//                       >
-//                         <img
-//                           src={buildImagePath(row.payment_method)}
-//                           alt={row.payment_method}
-//                           className="h-10 w-10 object-contain"
-//                           onError={(e) => {
-//                             e.currentTarget.style.display = "none";
-//                           }}
-//                         />
-//                         <div className="min-w-0">
-//                           <p className="truncate text-sm font-black">
-//                             {row.payment_method || "No method"}
-//                           </p>
-//                           <p className="text-[11px] text-slate-500">
-//                             {cashRow ? "Cash shortcut enabled" : "Manual entry"}
-//                           </p>
-//                         </div>
-//                       </div>
-
-//                       <div className="space-y-3">
-//                         <div className="grid gap-3 md:grid-cols-2">
-//                           <div>
-//                             <label className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
-//                               Amount
-//                             </label>
-//                             <input
-//                               type="number"
-//                               min="0"
-//                               step="0.01"
-//                               value={row.payment_amount}
-//                               disabled={readOnly}
-//                               onChange={(e) =>
-//                                 updateRow(
-//                                   index,
-//                                   "payment_amount",
-//                                   e.target.value,
-//                                 )
-//                               }
-//                               onFocus={handleSelectAllOnFocus}
-//                               placeholder="0.00"
-//                               className={`h-12 w-full rounded-2xl px-4 text-base font-bold outline-none ${inputClass}`}
-//                             />
-//                           </div>
-
-//                           <div>
-//                             <label className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
-//                               Reference
-//                             </label>
-//                             <input
-//                               type="text"
-//                               value={row.payment_reference}
-//                               disabled={readOnly}
-//                               onChange={(e) =>
-//                                 updateRow(
-//                                   index,
-//                                   "payment_reference",
-//                                   e.target.value,
-//                                 )
-//                               }
-//                               placeholder={
-//                                 cashRow ? "Optional for cash" : "Reference"
-//                               }
-//                               className={`h-12 w-full rounded-2xl px-4 text-sm outline-none ${inputClass}`}
-//                             />
-//                           </div>
-//                         </div>
-
-//                         {cashRow ? (
-//                           <div
-//                             className={`rounded-[20px] border p-3 ${
-//                               isDark
-//                                 ? "border-white/5 bg-white/[0.02]"
-//                                 : "border-slate-200 bg-slate-50"
-//                             }`}
-//                           >
-//                             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-//                               <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
-//                                 Quick Cash Input
-//                               </p>
-
-//                               <div className="flex flex-wrap gap-2">
-//                                 <button
-//                                   type="button"
-//                                   disabled={readOnly}
-//                                   onClick={() => setExactAmountForRow(index)}
-//                                   className="rounded-xl bg-emerald-600 px-3 py-2 text-[11px] font-black text-white transition hover:bg-emerald-500 disabled:opacity-50"
-//                                 >
-//                                   Exact
-//                                 </button>
-
-//                                 <button
-//                                   type="button"
-//                                   disabled={readOnly}
-//                                   onClick={() => clearAmountForRow(index)}
-//                                   className={`rounded-xl px-3 py-2 text-[11px] font-black transition disabled:opacity-50 ${
-//                                     isDark
-//                                       ? "bg-slate-800 text-slate-200 hover:bg-slate-700"
-//                                       : "bg-slate-200 text-slate-700 hover:bg-slate-300"
-//                                   }`}
-//                                 >
-//                                   Clear
-//                                 </button>
-//                               </div>
-//                             </div>
-
-//                             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-//                               {QUICK_DENOMINATIONS.map((amount) => (
-//                                 <button
-//                                   key={amount}
-//                                   type="button"
-//                                   disabled={readOnly}
-//                                   onClick={() =>
-//                                     addDenominationToRow(index, amount)
-//                                   }
-//                                   className={`rounded-2xl px-3 py-3 text-sm font-black transition disabled:opacity-50 ${
-//                                     isDark
-//                                       ? "border border-slate-700 bg-slate-900 text-slate-100 hover:border-blue-500 hover:bg-slate-800"
-//                                       : "border border-slate-200 bg-white text-slate-800 hover:border-blue-400 hover:bg-blue-50"
-//                                   }`}
-//                                 >
-//                                   ₱{amount.toLocaleString("en-PH")}
-//                                 </button>
-//                               ))}
-//                             </div>
-//                           </div>
-//                         ) : null}
-//                       </div>
-//                     </div>
-//                   </div>
-//                 );
-//               })
-//             )}
-//           </div>
-
-//           <div className="mt-4 grid gap-3 md:grid-cols-2">
-//             <div
-//               className={`rounded-2xl border p-4 ${
-//                 isDark
-//                   ? "border-white/5 bg-slate-950"
-//                   : "border-slate-200 bg-white"
-//               }`}
-//             >
-//               <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
-//                 Total Paid
-//               </p>
-//               <p className="mt-1 text-lg font-black text-blue-500">
-//                 {peso(totalPaid)}
-//               </p>
-//             </div>
-
-//             <div
-//               className={`rounded-2xl border p-4 ${
-//                 isDark
-//                   ? "border-white/5 bg-slate-950"
-//                   : "border-slate-200 bg-white"
-//               }`}
-//             >
-//               <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
-//                 Remaining
-//               </p>
-//               <p className="mt-1 text-lg font-black text-blue-500">
-//                 {peso(remaining)}
-//               </p>
-//             </div>
-//           </div>
-//         </div>
-
-//         <div className="flex justify-center">
-//           <button
-//             onClick={onClose}
-//             className="rounded-2xl bg-blue-600 px-10 py-3 text-sm font-black text-white transition hover:bg-blue-500"
-//           >
-//             Continue
-//           </button>
-//         </div>
-//       </div>
-//     </ModalShell>
-//   );
-// };
-
 const InputPaymentsModal = ({
   isOpen,
   onClose,
@@ -1448,21 +1100,21 @@ const InputPaymentsModal = ({
     ? "bg-slate-950 border-2 border-blue-500 text-white placeholder:text-slate-500"
     : "bg-white border-2 border-blue-500 text-slate-900 placeholder:text-slate-400";
 
-  const toNum = (value) => {
+  const toNumLocal = (value) => {
     const parsed = parseFloat(value);
     return Number.isFinite(parsed) ? parsed : 0;
   };
 
-  const peso = (value) => {
+  const pesoLocal = (value) => {
     return new Intl.NumberFormat("en-PH", {
       style: "currency",
       currency: "PHP",
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
-    }).format(toNum(value));
+    }).format(toNumLocal(value));
   };
 
-  const buildImagePath = (paymentMethod) => {
+  const buildImagePathLocal = (paymentMethod) => {
     if (!paymentMethod) return "";
 
     const fileName = String(paymentMethod)
@@ -1473,7 +1125,7 @@ const InputPaymentsModal = ({
     return `/payments/${fileName}.png`;
   };
 
-  const handleSelectAllOnFocus = (e) => {
+  const handleSelectAllOnFocusLocal = (e) => {
     requestAnimationFrame(() => {
       try {
         e.target.select();
@@ -1482,11 +1134,11 @@ const InputPaymentsModal = ({
   };
 
   const totalPaid = payments.reduce(
-    (sum, row) => sum + toNum(row.payment_amount),
+    (sum, row) => sum + toNumLocal(row.payment_amount),
     0,
   );
 
-  const remaining = Math.max(toNum(totalAmountDue) - totalPaid, 0);
+  const remaining = Math.max(toNumLocal(totalAmountDue) - totalPaid, 0);
 
   const activePaymentMethod =
     payments.length > 0 &&
@@ -1540,10 +1192,13 @@ const InputPaymentsModal = ({
 
         const otherRowsTotal = prev.reduce((sum, item, rowIndex) => {
           if (rowIndex === activePaymentIndex) return sum;
-          return sum + toNum(item.payment_amount);
+          return sum + toNumLocal(item.payment_amount);
         }, 0);
 
-        const exactNeeded = Math.max(toNum(totalAmountDue) - otherRowsTotal, 0);
+        const exactNeeded = Math.max(
+          toNumLocal(totalAmountDue) - otherRowsTotal,
+          0,
+        );
 
         return {
           ...row,
@@ -1561,7 +1216,7 @@ const InputPaymentsModal = ({
       prev.map((row, i) => {
         if (i !== activePaymentIndex) return row;
 
-        const current = toNum(row.payment_amount);
+        const current = toNumLocal(row.payment_amount);
         return {
           ...row,
           payment_amount: String(current + Number(amountToAdd || 0)),
@@ -1641,7 +1296,7 @@ const InputPaymentsModal = ({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className={`fixed inset-0 z-[100001] flex items-center justify-center bg-black/50 p-4`}
+          className="fixed inset-0 z-[100001] flex items-center justify-center bg-black/50 p-4"
         >
           <motion.div
             initial={{ opacity: 0, y: 18, scale: 0.98 }}
@@ -1673,7 +1328,7 @@ const InputPaymentsModal = ({
                     TOTAL AMOUNT DUE
                   </div>
                   <div className="text-right text-2xl font-black text-emerald-500">
-                    {peso(totalAmountDue)}
+                    {pesoLocal(totalAmountDue)}
                   </div>
                 </div>
 
@@ -1746,7 +1401,7 @@ const InputPaymentsModal = ({
                               }`}
                             >
                               <img
-                                src={buildImagePath(row.payment_method)}
+                                src={buildImagePathLocal(row.payment_method)}
                                 alt={row.payment_method}
                                 className="h-10 w-10 object-contain"
                                 onError={(e) => {
@@ -1787,7 +1442,7 @@ const InputPaymentsModal = ({
                                     }
                                     onFocus={(e) => {
                                       setActivePaymentIndex(index);
-                                      handleSelectAllOnFocus(e);
+                                      handleSelectAllOnFocusLocal(e);
                                     }}
                                     onClick={(e) => e.stopPropagation()}
                                     onBlur={() =>
@@ -1853,7 +1508,7 @@ const InputPaymentsModal = ({
                           Total Paid
                         </p>
                         <p className="mt-1 text-lg font-black text-blue-500">
-                          {peso(totalPaid)}
+                          {pesoLocal(totalPaid)}
                         </p>
                       </div>
 
@@ -1868,7 +1523,7 @@ const InputPaymentsModal = ({
                           Remaining
                         </p>
                         <p className="mt-1 text-lg font-black text-blue-500">
-                          {peso(remaining)}
+                          {pesoLocal(remaining)}
                         </p>
                       </div>
                     </div>
@@ -1993,38 +1648,82 @@ export default function TransactionPaymentModal({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const receiptRef = useRef(null);
   const [receiptSnapshot, setReceiptSnapshot] = useState(null);
+  const [printerName, setPrinterName] = useState("");
+  const [printers, setPrinters] = useState([]);
+  const DEFAULT_PRINTER_NAME = "XP-80C";
 
-  const handlePrintReceipt = useReactToPrint({
-    content: () => receiptRef.current,
-    documentTitle: `${transaction?.transaction_id || "receipt"}-${
-      isPaidMode ? "duplicate-invoice" : "receipt"
-    }`,
-    pageStyle: `
-      @media print {
-        @page {
-          size: 80mm auto;
-          margin: 0;
-        }
+  useEffect(() => {
+    if (!isOpen) return;
 
-        html, body {
-          margin: 0 !important;
-          padding: 0 !important;
-          background: #ffffff !important;
-          color: #000000 !important;
-          -webkit-print-color-adjust: exact !important;
-          print-color-adjust: exact !important;
-          font-family: Arial, Helvetica, sans-serif !important;
-        }
+    const loadPrinters = async () => {
+      try {
+        const list = await window.electronAPI?.getPrinters?.();
+        const safeList = Array.isArray(list) ? list : [];
 
-        .print-root {
-          width: 80mm !important;
-          min-height: auto !important;
-        }
+        setPrinters(safeList);
+
+        const defaultPrinter = safeList.find((p) => p.isDefault);
+        const resolvedPrinterName =
+          defaultPrinter?.name || DEFAULT_PRINTER_NAME;
+
+        setPrinterName(resolvedPrinterName);
+
+        console.log("Electron printers:", safeList);
+        console.log("Default printer:", resolvedPrinterName);
+      } catch (error) {
+        console.error("Failed to load printers:", error);
+        setPrinterName(DEFAULT_PRINTER_NAME);
       }
-    `,
-  });
+    };
+
+    loadPrinters();
+  }, [isOpen]);
+
+  const handleElectronPrint = async (snapshotOverride = null) => {
+    try {
+      const snapshot = snapshotOverride || receiptSnapshot;
+
+      if (!snapshot) {
+        throw new Error("No receipt data available to print.");
+      }
+
+      if (!window.electronAPI?.printReceipt) {
+        throw new Error("Electron print API is not available.");
+      }
+
+      const html = BuildPosPaymentReceiptHtml({
+        transaction: snapshot.transaction || transaction,
+        items: snapshot.items || items,
+        computed: snapshot.computed || computed,
+        payments: snapshot.payments || payments,
+        otherCharges: snapshot.otherCharges || otherCharges,
+        customerCards: snapshot.customerCards || customerCards,
+        isDuplicateCopy: snapshot.isDuplicateCopy || false,
+        apiHost,
+        categoryCode: transaction?.Category_Code || "",
+        unitCode: transaction?.Unit_Code || "",
+        terminalNumber: transaction?.terminal_number || "1",
+        corpName: "Crabs N Crack Seafood House",
+      });
+
+      const result = await window.electronAPI.printReceipt({
+        html,
+        printerName: printerName || DEFAULT_PRINTER_NAME,
+        silent: true,
+        copies: 1,
+      });
+
+      console.log("Payment print result:", result);
+
+      if (!result?.success) {
+        throw new Error(result?.message || "Failed to print receipt.");
+      }
+    } catch (error) {
+      console.error(error);
+      setErrorMessage(error.message || "Failed to print receipt.");
+    }
+  };
 
   useEffect(() => {
     if (!isOpen || !transaction?.transaction_id) return;
@@ -2456,8 +2155,6 @@ export default function TransactionPaymentModal({
     try {
       const payload = {
         transaction_id: transaction.transaction_id,
-
-        // needed by backend logs
         user_id: loggedUserId,
         user_name: loggedUserName,
         cashier: loggedUserName,
@@ -2573,8 +2270,8 @@ export default function TransactionPaymentModal({
     }
   };
 
-  const handlePrintDuplicate = () => {
-    setReceiptSnapshot({
+  const handlePrintDuplicate = async () => {
+    const snapshot = {
       transaction: {
         ...transaction,
         cashier: loggedUserName,
@@ -2585,11 +2282,10 @@ export default function TransactionPaymentModal({
       otherCharges: [...otherCharges],
       customerCards: customerCards.slice(0, computed.totalQualifiedAll),
       isDuplicateCopy: true,
-    });
+    };
 
-    setTimeout(() => {
-      handlePrintReceipt?.();
-    }, 120);
+    setReceiptSnapshot(snapshot);
+    await handleElectronPrint(snapshot);
   };
 
   if (!isOpen) return null;
@@ -2852,9 +2548,6 @@ export default function TransactionPaymentModal({
               <SectionCard isDark={isDark}>
                 <div className="mb-1">
                   <h3 className="text-xs font-black">Current Setup</h3>
-                  {/* <p className="mt-1 text-xs text-slate-500">
-                    Quick reference before saving or printing.
-                  </p> */}
                 </div>
 
                 <div className="space-y-1">
@@ -2878,6 +2571,28 @@ export default function TransactionPaymentModal({
                     isDark={isDark}
                   />
                 </div>
+              </SectionCard>
+
+              <SectionCard isDark={isDark}>
+                <label className="mb-2 block text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
+                  Printer
+                </label>
+                <select
+                  value={printerName}
+                  onChange={(e) => setPrinterName(e.target.value)}
+                  className={`w-full rounded-2xl px-3 py-3 text-sm outline-none ${
+                    isDark
+                      ? "border border-slate-700 bg-slate-950 text-white"
+                      : "border border-slate-300 bg-white text-slate-900"
+                  }`}
+                >
+                  <option value="">Default Printer</option>
+                  {printers.map((printer) => (
+                    <option key={printer.name} value={printer.name}>
+                      {printer.displayName || printer.name}
+                    </option>
+                  ))}
+                </select>
               </SectionCard>
 
               {errorMessage ? (
@@ -2998,30 +2713,12 @@ export default function TransactionPaymentModal({
           setShowSuccessModal(false);
           onClose?.();
         }}
-        onPrint={() => handlePrintReceipt?.()}
+        onPrint={() => handleElectronPrint()}
         isDark={isDark}
         title="Payment Successful"
         message="The payment has been saved successfully. You can print the receipt now."
         printText="Print Invoice"
       />
-
-      <div style={{ display: "none" }}>
-        <PosPaymentReceipt
-          ref={receiptRef}
-          transaction={receiptSnapshot?.transaction || transaction}
-          items={receiptSnapshot?.items || items}
-          computed={receiptSnapshot?.computed || computed}
-          payments={receiptSnapshot?.payments || payments}
-          otherCharges={receiptSnapshot?.otherCharges || otherCharges}
-          customerCards={receiptSnapshot?.customerCards || customerCards}
-          isDuplicateCopy={receiptSnapshot?.isDuplicateCopy || false}
-          apiHost={apiHost}
-          categoryCode={transaction?.Category_Code || ""}
-          unitCode={transaction?.Unit_Code || ""}
-          terminalNumber={transaction?.terminal_number || "1"}
-          corpName="Crabs N Crack Seafood House"
-        />
-      </div>
     </>
   );
 }
