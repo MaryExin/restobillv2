@@ -26,7 +26,6 @@ import ModalSuccessNavToSelf from "../Modals/ModalSuccessNavToSelf";
 import ButtonComponent from "./Common/ButtonComponent";
 import ModalYesNoReusable from "../Modals/ModalYesNoReusable";
 
-
 const peso = (value) =>
   `₱ ${Number(value || 0).toLocaleString("en-PH", {
     minimumFractionDigits: 2,
