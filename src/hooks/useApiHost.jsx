@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 
-const normalizeHost = (s) => String(s || "").trim().replace(/\/+$/, "");
+const normalizeHost = (s) =>
+  String(s || "")
+    .trim()
+    .replace(/\/+$/, "");
 
 export default function useApiHost() {
   const [apiHost, setApiHost] = useState("");

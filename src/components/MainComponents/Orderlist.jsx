@@ -39,12 +39,15 @@ import {
   BuildBillingReceiptHtml,
   BuildOrderReceiptHtml,
 } from "../../utils/BuildOrderlistPrintHtml";
+import useGetDefaultPrinter from "../../hooks/useGetDefaultPrinter";
 const Orderlist = ({
   tableselected,
   setshoworderlist,
   dateSelected,
   transactionId,
 }) => {
+  const defaultPrinterName = useGetDefaultPrinter();
+
   const navigate = useNavigate();
   const apiHost = useApiHost();
   const { isDark } = useTheme();
@@ -102,7 +105,6 @@ const Orderlist = ({
 
   const [printerName, setPrinterName] = useState("");
   const [printers, setPrinters] = useState([]);
-  const DEFAULT_PRINTER_NAME = "XP-80C";
 
   const userId = localStorage.getItem("user_id") || "0";
   const userName = localStorage.getItem("Cashier") || "Store Crew";
@@ -218,23 +220,41 @@ const Orderlist = ({
 
         console.log("Electron printers:", safeList);
         console.log("Printer count:", safeList.length);
+        console.log("Default printer from hook:", defaultPrinterName);
 
-        const defaultPrinter = safeList.find((p) => p.isDefault);
+        const matchedPrinter = safeList.find(
+          (p) =>
+            String(p.name || "").trim() ===
+            String(defaultPrinterName || "").trim(),
+        );
+
+        const fallbackElectronDefault = safeList.find((p) => p.isDefault);
+
         const resolvedPrinterName =
-          defaultPrinter?.name || DEFAULT_PRINTER_NAME;
+          matchedPrinter?.name ||
+          String(defaultPrinterName || "").trim() ||
+          fallbackElectronDefault?.name ||
+          "";
 
         setPrinterName(resolvedPrinterName);
 
-        console.log("Default printer name:", defaultPrinter?.name || "(none)");
+        console.log(
+          "Matched printer from hook:",
+          matchedPrinter?.name || "(none)",
+        );
+        console.log(
+          "Electron default printer:",
+          fallbackElectronDefault?.name || "(none)",
+        );
         console.log("Resolved printer name:", resolvedPrinterName);
       } catch (error) {
         console.error("Failed to load printers:", error);
-        setPrinterName(DEFAULT_PRINTER_NAME);
+        setPrinterName(String(defaultPrinterName || "").trim());
       }
     };
 
     loadPrinters();
-  }, []);
+  }, [defaultPrinterName]);
 
   const printViaElectron = async ({
     html,
@@ -255,7 +275,7 @@ const Orderlist = ({
 
       const result = await window.electronAPI.printReceipt({
         html,
-        printerName: printerName || DEFAULT_PRINTER_NAME,
+        printerName: printerName || defaultPrinterName || "",
         silent: true,
         copies: 1,
       });

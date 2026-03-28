@@ -12,6 +12,7 @@ import {
 } from "react-icons/fi";
 import ButtonComponent from "./Common/ButtonComponent";
 import { BuildPrintableDiscountReceiptHtml } from "../../utils/buildPrintableDiscountReceiptHtml";
+import useGetDefaultPrinter from "../../hooks/useGetDefaultPrinter";
 
 const peso = (value) =>
   Number(value || 0).toLocaleString("en-PH", {
@@ -400,6 +401,8 @@ const ModalDiscountTransaction = ({
   isDark,
   billingNo,
 }) => {
+  const defaultPrinterName = useGetDefaultPrinter();
+
   const [printerName, setPrinterName] = useState("");
   const [printers, setPrinters] = useState([]);
 
@@ -422,8 +425,6 @@ const ModalDiscountTransaction = ({
   const [initialLoadedSignature, setInitialLoadedSignature] = useState("");
   const [showOverrideWarning, setShowOverrideWarning] = useState(false);
 
-  const DEFAULT_PRINTER_NAME = "XP-80C";
-
   useEffect(() => {
     if (!isOpen) return;
 
@@ -436,23 +437,41 @@ const ModalDiscountTransaction = ({
 
         console.log("Electron printers:", safeList);
         console.log("Printer count:", safeList.length);
+        console.log("Default printer from hook:", defaultPrinterName);
 
-        const defaultPrinter = safeList.find((p) => p.isDefault);
+        const matchedPrinter = safeList.find(
+          (p) =>
+            String(p.name || "").trim() ===
+            String(defaultPrinterName || "").trim(),
+        );
+
+        const fallbackElectronDefault = safeList.find((p) => p.isDefault);
+
         const resolvedPrinterName =
-          defaultPrinter?.name || DEFAULT_PRINTER_NAME;
+          matchedPrinter?.name ||
+          String(defaultPrinterName || "").trim() ||
+          fallbackElectronDefault?.name ||
+          "";
 
         setPrinterName(resolvedPrinterName);
 
-        console.log("Default printer name:", defaultPrinter?.name || "(none)");
+        console.log(
+          "Matched printer from hook:",
+          matchedPrinter?.name || "(none)",
+        );
+        console.log(
+          "Electron default printer:",
+          fallbackElectronDefault?.name || "(none)",
+        );
         console.log("Resolved printer name:", resolvedPrinterName);
       } catch (error) {
         console.error("Failed to load printers:", error);
-        setPrinterName(DEFAULT_PRINTER_NAME);
+        setPrinterName(String(defaultPrinterName || "").trim());
       }
     };
 
     loadPrinters();
-  }, [isOpen]);
+  }, [isOpen, defaultPrinterName]);
 
   const handleChangeCount = (key, value) => {
     setDiscountState((prev) => ({
