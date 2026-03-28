@@ -95,7 +95,7 @@
   },
   "build": {
     "appId": "com.lenard.restobill",
-    "productName": "LightemPOS",
+    "productName": "Lightem Pos",
     "directories": {
       "output": "release"
     },
