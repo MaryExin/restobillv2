@@ -62,11 +62,7 @@ export function BuildPrintableDiscountReceiptHtml({
 
           .print-root {
             width: 80mm;
-            padding:
-              calc(14px * var(--s))
-              calc(10px * var(--s))
-              calc(14px * var(--s))
-              calc(10px * var(--s));
+            padding: "14px 29px",
             font-size: calc(11px * var(--s));
             line-height: 1.2;
           }
