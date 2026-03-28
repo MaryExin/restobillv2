@@ -296,6 +296,7 @@ const SuccessModal = ({
   isDark,
   title = "Success",
   message = "Saved successfully.",
+  isPrinting = false,
   printText = "Print Receipt",
 }) => {
   return (
@@ -313,26 +314,28 @@ const SuccessModal = ({
         </div>
 
         <div className="mt-6 grid grid-cols-2 gap-3">
-          <button
+          <ButtonComponent
             type="button"
             onClick={onClose}
-            className={`rounded-2xl px-6 py-3 text-sm font-black transition ${
-              isDark
-                ? "border border-slate-700 bg-slate-800 text-slate-200 hover:text-white"
-                : "border border-slate-200 bg-slate-100 text-slate-700 hover:text-slate-900"
-            }`}
+            variant={isDark ? "dark" : "secondary"}
+            className="px-6 py-3 text-sm mb-0"
+            disabled={isPrinting}
           >
             Continue
-          </button>
+          </ButtonComponent>
 
-          <button
+          <ButtonComponent
             type="button"
             onClick={onPrint}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-6 py-3 text-sm font-black text-white transition hover:bg-blue-500"
+            variant="primary"
+            icon={<FiPrinter size={15} />}
+            className="px-6 py-3 text-sm mb-0"
+            isLoading={isPrinting}
+            loadingText="Printing..."
+            disabled={isPrinting}
           >
-            <FiPrinter size={15} />
             {printText}
-          </button>
+          </ButtonComponent>
         </div>
       </div>
     </ModalShell>
@@ -1626,6 +1629,8 @@ export default function TransactionPaymentModal({
 }) {
   const defaultPrinterName = useGetDefaultPrinter();
 
+  const [isPrinting, setIsPrinting] = useState(false);
+
   const isPaidMode = mode === "paid";
 
   const [items, setItems] = useState([]);
@@ -1743,6 +1748,15 @@ export default function TransactionPaymentModal({
     } catch (error) {
       console.error(error);
       setErrorMessage(error.message || "Failed to print receipt.");
+    }
+  };
+
+  const handleSuccessModalPrint = async () => {
+    try {
+      setIsPrinting(true);
+      await handleElectronPrint();
+    } finally {
+      setIsPrinting(false);
     }
   };
 
@@ -2734,7 +2748,8 @@ export default function TransactionPaymentModal({
           setShowSuccessModal(false);
           onClose?.();
         }}
-        onPrint={() => handleElectronPrint()}
+        onPrint={handleSuccessModalPrint}
+        isPrinting={isPrinting}
         isDark={isDark}
         title="Payment Successful"
         message="The payment has been saved successfully. You can print the receipt now."

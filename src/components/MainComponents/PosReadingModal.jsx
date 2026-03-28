@@ -1,10 +1,12 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { FaCashRegister, FaPrint } from "react-icons/fa";
 import { FiX } from "react-icons/fi";
 import useApiHost from "../../hooks/useApiHost";
+import useGetDefaultPrinter from "../../hooks/useGetDefaultPrinter";
+import ButtonComponent from "./Common/ButtonComponent";
 
 export default function PosReadingModal({
   open = true,
@@ -20,7 +22,34 @@ export default function PosReadingModal({
   zEndpoint = "/api/generate_z_reading_data.php",
 }) {
   const apiHost = useApiHost();
-  const printFrameRef = useRef(null);
+  const defaultPrinterName = useGetDefaultPrinter();
+  const [printerName, setPrinterName] = useState("");
+  const [printers, setPrinters] = useState([]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const loadPrinters = async () => {
+      try {
+        const list = await window.electronAPI?.getPrinters?.();
+        const safeList = Array.isArray(list) ? list : [];
+        setPrinters(safeList);
+
+        const resolvedPrinter =
+          String(defaultPrinterName || "").trim() ||
+          safeList.find((p) => p.isDefault)?.name ||
+          "";
+
+        setPrinterName(resolvedPrinter);
+      } catch (error) {
+        console.error("Failed to load printers:", error);
+        setPrinters([]);
+        setPrinterName(String(defaultPrinterName || "").trim());
+      }
+    };
+
+    loadPrinters();
+  }, [open, defaultPrinterName]);
 
   const [terminalConfig, setTerminalConfig] = useState({
     categoryCode: categoryCode || "",
@@ -543,6 +572,34 @@ export default function PosReadingModal({
     `;
   };
 
+  const printViaElectron = async (html, documentName = "pos-reading") => {
+    if (!window.electronAPI?.printReceipt) {
+      throw new Error("Electron print API is not available.");
+    }
+
+    const resolvedPrinterName =
+      String(printerName || "").trim() ||
+      String(defaultPrinterName || "").trim();
+
+    console.log("Selected printerName:", resolvedPrinterName);
+    console.log("Available printers:", printers);
+
+    const result = await window.electronAPI.printReceipt({
+      html,
+      printerName: resolvedPrinterName,
+      silent: true,
+      copies: 1,
+    });
+
+    console.log(`${documentName} print result:`, result);
+
+    if (!result?.success) {
+      throw new Error(result?.message || `Failed to print ${documentName}.`);
+    }
+
+    return result;
+  };
+
   const handlePrint = async () => {
     if (!validate()) return;
 
@@ -622,76 +679,42 @@ export default function PosReadingModal({
         ? buildZPrintHtml(payload)
         : buildXPrintHtml(payload);
 
-      if (!printFrameRef.current) {
-        const frame = document.createElement("iframe");
-        frame.style.position = "fixed";
-        frame.style.right = "0";
-        frame.style.bottom = "0";
-        frame.style.width = "0";
-        frame.style.height = "0";
-        frame.style.border = "0";
-        frame.setAttribute("aria-hidden", "true");
-        document.body.appendChild(frame);
-        printFrameRef.current = frame;
-      }
+      await printViaElectron(printHtml, isZReading ? "z-reading" : "x-reading");
 
-      const frameWindow = printFrameRef.current.contentWindow;
-      const frameDocument =
-        printFrameRef.current.contentDocument || frameWindow?.document;
+      if (isZReading) {
+        setActiveType(null);
+        resetForm();
+        onClose();
 
-      if (!frameDocument) {
-        throw new Error("Unable to prepare print document.");
-      }
-
-      frameDocument.open();
-      frameDocument.write(printHtml);
-      frameDocument.close();
-
-      setTimeout(async () => {
         try {
-          frameWindow?.focus();
-          frameWindow?.print();
+          await onZReadingPrinted();
 
-          if (isZReading) {
-            setActiveType(null);
-            resetForm();
-            onClose();
-
-            try {
-              await onZReadingPrinted();
-
-              if (window.refreshOpenNewDayShift) {
-                await window.refreshOpenNewDayShift();
-              }
-
-              if (window.refreshShiftPanel) {
-                await window.refreshShiftPanel();
-              }
-
-              if (window.refreshLayoutShift) {
-                await window.refreshLayoutShift();
-              }
-
-              if (window.refreshSwitchUserShift) {
-                await window.refreshSwitchUserShift();
-              }
-            } catch (refreshError) {
-              console.error("Shift refresh error:", refreshError);
-            }
+          if (window.refreshOpenNewDayShift) {
+            await window.refreshOpenNewDayShift();
           }
-        } catch (error) {
-          console.error("Print error:", error);
-          openBlockerModal("Print Error", "Unable to open the print dialog.");
-        } finally {
-          setIsPrinting(false);
+
+          if (window.refreshShiftPanel) {
+            await window.refreshShiftPanel();
+          }
+
+          if (window.refreshLayoutShift) {
+            await window.refreshLayoutShift();
+          }
+
+          if (window.refreshSwitchUserShift) {
+            await window.refreshSwitchUserShift();
+          }
+        } catch (refreshError) {
+          console.error("Shift refresh error:", refreshError);
         }
-      }, 400);
+      }
     } catch (error) {
       console.error(error);
       openBlockerModal(
         "Processing Error",
         error.message || "Something went wrong while printing.",
       );
+    } finally {
       setIsPrinting(false);
     }
   };
@@ -850,6 +873,30 @@ export default function PosReadingModal({
                     </div>
                   </div>
 
+                  <div className="mt-5">
+                    <label className="mb-2 block text-sm font-semibold text-zinc-700">
+                      Printer
+                    </label>
+
+                    <select
+                      value={printerName}
+                      onChange={(e) => setPrinterName(e.target.value)}
+                      disabled={isPrinting}
+                      className="h-14 w-full rounded-2xl border border-zinc-200 bg-white px-4 text-base text-zinc-800 outline-none transition focus:border-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <option value="">
+                        {defaultPrinterName
+                          ? `Default Printer (${defaultPrinterName})`
+                          : "Default Printer"}
+                      </option>
+                      {printers.map((printer) => (
+                        <option key={printer.name} value={printer.name}>
+                          {printer.displayName || printer.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                     <button
                       type="button"
@@ -864,15 +911,22 @@ export default function PosReadingModal({
                       Back
                     </button>
 
-                    <button
-                      type="button"
+                    <ButtonComponent
                       onClick={handlePrint}
+                      isLoading={isPrinting}
                       disabled={isPrinting}
-                      className="inline-flex items-center justify-center gap-2 rounded-[24px] bg-gradient-to-b from-[#4f6df5] to-[#3f5fe0] px-6 py-3 text-sm font-bold text-white shadow-[0_12px_30px_rgba(63,95,224,0.28)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
+                      loadingText={
+                        activeType === "z"
+                          ? "Printing Z-Reading..."
+                          : "Printing X-Reading..."
+                      }
+                      variant="primary"
+                      icon={<FaPrint className="shrink-0" />}
+                      fullWidth={false}
+                      className="px-6 rounded-[24px] shadow-[0_12px_30px_rgba(63,95,224,0.28)] !mb-0"
                     >
-                      <FaPrint className="shrink-0" />
-                      {isPrinting ? "Preparing Print..." : "Print Now"}
-                    </button>
+                      Print Now
+                    </ButtonComponent>
                   </div>
                 </motion.div>
               </motion.div>

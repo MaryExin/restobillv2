@@ -408,6 +408,7 @@ const ModalDiscountTransaction = ({
 
   const [items, setItems] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
   const [customerCount, setCustomerCount] = useState(1);
   const [discountState, setDiscountState] = useState(buildInitialDiscountState);
   const [errorMessage, setErrorMessage] = useState("");
@@ -854,7 +855,7 @@ const ModalDiscountTransaction = ({
     validateQualifiedCounts(customerCount, discountState);
   }, [customerCount, discountState]);
 
-  const isPrintDisabled = Boolean(qualifiedPrompt);
+  const isPrintDisabled = Boolean(qualifiedPrompt) || isPrinting;
 
   const saveBillingBeforePrint = async () => {
     if (!apiHost || !transaction?.transaction_id) {
@@ -948,6 +949,8 @@ const ModalDiscountTransaction = ({
   };
 
   const handleNativePrint = async () => {
+    if (isPrinting) return;
+
     if (!apiHost || !transaction?.transaction_id) {
       alert("Missing transaction data.");
       return;
@@ -966,6 +969,8 @@ const ModalDiscountTransaction = ({
     );
 
     try {
+      setIsPrinting(true);
+
       const billingResult = await saveBillingBeforePrint();
 
       const finalBillingNo =
@@ -1001,7 +1006,7 @@ const ModalDiscountTransaction = ({
       const result = await window.electronAPI.printReceipt({
         html,
         printerName,
-        silent: true, // temporary test to false for preview
+        silent: true,
         copies: 1,
       });
 
@@ -1013,8 +1018,11 @@ const ModalDiscountTransaction = ({
     } catch (error) {
       console.error(error);
       alert(error.message || "Failed to print billing.");
+    } finally {
+      setIsPrinting(false);
     }
   };
+
   const containerClass = isDark
     ? "bg-slate-900 border border-white/10 text-white"
     : "bg-white border border-slate-200 text-slate-900";
@@ -1060,11 +1068,12 @@ const ModalDiscountTransaction = ({
             >
               <button
                 onClick={onClose}
+                disabled={isPrinting}
                 className={`absolute right-3 top-3 rounded-full p-1.5 transition-all ${
                   isDark
                     ? "bg-slate-800 text-slate-400 hover:bg-red-500/20 hover:text-red-400"
                     : "bg-slate-100 text-slate-500 hover:bg-red-100 hover:text-red-500"
-                }`}
+                } ${isPrinting ? "opacity-50 cursor-not-allowed" : ""}`}
               >
                 <FiX size={14} />
               </button>
@@ -1148,7 +1157,10 @@ const ModalDiscountTransaction = ({
                   <button
                     type="button"
                     onClick={() => setShowItemsModal(true)}
-                    className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white transition-all hover:bg-blue-500"
+                    disabled={isPrinting}
+                    className={`inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white transition-all hover:bg-blue-500 ${
+                      isPrinting ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
                   >
                     <FiEye size={14} />
                     View Ordered Items
@@ -1189,7 +1201,10 @@ const ModalDiscountTransaction = ({
                                 : Number(customerCount);
                             setCustomerCount(normalized);
                           }}
-                          className={`w-full rounded-lg px-3 py-2 text-sm outline-none ${inputClass}`}
+                          disabled={isPrinting}
+                          className={`w-full rounded-lg px-3 py-2 text-sm outline-none ${inputClass} ${
+                            isPrinting ? "opacity-60 cursor-not-allowed" : ""
+                          }`}
                         />
                       </div>
 
@@ -1221,7 +1236,9 @@ const ModalDiscountTransaction = ({
                         meta={meta}
                         values={discountState[meta.key]}
                         isDark={isDark}
-                        inputClass={inputClass}
+                        inputClass={`${inputClass} ${
+                          isPrinting ? "opacity-60 cursor-not-allowed" : ""
+                        }`}
                         cardClass={innerCardClass}
                         onChangeCount={handleChangeCount}
                         onChangeManualAmount={handleChangeManualAmount}
@@ -1333,7 +1350,10 @@ const ModalDiscountTransaction = ({
                 <select
                   value={printerName}
                   onChange={(e) => setPrinterName(e.target.value)}
-                  className={`w-full rounded-lg px-3 py-2 text-sm outline-none ${inputClass}`}
+                  disabled={isPrinting}
+                  className={`w-full rounded-lg px-3 py-2 text-sm outline-none ${inputClass} ${
+                    isPrinting ? "opacity-60 cursor-not-allowed" : ""
+                  }`}
                 >
                   <option value="">Default Printer</option>
                   {printers.map((printer) => (
@@ -1348,19 +1368,19 @@ const ModalDiscountTransaction = ({
                 <ButtonComponent
                   onClick={onClose}
                   isLoading={false}
-                  disabled={false}
+                  disabled={isPrinting}
                   loadingText="Cancel..."
                   variant="secondary"
-                  icon={<FiPrinter size={14} />}
+                  icon={<FiX size={14} />}
                 >
                   Cancel
                 </ButtonComponent>
 
                 <ButtonComponent
                   onClick={handleNativePrint}
-                  isLoading={false}
+                  isLoading={isPrinting}
                   disabled={isPrintDisabled}
-                  loadingText="Print..."
+                  loadingText="Printing Billing..."
                   variant="primary"
                   icon={<FiPrinter size={14} />}
                 >

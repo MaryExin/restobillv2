@@ -2,7 +2,7 @@ const { app, BrowserWindow, ipcMain, protocol } = require("electron");
 const path = require("path");
 const fs = require("fs");
 
-const OPEN_DEVTOOLS_IN_PACKAGED = true; // set false in production if you do not want DevTools
+const OPEN_DEVTOOLS_IN_PACKAGED = false; // set false in production if you do not want DevTools
 const DEV_SERVER_URL = "http://localhost:5173";
 
 // Register custom protocol before app is ready
@@ -26,6 +26,9 @@ function createWindow() {
     width: 1280,
     height: 800,
     autoHideMenuBar: true,
+    icon: app.isPackaged
+      ? path.join(process.resourcesPath, "icon.ico")
+      : path.join(__dirname, "..", "build", "icon.ico"),
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
@@ -180,6 +183,9 @@ app.whenReady().then(() => {
         height: 900,
         autoHideMenuBar: true,
         backgroundColor: "#ffffff",
+        icon: app.isPackaged
+          ? path.join(process.resourcesPath, "icon.ico")
+          : path.join(__dirname, "..", "build", "icon.ico"),
         webPreferences: {
           contextIsolation: true,
           nodeIntegration: false,

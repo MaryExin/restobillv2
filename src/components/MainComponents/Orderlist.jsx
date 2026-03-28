@@ -48,6 +48,8 @@ const Orderlist = ({
 }) => {
   const defaultPrinterName = useGetDefaultPrinter();
 
+  const [isPrintingOnly, setIsPrintingOnly] = useState(false);
+
   const navigate = useNavigate();
   const apiHost = useApiHost();
   const { isDark } = useTheme();
@@ -1203,6 +1205,8 @@ const Orderlist = ({
   };
 
   const handlePrintOnly = async () => {
+    if (isPrintingOnly) return;
+
     if (!canPrintOnly) {
       alert(
         "Print Only is available only when there are no new or edited items.",
@@ -1215,11 +1219,16 @@ const Orderlist = ({
       return;
     }
 
-    setIsReprint(true);
-    setShowqrModal(false);
-    setShowConfirmModal(false);
+    try {
+      setIsPrintingOnly(true);
+      setIsReprint(true);
+      setShowqrModal(false);
+      setShowConfirmModal(false);
 
-    await handlePrintAllElectron();
+      await handlePrintAllElectron();
+    } finally {
+      setIsPrintingOnly(false);
+    }
   };
 
   const onOpenDiscountModal = (item, e) => {
@@ -1832,21 +1841,25 @@ const Orderlist = ({
                 <FaReceipt /> View Full Summary
               </button>
 
-              <div className="absolute right-4 top-[10px] z-20 flex flex-row gap-2">
+              <div className="absolute right-4 top-[10px] z-20 flex flex-row items-center gap-2">
                 <button
                   onClick={() => setShowDesktopCartActions((prev) => !prev)}
-                  className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500"
+                  className="-mt-3 inline-flex h-10 items-center justify-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-500"
                 >
                   Save
                 </button>
 
                 {canPrintOnly && (
-                  <button
+                  <ButtonComponent
                     onClick={handlePrintOnly}
-                    className="flex items-center gap-2 rounded-xl bg-yellow-600 px-4 py-2 text-sm font-semibold text-white hover:bg-yellow-500"
-                  >
-                    <FiPrinter />
-                  </button>
+                    variant="warning"
+                    icon={<FiPrinter size={16} />}
+                    fullWidth={false}
+                    isLoading={isPrintingOnly}
+                    disabled={isPrintingOnly}
+                    loadingText="Printing..."
+                    className="h-10 min-w-[44px] px-4 text-sm rounded-xl mb-0"
+                  ></ButtonComponent>
                 )}
               </div>
 
