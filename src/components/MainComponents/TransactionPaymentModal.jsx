@@ -13,6 +13,7 @@ import {
 import { FaMoneyBill } from "react-icons/fa";
 import ButtonComponent from "./Common/ButtonComponent";
 import BuildPosPaymentReceiptHtml from "../../utils/BuildPosPaymentReceiptHtml";
+import useGetDefaultPrinter from "../../hooks/useGetDefaultPrinter";
 
 const loggedUserId = localStorage.getItem("user_id") || "";
 const loggedUserName =
@@ -1623,6 +1624,8 @@ export default function TransactionPaymentModal({
   onSaved,
   mode = "pending",
 }) {
+  const defaultPrinterName = useGetDefaultPrinter();
+
   const isPaidMode = mode === "paid";
 
   const [items, setItems] = useState([]);
@@ -1651,7 +1654,6 @@ export default function TransactionPaymentModal({
   const [receiptSnapshot, setReceiptSnapshot] = useState(null);
   const [printerName, setPrinterName] = useState("");
   const [printers, setPrinters] = useState([]);
-  const DEFAULT_PRINTER_NAME = "XP-80C";
 
   useEffect(() => {
     if (!isOpen) return;
@@ -1663,22 +1665,41 @@ export default function TransactionPaymentModal({
 
         setPrinters(safeList);
 
-        const defaultPrinter = safeList.find((p) => p.isDefault);
+        const matchedPrinter = safeList.find(
+          (p) =>
+            String(p.name || "").trim() ===
+            String(defaultPrinterName || "").trim(),
+        );
+
+        const fallbackElectronDefault = safeList.find((p) => p.isDefault);
+
         const resolvedPrinterName =
-          defaultPrinter?.name || DEFAULT_PRINTER_NAME;
+          matchedPrinter?.name ||
+          String(defaultPrinterName || "").trim() ||
+          fallbackElectronDefault?.name ||
+          "";
 
         setPrinterName(resolvedPrinterName);
 
         console.log("Electron printers:", safeList);
-        console.log("Default printer:", resolvedPrinterName);
+        console.log("Default printer from hook:", defaultPrinterName);
+        console.log(
+          "Matched printer from hook:",
+          matchedPrinter?.name || "(none)",
+        );
+        console.log(
+          "Electron default printer:",
+          fallbackElectronDefault?.name || "(none)",
+        );
+        console.log("Resolved printer:", resolvedPrinterName);
       } catch (error) {
         console.error("Failed to load printers:", error);
-        setPrinterName(DEFAULT_PRINTER_NAME);
+        setPrinterName(String(defaultPrinterName || "").trim());
       }
     };
 
     loadPrinters();
-  }, [isOpen]);
+  }, [isOpen, defaultPrinterName]);
 
   const handleElectronPrint = async (snapshotOverride = null) => {
     try {
@@ -1709,7 +1730,7 @@ export default function TransactionPaymentModal({
 
       const result = await window.electronAPI.printReceipt({
         html,
-        printerName: printerName || DEFAULT_PRINTER_NAME,
+        printerName: printerName || defaultPrinterName || "",
         silent: true,
         copies: 1,
       });

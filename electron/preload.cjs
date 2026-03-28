@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("appConfig", {
   getApiHost: () => ipcRenderer.invoke("get-api-host"),
+  getDefaultPrinterName: () => ipcRenderer.invoke("get-default-printer-name"),
 });
 
 contextBridge.exposeInMainWorld("electronAPI", {

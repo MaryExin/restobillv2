@@ -3,8 +3,6 @@ const path = require("path");
 const fs = require("fs");
 
 const OPEN_DEVTOOLS_IN_PACKAGED = true; // set false in production if you do not want DevTools
-const DEFAULT_PRINTER_NAME = "XP-80C";
-
 const DEV_SERVER_URL = "http://localhost:5173";
 
 // Register custom protocol before app is ready
@@ -57,12 +55,32 @@ function getIpFilePath() {
     : path.join(__dirname, "..", "public", "ip.txt");
 }
 
+function getPrinterFilePath() {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, "printer.txt")
+    : path.join(__dirname, "..", "public", "printer.txt");
+}
+
+function readTextFileSafe(filePath) {
+  try {
+    return fs.readFileSync(filePath, "utf8").trim();
+  } catch (error) {
+    console.error(`Failed to read file: ${filePath}`, error);
+    return "";
+  }
+}
+
+function getDefaultPrinterNameFromFile() {
+  const printerPath = getPrinterFilePath();
+  console.log("Reading printer.txt from:", printerPath);
+  return readTextFileSafe(printerPath);
+}
+
 function mapPrinterInfo(printer) {
   return {
     name: printer?.name || "",
     displayName: printer?.displayName || printer?.name || "",
     description: printer?.description || "",
-    // newer Electron may no longer provide these
     status: typeof printer?.status === "undefined" ? null : printer.status,
     isDefault:
       typeof printer?.isDefault === "undefined" ? null : printer.isDefault,
@@ -80,9 +98,18 @@ app.whenReady().then(() => {
     try {
       const ipPath = getIpFilePath();
       console.log("Reading ip.txt from:", ipPath);
-      return fs.readFileSync(ipPath, "utf8").trim();
+      return readTextFileSafe(ipPath);
     } catch (error) {
       console.error("Failed to read ip.txt:", error);
+      return "";
+    }
+  });
+
+  ipcMain.handle("get-default-printer-name", () => {
+    try {
+      return getDefaultPrinterNameFromFile();
+    } catch (error) {
+      console.error("Failed to read printer.txt:", error);
       return "";
     }
   });
@@ -118,11 +145,15 @@ app.whenReady().then(() => {
         copies = 1,
       } = payload || {};
 
+      const printerFromFile = getDefaultPrinterNameFromFile();
+
       const resolvedPrinterName =
-        String(printerName || "").trim() || DEFAULT_PRINTER_NAME;
+        String(printerName || "").trim() ||
+        String(printerFromFile || "").trim();
 
       console.log("print-receipt payload:", {
         printerName,
+        printerFromFile,
         resolvedPrinterName,
         silent,
         copies,
@@ -133,6 +164,13 @@ app.whenReady().then(() => {
         return {
           success: false,
           message: "Missing receipt HTML.",
+        };
+      }
+
+      if (!resolvedPrinterName) {
+        return {
+          success: false,
+          message: "No printer name provided and printer.txt is empty.",
         };
       }
 
@@ -172,7 +210,6 @@ app.whenReady().then(() => {
         "data:text/html;charset=utf-8," + encodeURIComponent(html),
       );
 
-      // Give Chromium extra time to layout fonts/images/content.
       await new Promise((resolve) => setTimeout(resolve, 500));
 
       const visiblePrinters = await getPrintersFromWindow(printWindow);
@@ -223,7 +260,6 @@ app.whenReady().then(() => {
         };
       }
 
-      // Some receipt printers/drivers behave better with a slight delay before close.
       await new Promise((resolve) => setTimeout(resolve, 800));
 
       return {
