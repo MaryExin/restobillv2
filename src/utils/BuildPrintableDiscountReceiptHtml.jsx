@@ -49,6 +49,7 @@ export function BuildPrintableDiscountReceiptHtml({
           body {
             margin: 0;
             padding: 0;
+            width: 80mm;
             background: #ffffff;
             color: #000000;
             font-family: Arial, Helvetica, sans-serif;
@@ -57,19 +58,19 @@ export function BuildPrintableDiscountReceiptHtml({
           }
 
           body {
-            width: 80mm;
+            overflow: hidden;
           }
 
           .print-root {
             width: 80mm;
-            padding: "14px 29px",
+            padding: calc(10px * var(--s)) calc(10px * var(--s));
             font-size: calc(11px * var(--s));
             line-height: 1.2;
           }
 
           .divider {
             border-top: 1px solid #000;
-            margin: calc(10px * var(--s)) 0 calc(8px * var(--s));
+            margin: calc(8px * var(--s)) 0 calc(7px * var(--s));
           }
 
           table {
@@ -125,16 +126,8 @@ export function BuildPrintableDiscountReceiptHtml({
             margin-top: calc(2px * var(--s));
           }
 
-          .mt-3 {
-            margin-top: calc(3px * var(--s));
-          }
-
           .mt-12 {
             margin-top: calc(12px * var(--s));
-          }
-
-          .mb-4 {
-            margin-bottom: calc(4px * var(--s));
           }
 
           .mb-8 {
@@ -155,35 +148,48 @@ export function BuildPrintableDiscountReceiptHtml({
             display: flex;
             justify-content: space-between;
             align-items: baseline;
+            gap: calc(8px * var(--s));
             font-weight: 900;
             font-size: calc(14px * var(--s));
           }
 
           .label-col {
-            width: 40%;
+            width: 44%;
             white-space: nowrap;
           }
 
           .value-col {
-            width: 60%;
-          }
-
-          /* adjusted here */
-          .item-col {
-            width: 40%;
+            width: 56%;
+            text-align: right;
             word-break: break-word;
             overflow-wrap: break-word;
           }
 
+          .item-col {
+            width: 42%;
+            word-break: break-word;
+            overflow-wrap: break-word;
+            padding-right: calc(4px * var(--s));
+          }
+
           .qty-col {
-            width: 20%;
+            width: 18%;
             text-align: center;
             white-space: nowrap;
+            padding-right: calc(2px * var(--s));
           }
 
           .amt-col {
             width: 40%;
             text-align: right;
+            white-space: nowrap;
+          }
+
+          .item-row td {
+            padding-bottom: calc(2px * var(--s));
+          }
+
+          .nowrap {
             white-space: nowrap;
           }
 
@@ -211,57 +217,53 @@ export function BuildPrintableDiscountReceiptHtml({
             <tbody>
               <tr>
                 <td className="bold label-col">Trans. No.:</td>
-                <td className="right value-col">
+                <td className="value-col">
                   {transaction?.transaction_id || "-"}
                 </td>
               </tr>
               <tr>
                 <td className="bold label-col">Billing No.:</td>
-                <td className="right value-col">
+                <td className="value-col">
                   {transaction?.billing_no || transaction?.billingNo || "-"}
                 </td>
               </tr>
               <tr>
                 <td className="bold label-col">Invoice No.:</td>
-                <td className="right value-col">
+                <td className="value-col">
                   {transaction?.invoice_no || transaction?.invoiceNo || "-"}
                 </td>
               </tr>
               <tr>
                 <td className="bold label-col">Trans. Date:</td>
-                <td className="right value-col">
+                <td className="value-col">
                   {transaction?.transaction_date || dateFrom || "-"}
                 </td>
               </tr>
               <tr>
                 <td className="bold label-col">Trans. Time:</td>
-                <td className="right value-col">
+                <td className="value-col">
                   {transaction?.transaction_time || "-"}
                 </td>
               </tr>
               <tr>
                 <td className="bold label-col">Terminal No.:</td>
-                <td className="right value-col">
+                <td className="value-col">
                   {transaction?.terminal_number || "-"}
                 </td>
               </tr>
               <tr>
                 <td className="bold label-col">Order Type:</td>
-                <td className="right value-col">
-                  {transaction?.order_type || "-"}
-                </td>
+                <td className="value-col">{transaction?.order_type || "-"}</td>
               </tr>
               <tr>
                 <td className="bold label-col">Ref./Tag #:</td>
-                <td className="right value-col">
+                <td className="value-col">
                   {transaction?.table_number || "-"}
                 </td>
               </tr>
               <tr>
                 <td className="bold label-col">Cashier:</td>
-                <td className="right value-col">
-                  {transaction?.cashier || "-"}
-                </td>
+                <td className="value-col">{transaction?.cashier || "-"}</td>
               </tr>
             </tbody>
           </table>
@@ -283,17 +285,17 @@ export function BuildPrintableDiscountReceiptHtml({
                 const lineTotal = qty * price;
 
                 return (
-                  <tr key={item.ID || index}>
+                  <tr key={item.ID || index} className="item-row">
                     <td className="item-col">
                       •{" "}
                       {String(
                         item.item_name || item.product_id || "-",
                       ).toUpperCase()}
                     </td>
-                    <td className="qty-col">
+                    <td className="qty-col nowrap">
                       {qty} {item.unit_of_measure || ""}
                     </td>
-                    <td className="amt-col">{peso(lineTotal)}</td>
+                    <td className="amt-col nowrap">{peso(lineTotal)}</td>
                   </tr>
                 );
               })}
@@ -306,9 +308,7 @@ export function BuildPrintableDiscountReceiptHtml({
             <tbody>
               <tr>
                 <td className="bold label-col">TOTAL SALES:</td>
-                <td className="right value-col">
-                  {peso(computed?.grossTotal)}
-                </td>
+                <td className="value-col">{peso(computed?.grossTotal)}</td>
               </tr>
 
               {activeBreakdown.map((entry) =>
@@ -317,7 +317,7 @@ export function BuildPrintableDiscountReceiptHtml({
                     <td className="bold label-col">
                       {String(entry?.label || "DISCOUNT").toUpperCase()}:
                     </td>
-                    <td className="right value-col">
+                    <td className="value-col">
                       {signedNegativePeso(entry?.discountAmount)}
                     </td>
                   </tr>
@@ -327,7 +327,7 @@ export function BuildPrintableDiscountReceiptHtml({
               {Number(computed?.totalVatExemption || 0) > 0 ? (
                 <tr>
                   <td className="bold label-col">VAT EXEMPTION:</td>
-                  <td className="right value-col">
+                  <td className="value-col">
                     {signedNegativePeso(computed?.totalVatExemption)}
                   </td>
                 </tr>
@@ -348,31 +348,25 @@ export function BuildPrintableDiscountReceiptHtml({
             <tbody>
               <tr>
                 <td className="bold label-col">VATABLE SALES:</td>
-                <td className="right value-col">
-                  {peso(computed?.vatableSales)}
-                </td>
+                <td className="value-col">{peso(computed?.vatableSales)}</td>
               </tr>
               <tr>
                 <td className="bold label-col">VAT AMOUNT:</td>
-                <td className="right value-col">
-                  {peso(computed?.vatableSalesVat)}
-                </td>
+                <td className="value-col">{peso(computed?.vatableSalesVat)}</td>
               </tr>
               <tr>
                 <td className="bold label-col">VAT EXEMPT SALES:</td>
-                <td className="right value-col">
-                  {peso(computed?.vatExemptSales)}
-                </td>
+                <td className="value-col">{peso(computed?.vatExemptSales)}</td>
               </tr>
               <tr>
                 <td className="bold label-col">VAT EXEMPTION:</td>
-                <td className="right value-col">
+                <td className="value-col">
                   {peso(computed?.totalVatExemption)}
                 </td>
               </tr>
               <tr>
                 <td className="bold label-col">ZERO RATED SALES:</td>
-                <td className="right value-col">
+                <td className="value-col">
                   {peso(computed?.vatZeroRatedSales)}
                 </td>
               </tr>
@@ -385,43 +379,41 @@ export function BuildPrintableDiscountReceiptHtml({
             <tbody>
               <tr>
                 <td className="bold label-col">Total Customers:</td>
-                <td className="right value-col">
+                <td className="value-col">
                   {computed?.safeCustomerCount ?? 0}
                 </td>
               </tr>
               <tr>
                 <td className="bold label-col">Total Qualified:</td>
-                <td className="right value-col">{totalQualifiedAll}</td>
+                <td className="value-col">{totalQualifiedAll}</td>
               </tr>
               <tr>
                 <td className="bold label-col">Statutory Qualified:</td>
-                <td className="right value-col">{statutoryQualifiedCount}</td>
+                <td className="value-col">{statutoryQualifiedCount}</td>
               </tr>
 
               {activeBreakdown.map((entry) => (
                 <React.Fragment key={`print-breakdown-${entry.key}`}>
                   <tr>
                     <td className="bold label-col">{entry.label} Count:</td>
-                    <td className="right value-col">{entry.qualifiedCount}</td>
+                    <td className="value-col">{entry.qualifiedCount}</td>
                   </tr>
                   <tr>
                     <td className="bold label-col">{entry.label} Amount:</td>
-                    <td className="right value-col">
-                      {peso(entry.discountAmount)}
-                    </td>
+                    <td className="value-col">{peso(entry.discountAmount)}</td>
                   </tr>
                 </React.Fragment>
               ))}
 
               <tr>
                 <td className="bold label-col">Discountable Gross:</td>
-                <td className="right value-col">
+                <td className="value-col">
                   {peso(computed?.discountableGross)}
                 </td>
               </tr>
               <tr>
                 <td className="bold label-col">Discountable Base:</td>
-                <td className="right value-col">
+                <td className="value-col">
                   {peso(computed?.discountableBase)}
                 </td>
               </tr>

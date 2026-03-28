@@ -10,20 +10,31 @@ export default function useGetDefaultPrinter() {
 
     (async () => {
       try {
-        // ✅ EXE: read editable resources/printer.txt via Electron preload
-        if (window.appConfig?.getPrinterName) {
-          const name = await window.appConfig.getPrinterName();
-          if (!cancelled) setPrinterName(normalizePrinterName(name));
+        // Electron / EXE: read from main process
+        if (window.appConfig?.getDefaultPrinterName) {
+          const name = await window.appConfig.getDefaultPrinterName();
+          console.log("Printer from Electron preload:", name);
+
+          if (!cancelled) {
+            setPrinterName(normalizePrinterName(name));
+          }
           return;
         }
 
-        // ✅ Browser dev: read from public/printer.txt
+        // Browser / Vite dev fallback: read public/printer.txt
         const res = await fetch("./printer.txt", { cache: "no-store" });
         const txt = await res.text();
 
-        if (!cancelled) setPrinterName(normalizePrinterName(txt));
-      } catch (e) {
-        if (!cancelled) setPrinterName("");
+        console.log("Printer from fetch ./printer.txt:", txt);
+
+        if (!cancelled) {
+          setPrinterName(normalizePrinterName(txt));
+        }
+      } catch (error) {
+        console.error("Failed to load default printer:", error);
+        if (!cancelled) {
+          setPrinterName("");
+        }
       }
     })();
 

@@ -1,9 +1,9 @@
 {
-  "name": "rci_app",
+  "name": "lightem_app",
   "private": true,
   "homepage": ".",
   "version": "0.0.1",
-  "description": "RCI desktop app",
+  "description": "Lightem desktop app",
   "author": "Lightem",
   "type": "module",
   "main": "electron/main.cjs",
@@ -14,7 +14,7 @@
     "dev:electron:debug": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron --inspect=5858 .\"",
     "build": "vite build",
     "pack": "npm run build && electron-builder --dir",
-    "dist": "npm run build && electron-builder"
+    "dist": "npm run build && electron-builder --win nsis"
   },
   "dependencies": {
     "@emotion/react": "^11.11.0",
@@ -95,7 +95,7 @@
   },
   "build": {
     "appId": "com.lenard.restobill",
-    "productName": "RestoBill",
+    "productName": "LightemPOS",
     "directories": {
       "output": "release"
     },
@@ -117,12 +117,34 @@
         "to": "ip.txt"
       },
       {
+        "from": "public/printer.txt",
+        "to": "printer.txt"
+      },
+      {
         "from": "public/pos-config.json",
         "to": "pos-config.json"
+      },
+      {
+        "from": "build/icon.ico",
+        "to": "icon.ico"
       }
     ],
     "win": {
-      "target": "nsis"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
     }
   }
 }
