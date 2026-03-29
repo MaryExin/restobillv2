@@ -2122,7 +2122,7 @@ const Orderlist = ({
               <AnimatePresence>
                 {showTransferModal && (
                   <motion.div
-                    className={`fixed inset-0 z-[500] flex items-center justify-center backdrop-blur-sm px-4 sm:px-6 py-4 ${
+                    className={`fixed inset-0 z-[500] flex items-center justify-center backdrop-blur-sm px-3 sm:px-4 py-3 ${
                       isDark ? "bg-black/60" : "bg-slate-900/30"
                     }`}
                     initial={{ opacity: 0 }}
@@ -2130,48 +2130,47 @@ const Orderlist = ({
                     exit={{ opacity: 0 }}
                   >
                     <motion.div
-                      initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                      initial={{ opacity: 0, scale: 0.97, y: 8 }}
                       animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                      className={`w-full max-w-[900px] rounded-[2rem] p-5 sm:p-6 shadow-2xl ${
+                      exit={{ opacity: 0, scale: 0.97, y: 8 }}
+                      className={`w-full max-w-[820px] rounded-[1.5rem] p-4 sm:p-5 shadow-2xl ${
                         isDark
                           ? "bg-slate-950 border border-white/10"
                           : "bg-white border border-slate-200"
                       }`}
                     >
-                      <div className="flex items-center justify-between mb-6">
+                      <div className="flex items-start justify-between gap-3 mb-4">
                         <div>
                           <h2
-                            className={`text-xl font-black ${
+                            className={`text-lg sm:text-xl font-black ${
                               isDark ? "text-white" : "text-slate-900"
                             }`}
                           >
                             Transfer Table
                           </h2>
                           <p
-                            className={`text-sm ${
+                            className={`text-xs sm:text-sm ${
                               isDark ? "text-slate-400" : "text-slate-500"
                             }`}
                           >
-                            Choose fixed table, merge tables, or type a special
-                            table name.
+                            Choose fixed table, merge tables, or type a special table name.
                           </p>
                         </div>
 
                         <button
                           onClick={resetTransferState}
-                          className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                          className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
                             isDark
                               ? "text-slate-400 hover:text-white hover:bg-slate-800"
                               : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
                           }`}
                         >
-                          <FiX size={18} />
+                          <FiX size={16} />
                         </button>
                       </div>
 
                       <div
-                        className={`grid grid-cols-2 gap-2 mb-5 p-1.5 rounded-2xl ${
+                        className={`grid grid-cols-2 gap-2 mb-4 p-1 rounded-2xl ${
                           isDark
                             ? "bg-slate-900/40 border border-white/5"
                             : "bg-slate-100 border border-slate-200"
@@ -2179,7 +2178,7 @@ const Orderlist = ({
                       >
                         <button
                           onClick={() => setTransferMode("fixed")}
-                          className={`rounded-2xl px-4 py-3 font-bold transition-all ${
+                          className={`rounded-xl px-3 py-2.5 text-sm font-bold transition-all ${
                             transferMode === "fixed"
                               ? "bg-blue-600 text-white"
                               : isDark
@@ -2195,7 +2194,7 @@ const Orderlist = ({
                             setTransferMode("merge");
                             seedCurrentMergeTables();
                           }}
-                          className={`rounded-2xl px-4 py-3 font-bold transition-all ${
+                          className={`rounded-xl px-3 py-2.5 text-sm font-bold transition-all ${
                             transferMode === "merge"
                               ? "bg-blue-600 text-white"
                               : isDark
@@ -2208,10 +2207,10 @@ const Orderlist = ({
                       </div>
 
                       {transferMode === "fixed" ? (
-                        <div className="space-y-5">
-                          <div className="relative group">
+                        <div className="space-y-4">
+                          <div className="relative">
                             <FaSearch
-                              className={`absolute left-5 top-1/2 -translate-y-1/2 ${
+                              className={`absolute left-4 top-1/2 -translate-y-1/2 ${
                                 isDark ? "text-slate-600" : "text-slate-400"
                               }`}
                             />
@@ -2219,10 +2218,8 @@ const Orderlist = ({
                               type="text"
                               placeholder="Search fixed table..."
                               value={transferSearch}
-                              onChange={(e) =>
-                                setTransferSearch(e.target.value)
-                              }
-                              className={`w-full rounded-2xl py-4 pl-14 pr-5 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${
+                              onChange={(e) => setTransferSearch(e.target.value)}
+                              className={`w-full rounded-xl py-3 pl-11 pr-4 text-sm focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${
                                 isDark
                                   ? "bg-slate-900/50 border border-slate-800 text-white focus:border-blue-500/40"
                                   : "bg-slate-50 border border-slate-300 text-slate-900 focus:border-blue-400"
@@ -2232,7 +2229,7 @@ const Orderlist = ({
 
                           <div>
                             <label
-                              className={`block text-[10px] font-black uppercase tracking-[0.3em] mb-3 ${
+                              className={`block text-[10px] font-black uppercase tracking-[0.25em] mb-2 ${
                                 isDark ? "text-slate-500" : "text-slate-500"
                               }`}
                             >
@@ -2240,7 +2237,7 @@ const Orderlist = ({
                             </label>
 
                             <div
-                              className={`max-h-[250px] overflow-y-auto rounded-3xl p-3 ${
+                              className={`max-h-[200px] overflow-y-auto rounded-2xl p-2 ${
                                 isDark
                                   ? "border border-white/5 bg-slate-900/30"
                                   : "border border-slate-200 bg-slate-50"
@@ -2249,29 +2246,26 @@ const Orderlist = ({
                               {transferTableList.filter((table) =>
                                 String(table.table_name || "")
                                   .toLowerCase()
-                                  .includes(transferSearch.toLowerCase()),
+                                  .includes(transferSearch.toLowerCase())
                               ).length > 0 ? (
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                                   {transferTableList
                                     .filter((table) =>
                                       String(table.table_name || "")
                                         .toLowerCase()
-                                        .includes(transferSearch.toLowerCase()),
+                                        .includes(transferSearch.toLowerCase())
                                     )
                                     .map((table) => {
                                       const tableName = table.table_name;
                                       const isSelected =
-                                        String(selectedTransferTable) ===
-                                        String(tableName);
+                                        String(selectedTransferTable) === String(tableName);
 
                                       return (
                                         <button
                                           key={table.ID ?? tableName}
                                           type="button"
-                                          onClick={() =>
-                                            setSelectedTransferTable(tableName)
-                                          }
-                                          className={`group relative rounded-2xl px-4 py-4 text-left transition-all duration-200 border shadow-sm hover:scale-[1.02] active:scale-[0.98] ${
+                                          onClick={() => setSelectedTransferTable(tableName)}
+                                          className={`group relative rounded-xl px-3 py-3 text-left transition-all duration-200 border shadow-sm hover:scale-[1.01] active:scale-[0.98] ${
                                             isSelected
                                               ? isDark
                                                 ? "bg-blue-500/15 border-blue-400/40 text-white shadow-blue-500/10"
@@ -2281,10 +2275,10 @@ const Orderlist = ({
                                                 : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"
                                           }`}
                                         >
-                                          <div className="flex items-start justify-between gap-3">
+                                          <div className="flex items-start justify-between gap-2">
                                             <div>
                                               <p
-                                                className={`text-[10px] font-black uppercase tracking-[0.25em] mb-1 ${
+                                                className={`text-[9px] font-black uppercase tracking-[0.2em] mb-1 ${
                                                   isSelected
                                                     ? isDark
                                                       ? "text-blue-300"
@@ -2296,13 +2290,13 @@ const Orderlist = ({
                                               >
                                                 Table
                                               </p>
-                                              <p className="text-base font-extrabold leading-tight break-words">
+                                              <p className="text-sm font-extrabold leading-tight break-words">
                                                 {tableName}
                                               </p>
                                             </div>
 
                                             <div
-                                              className={`shrink-0 mt-1 h-6 w-6 rounded-full flex items-center justify-center transition-all ${
+                                              className={`shrink-0 mt-0.5 h-5 w-5 rounded-full flex items-center justify-center transition-all ${
                                                 isSelected
                                                   ? isDark
                                                     ? "bg-blue-500 text-white"
@@ -2313,11 +2307,9 @@ const Orderlist = ({
                                               }`}
                                             >
                                               {isSelected ? (
-                                                <FaCheck size={11} />
+                                                <FaCheck size={9} />
                                               ) : (
-                                                <span className="text-[10px] font-bold">
-                                                  +
-                                                </span>
+                                                <span className="text-[9px] font-bold">+</span>
                                               )}
                                             </div>
                                           </div>
@@ -2327,7 +2319,7 @@ const Orderlist = ({
                                 </div>
                               ) : (
                                 <div
-                                  className={`rounded-2xl px-5 py-6 text-center text-sm ${
+                                  className={`rounded-xl px-4 py-5 text-center text-sm ${
                                     isDark
                                       ? "bg-slate-800/50 text-slate-500"
                                       : "bg-white text-slate-500 border border-dashed border-slate-200"
@@ -2341,7 +2333,7 @@ const Orderlist = ({
 
                           <div>
                             <label
-                              className={`block text-[10px] font-black uppercase tracking-[0.3em] mb-3 ${
+                              className={`block text-[10px] font-black uppercase tracking-[0.25em] mb-2 ${
                                 isDark ? "text-slate-500" : "text-slate-500"
                               }`}
                             >
@@ -2352,10 +2344,8 @@ const Orderlist = ({
                               type="text"
                               placeholder="e.g. VIP Table, Function Hall"
                               value={customTransferTableName}
-                              onChange={(e) =>
-                                setCustomTransferTableName(e.target.value)
-                              }
-                              className={`w-full rounded-2xl py-4 px-5 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${
+                              onChange={(e) => setCustomTransferTableName(e.target.value)}
+                              className={`w-full rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${
                                 isDark
                                   ? "bg-slate-900/50 border border-slate-800 text-white placeholder:text-slate-500 focus:border-blue-500/40"
                                   : "bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-blue-400"
@@ -2364,14 +2354,14 @@ const Orderlist = ({
                           </div>
 
                           <div
-                            className={`rounded-3xl px-5 py-5 ${
+                            className={`rounded-2xl px-4 py-4 ${
                               isDark
                                 ? "bg-slate-900/40 border border-white/5"
                                 : "bg-slate-50 border border-slate-200"
                             }`}
                           >
                             <p
-                              className={`text-[10px] font-black uppercase tracking-[0.3em] mb-3 ${
+                              className={`text-[10px] font-black uppercase tracking-[0.25em] mb-2 ${
                                 isDark ? "text-slate-500" : "text-slate-500"
                               }`}
                             >
@@ -2379,27 +2369,29 @@ const Orderlist = ({
                             </p>
 
                             <div
-                              className={`rounded-2xl px-4 py-4 ${
+                              className={`rounded-xl px-4 py-3 ${
                                 isDark
                                   ? "bg-slate-950/70 border border-white/5"
                                   : "bg-white border border-slate-200"
                               }`}
                             >
                               <p
-                                className={`text-lg font-bold leading-relaxed ${
+                                className={`text-sm sm:text-base font-bold leading-relaxed ${
                                   isDark ? "text-white" : "text-slate-900"
                                 }`}
                               >
-                                {customTransferTableName.trim() || selectedTransferTable || "None"}
+                                {customTransferTableName.trim() ||
+                                  selectedTransferTable ||
+                                  "None"}
                               </p>
                             </div>
                           </div>
                         </div>
                       ) : transferMode === "merge" ? (
-                        <div className="space-y-5">
-                          <div className="relative group">
+                        <div className="space-y-4">
+                          <div className="relative">
                             <FaSearch
-                              className={`absolute left-5 top-1/2 -translate-y-1/2 ${
+                              className={`absolute left-4 top-1/2 -translate-y-1/2 ${
                                 isDark ? "text-slate-600" : "text-slate-400"
                               }`}
                             />
@@ -2407,10 +2399,8 @@ const Orderlist = ({
                               type="text"
                               placeholder="Search tables to merge..."
                               value={transferSearch}
-                              onChange={(e) =>
-                                setTransferSearch(e.target.value)
-                              }
-                              className={`w-full rounded-2xl py-4 pl-14 pr-5 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${
+                              onChange={(e) => setTransferSearch(e.target.value)}
+                              className={`w-full rounded-xl py-3 pl-11 pr-4 text-sm focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${
                                 isDark
                                   ? "bg-slate-900/50 border border-slate-800 text-white focus:border-blue-500/40"
                                   : "bg-slate-50 border border-slate-300 text-slate-900 focus:border-blue-400"
@@ -2420,7 +2410,7 @@ const Orderlist = ({
 
                           <div>
                             <label
-                              className={`block text-[10px] font-black uppercase tracking-[0.3em] mb-3 ${
+                              className={`block text-[10px] font-black uppercase tracking-[0.25em] mb-2 ${
                                 isDark ? "text-slate-500" : "text-slate-500"
                               }`}
                             >
@@ -2428,89 +2418,87 @@ const Orderlist = ({
                             </label>
 
                             <div
-                            className={`max-h-[250px] overflow-y-auto rounded-3xl p-3 ${
+                              className={`max-h-[200px] overflow-y-auto rounded-2xl p-2 ${
                                 isDark
                                   ? "border border-white/5 bg-slate-900/30"
                                   : "border border-slate-200 bg-slate-50"
                               }`}
                             >
                               {mergeSelectableTables.length > 0 ? (
-                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
                                   {mergeSelectableTables.map((table) => {
-                                      const tableName = table.table_name;
-                                      const isSelected = selectedMergeTables.some(
-                                        (item) =>
-                                          normalizeTableName(item) === normalizeTableName(tableName),
-                                      );
-                                      const isCurrentTable = currentTableParts.some(
-                                        (item) =>
-                                          normalizeTableName(item) === normalizeTableName(tableName),
-                                      );
+                                    const tableName = table.table_name;
+                                    const isSelected = selectedMergeTables.some(
+                                      (item) =>
+                                        normalizeTableName(item) ===
+                                        normalizeTableName(tableName)
+                                    );
+                                    const isCurrentTable = currentTableParts.some(
+                                      (item) =>
+                                        normalizeTableName(item) ===
+                                        normalizeTableName(tableName)
+                                    );
 
-                                      return (
-                                        <button
-                                          key={table.ID ?? tableName}
-                                          type="button"
-                                          onClick={() =>
-                                            toggleMergeTableSelection(tableName)
-                                          }
-                                          className={`group relative rounded-2xl px-4 py-4 text-left transition-all duration-200 border shadow-sm hover:scale-[1.02] active:scale-[0.98] ${
-                                            isSelected
-                                              ? isDark
-                                                ? "bg-blue-500/15 border-blue-400/40 text-white shadow-blue-500/10"
-                                                : "bg-blue-50 border-blue-300 text-blue-700 shadow-blue-100"
-                                              : isDark
-                                                ? "bg-slate-800/70 border-white/5 text-slate-200 hover:bg-slate-800"
-                                                : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"
-                                          }`}
-                                        >
-                                          <div className="flex items-start justify-between gap-3">
-                                            <div>
-                                              <p
-                                                className={`text-[10px] font-black uppercase tracking-[0.25em] mb-1 ${
-                                                  isSelected
-                                                    ? isDark
-                                                      ? "text-blue-300"
-                                                      : "text-blue-500"
-                                                    : isDark
-                                                      ? "text-slate-500"
-                                                      : "text-slate-400"
-                                                }`}
-                                              >
-                                                {isCurrentTable ? "Current Table" : "Table"}
-                                              </p>
-                                              <p className="text-base font-extrabold leading-tight break-words">
-                                                {tableName}
-                                              </p>
-                                            </div>
-
-                                            <div
-                                              className={`shrink-0 mt-1 h-6 w-6 rounded-full flex items-center justify-center transition-all ${
+                                    return (
+                                      <button
+                                        key={table.ID ?? tableName}
+                                        type="button"
+                                        onClick={() => toggleMergeTableSelection(tableName)}
+                                        className={`group relative rounded-xl px-3 py-3 text-left transition-all duration-200 border shadow-sm hover:scale-[1.01] active:scale-[0.98] ${
+                                          isSelected
+                                            ? isDark
+                                              ? "bg-blue-500/15 border-blue-400/40 text-white shadow-blue-500/10"
+                                              : "bg-blue-50 border-blue-300 text-blue-700 shadow-blue-100"
+                                            : isDark
+                                              ? "bg-slate-800/70 border-white/5 text-slate-200 hover:bg-slate-800"
+                                              : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"
+                                        }`}
+                                      >
+                                        <div className="flex items-start justify-between gap-2">
+                                          <div>
+                                            <p
+                                              className={`text-[9px] font-black uppercase tracking-[0.2em] mb-1 ${
                                                 isSelected
                                                   ? isDark
-                                                    ? "bg-blue-500 text-white"
-                                                    : "bg-blue-600 text-white"
+                                                    ? "text-blue-300"
+                                                    : "text-blue-500"
                                                   : isDark
-                                                    ? "bg-slate-700 text-slate-400"
-                                                    : "bg-slate-100 text-slate-400"
+                                                    ? "text-slate-500"
+                                                    : "text-slate-400"
                                               }`}
                                             >
-                                              {isSelected ? (
-                                                <FaCheck size={11} />
-                                              ) : (
-                                                <span className="text-[10px] font-bold">
-                                                  +
-                                                </span>
-                                              )}
-                                            </div>
+                                              {isCurrentTable ? "Current" : "Table"}
+                                            </p>
+                                            <p className="text-sm font-extrabold leading-tight break-words">
+                                              {tableName}
+                                            </p>
                                           </div>
-                                        </button>
-                                      );
-                                    })}
+
+                                          <div
+                                            className={`shrink-0 mt-0.5 h-5 w-5 rounded-full flex items-center justify-center transition-all ${
+                                              isSelected
+                                                ? isDark
+                                                  ? "bg-blue-500 text-white"
+                                                  : "bg-blue-600 text-white"
+                                                : isDark
+                                                  ? "bg-slate-700 text-slate-400"
+                                                  : "bg-slate-100 text-slate-400"
+                                            }`}
+                                          >
+                                            {isSelected ? (
+                                              <FaCheck size={9} />
+                                            ) : (
+                                              <span className="text-[9px] font-bold">+</span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </button>
+                                    );
+                                  })}
                                 </div>
                               ) : (
                                 <div
-                                  className={`rounded-2xl px-5 py-6 text-center text-sm ${
+                                  className={`rounded-xl px-4 py-5 text-center text-sm ${
                                     isDark
                                       ? "bg-slate-800/50 text-slate-500"
                                       : "bg-white text-slate-500 border border-dashed border-slate-200"
@@ -2524,7 +2512,7 @@ const Orderlist = ({
 
                           <div>
                             <label
-                              className={`block text-[10px] font-black uppercase tracking-[0.3em] mb-3 ${
+                              className={`block text-[10px] font-black uppercase tracking-[0.25em] mb-2 ${
                                 isDark ? "text-slate-500" : "text-slate-500"
                               }`}
                             >
@@ -2535,10 +2523,8 @@ const Orderlist = ({
                               type="text"
                               placeholder="e.g. VIP Table, Function Hall"
                               value={customMergeTableName}
-                              onChange={(e) =>
-                                setCustomMergeTableName(e.target.value)
-                              }
-                              className={`w-full rounded-2xl py-4 px-5 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${
+                              onChange={(e) => setCustomMergeTableName(e.target.value)}
+                              className={`w-full rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${
                                 isDark
                                   ? "bg-slate-900/50 border border-slate-800 text-white placeholder:text-slate-500 focus:border-blue-500/40"
                                   : "bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-blue-400"
@@ -2547,14 +2533,14 @@ const Orderlist = ({
                           </div>
 
                           <div
-                            className={`rounded-3xl px-5 py-5 ${
+                            className={`rounded-2xl px-4 py-4 ${
                               isDark
                                 ? "bg-slate-900/40 border border-white/5"
                                 : "bg-slate-50 border border-slate-200"
                             }`}
                           >
                             <p
-                              className={`text-[10px] font-black uppercase tracking-[0.3em] mb-3 ${
+                              className={`text-[10px] font-black uppercase tracking-[0.25em] mb-2 ${
                                 isDark ? "text-slate-500" : "text-slate-500"
                               }`}
                             >
@@ -2562,14 +2548,14 @@ const Orderlist = ({
                             </p>
 
                             <div
-                              className={`rounded-2xl px-4 py-4 ${
+                              className={`rounded-xl px-4 py-3 ${
                                 isDark
                                   ? "bg-slate-950/70 border border-white/5"
                                   : "bg-white border border-slate-200"
                               }`}
                             >
                               <p
-                                className={`text-lg font-bold leading-relaxed ${
+                                className={`text-sm sm:text-base font-bold leading-relaxed ${
                                   isDark ? "text-white" : "text-slate-900"
                                 }`}
                               >
@@ -2580,10 +2566,10 @@ const Orderlist = ({
                         </div>
                       ) : null}
 
-                      <div className="flex gap-3 pt-5">
+                      <div className="flex gap-2 pt-4">
                         <button
                           onClick={resetTransferState}
-                          className={`flex-1 rounded-2xl px-5 py-4 transition-all ${
+                          className={`flex-1 rounded-xl px-4 py-3 text-sm transition-all ${
                             isDark
                               ? "bg-slate-800 text-slate-300 hover:text-white"
                               : "bg-slate-200 text-slate-700 hover:text-slate-900"
@@ -2594,7 +2580,7 @@ const Orderlist = ({
 
                         <button
                           onClick={requestTransferConfirm}
-                          className="flex-1 px-5 py-4 font-bold text-white transition-all bg-blue-600 rounded-2xl hover:bg-blue-500"
+                          className="flex-1 px-4 py-3 text-sm font-bold text-white transition-all bg-blue-600 rounded-xl hover:bg-blue-500"
                         >
                           Confirm Transfer
                         </button>
