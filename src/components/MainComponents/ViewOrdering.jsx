@@ -46,10 +46,41 @@ const ViewOrdering = () => {
   const [selectedCustomTables, setSelectedCustomTables] = useState([]);
   const [transactionId, setTransactionId] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [specialTableName, setSpecialTableName] = useState("");
+  const [customFixedTableName, setCustomFixedTableName] = useState("");
+  const [customMergeTableName, setCustomMergeTableName] = useState("");
 
   const itemsPerPage = 15;
   const apiHost = useApiHost();
+
+  const normalizeTableName = (value) =>
+    String(value || "")
+      .replace(/\s*&\s*/g, " & ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+
+  const buildUniqueTableNames = (tables = []) => {
+    const seen = new Set();
+    const merged = [];
+
+    tables.forEach((tableName) => {
+      const cleanName = String(tableName || "").trim();
+      const normalizedName = normalizeTableName(cleanName);
+
+      if (!cleanName || seen.has(normalizedName)) return;
+
+      seen.add(normalizedName);
+      merged.push(cleanName);
+    });
+
+    return merged.sort((a, b) =>
+      String(a).localeCompare(String(b), undefined, {
+        numeric: true,
+        sensitivity: "base",
+      }),
+    );
+  };
+
 
   const sortFloorTables = (list) => {
     return [...list].sort((a, b) =>
@@ -182,7 +213,8 @@ const resetOrderModal = () => {
   setSelectedCustomTables([]);
   setFixedSearch("");
   setMergeSearch("");
-  setSpecialTableName("");
+  setCustomFixedTableName("");
+  setCustomMergeTableName("");
 };
 
   const toggleCustomTableSelection = (tableName) => {
@@ -203,10 +235,13 @@ const resetOrderModal = () => {
   };
 
   const customTablePreview = useMemo(() => {
-    if (selectedCustomTables.length === 0) return "None";
+    const merged = buildUniqueTableNames([
+      ...selectedCustomTables,
+      customMergeTableName,
+    ]);
 
-    return selectedCustomTables.join(" & ");
-  }, [selectedCustomTables]);
+    return merged.length ? merged.join(" & ") : "None";
+  }, [selectedCustomTables, customMergeTableName]);
 
   const handleOpenOrderModal = () => {
     if (!apiHost) return;
@@ -227,27 +262,24 @@ const handleOpenOrder = () => {
   let value = "";
 
   if (tableMode === "fixed") {
-    if (!selectedFixedTable) {
-      alert("Please select a fixed table.");
-      return;
-    }
-    value = selectedFixedTable;
-  }
+    value = customFixedTableName.trim() || selectedFixedTable;
 
-  else if (tableMode === "custom") {
-    if (selectedCustomTables.length === 0) {
-      alert("Please select at least 1 table to merge.");
+    if (!value) {
+      alert("Please select a fixed table or type a custom table name.");
       return;
     }
-    value = selectedCustomTables.join(" & ");
-  }
+  } else if (tableMode === "custom") {
+    const mergedTables = buildUniqueTableNames([
+      ...selectedCustomTables,
+      customMergeTableName,
+    ]);
 
-  else if (tableMode === "special") {
-    if (!specialTableName.trim()) {
-      alert("Please enter a special table name.");
+    if (mergedTables.length === 0) {
+      alert("Please select at least 1 table to merge or type a custom table name.");
       return;
     }
-    value = specialTableName.trim();
+
+    value = mergedTables.join(" & ");
   }
 
   openOrderList(value, "");
@@ -380,7 +412,7 @@ const handleOpenOrder = () => {
                 isDark ? "text-slate-400" : "text-slate-500"
               }`}
             >
-              Choose fixed table, merge tables, or type a special table name.
+              Choose a fixed table or merge tables. You can also type a custom or special table name inside either option.
             </p>
           </div>
 
@@ -397,7 +429,7 @@ const handleOpenOrder = () => {
         </div>
 
         <div
-          className={`grid grid-cols-3 gap-2 mb-5 p-1.5 rounded-2xl ${
+          className={`grid grid-cols-2 gap-2 mb-5 p-1.5 rounded-2xl ${
             isDark
               ? "bg-slate-900/40 border border-white/5"
               : "bg-slate-100 border border-slate-200"
@@ -427,19 +459,6 @@ const handleOpenOrder = () => {
             }`}
           >
             Merge Table
-          </button>
-
-          <button
-            onClick={() => setTableMode("special")}
-            className={`rounded-2xl px-4 py-3 font-bold transition-all ${
-              tableMode === "special"
-                ? "bg-blue-600 text-white"
-                : isDark
-                  ? "text-slate-400 hover:text-white"
-                  : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            Special Table
           </button>
         </div>
 
@@ -474,7 +493,7 @@ const handleOpenOrder = () => {
               </label>
 
               <div
-                className={`max-h-[300px] overflow-y-auto rounded-3xl p-3 ${
+                className={`max-h-[250px] overflow-y-auto rounded-3xl p-3 ${
                   isDark
                     ? "border border-white/5 bg-slate-900/30"
                     : "border border-slate-200 bg-slate-50"
@@ -581,6 +600,28 @@ const handleOpenOrder = () => {
               </div>
             </div>
 
+            <div>
+              <label
+                className={`block text-[10px] font-black uppercase tracking-[0.3em] mb-3 ${
+                  isDark ? "text-slate-500" : "text-slate-500"
+                }`}
+              >
+                Or Type Custom / Special Table
+              </label>
+
+              <input
+                type="text"
+                placeholder="e.g. VIP Table, Function Hall"
+                value={customFixedTableName}
+                onChange={(e) => setCustomFixedTableName(e.target.value)}
+                className={`w-full rounded-2xl py-4 px-5 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${
+                  isDark
+                    ? "bg-slate-900/50 border border-slate-800 text-white placeholder:text-slate-500 focus:border-blue-500/40"
+                    : "bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-blue-400"
+                }`}
+              />
+            </div>
+
             <div
               className={`rounded-3xl px-5 py-5 ${
                 isDark
@@ -608,12 +649,12 @@ const handleOpenOrder = () => {
                     isDark ? "text-white" : "text-slate-900"
                   }`}
                 >
-                  {selectedFixedTable || "None"}
+                  {customFixedTableName.trim() || selectedFixedTable || "None"}
                 </p>
               </div>
             </div>
           </div>
-        ) : tableMode === "custom" ? (
+        ) : (
           <div className="space-y-5">
             <div className="relative group">
               <FaSearch
@@ -644,7 +685,7 @@ const handleOpenOrder = () => {
               </label>
 
               <div
-                className={`max-h-80 overflow-y-auto rounded-3xl p-3 ${
+               className={`max-h-[250px] overflow-y-auto rounded-3xl p-3 ${
                   isDark
                     ? "border border-white/5 bg-slate-900/30"
                     : "border border-slate-200 bg-slate-50"
@@ -750,54 +791,20 @@ const handleOpenOrder = () => {
               </div>
             </div>
 
-            <div
-              className={`rounded-3xl px-5 py-5 ${
-                isDark
-                  ? "bg-slate-900/40 border border-white/5"
-                  : "bg-slate-50 border border-slate-200"
-              }`}
-            >
-              <p
-                className={`text-[10px] font-black uppercase tracking-[0.3em] mb-3 ${
-                  isDark ? "text-slate-500" : "text-slate-500"
-                }`}
-              >
-                Preview
-              </p>
-
-              <div
-                className={`rounded-2xl px-4 py-4 ${
-                  isDark
-                    ? "bg-slate-950/70 border border-white/5"
-                    : "bg-white border border-slate-200"
-                }`}
-              >
-                <p
-                  className={`text-lg font-bold leading-relaxed ${
-                    isDark ? "text-white" : "text-slate-900"
-                  }`}
-                >
-                  {customTablePreview}
-                </p>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-5">
             <div>
               <label
                 className={`block text-[10px] font-black uppercase tracking-[0.3em] mb-3 ${
                   isDark ? "text-slate-500" : "text-slate-500"
                 }`}
               >
-                Special Table Name
+                Add Custom / Special Table To Merge
               </label>
 
               <input
                 type="text"
-                placeholder="e.g. Special Table, VIP Table, Function Hall"
-                value={specialTableName}
-                onChange={(e) => setSpecialTableName(e.target.value)}
+                placeholder="e.g. VIP Table, Function Hall"
+                value={customMergeTableName}
+                onChange={(e) => setCustomMergeTableName(e.target.value)}
                 className={`w-full rounded-2xl py-4 px-5 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${
                   isDark
                     ? "bg-slate-900/50 border border-slate-800 text-white placeholder:text-slate-500 focus:border-blue-500/40"
@@ -833,7 +840,7 @@ const handleOpenOrder = () => {
                     isDark ? "text-white" : "text-slate-900"
                   }`}
                 >
-                  {specialTableName || "None"}
+                  {customTablePreview}
                 </p>
               </div>
             </div>
