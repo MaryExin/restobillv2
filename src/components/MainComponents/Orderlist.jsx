@@ -142,6 +142,9 @@ const Orderlist = ({
 
   const [isPricingLoading, setIsPricingLoading] = useState(false);
 
+  const makeLineId = (prefix = "LINE") =>
+    `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
   useEffect(() => {
     if (!apiHost) return;
 
@@ -312,7 +315,7 @@ const Orderlist = ({
       tableselected,
       instructions,
       transactionId,
-      isReprint: false,
+      printMode: transactionId ? "additional" : "new",
     });
 
     return printViaElectron({
@@ -330,7 +333,7 @@ const Orderlist = ({
     });
   };
 
-  const handlePrintAllElectron = async () => {
+  const handlePrintAllElectron = async (printMode = "auto") => {
     const html = BuildOrderReceiptHtml({
       productcart: {
         customer: tableselected,
@@ -340,7 +343,7 @@ const Orderlist = ({
       tableselected,
       instructions,
       transactionId,
-      isReprint,
+      printMode,
     });
 
     return printViaElectron({
@@ -546,7 +549,8 @@ const Orderlist = ({
 
         if (!Array.isArray(data.order_details)) return;
 
-        const mappedCart = data.order_details.map((item) => ({
+        const mappedCart = data.order_details.map((item, index) => ({
+          lineId: item.ID ? `db-${item.ID}` : `db-${item.product_id}-${index}`,
           code: item.product_id,
           name: item.item_name || item.product_id,
           price: Number(item.selling_price),
@@ -705,8 +709,8 @@ const Orderlist = ({
     additionalCartItems.length === 0 &&
     !hasLoadedItemsChanged;
 
-  const requestRemoveItem = (code) => {
-    setItemToDelete(code);
+  const requestRemoveItem = (lineId) => {
+    setItemToDelete(lineId);
     setShowDeleteItemModal(true);
   };
 
@@ -744,6 +748,7 @@ const Orderlist = ({
         items: [
           ...prev.items,
           {
+            lineId: makeLineId("new"),
             code: product.product_id,
             name: product.item_name,
             price: Number(product.selling_price) || 0,
@@ -779,6 +784,7 @@ const Orderlist = ({
         items: [
           ...prev.items,
           {
+            lineId: makeLineId("new"),
             code: product.product_id,
             quantity: 1,
             itemInstruction: "",
@@ -790,13 +796,13 @@ const Orderlist = ({
     });
   };
 
-  const updateQuantityByInput = (code, value) => {
+  const updateQuantityByInput = (lineId, value) => {
     if (isCartFromDB) return;
 
     setproductcart((prev) => ({
       ...prev,
       items: prev.items.map((i) =>
-        i.code === code
+        i.lineId === lineId && i.isLoadedFromDB !== true
           ? {
               ...i,
               quantity:
@@ -814,7 +820,7 @@ const Orderlist = ({
     setcartforqr((prev) => ({
       ...prev,
       items: prev.items.map((i) =>
-        i.code === code
+        i.lineId === lineId && i.isLoadedFromDB !== true
           ? {
               ...i,
               quantity:
@@ -830,14 +836,14 @@ const Orderlist = ({
     }));
   };
 
-  const updateQuantity = (code, delta) => {
+  const updateQuantity = (lineId, delta) => {
     if (isCartFromDB) return;
 
     setproductcart((prev) => ({
       ...prev,
       items: prev.items
         .map((i) =>
-          i.code === code
+          i.lineId === lineId && i.isLoadedFromDB !== true
             ? {
                 ...i,
                 quantity: Math.max(1, Number(i.quantity || 1) + delta),
@@ -851,7 +857,7 @@ const Orderlist = ({
       ...prev,
       items: prev.items
         .map((i) =>
-          i.code === code
+          i.lineId === lineId && i.isLoadedFromDB !== true
             ? {
                 ...i,
                 quantity: Math.max(1, Number(i.quantity || 1) + delta),
@@ -862,17 +868,17 @@ const Orderlist = ({
     }));
   };
 
-  const removeItem = (code) => {
+  const removeItem = (lineId) => {
     if (isCartFromDB) return;
 
     setproductcart((prev) => ({
       ...prev,
-      items: prev.items.filter((i) => i.code !== code),
+      items: prev.items.filter((i) => i.lineId !== lineId),
     }));
 
     setcartforqr((prev) => ({
       ...prev,
-      items: prev.items.filter((i) => i.code !== code),
+      items: prev.items.filter((i) => i.lineId !== lineId),
     }));
   };
 
@@ -902,7 +908,8 @@ const Orderlist = ({
     setproductcart((prev) => ({
       ...prev,
       items: prev.items.map((item) =>
-        item.code === selectedInstructionItem.code
+        item.lineId === selectedInstructionItem.lineId &&
+        item.isLoadedFromDB !== true
           ? { ...item, itemInstruction: itemInstructionText }
           : item,
       ),
@@ -911,7 +918,8 @@ const Orderlist = ({
     setcartforqr((prev) => ({
       ...prev,
       items: prev.items.map((item) =>
-        item.code === selectedInstructionItem.code
+        item.lineId === selectedInstructionItem.lineId &&
+        item.isLoadedFromDB !== true
           ? { ...item, itemInstruction: itemInstructionText }
           : item,
       ),
@@ -1221,11 +1229,10 @@ const Orderlist = ({
 
     try {
       setIsPrintingOnly(true);
-      setIsReprint(true);
       setShowqrModal(false);
       setShowConfirmModal(false);
 
-      await handlePrintAllElectron();
+      await handlePrintAllElectron("duplicate");
     } finally {
       setIsPrintingOnly(false);
     }
@@ -1844,7 +1851,7 @@ const Orderlist = ({
               <div className="absolute right-4 top-[10px] z-20 flex flex-row items-center gap-2">
                 <button
                   onClick={() => setShowDesktopCartActions((prev) => !prev)}
-                  className="-mt-3 inline-flex h-10 items-center justify-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-500"
+                  className="inline-flex h-10 items-center justify-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-500"
                 >
                   Save
                 </button>
@@ -1857,8 +1864,8 @@ const Orderlist = ({
                     fullWidth={false}
                     isLoading={isPrintingOnly}
                     disabled={isPrintingOnly}
-                    loadingText="Printing..."
-                    className="h-10 min-w-[44px] px-4 text-sm rounded-xl mb-0"
+                    loadingText=""
+                    className="mt-3 h-10 min-w-[44px] px-4 text-sm rounded-xl mb-0"
                   ></ButtonComponent>
                 )}
               </div>
@@ -1901,7 +1908,7 @@ const Orderlist = ({
                       updateQuantity={updateQuantity}
                       updateQuantityByInput={updateQuantityByInput}
                       removeItem={requestRemoveItem}
-                      readOnly={false}
+                      readOnly={true}
                       openItemInstructionModal={openItemInstructionModal}
                       isDark={isDark}
                     />
@@ -2710,7 +2717,7 @@ const Orderlist = ({
                     updateQuantity={updateQuantity}
                     updateQuantityByInput={updateQuantityByInput}
                     removeItem={removeItem}
-                    readOnly={false}
+                    readOnly={true}
                     openItemInstructionModal={openItemInstructionModal}
                     isDark={isDark}
                   />
@@ -3568,7 +3575,7 @@ const Orderlist = ({
                     isDark ? "text-white" : "text-slate-900"
                   }`}
                 >
-                  Table {tableselected}
+                  {tableselected}
                 </h2>
 
                 <p
@@ -3660,8 +3667,7 @@ const Orderlist = ({
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.05 }}
                         onClick={(e) => {
-                          if (e.target.closest("button")) return;
-                          onBillingTransactionClick(item);
+                          onOpenDiscountModal(item, e);
                         }}
                         className={`group flex items-center justify-between p-4 rounded-2xl transition-all cursor-pointer ${
                           isDark
@@ -3800,7 +3806,7 @@ const CartList = ({
 
         return (
           <div
-            key={`${item.code}-${index}`}
+            key={item.lineId || `${item.code}-${index}`}
             className={`rounded-xl p-3 border transition-colors ${
               isDark
                 ? "bg-white/5 border-white/5"
@@ -3839,7 +3845,7 @@ const CartList = ({
                   </button>
 
                   <button
-                    onClick={() => removeItem?.(item.code)}
+                    onClick={() => removeItem?.(item.lineId)}
                     className={`p-2 transition-colors ${
                       isDark
                         ? "text-slate-500 hover:text-red-400"
@@ -3876,7 +3882,7 @@ const CartList = ({
                     value={item.quantity}
                     onFocus={(e) => e.target.select()}
                     onChange={(e) =>
-                      updateQuantityByInput?.(item.code, e.target.value)
+                      updateQuantityByInput?.(item.lineId, e.target.value)
                     }
                     onBlur={(e) => {
                       const value = e.target.value.trim();
@@ -3885,7 +3891,7 @@ const CartList = ({
                         Number(value) <= 0 ||
                         Number.isNaN(Number(value))
                       ) {
-                        updateQuantityByInput?.(item.code, "1");
+                        updateQuantityByInput?.(item.lineId, "1");
                       }
                     }}
                     className={`w-20 rounded-lg px-3 py-2 text-sm outline-none transition-colors ${
@@ -3904,7 +3910,7 @@ const CartList = ({
                   }`}
                 >
                   <button
-                    onClick={() => updateQuantity?.(item.code, -1)}
+                    onClick={() => updateQuantity?.(item.lineId, -1)}
                     className={`w-7 h-7 flex items-center justify-center rounded-md transition-colors ${
                       isDark
                         ? "text-slate-300 bg-slate-800 hover:bg-slate-700"
@@ -3923,7 +3929,7 @@ const CartList = ({
                   </span>
 
                   <button
-                    onClick={() => updateQuantity?.(item.code, 1)}
+                    onClick={() => updateQuantity?.(item.lineId, 1)}
                     className={`w-7 h-7 flex items-center justify-center rounded-md transition-colors ${
                       isDark
                         ? "text-slate-300 bg-slate-800 hover:bg-slate-700"

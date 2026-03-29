@@ -61,29 +61,30 @@ export function BuildPrintableDiscountReceiptHtml({
             overflow: hidden;
           }
 
-          .print-root {
-            width: 80mm;
-            padding: calc(10px * var(--s)) calc(10px * var(--s));
-            font-size: calc(11px * var(--s));
-            line-height: 1.2;
-          }
+       .print-root {
+          width: 76.5mm;
+          padding: calc(8px * var(--s)) calc(5px * var(--s)) calc(8px * var(--s)) calc(2px * var(--s));
+          font-size: calc(10.5px * var(--s));
+          line-height: 1.18;
+          margin: 0;
+        }
 
           .divider {
             border-top: 1px solid #000;
             margin: calc(8px * var(--s)) 0 calc(7px * var(--s));
           }
 
-          table {
-            width: 100%;
-            border-collapse: collapse;
-            table-layout: fixed;
-            font-size: calc(10px * var(--s));
-          }
-
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          table-layout: fixed;
+          font-size: calc(9.6px * var(--s));
+        }
           td,
           th {
             padding: 0;
             vertical-align: top;
+            line-height: 1.1;
           }
 
           .center {
@@ -144,50 +145,70 @@ export function BuildPrintableDiscountReceiptHtml({
             margin-top: calc(3px * var(--s));
           }
 
-          .amount-due {
-            display: flex;
-            justify-content: space-between;
-            align-items: baseline;
-            gap: calc(8px * var(--s));
-            font-weight: 900;
-            font-size: calc(14px * var(--s));
-          }
+      .label-col {
+          width: 32%;
+          white-space: nowrap;
+          padding-right: 0;
+        }
 
-          .label-col {
-            width: 44%;
-            white-space: nowrap;
-          }
+        .value-col {
+          width: 68%;
+          text-align: right;
+          white-space: nowrap;
+          overflow: visible;
+          padding-right: calc(14px * var(--s));
+          padding-left: 0;
+        }
 
-          .value-col {
-            width: 56%;
-            text-align: right;
-            word-break: break-word;
-            overflow-wrap: break-word;
-          }
+        .amount-due {
+          display: flex;
+          justify-content: space-between;
+          align-items: baseline;
+          gap: calc(4px * var(--s));
+          font-weight: 900;
+          font-size: calc(14px * var(--s));
+        }
 
-          .item-col {
-            width: 42%;
-            word-break: break-word;
-            overflow-wrap: break-word;
-            padding-right: calc(4px * var(--s));
-          }
+        .amount-due-label {
+          white-space: nowrap;
+          flex: 0 0 auto;
+        }
 
-          .qty-col {
-            width: 18%;
-            text-align: center;
-            white-space: nowrap;
-            padding-right: calc(2px * var(--s));
-          }
+        .amount-due-value {
+          white-space: nowrap;
+          text-align: right;
+          padding-right: calc(14px * var(--s));
+          flex: 1 1 auto;
+        }
 
-          .amt-col {
-            width: 40%;
-            text-align: right;
-            white-space: nowrap;
-          }
+      .item-col {
+        width: 44%;
+        word-break: break-word;
+        overflow-wrap: break-word;
+        padding-right: calc(1px * var(--s));
+        padding-left: 0;
+      }
 
-          .item-row td {
-            padding-bottom: calc(2px * var(--s));
-          }
+      .qty-col {
+        width: 8%;
+        text-align: center;
+        white-space: nowrap;
+        padding-right: 0;
+        padding-left: 0;
+      }
+
+      .amt-col {
+        width: 44%;
+        text-align: right;
+        white-space: nowrap;
+        padding-right: calc(12px * var(--s));
+        padding-left: 0;
+      }
+                  
+
+     .item-row td {
+        padding-bottom: calc(1px * var(--s));
+      }
 
           .nowrap {
             white-space: nowrap;
@@ -284,13 +305,20 @@ export function BuildPrintableDiscountReceiptHtml({
                 const price = Number(item.selling_price || 0);
                 const lineTotal = qty * price;
 
+                const isDiscountable =
+                  String(item.isDiscountable || "")
+                    .trim()
+                    .toLowerCase() === "yes";
+
+                const itemLabel = String(
+                  item.item_name || item.product_id || "-",
+                ).toUpperCase();
+
                 return (
                   <tr key={item.ID || index} className="item-row">
                     <td className="item-col">
-                      •{" "}
-                      {String(
-                        item.item_name || item.product_id || "-",
-                      ).toUpperCase()}
+                      • {itemLabel}
+                      {isDiscountable ? " (D)" : ""}
                     </td>
                     <td className="qty-col nowrap">
                       {qty} {item.unit_of_measure || ""}
@@ -338,8 +366,10 @@ export function BuildPrintableDiscountReceiptHtml({
           <div className="divider" />
 
           <div className="amount-due mb-8">
-            <span>AMOUNT DUE:</span>
-            <span>{peso(computed?.netAfterDiscount)}</span>
+            <span className="amount-due-label">AMOUNT DUE:</span>
+            <span className="amount-due-value">
+              {peso(computed?.netAfterDiscount)}
+            </span>
           </div>
 
           <div className="divider" />

@@ -325,39 +325,96 @@ export default function PosReadingModal({
     });
 
   const commonPrintStyles = `
-    <style>
-      @page {
-        size: 80mm auto;
-        margin: 0;
-      }
-      html, body {
-        width: 80mm;
-        margin: 0;
-        padding: 0;
-        background: #fff;
-      }
-      body {
-        font-family: Arial, Helvetica, sans-serif;
-        font-size: 11px;
-        color: #000;
-      }
-      .receipt {
-        width: 72mm;
-        margin: 0 auto;
-        padding: 4mm 2mm 6mm;
-        box-sizing: border-box;
-      }
-      .center { text-align: center; }
-      .title { font-weight: 700; font-size: 14px; line-height: 1.2; }
-      .subtitle { font-size: 10px; line-height: 1.3; }
-      .line { border-top: 1px dashed #000; margin: 6px 0; }
-      table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-      td { padding: 1px 0; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; }
-      .label { width: 62%; }
-      .value { width: 38%; text-align: right; }
-      .strong { font-weight: 700; }
-    </style>
-  `;
+  <style>
+    :root {
+      --s: 1;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    @page {
+      size: 80mm auto;
+      margin: 0;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 80mm;
+      background: #fff;
+      color: #000;
+      font-family: Arial, Helvetica, sans-serif;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    body {
+      overflow: hidden;
+    }
+
+    .receipt {
+      width: 76.5mm;
+      padding: calc(8px * var(--s)) calc(5px * var(--s)) calc(8px * var(--s)) calc(2px * var(--s));
+      font-size: calc(10.5px * var(--s));
+      line-height: 1.18;
+      margin: 0;
+      box-sizing: border-box;
+    }
+
+    .center { text-align: center; }
+
+    .title {
+      font-weight: 900;
+      font-size: calc(15px * var(--s));
+      line-height: 1.15;
+    }
+
+    .subtitle {
+      font-size: calc(10px * var(--s));
+      line-height: 1.3;
+    }
+
+    .line {
+      border-top: 1px solid #000;
+      margin: calc(8px * var(--s)) 0 calc(7px * var(--s));
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: calc(9.6px * var(--s));
+    }
+
+    td, th {
+      padding: 0;
+      vertical-align: top;
+      line-height: 1.1;
+    }
+
+    .label {
+      width: 32%;
+      white-space: nowrap;
+      padding-right: 0;
+      text-align: left;
+    }
+
+    .value {
+      width: 68%;
+      text-align: right;
+      white-space: nowrap;
+      overflow: visible;
+      padding-right: calc(16px * var(--s));
+      padding-left: 0;
+    }
+
+    .strong {
+      font-weight: 700;
+    }
+  </style>
+`;
 
   const buildXPrintHtml = (data) => {
     const otherPaymentsBreakdown = Array.isArray(data?.otherPaymentsBreakdown)
@@ -392,15 +449,19 @@ export default function PosReadingModal({
         <meta charset="utf-8" />
         <title>X Reading</title>
         ${commonPrintStyles}
-        <style>
-          .sublabel {
-            padding-left: 14px;
-            font-size: 11px;
-          }
-          .subvalue {
-            font-size: 11px;
-          }
-        </style>
+      <style>
+        .sublabel {
+          padding-left: calc(14px * var(--s));
+          font-size: calc(9.6px * var(--s));
+        }
+
+        .subvalue {
+          font-size: calc(9.6px * var(--s));
+          text-align: right;
+          white-space: nowrap;
+          padding-right: calc(14px * var(--s));
+        }
+      </style>
       </head>
       <body>
         <div class="receipt">

@@ -19,6 +19,11 @@ export function BuildPosPaymentReceiptHtml({
   isDuplicateCopy = false,
   terminalConfig = {},
 }) {
+  const yesNoToBool = (value) =>
+    String(value || "")
+      .trim()
+      .toLowerCase() === "yes";
+
   const safeTransaction = transaction || {};
   const safeItems = Array.isArray(items) ? items : [];
   const safePayments = Array.isArray(payments) ? payments : [];
@@ -61,6 +66,13 @@ export function BuildPosPaymentReceiptHtml({
     Number(computed?.statutoryQualifiedCount || 0) > 0 ||
     activeBreakdown.length > 0;
 
+  const MetaColGroup = () => (
+    <colgroup>
+      <col style={{ width: "32%" }} />
+      <col style={{ width: "68%" }} />
+    </colgroup>
+  );
+
   const receipt = (
     <html>
       <head>
@@ -70,6 +82,10 @@ export function BuildPosPaymentReceiptHtml({
           {isDuplicateCopy ? "duplicate-invoice" : "invoice"}
         </title>
         <style>{`
+          :root {
+            --s: 1;
+          }
+
           * {
             box-sizing: border-box;
           }
@@ -78,6 +94,7 @@ export function BuildPosPaymentReceiptHtml({
           body {
             margin: 0;
             padding: 0;
+            width: 80mm;
             background: #ffffff;
             color: #000000;
             font-family: Arial, Helvetica, sans-serif;
@@ -86,30 +103,31 @@ export function BuildPosPaymentReceiptHtml({
           }
 
           body {
-            width: 80mm;
+            overflow: hidden;
           }
 
           .print-root {
-            width: 80mm;
-            min-height: auto;
+            width: 76.5mm;
+            padding: calc(8px * var(--s)) calc(5px * var(--s)) calc(8px * var(--s)) calc(2px * var(--s));
+            font-size: calc(10.5px * var(--s));
+            line-height: 1.18;
+            margin: 0;
             background: #ffffff;
             color: #000000;
-            padding: 14px 29px;
-            font-family: Arial, Helvetica, sans-serif;
-            font-size: 11px;
-            line-height: 1.25;
           }
 
           table {
             width: 100%;
             border-collapse: collapse;
             table-layout: fixed;
+            font-size: calc(9.6px * var(--s));
           }
 
           td,
           th {
             padding: 0;
             vertical-align: top;
+            line-height: 1.1;
           }
 
           .center {
@@ -134,102 +152,145 @@ export function BuildPosPaymentReceiptHtml({
 
           .header-title {
             font-weight: 900;
-            font-size: 15px;
+            font-size: calc(15px * var(--s));
             line-height: 1.15;
           }
 
           .sub-title {
             font-weight: 700;
-            font-size: 12px;
-            margin-top: 2px;
+            font-size: calc(12px * var(--s));
+            margin-top: calc(2px * var(--s));
           }
 
           .small {
-            font-size: 10px;
+            font-size: calc(10px * var(--s));
           }
 
           .invoice-title {
             text-align: center;
             font-weight: 900;
-            font-size: 14px;
-            margin-bottom: 4px;
+            font-size: calc(14px * var(--s));
+            margin-bottom: calc(4px * var(--s));
           }
 
           .duplicate-copy {
             text-align: center;
             font-weight: 900;
-            font-size: 11px;
-            margin-bottom: 8px;
+            font-size: calc(11px * var(--s));
+            margin-bottom: calc(8px * var(--s));
           }
 
           .divider {
             border-top: 1px solid #000;
-            margin: 10px 0 8px;
+            margin: calc(8px * var(--s)) 0 calc(7px * var(--s));
           }
 
           .divider-tight {
             border-top: 1px solid #000;
-            margin: 8px 0 6px;
+            margin: calc(8px * var(--s)) 0 calc(6px * var(--s));
           }
 
+          .meta-table th,
           .meta-table td {
-            font-size: 10px;
-            padding: 1px 0;
+            font-size: calc(9.6px * var(--s));
           }
+
+          .meta-table th {
+            padding-bottom: calc(4px * var(--s));
+          }
+
+            .label-col {
+          width: 38%;
+          white-space: normal;
+          word-break: break-word;
+          overflow-wrap: anywhere;
+          padding-right: calc(4px * var(--s));
+        }
+
+        .value-col {
+          width: 62%;
+          text-align: right;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: clip;
+          padding-right: calc(12px * var(--s));
+          padding-left: 0;
+        }
 
           .item-table th,
           .item-table td {
-            font-size: 10px;
-            padding: 2px 0;
+            font-size: calc(9.6px * var(--s));
           }
 
           .item-table th {
-            padding-bottom: 4px;
+            padding-bottom: calc(4px * var(--s));
           }
 
           .item-col {
-            width: 46%;
+            width: 44%;
             text-align: left;
             word-break: break-word;
             overflow-wrap: break-word;
+            padding-right: calc(1px * var(--s));
+            padding-left: 0;
           }
 
           .qty-col {
-            width: 22%;
+            width: 8%;
             text-align: center;
             white-space: nowrap;
+            padding-right: 0;
+            padding-left: 0;
           }
 
           .amt-col {
-            width: 32%;
+            width: 44%;
             text-align: right;
             white-space: nowrap;
+            padding-right: calc(16px * var(--s));
+            padding-left: 0;
+          }
+
+          .item-row td {
+            padding-bottom: calc(1px * var(--s));
           }
 
           .amount-due {
             display: flex;
             justify-content: space-between;
             align-items: baseline;
+            gap: calc(4px * var(--s));
             font-weight: 900;
-            font-size: 14px;
-            margin-bottom: 8px;
+            font-size: calc(16px * var(--s));
+          }
+
+          .amount-due-label {
+            white-space: nowrap;
+            flex: 0 0 auto;
+          }
+
+          .amount-due-value {
+            white-space: nowrap;
+            text-align: right;
+            padding-right: calc(16px * var(--s));
+            flex: 1 1 auto;
           }
 
           .customer-section-title {
-            font-size: 10px;
+            font-size: calc(10px * var(--s));
             font-weight: 700;
-            margin-bottom: 4px;
+            margin-bottom: calc(4px * var(--s));
           }
 
           .thanks {
             text-align: center;
-            font-size: 10px;
+            font-size: calc(10px * var(--s));
           }
 
           .supplier-block {
-            margin-top: 10px;
+            margin-top: calc(10px * var(--s));
             text-align: center;
-            font-size: 10px;
+            font-size: calc(10px * var(--s));
           }
 
           .supplier-block .bold {
@@ -280,50 +341,55 @@ export function BuildPosPaymentReceiptHtml({
           ) : null}
 
           <table className="meta-table">
+            <MetaColGroup />
             <tbody>
               <tr>
-                <td className="bold">Trans. No.:</td>
-                <td className="right">
+                <td className="bold label-col">Trans. No.:</td>
+                <td className="value-col">
                   {safeTransaction?.transaction_id || "-"}
                 </td>
               </tr>
               <tr>
-                <td className="bold">INV#:</td>
-                <td className="right">{safeTransaction?.invoice_no || "-"}</td>
+                <td className="bold label-col">INV#:</td>
+                <td className="value-col">
+                  {safeTransaction?.invoice_no || "-"}
+                </td>
               </tr>
               <tr>
-                <td className="bold">Trans. Date:</td>
-                <td className="right">
+                <td className="bold label-col">Trans. Date:</td>
+                <td className="value-col">
                   {safeTransaction?.transaction_date || "-"}
                 </td>
               </tr>
               <tr>
-                <td className="bold">Trans. Time:</td>
-                <td className="right">
+                <td className="bold label-col">Trans. Time:</td>
+                <td className="value-col">
                   {safeTransaction?.transaction_time || "-"}
                 </td>
               </tr>
               <tr>
-                <td className="bold">Terminal No.:</td>
-                <td className="right">
+                <td className="bold label-col">Terminal No.:</td>
+                <td className="value-col">
                   {safeTransaction?.terminal_number ||
                     terminalConfig?.terminalNumber ||
                     "-"}
                 </td>
               </tr>
               <tr>
-                <td className="bold">Order Type:</td>
-                <td className="right">{safeTransaction?.order_type || "-"}</td>
+                <td className="bold label-col">Order Type:</td>
+                <td className="value-col">
+                  {safeTransaction?.order_type || "-"}
+                </td>
               </tr>
               <tr>
-                <td className="bold">Ref./Tag #:</td>
-                <td className="right">
+                <td className="bold label-col">Ref./Tag #:</td>
+                <td className="value-col">
                   {safeTransaction?.table_number || "-"}
                 </td>
               </tr>
               <tr>
-                <td className="bold">Cashier:</td>
-                <td className="right">{safeTransaction?.cashier || "-"}</td>
+                <td className="bold label-col">Cashier:</td>
+                <td className="value-col">{safeTransaction?.cashier || "-"}</td>
               </tr>
             </tbody>
           </table>
@@ -344,13 +410,16 @@ export function BuildPosPaymentReceiptHtml({
                 const price = Number(item.selling_price || 0);
                 const lineTotal = qty * price;
 
+                const isDiscountable = yesNoToBool(item.isDiscountable);
+                const itemLabel = String(
+                  item.item_name || item.product_id || "-",
+                ).toUpperCase();
+
                 return (
-                  <tr key={item.ID || index}>
+                  <tr key={item.ID || index} className="item-row">
                     <td className="item-col">
-                      •{" "}
-                      {String(
-                        item.item_name || item.product_id || "-",
-                      ).toUpperCase()}
+                      • {itemLabel}
+                      {isDiscountable ? " (D)" : ""}
                     </td>
                     <td className="qty-col">
                       {qty} {item.unit_of_measure || ""}
@@ -365,19 +434,20 @@ export function BuildPosPaymentReceiptHtml({
           <div className="divider" />
 
           <table className="meta-table">
+            <MetaColGroup />
             <tbody>
               <tr>
-                <td className="bold">TOTAL SALES:</td>
-                <td className="right">{peso(computed?.grossTotal)}</td>
+                <td className="bold label-col">TOTAL SALES:</td>
+                <td className="value-col">{peso(computed?.grossTotal)}</td>
               </tr>
 
               {activeBreakdown.map((entry) =>
                 Number(entry?.discountAmount || 0) > 0 ? (
                   <tr key={entry.key}>
-                    <td className="bold">
+                    <td className="bold label-col">
                       {String(entry?.label || "DISCOUNT").toUpperCase()}:
                     </td>
-                    <td className="right">
+                    <td className="value-col">
                       {signedNegativePeso(entry?.discountAmount)}
                     </td>
                   </tr>
@@ -386,8 +456,8 @@ export function BuildPosPaymentReceiptHtml({
 
               {Number(computed?.totalVatExemption || 0) > 0 ? (
                 <tr>
-                  <td className="bold">VAT EXEMPTION:</td>
-                  <td className="right">
+                  <td className="bold label-col">VAT EXEMPTION:</td>
+                  <td className="value-col">
                     {signedNegativePeso(computed?.totalVatExemption)}
                   </td>
                 </tr>
@@ -395,11 +465,11 @@ export function BuildPosPaymentReceiptHtml({
 
               {safeOtherCharges.map((charge, index) => (
                 <tr key={`${charge.particulars}-${index}`}>
-                  <td className="bold">
+                  <td className="bold label-col">
                     {String(charge.particulars || "OTHER CHARGE").toUpperCase()}
                     :
                   </td>
-                  <td className="right">{peso(charge.amount)}</td>
+                  <td className="value-col">{peso(charge.amount)}</td>
                 </tr>
               ))}
             </tbody>
@@ -408,19 +478,24 @@ export function BuildPosPaymentReceiptHtml({
           <div className="divider-tight" />
 
           <div className="amount-due">
-            <span>AMOUNT DUE:</span>
-            <span>{peso(computed?.totalAmountDue)}</span>
+            <span className="amount-due-label">AMOUNT DUE:</span>
+            <span className="amount-due-value">
+              {peso(computed?.totalAmountDue)}
+            </span>
           </div>
 
+          <div className="divider-tight" />
+
           <table className="meta-table">
+            <MetaColGroup />
             <tbody>
               <tr>
-                <td className="bold">PAYMENT ({paymentLabel}):</td>
-                <td className="right">{peso(computed?.totalPaid)}</td>
+                <td className="bold label-col">PAYMENT ({paymentLabel}):</td>
+                <td className="value-col">{peso(computed?.totalPaid)}</td>
               </tr>
               <tr>
-                <td className="bold">CHANGE:</td>
-                <td className="right">{peso(computed?.changeAmount)}</td>
+                <td className="bold label-col">CHANGE:</td>
+                <td className="value-col">{peso(computed?.changeAmount)}</td>
               </tr>
             </tbody>
           </table>
@@ -428,26 +503,31 @@ export function BuildPosPaymentReceiptHtml({
           <div className="divider-tight" />
 
           <table className="meta-table">
+            <MetaColGroup />
             <tbody>
               <tr>
-                <td className="bold">VATABLE SALES:</td>
-                <td className="right">{peso(computed?.vatableSales)}</td>
+                <td className="bold label-col">VATABLE SALES:</td>
+                <td className="value-col">{peso(computed?.vatableSales)}</td>
               </tr>
               <tr>
-                <td className="bold">VAT AMOUNT:</td>
-                <td className="right">{peso(computed?.vatableSalesVat)}</td>
+                <td className="bold label-col">VAT AMOUNT:</td>
+                <td className="value-col">{peso(computed?.vatableSalesVat)}</td>
               </tr>
               <tr>
-                <td className="bold">VAT EXEMPT SALES:</td>
-                <td className="right">{peso(computed?.vatExemptSales)}</td>
+                <td className="bold label-col">VAT EXEMPT SALES:</td>
+                <td className="value-col">{peso(computed?.vatExemptSales)}</td>
               </tr>
               <tr>
-                <td className="bold">VAT EXEMPTION:</td>
-                <td className="right">{peso(computed?.totalVatExemption)}</td>
+                <td className="bold label-col">VAT EXEMPTION:</td>
+                <td className="value-col">
+                  {peso(computed?.totalVatExemption)}
+                </td>
               </tr>
               <tr>
-                <td className="bold">ZERO RATED SALES:</td>
-                <td className="right">{peso(computed?.vatZeroRatedSales)}</td>
+                <td className="bold label-col">ZERO RATED SALES:</td>
+                <td className="value-col">
+                  {peso(computed?.vatZeroRatedSales)}
+                </td>
               </tr>
             </tbody>
           </table>
@@ -457,17 +537,18 @@ export function BuildPosPaymentReceiptHtml({
               <div className="divider" />
 
               <table className="meta-table">
+                <MetaColGroup />
                 <tbody>
                   <tr>
-                    <td className="bold">Total Customers:</td>
-                    <td className="right">
+                    <td className="bold label-col">Total Customers:</td>
+                    <td className="value-col">
                       {Number(computed?.safeCustomerCount || 0)}
                     </td>
                   </tr>
 
                   <tr>
-                    <td className="bold">Total Qualified:</td>
-                    <td className="right">
+                    <td className="bold label-col">Total Qualified:</td>
+                    <td className="value-col">
                       {Number(
                         computed?.totalQualifiedCount ||
                           computed?.totalQualifiedAll ||
@@ -479,31 +560,35 @@ export function BuildPosPaymentReceiptHtml({
                   {activeBreakdown.map((entry) => (
                     <React.Fragment key={`summary-${entry.key}`}>
                       <tr>
-                        <td className="bold">{getDiscountCountLabel(entry)}</td>
-                        <td className="right">
+                        <td className="bold label-col">
+                          {getDiscountCountLabel(entry)}
+                        </td>
+                        <td className="value-col">
                           {Number(entry?.qualifiedCount || 0)}
                         </td>
                       </tr>
 
                       <tr>
-                        <td className="bold">
+                        <td className="bold label-col">
                           {getDiscountAmountLabel(entry)}
                         </td>
-                        <td className="right">{peso(entry?.discountAmount)}</td>
+                        <td className="value-col">
+                          {peso(entry?.discountAmount)}
+                        </td>
                       </tr>
                     </React.Fragment>
                   ))}
 
                   <tr>
-                    <td className="bold">Discountable Gross:</td>
-                    <td className="right">
+                    <td className="bold label-col">Discountable Gross:</td>
+                    <td className="value-col">
                       {peso(computed?.discountableGross)}
                     </td>
                   </tr>
 
                   <tr>
-                    <td className="bold">Discountable Base:</td>
-                    <td className="right">
+                    <td className="bold label-col">Discountable Base:</td>
+                    <td className="value-col">
                       {peso(computed?.discountableBase)}
                     </td>
                   </tr>
@@ -526,22 +611,21 @@ export function BuildPosPaymentReceiptHtml({
                   className="meta-table"
                   style={{ marginBottom: "6px" }}
                 >
+                  <MetaColGroup />
                   <tbody>
                     <tr>
-                      <td>{card.customer_name || ""}</td>
-                    </tr>
-
-                    <tr>
-                      <td className="bold">Name:</td>
-                      <td>{card.customer_name || ""}</td>
+                      <td className="label-col bold">Name:</td>
+                      <td className="value-col">{card.customer_name || ""}</td>
                     </tr>
                     <tr>
-                      <td className="bold">ID:</td>
-                      <td>{card.customer_exclusive_id || ""}</td>
+                      <td className="label-col bold">ID:</td>
+                      <td className="value-col">
+                        {card.customer_exclusive_id || ""}
+                      </td>
                     </tr>
                     <tr>
-                      <td className="bold">Signature:</td>
-                      <td></td>
+                      <td className="label-col bold">Signature:</td>
+                      <td className="value-col"></td>
                     </tr>
                   </tbody>
                 </table>
