@@ -123,7 +123,8 @@ const Orderlist = ({
   const [transferSearch, setTransferSearch] = useState("");
   const [selectedTransferTable, setSelectedTransferTable] = useState("");
   const [selectedMergeTables, setSelectedMergeTables] = useState([]);
-  const [specialTransferTableName, setSpecialTransferTableName] = useState("");
+  const [customTransferTableName, setCustomTransferTableName] = useState("");
+  const [customMergeTableName, setCustomMergeTableName] = useState("");
   const [transferTableList, setTransferTableList] = useState([]);
   const [transferLoading, setTransferLoading] = useState(false);
 
@@ -613,27 +614,11 @@ const Orderlist = ({
       .filter(Boolean);
   }, [tableselected]);
 
-  const filteredTransferTables = useMemo(() => {
-    const currentTableSet = new Set(
-      currentTableParts.map((item) => normalizeTableName(item)),
-    );
-
-    return (transferTableList || []).filter((table) => {
-      const rawTableName = table.table_name || "";
-      const normalizedTableName = normalizeTableName(rawTableName);
-
-      return (
-        normalizedTableName.includes(normalizeTableName(transferSearch)) &&
-        !currentTableSet.has(normalizedTableName)
-      );
-    });
-  }, [transferTableList, transferSearch, currentTableParts]);
-
-  const mergePreview = useMemo(() => {
-    const merged = [];
+  const buildUniqueTableNames = (tables = []) => {
     const seen = new Set();
+    const merged = [];
 
-    const addTable = (tableName) => {
+    tables.forEach((tableName) => {
       const cleanName = String(tableName || "").trim();
       const normalizedName = normalizeTableName(cleanName);
 
@@ -641,13 +626,56 @@ const Orderlist = ({
 
       seen.add(normalizedName);
       merged.push(cleanName);
-    };
+    });
 
-    currentTableParts.forEach(addTable);
-    selectedMergeTables.forEach(addTable);
+    return merged.sort((a, b) =>
+      String(a).localeCompare(String(b), undefined, {
+        numeric: true,
+        sensitivity: "base",
+      }),
+    );
+  };
+
+  const filteredTransferTables = useMemo(() => {
+    return (transferTableList || []).filter((table) => {
+      const rawTableName = table.table_name || "";
+      const normalizedTableName = normalizeTableName(rawTableName);
+
+      return normalizedTableName.includes(normalizeTableName(transferSearch));
+    });
+  }, [transferTableList, transferSearch]);
+
+  const mergeSelectableTables = useMemo(() => {
+    const baseTables = Array.isArray(filteredTransferTables)
+      ? [...filteredTransferTables]
+      : [];
+
+    currentTableParts.forEach((tableName, index) => {
+      const exists = baseTables.some(
+        (table) =>
+          normalizeTableName(table?.table_name || "") ===
+          normalizeTableName(tableName),
+      );
+
+      if (!exists) {
+        baseTables.unshift({
+          ID: `current-table-${index}-${tableName}`,
+          table_name: tableName,
+        });
+      }
+    });
+
+    return baseTables;
+  }, [filteredTransferTables, currentTableParts]);
+
+  const mergePreview = useMemo(() => {
+    const merged = buildUniqueTableNames([
+      ...selectedMergeTables,
+      customMergeTableName,
+    ]);
 
     return merged.length ? merged.join(" & ") : "None";
-  }, [currentTableParts, selectedMergeTables]);
+  }, [selectedMergeTables, customMergeTableName]);
 
   const cartSummaryItems = productcart.items;
   const isCartFromDB = false;
@@ -1311,12 +1339,17 @@ const Orderlist = ({
     0,
   );
 
+  const seedCurrentMergeTables = () => {
+    setSelectedMergeTables(buildUniqueTableNames(currentTableParts));
+  };
+
   const resetTransferState = () => {
     setShowTransferModal(false);
     setTransferSearch("");
     setSelectedTransferTable("");
     setSelectedMergeTables([]);
-    setSpecialTransferTableName("");
+    setCustomTransferTableName("");
+    setCustomMergeTableName("");
     setTransferTableList([]);
     setTransferLoading(false);
     setShowTransferConfirmModal(false);
@@ -1332,8 +1365,9 @@ const Orderlist = ({
       setShowTransferModal(true);
       setTransferSearch("");
       setSelectedTransferTable("");
-      setSelectedMergeTables([]);
-      setSpecialTransferTableName("");
+      setSelectedMergeTables(buildUniqueTableNames(currentTableParts));
+      setCustomTransferTableName("");
+      setCustomMergeTableName("");
       setTransferMode("fixed");
 
       const response = await fetch(`${apiHost}/api/master_table_list.php`);
@@ -1355,22 +1389,20 @@ const Orderlist = ({
     }
 
     if (transferMode === "fixed") {
-      if (!selectedTransferTable) {
-        alert("Please select a fixed table.");
+      if (!(customTransferTableName.trim() || selectedTransferTable)) {
+        alert("Please select a fixed table or type a custom table name.");
         return;
       }
     }
 
     if (transferMode === "merge") {
-      if (selectedMergeTables.length === 0) {
-        alert("Please select at least one table to merge.");
-        return;
-      }
-    }
+      const mergedTables = buildUniqueTableNames([
+        ...selectedMergeTables,
+        customMergeTableName,
+      ]);
 
-    if (transferMode === "special") {
-      if (!specialTransferTableName.trim()) {
-        alert("Please enter a special table name.");
+      if (mergedTables.length === 0) {
+        alert("Please select at least one table to merge or type a custom table name.");
         return;
       }
     }
@@ -1379,36 +1411,7 @@ const Orderlist = ({
   };
 
   const toggleMergeTableSelection = (tableName) => {
-    setSelectedMergeTables((prev) => {
-      const exists = prev.includes(tableName);
-
-      if (exists) {
-        return prev.filter((item) => item !== tableName);
-      }
-
-      return [...prev, tableName].sort((a, b) =>
-        String(a).localeCompare(String(b), undefined, {
-          numeric: true,
-          sensitivity: "base",
-        }),
-      );
-    });
-  };
-
-  const mergeTablePreview = useMemo(() => {
-    if (selectedMergeTables.length === 0) return "None";
-    return selectedMergeTables.join(" & ");
-  }, [selectedMergeTables]);
-
-  const toggleMergeTable = (tableName) => {
     const normalizedIncoming = normalizeTableName(tableName);
-    const currentTableSet = new Set(
-      currentTableParts.map((item) => normalizeTableName(item)),
-    );
-
-    if (currentTableSet.has(normalizedIncoming)) {
-      return;
-    }
 
     setSelectedMergeTables((prev) => {
       const exists = prev.some(
@@ -1421,14 +1424,18 @@ const Orderlist = ({
         );
       }
 
-      return [...prev, tableName].sort((a, b) =>
-        String(a).localeCompare(String(b), undefined, {
-          numeric: true,
-          sensitivity: "base",
-        }),
-      );
+      return buildUniqueTableNames([...prev, tableName]);
     });
   };
+
+  const mergeTablePreview = useMemo(() => {
+    const merged = buildUniqueTableNames([
+      ...selectedMergeTables,
+      customMergeTableName,
+    ]);
+
+    return merged.length ? merged.join(" & ") : "None";
+  }, [selectedMergeTables, customMergeTableName]);
 
   const handleConfirmTransferTable = async () => {
     if (isTransferringTable) return;
@@ -1442,17 +1449,16 @@ const Orderlist = ({
       let finalTransactionType = "";
 
       if (transferMode === "fixed") {
-        finalTableValue = selectedTransferTable;
+        finalTableValue = customTransferTableName.trim() || selectedTransferTable;
         finalRemarks = `Transferred from table ${tableselected} to ${finalTableValue}`;
         finalTransactionType = "TRANSFER TABLE";
       } else if (transferMode === "merge") {
-        finalTableValue = selectedMergeTables.join(" & ");
+        finalTableValue = buildUniqueTableNames([
+          ...selectedMergeTables,
+          customMergeTableName,
+        ]).join(" & ");
         finalRemarks = `Merged table ${tableselected} to ${finalTableValue}`;
         finalTransactionType = "MERGE TABLE";
-      } else if (transferMode === "special") {
-        finalTableValue = specialTransferTableName.trim();
-        finalRemarks = `Transferred from table ${tableselected} to ${finalTableValue}`;
-        finalTransactionType = "TRANSFER TABLE";
       }
 
       if (!finalTableValue) {
@@ -2165,7 +2171,7 @@ const Orderlist = ({
                       </div>
 
                       <div
-                        className={`grid grid-cols-3 gap-2 mb-5 p-1.5 rounded-2xl ${
+                        className={`grid grid-cols-2 gap-2 mb-5 p-1.5 rounded-2xl ${
                           isDark
                             ? "bg-slate-900/40 border border-white/5"
                             : "bg-slate-100 border border-slate-200"
@@ -2185,7 +2191,10 @@ const Orderlist = ({
                         </button>
 
                         <button
-                          onClick={() => setTransferMode("merge")}
+                          onClick={() => {
+                            setTransferMode("merge");
+                            seedCurrentMergeTables();
+                          }}
                           className={`rounded-2xl px-4 py-3 font-bold transition-all ${
                             transferMode === "merge"
                               ? "bg-blue-600 text-white"
@@ -2195,19 +2204,6 @@ const Orderlist = ({
                           }`}
                         >
                           Merge Table
-                        </button>
-
-                        <button
-                          onClick={() => setTransferMode("special")}
-                          className={`rounded-2xl px-4 py-3 font-bold transition-all ${
-                            transferMode === "special"
-                              ? "bg-blue-600 text-white"
-                              : isDark
-                                ? "text-slate-400 hover:text-white"
-                                : "text-slate-600 hover:text-slate-900"
-                          }`}
-                        >
-                          Special Table
                         </button>
                       </div>
 
@@ -2244,7 +2240,7 @@ const Orderlist = ({
                             </label>
 
                             <div
-                              className={`max-h-[300px] overflow-y-auto rounded-3xl p-3 ${
+                              className={`max-h-[250px] overflow-y-auto rounded-3xl p-3 ${
                                 isDark
                                   ? "border border-white/5 bg-slate-900/30"
                                   : "border border-slate-200 bg-slate-50"
@@ -2343,6 +2339,30 @@ const Orderlist = ({
                             </div>
                           </div>
 
+                          <div>
+                            <label
+                              className={`block text-[10px] font-black uppercase tracking-[0.3em] mb-3 ${
+                                isDark ? "text-slate-500" : "text-slate-500"
+                              }`}
+                            >
+                              Or Type Custom / Special Table
+                            </label>
+
+                            <input
+                              type="text"
+                              placeholder="e.g. VIP Table, Function Hall"
+                              value={customTransferTableName}
+                              onChange={(e) =>
+                                setCustomTransferTableName(e.target.value)
+                              }
+                              className={`w-full rounded-2xl py-4 px-5 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${
+                                isDark
+                                  ? "bg-slate-900/50 border border-slate-800 text-white placeholder:text-slate-500 focus:border-blue-500/40"
+                                  : "bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-blue-400"
+                              }`}
+                            />
+                          </div>
+
                           <div
                             className={`rounded-3xl px-5 py-5 ${
                               isDark
@@ -2370,7 +2390,7 @@ const Orderlist = ({
                                   isDark ? "text-white" : "text-slate-900"
                                 }`}
                               >
-                                {selectedTransferTable || "None"}
+                                {customTransferTableName.trim() || selectedTransferTable || "None"}
                               </p>
                             </div>
                           </div>
@@ -2408,28 +2428,24 @@ const Orderlist = ({
                             </label>
 
                             <div
-                              className={`max-h-80 overflow-y-auto rounded-3xl p-3 ${
+                            className={`max-h-[250px] overflow-y-auto rounded-3xl p-3 ${
                                 isDark
                                   ? "border border-white/5 bg-slate-900/30"
                                   : "border border-slate-200 bg-slate-50"
                               }`}
                             >
-                              {transferTableList.filter((table) =>
-                                String(table.table_name || "")
-                                  .toLowerCase()
-                                  .includes(transferSearch.toLowerCase()),
-                              ).length > 0 ? (
+                              {mergeSelectableTables.length > 0 ? (
                                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                                  {transferTableList
-                                    .filter((table) =>
-                                      String(table.table_name || "")
-                                        .toLowerCase()
-                                        .includes(transferSearch.toLowerCase()),
-                                    )
-                                    .map((table) => {
+                                  {mergeSelectableTables.map((table) => {
                                       const tableName = table.table_name;
-                                      const isSelected =
-                                        selectedMergeTables.includes(tableName);
+                                      const isSelected = selectedMergeTables.some(
+                                        (item) =>
+                                          normalizeTableName(item) === normalizeTableName(tableName),
+                                      );
+                                      const isCurrentTable = currentTableParts.some(
+                                        (item) =>
+                                          normalizeTableName(item) === normalizeTableName(tableName),
+                                      );
 
                                       return (
                                         <button
@@ -2461,7 +2477,7 @@ const Orderlist = ({
                                                       : "text-slate-400"
                                                 }`}
                                               >
-                                                Table
+                                                {isCurrentTable ? "Current Table" : "Table"}
                                               </p>
                                               <p className="text-base font-extrabold leading-tight break-words">
                                                 {tableName}
@@ -2506,55 +2522,21 @@ const Orderlist = ({
                             </div>
                           </div>
 
-                          <div
-                            className={`rounded-3xl px-5 py-5 ${
-                              isDark
-                                ? "bg-slate-900/40 border border-white/5"
-                                : "bg-slate-50 border border-slate-200"
-                            }`}
-                          >
-                            <p
-                              className={`text-[10px] font-black uppercase tracking-[0.3em] mb-3 ${
-                                isDark ? "text-slate-500" : "text-slate-500"
-                              }`}
-                            >
-                              Preview
-                            </p>
-
-                            <div
-                              className={`rounded-2xl px-4 py-4 ${
-                                isDark
-                                  ? "bg-slate-950/70 border border-white/5"
-                                  : "bg-white border border-slate-200"
-                              }`}
-                            >
-                              <p
-                                className={`text-lg font-bold leading-relaxed ${
-                                  isDark ? "text-white" : "text-slate-900"
-                                }`}
-                              >
-                                {mergeTablePreview}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-5">
                           <div>
                             <label
                               className={`block text-[10px] font-black uppercase tracking-[0.3em] mb-3 ${
                                 isDark ? "text-slate-500" : "text-slate-500"
                               }`}
                             >
-                              Special Table Name
+                              Add Custom / Special Table To Merge
                             </label>
 
                             <input
                               type="text"
                               placeholder="e.g. VIP Table, Function Hall"
-                              value={specialTransferTableName}
+                              value={customMergeTableName}
                               onChange={(e) =>
-                                setSpecialTransferTableName(e.target.value)
+                                setCustomMergeTableName(e.target.value)
                               }
                               className={`w-full rounded-2xl py-4 px-5 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${
                                 isDark
@@ -2591,12 +2573,12 @@ const Orderlist = ({
                                   isDark ? "text-white" : "text-slate-900"
                                 }`}
                               >
-                                {specialTransferTableName || "None"}
+                                {mergeTablePreview}
                               </p>
                             </div>
                           </div>
                         </div>
-                      )}
+                      ) : null}
 
                       <div className="flex gap-3 pt-5">
                         <button
@@ -2633,7 +2615,7 @@ const Orderlist = ({
                     message={
                       transferMode === "merge"
                         ? `Are you sure you want to update this transaction table into ${mergePreview}?`
-                        : `Are you sure you want to transfer this order from ${tableselected} to ${selectedTransferTable}?`
+                        : `Are you sure you want to transfer this order from ${tableselected} to ${customTransferTableName.trim() || selectedTransferTable}?`
                     }
                     setYesNoModalOpen={setShowTransferConfirmModal}
                     triggerYesNoEvent={handleConfirmTransferTable}
