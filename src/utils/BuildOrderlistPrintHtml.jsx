@@ -15,7 +15,7 @@ export function BuildOrderReceiptHtml({
   tableselected,
   instructions,
   transactionId,
-  isReprint,
+  printMode = "auto",
 }) {
   let cartItems = [];
 
@@ -35,6 +35,10 @@ export function BuildOrderReceiptHtml({
         <meta charSet="UTF-8" />
         <title>Order Summary</title>
         <style>{`
+          :root {
+            --s: 0.85;
+          }
+
           * {
             box-sizing: border-box;
           }
@@ -43,44 +47,168 @@ export function BuildOrderReceiptHtml({
           body {
             margin: 0;
             padding: 0;
+            width: 80mm;
             background: #ffffff;
             color: #000000;
-            font-family: monospace;
+            font-family: Arial, Helvetica, sans-serif;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
           }
 
           body {
-            width: 80mm;
+            overflow: hidden;
           }
 
           .print-root {
-            width: 80mm;
-            min-height: 100vh;
+            width: 76.5mm;
+            padding: calc(8px * var(--s)) calc(5px * var(--s)) calc(8px * var(--s)) calc(2px * var(--s));
+            font-size: calc(10.5px * var(--s));
+            line-height: 1.18;
+            margin: 0;
             background: #ffffff;
             color: #000000;
-            padding: 16px;
-            font-size: 12px;
           }
 
-          .text-center {
+          .divider {
+            border-top: 1px solid #000;
+            margin: calc(8px * var(--s)) 0 calc(7px * var(--s));
+          }
+
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            font-size: calc(9.6px * var(--s));
+          }
+
+          th,
+          td {
+            padding: 0;
+            vertical-align: top;
+            line-height: 1.1;
+          }
+
+          .center {
             text-align: center;
           }
 
-          .mb-4 {
-            margin-bottom: 16px;
+          .right {
+            text-align: right;
           }
 
-          .mt-8 {
-            margin-top: 32px;
+          .left {
+            text-align: left;
+          }
+
+          .bold {
+            font-weight: 700;
+          }
+
+          .black {
+            font-weight: 900;
+          }
+
+          .big {
+            font-size: calc(14px * var(--s));
+          }
+
+          .bigger {
+            font-size: calc(15px * var(--s));
+          }
+
+          .text-12 {
+            font-size: calc(12px * var(--s));
+          }
+
+          .text-10 {
+            font-size: calc(10px * var(--s));
+          }
+
+          .text-9 {
+            font-size: calc(9px * var(--s));
+          }
+
+          .text-8 {
+            font-size: calc(8px * var(--s));
+          }
+
+          .mt-1 {
+            margin-top: calc(1px * var(--s));
+          }
+
+          .mt-2 {
+            margin-top: calc(2px * var(--s));
           }
 
           .mt-3 {
-            margin-top: 12px;
+            margin-top: calc(12px * var(--s));
+          }
+
+          .mt-8 {
+            margin-top: calc(32px * var(--s));
           }
 
           .mb-2 {
-            margin-bottom: 8px;
+            margin-bottom: calc(8px * var(--s));
+          }
+
+          .mb-4 {
+            margin-bottom: calc(16px * var(--s));
+          }
+
+          .mb-8 {
+            margin-bottom: calc(8px * var(--s));
+          }
+
+          .pb-4 {
+            padding-bottom: calc(4px * var(--s));
+          }
+
+          .pt-2 {
+            padding-top: calc(8px * var(--s));
+          }
+
+          .py-1 {
+            padding-top: calc(4px * var(--s));
+            padding-bottom: calc(4px * var(--s));
+          }
+
+          .py-2 {
+            padding-top: calc(8px * var(--s));
+            padding-bottom: calc(8px * var(--s));
+          }
+
+          .my-2 {
+            margin-top: calc(8px * var(--s));
+            margin-bottom: calc(8px * var(--s));
+          }
+
+          .italic {
+            font-style: italic;
+          }
+
+          .uppercase {
+            text-transform: uppercase;
+          }
+
+          .underline {
+            text-decoration: underline;
+          }
+
+          .opacity-70 {
+            opacity: 0.7;
+          }
+
+          .leading-tight {
+            line-height: 1.25;
+          }
+
+          .w-full {
+            width: 100%;
+          }
+
+          .nowrap {
+            white-space: nowrap;
           }
 
           .border-dashed {
@@ -108,116 +236,82 @@ export function BuildOrderReceiptHtml({
             border-top: 2px solid #000000;
           }
 
-          .py-1 {
-            padding-top: 4px;
-            padding-bottom: 4px;
+          .meta-label-col {
+            width: 32%;
+            white-space: nowrap;
+            padding-right: 0;
           }
 
-          .py-2 {
-            padding-top: 8px;
-            padding-bottom: 8px;
-          }
-
-          .pt-2 {
-            padding-top: 8px;
-          }
-
-          .my-2 {
-            margin-top: 8px;
-            margin-bottom: 8px;
-          }
-
-          .italic {
-            font-style: italic;
-          }
-
-          .font-bold {
-            font-weight: 700;
-          }
-
-          .font-black {
-            font-weight: 900;
-          }
-
-          .uppercase {
-            text-transform: uppercase;
-          }
-
-          .underline {
-            text-decoration: underline;
-          }
-
-          .text-xl {
-            font-size: 20px;
-          }
-
-          .text-lg {
-            font-size: 18px;
-          }
-
-          .text-sm {
-            font-size: 14px;
-          }
-
-          .text-10 {
-            font-size: 10px;
-          }
-
-          .text-9 {
-            font-size: 9px;
-          }
-
-          .opacity-70 {
-            opacity: 0.7;
-          }
-
-          .leading-tight {
-            line-height: 1.25;
-          }
-
-          .w-full {
-            width: 100%;
-          }
-
-          .right {
+          .meta-value-col {
+            width: 68%;
             text-align: right;
+            white-space: nowrap;
+            overflow: visible;
+            padding-right: calc(14px * var(--s));
+            padding-left: 0;
           }
 
-          .center {
-            text-align: center;
+          .amount-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: calc(4px * var(--s));
+            font-weight: 900;
+            font-size: calc(14px * var(--s));
           }
 
-          .left {
-            text-align: left;
+          .amount-row-label {
+            white-space: nowrap;
+            flex: 0 0 auto;
           }
 
-          table {
-            width: 100%;
-            border-collapse: collapse;
-            table-layout: fixed;
-          }
-
-          th,
-          td {
-            vertical-align: top;
+          .amount-row-value {
+            white-space: nowrap;
+            text-align: right;
+            padding-right: calc(16px * var(--s));
+            flex: 1 1 auto;
           }
 
           .item-col {
-            width: 52%;
+            width: 44%;
             word-break: break-word;
             overflow-wrap: break-word;
+            padding-right: calc(1px * var(--s));
+            padding-left: 0;
           }
 
           .qty-col {
-            width: 16%;
+            width: 8%;
             text-align: center;
             white-space: nowrap;
+            padding-right: 0;
+            padding-left: 0;
           }
 
           .amt-col {
-            width: 32%;
+            width: 44%;
             text-align: right;
             white-space: nowrap;
+            padding-right: calc(16px * var(--s));
+            padding-left: 0;
+          }
+
+          .item-row td {
+            padding-bottom: calc(1px * var(--s));
+          }
+
+          .section-note {
+            font-size: calc(11px * var(--s));
+            white-space: pre-wrap;
+            word-break: break-word;
+          }
+
+          .status-banner {
+            font-size: calc(26px * var(--s));
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            line-height: 1.05;
           }
 
           @page {
@@ -228,21 +322,22 @@ export function BuildOrderReceiptHtml({
       </head>
       <body>
         <div className="print-root">
-          <div className="text-center mb-4">
-            <h2 className="text-xl font-bold uppercase underline">
+          <div className="center mb-4">
+            <div className="black bigger uppercase underline">
               Order Summary
-            </h2>
-            <p className="font-bold text-lg">Table: {tableselected}</p>
-            <p>{new Date().toLocaleString()}</p>
-            <div className="border-b border-dashed border-black my-2" />
+            </div>
+            <div className="bold big mt-2">Table: {tableselected}</div>
+            <div className="text-10 mt-1">{new Date().toLocaleString()}</div>
           </div>
+
+          <div className="divider" />
 
           <table className="w-full mb-4">
             <thead>
-              <tr className="border-b border-black text-10">
-                <th className="left py-1 item-col">Item</th>
-                <th className="qty-col py-1">Qty</th>
-                <th className="amt-col py-1">Price</th>
+              <tr>
+                <th className="left item-col pb-4">Item</th>
+                <th className="qty-col pb-4">Qty</th>
+                <th className="amt-col pb-4">Price</th>
               </tr>
             </thead>
 
@@ -255,9 +350,9 @@ export function BuildOrderReceiptHtml({
                 </tr>
               ) : (
                 cartItems.map((item, index) => (
-                  <tr key={item.code || index}>
+                  <tr key={item.code || index} className="item-row">
                     <td className="py-2 leading-tight item-col">
-                      <div className="font-bold uppercase">{item.name}</div>
+                      <div className="bold uppercase">{item.name}</div>
 
                       {item.itemInstruction ? (
                         <div className="text-9 italic mt-1">
@@ -265,12 +360,12 @@ export function BuildOrderReceiptHtml({
                         </div>
                       ) : null}
 
-                      <div className="text-9">{item.code}</div>
+                      <div className="text-8 mt-1">{item.code}</div>
                     </td>
 
-                    <td className="qty-col py-2">{item.quantity}</td>
+                    <td className="qty-col py-2 nowrap">{item.quantity}</td>
 
-                    <td className="amt-col py-2">
+                    <td className="amt-col py-2 nowrap">
                       ₱{peso(Number(item.price) * Number(item.quantity))}
                     </td>
                   </tr>
@@ -279,85 +374,60 @@ export function BuildOrderReceiptHtml({
             </tbody>
           </table>
 
-          <div className="border-t-2 border-black pt-2 mb-4">
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                fontWeight: 900,
-                fontSize: "14px",
-              }}
-            >
-              <span>GRAND TOTAL</span>
-              <span>₱{peso(Number(totalPrice || 0))}</span>
-            </div>
+          <div className="divider" />
+
+          <div className="amount-row mb-8">
+            <span className="amount-row-label">GRAND TOTAL</span>
+            <span className="amount-row-value">
+              ₱{peso(Number(totalPrice || 0))}
+            </span>
           </div>
 
           {instructions ? (
-            <div className="border-t border-dashed border-black pt-2 mt-2">
-              <p className="font-bold uppercase text-10 mb-2">Instructions</p>
-              <p
-                style={{
-                  fontSize: "11px",
-                  whiteSpace: "pre-wrap",
-                  wordBreak: "break-word",
-                }}
-              >
-                {instructions}
-              </p>
-            </div>
+            <>
+              <div className="divider" />
+              <div className="pt-2 mt-2">
+                <div className="bold uppercase text-10 mb-2">Instructions</div>
+                <div className="section-note">{instructions}</div>
+              </div>
+            </>
           ) : null}
 
-          {isReprint ? (
-            <div className="mt-3 mb-2 text-center font-bold">
-              <div className="border-y border-dashed border-black py-1">
-                <p
-                  style={{
-                    fontSize: "25px",
-                    fontWeight: 900,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.12em",
-                  }}
-                >
-                  Duplicate Copy
-                </p>
+          {printMode === "duplicate" ? (
+            <div className="mt-3 mb-2 center bold">
+              <div className="py-1">
+                <div className="status-banner">Duplicate Copy</div>
+              </div>
+            </div>
+          ) : printMode === "additional" ? (
+            <div className="mt-3 mb-2 center bold">
+              <div className="py-1">
+                <div className="status-banner">Additional Order</div>
+              </div>
+            </div>
+          ) : printMode === "new" ? (
+            <div className="mt-3 mb-2 center bold">
+              <div className="py-1">
+                <div className="status-banner">New Order</div>
               </div>
             </div>
           ) : transactionId ? (
-            <div className="mt-3 mb-2 text-center font-bold">
-              <div className="border-y border-dashed border-black py-1">
-                <p
-                  style={{
-                    fontSize: "30px",
-                    fontWeight: 900,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.12em",
-                  }}
-                >
-                  Additional Order
-                </p>
+            <div className="mt-3 mb-2 center bold">
+              <div className="py-1">
+                <div className="status-banner">Additional Order</div>
               </div>
             </div>
           ) : (
-            <div className="mt-3 mb-2 text-center font-bold">
-              <div className="border-y border-dashed border-black py-1">
-                <p
-                  style={{
-                    fontSize: "30px",
-                    fontWeight: 900,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.12em",
-                  }}
-                >
-                  New Order
-                </p>
+            <div className="mt-3 mb-2 center bold">
+              <div className="py-1">
+                <div className="status-banner">New Order</div>
               </div>
             </div>
           )}
 
-          <div className="text-center mt-8 text-9 italic opacity-70">
-            <p>Thank you for your order!</p>
-            <p>Please present this to the counter.</p>
+          <div className="center mt-8 text-9 italic opacity-70">
+            <div>Thank you for your order!</div>
+            <div>Please present this to the counter.</div>
           </div>
         </div>
       </body>
@@ -378,6 +448,10 @@ export function BuildBillingReceiptHtml({
         <meta charSet="UTF-8" />
         <title>{title}</title>
         <style>{`
+          :root {
+            --s: 0.85;
+          }
+
           * {
             box-sizing: border-box;
           }
@@ -386,20 +460,24 @@ export function BuildBillingReceiptHtml({
           body {
             margin: 0;
             padding: 0;
+            width: 80mm;
             background: #ffffff !important;
             color: #000000 !important;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
+            font-family: Arial, Helvetica, sans-serif;
           }
 
           body {
-            width: 80mm;
+            overflow: hidden;
           }
 
           .print-host {
-            width: 80mm;
+            width: 76.5mm;
+            padding: calc(8px * var(--s)) calc(5px * var(--s)) calc(8px * var(--s)) calc(2px * var(--s));
             background: #ffffff !important;
             color: #000000 !important;
+            margin: 0;
           }
 
           @page {

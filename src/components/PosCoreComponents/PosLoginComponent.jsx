@@ -167,7 +167,7 @@ const PosLoginComponent = () => {
 
   return (
     <>
-      <div className="h-screen overflow-hidden bg-[#f4f6f8] lg:py-10">
+      <div className="h-screen overflow-hidden bg-gradient-to-r from-blue-50 to-blue-200  lg:py-10">
         <div className="mx-auto h-full w-full max-w-[1600px]">
           <div className="grid h-full grid-cols-1 md:grid-cols-[420px_minmax(0,1fr)] lg:grid-cols-[460px_minmax(0,1fr)]">
             <section className="relative flex h-full items-center justify-center overflow-hidden bg-white/80 px-5 py-6 sm:px-6 md:px-8">
@@ -175,14 +175,14 @@ const PosLoginComponent = () => {
 
               <div className="relative z-10 w-full max-w-[340px]">
                 <div className="mb-12">
-                  <h1 className="text-center text-[34px] font-extrabold tracking-tight text-teal-700 sm:text-[38px]">
+                  <h1 className="text-center font-[Poppins-Black] text-[34px] font-extrabold tracking-tight bg-gradient-to-r from-blue-700 via-sky-500 to-fuchsia-400 bg-clip-text text-transparent sm:text-[38px]">
                     Point of Sales
                   </h1>
                 </div>
 
                 <form onSubmit={handleOpenConfirm} className="space-y-5">
                   <div className="relative">
-                    <div className="flex h-14 items-center rounded-full border border-teal-400/70 bg-white px-4 shadow-[0_6px_18px_rgba(0,0,0,0.04)]">
+                    <div className="flex h-14 items-center rounded-full border border-blue-400/70 bg-white px-4 shadow-[0_6px_18px_rgba(0,0,0,0.04)]">
                       <div className="mr-3 grid h-8 w-8 place-items-center rounded-full bg-slate-100 text-slate-500">
                         <FiUser className="h-4 w-4" />
                       </div>
@@ -200,7 +200,7 @@ const PosLoginComponent = () => {
                   </div>
 
                   <div className="relative">
-                    <div className="flex h-14 items-center rounded-full border border-emerald-300/80 bg-white px-4 shadow-[0_6px_18px_rgba(0,0,0,0.04)]">
+                    <div className="flex h-14 items-center rounded-full border border-blue-300/80 bg-white px-4 shadow-[0_6px_18px_rgba(0,0,0,0.04)]">
                       <div className="mr-3 grid h-8 w-8 place-items-center rounded-full bg-slate-100 text-slate-500">
                         <FiLock className="h-4 w-4" />
                       </div>
@@ -239,7 +239,7 @@ const PosLoginComponent = () => {
                       type="button"
                       onClick={handleOpenConfirm}
                       disabled={isDisabled || isSubmitting}
-                      className="mx-auto flex h-[52px] w-[190px] items-center justify-center rounded-full bg-teal-600 px-6 text-[18px] font-semibold text-gray-100 shadow-[0_14px_28px_rgba(13,148,136,0.30)] transition hover:bg-teal-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+                      className="mx-auto flex h-[52px] w-[190px] items-center justify-center rounded-full bg-blue-600 px-6 text-[18px] font-semibold text-gray-100 shadow-[0_14px_28px_rgba(37,99,235,0.32)] transition hover:bg-blue-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {!apiHost ? (
                         "Resolving..."
@@ -261,7 +261,7 @@ const PosLoginComponent = () => {
               </div>
             </section>
 
-            <section className="relative hidden h-full overflow-hidden md:block">
+            <section className="relative hidden h-full  overflow-hidden md:block">
               <img
                 src={RIGHT_IMAGE}
                 alt="Login visual"
