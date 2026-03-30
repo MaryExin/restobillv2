@@ -688,6 +688,71 @@ const Orderlist = ({
     (item) => item.isLoadedFromDB !== true,
   );
 
+  const buildCartMergeKey = (item) => {
+    const code = String(item?.code || "").trim().toLowerCase();
+    const instruction = String(item?.itemInstruction || "")
+      .trim()
+      .toLowerCase();
+    const price = Number(item?.price || 0);
+
+    return `${code}__${instruction}__${price}`;
+  };
+
+  const recentDisplayItems = useMemo(() => {
+    if (loadedCartItems.length === 0) return [];
+
+    const additionalQtyMap = additionalCartItems.reduce((acc, item) => {
+      const key = buildCartMergeKey(item);
+      acc[key] = (acc[key] || 0) + Number(item.quantity || 0);
+      return acc;
+    }, {});
+
+    return loadedCartItems.map((item) => {
+      const key = buildCartMergeKey(item);
+      const additionalQty = Number(additionalQtyMap[key] || 0);
+
+      return {
+        ...item,
+        lineId: `recent-${key}`,
+        mergedKey: key,
+        quantity: Number(item.quantity || 0) + additionalQty,
+        baseQuantity: Number(item.quantity || 0),
+        additionalQuantity: additionalQty,
+      };
+    });
+  }, [loadedCartItems, additionalCartItems]);
+
+  const visibleAdditionalCartItems = useMemo(() => {
+    if (additionalCartItems.length === 0) return [];
+
+    const loadedKeys = new Set(loadedCartItems.map((item) => buildCartMergeKey(item)));
+
+    return additionalCartItems.filter(
+      (item) => !loadedKeys.has(buildCartMergeKey(item)),
+    );
+  }, [additionalCartItems, loadedCartItems]);
+
+  const mergedCartItemsForSave = useMemo(() => {
+    const mergedMap = new Map();
+
+    cartSummaryItems.forEach((item) => {
+      const key = buildCartMergeKey(item);
+      const existing = mergedMap.get(key);
+
+      if (existing) {
+        existing.quantity += Number(item.quantity || 0);
+        return;
+      }
+
+      mergedMap.set(key, {
+        ...item,
+        quantity: Number(item.quantity || 0),
+      });
+    });
+
+    return Array.from(mergedMap.values());
+  }, [cartSummaryItems]);
+
   const groupedSummaryOrders = useMemo(() => {
     const grouped = {};
 
@@ -737,7 +802,103 @@ const Orderlist = ({
     additionalCartItems.length === 0 &&
     !hasLoadedItemsChanged;
 
-  const requestRemoveItem = (lineId) => {
+  const syncCartState = (updater) => {
+    setproductcart((prev) => ({
+      ...prev,
+      items: updater(prev.items),
+    }));
+
+    setcartforqr((prev) => ({
+      ...prev,
+      items: updater(prev.items),
+    }));
+  };
+
+  const addOrUpdateRecentProxyItem = (proxyItem, delta = 1) => {
+    const mergedKey = proxyItem?.mergedKey || buildCartMergeKey(proxyItem);
+
+    syncCartState((items) => {
+      const nextItems = [...items];
+      const additionalIndex = nextItems.findIndex(
+        (entry) =>
+          entry.isLoadedFromDB !== true && buildCartMergeKey(entry) === mergedKey,
+      );
+
+      if (additionalIndex >= 0) {
+        nextItems[additionalIndex] = {
+          ...nextItems[additionalIndex],
+          quantity: Math.max(
+            1,
+            Number(nextItems[additionalIndex].quantity || 0) + delta,
+          ),
+        };
+
+        return nextItems;
+      }
+
+      nextItems.push({
+        ...proxyItem,
+        lineId: makeLineId("new"),
+        quantity: Math.max(1, delta),
+        isLoadedFromDB: false,
+      });
+
+      return nextItems;
+    });
+  };
+
+  const updateRecentDisplayQuantity = (lineId, delta, proxyItem) => {
+    if (isCartFromDB || !proxyItem) return;
+
+    const mergedKey = proxyItem?.mergedKey || buildCartMergeKey(proxyItem);
+
+    if (delta > 0) {
+      addOrUpdateRecentProxyItem(proxyItem, delta);
+      return;
+    }
+
+    let remaining = Math.abs(delta);
+
+    syncCartState((items) => {
+      const nextItems = items.map((entry) => ({ ...entry }));
+
+      for (let i = 0; i < nextItems.length && remaining > 0; i += 1) {
+        const entry = nextItems[i];
+        if (entry.isLoadedFromDB === true) continue;
+        if (buildCartMergeKey(entry) !== mergedKey) continue;
+
+        const currentQty = Number(entry.quantity || 0);
+        const deduct = Math.min(currentQty, remaining);
+        entry.quantity = currentQty - deduct;
+        remaining -= deduct;
+      }
+
+      for (let i = 0; i < nextItems.length && remaining > 0; i += 1) {
+        const entry = nextItems[i];
+        if (entry.isLoadedFromDB !== true) continue;
+        if (buildCartMergeKey(entry) !== mergedKey) continue;
+
+        const currentQty = Number(entry.quantity || 0);
+        const deduct = Math.min(currentQty, remaining);
+        entry.quantity = currentQty - deduct;
+        remaining -= deduct;
+      }
+
+      return nextItems.filter((entry) => Number(entry.quantity || 0) > 0);
+    });
+  };
+
+  const removeRecentDisplayItem = (lineId, proxyItem) => {
+    if (isCartFromDB || !proxyItem) return;
+
+    const mergedKey = proxyItem?.mergedKey || buildCartMergeKey(proxyItem);
+
+    syncCartState((items) =>
+      items.filter((entry) => buildCartMergeKey(entry) !== mergedKey),
+    );
+  };
+
+  const requestRemoveItem = (lineId, item = null) => {
     setItemToDelete(lineId);
     setShowDeleteItemModal(true);
   };
@@ -1170,7 +1331,7 @@ const Orderlist = ({
       formData.append(
         "cart_items",
         JSON.stringify(
-          productcart.items.map((item) => ({
+          mergedCartItemsForSave.map((item) => ({
             product_id: item.code,
             sku: item.code,
             sales_quantity: item.quantity,
@@ -1877,7 +2038,7 @@ const Orderlist = ({
               </div>
 
               <div className="flex-1 min-h-0 overflow-y-auto pr-2">
-                {additionalCartItems.length > 0 && (
+                {visibleAdditionalCartItems.length > 0 && (
                   <div
                     className={`p-4 pt-2 ${
                       isDark
@@ -1889,7 +2050,7 @@ const Orderlist = ({
                       New Items
                     </h4>
                     <CartList
-                      items={additionalCartItems}
+                      items={visibleAdditionalCartItems}
                       updateQuantity={updateQuantity}
                       updateQuantityByInput={updateQuantityByInput}
                       removeItem={requestRemoveItem}
@@ -1910,19 +2071,20 @@ const Orderlist = ({
                       Recent Orders
                     </h4>
                     <CartList
-                      items={loadedCartItems}
-                      updateQuantity={updateQuantity}
+                      items={recentDisplayItems}
+                      updateQuantity={updateRecentDisplayQuantity}
                       updateQuantityByInput={updateQuantityByInput}
                       removeItem={requestRemoveItem}
-                      readOnly={true}
+                      readOnly={false}
                       openItemInstructionModal={openItemInstructionModal}
                       isDark={isDark}
+                      showInstructionButton={false}
                     />
                   </div>
                 )}
 
                 {loadedCartItems.length === 0 &&
-                  additionalCartItems.length === 0 && (
+                  visibleAdditionalCartItems.length === 0 && (
                     <CartList
                       items={[]}
                       updateQuantity={updateQuantity}
@@ -2681,18 +2843,19 @@ const Orderlist = ({
                     Loaded Items
                   </h4>
                   <CartList
-                    items={loadedCartItems}
-                    updateQuantity={updateQuantity}
+                    items={recentDisplayItems}
+                    updateQuantity={updateRecentDisplayQuantity}
                     updateQuantityByInput={updateQuantityByInput}
-                    removeItem={removeItem}
-                    readOnly={true}
+                    removeItem={requestRemoveItem}
+                    readOnly={false}
                     openItemInstructionModal={openItemInstructionModal}
                     isDark={isDark}
+                    showInstructionButton={false}
                   />
                 </div>
               )}
 
-              {additionalCartItems.length > 0 && (
+              {visibleAdditionalCartItems.length > 0 && (
                 <div
                   className={`p-4 pt-2 ${
                     isDark
@@ -2704,7 +2867,7 @@ const Orderlist = ({
                     Additional Items
                   </h4>
                   <CartList
-                    items={additionalCartItems}
+                    items={visibleAdditionalCartItems}
                     updateQuantity={updateQuantity}
                     updateQuantityByInput={updateQuantityByInput}
                     removeItem={removeItem}
@@ -2716,7 +2879,7 @@ const Orderlist = ({
               )}
 
               {loadedCartItems.length === 0 &&
-                additionalCartItems.length === 0 && (
+                visibleAdditionalCartItems.length === 0 && (
                   <CartList
                     items={[]}
                     updateQuantity={updateQuantity}
@@ -3756,6 +3919,7 @@ const CartList = ({
   extraClassName = "",
   openItemInstructionModal,
   isDark,
+  showInstructionButton = true,
 }) => (
   <div className={`flex-1 overflow-y-auto p-4 space-y-3 ${extraClassName}`}>
     {items.length === 0 ? (
@@ -3800,20 +3964,22 @@ const CartList = ({
 
               {!readOnly && (
                 <div className="flex items-center gap-3 shrink-0">
-                  <button
-                    onClick={() => openItemInstructionModal?.(item)}
-                    className={`p-2 transition-colors ${
-                      isDark
-                        ? "text-slate-400 hover:text-amber-300"
-                        : "text-slate-500 hover:text-amber-600"
-                    }`}
-                    title="Add instruction"
-                  >
-                    <FaEdit size={18} />
-                  </button>
+                  {showInstructionButton && (
+                    <button
+                      onClick={() => openItemInstructionModal?.(item)}
+                      className={`p-2 transition-colors ${
+                        isDark
+                          ? "text-slate-400 hover:text-amber-300"
+                          : "text-slate-500 hover:text-amber-600"
+                      }`}
+                      title="Add instruction"
+                    >
+                      <FaEdit size={18} />
+                    </button>
+                  )}
 
                   <button
-                    onClick={() => removeItem?.(item.lineId)}
+                    onClick={() => removeItem?.(item.lineId, item)}
                     className={`p-2 transition-colors ${
                       isDark
                         ? "text-slate-500 hover:text-red-400"
@@ -3878,7 +4044,7 @@ const CartList = ({
                   }`}
                 >
                   <button
-                    onClick={() => updateQuantity?.(item.lineId, -1)}
+                    onClick={() => updateQuantity?.(item.lineId, -1, item)}
                     className={`w-7 h-7 flex items-center justify-center rounded-md transition-colors ${
                       isDark
                         ? "text-slate-300 bg-slate-800 hover:bg-slate-700"
@@ -3897,7 +4063,7 @@ const CartList = ({
                   </span>
 
                   <button
-                    onClick={() => updateQuantity?.(item.lineId, 1)}
+                    onClick={() => updateQuantity?.(item.lineId, 1, item)}
                     className={`w-7 h-7 flex items-center justify-center rounded-md transition-colors ${
                       isDark
                         ? "text-slate-300 bg-slate-800 hover:bg-slate-700"

@@ -73,6 +73,56 @@ export function BuildPosPaymentReceiptHtml({
     </colgroup>
   );
 
+  const splitAddressLines = (value) => {
+    const raw = String(value || "")
+      .split(/\r?\n|\|/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    if (raw.length > 0) return raw;
+    return [];
+  };
+
+  const companyName =
+    terminalConfig?.corpName || "CRABS N CRACK SEAFOOD HOUSE";
+
+  const businessUnitName =
+    terminalConfig?.businessUnitName || "AND SHAKING CRABS - STA. MARIA";
+
+  const legalEntityName =
+    terminalConfig?.legalEntityName ||
+    terminalConfig?.companyName ||
+    terminalConfig?.registeredName ||
+    "";
+
+  const addressLines = splitAddressLines(
+    terminalConfig?.unitAddress ||
+      terminalConfig?.address ||
+      terminalConfig?.businessAddress ||
+      "",
+  );
+
+  const vatTin =
+    terminalConfig?.vatTin ||
+    terminalConfig?.tin ||
+    terminalConfig?.vatRegTin ||
+    "";
+
+  const supplierName =
+    terminalConfig?.supplierName || "LIGHTEM SOLUTIONS INCORPORATED";
+
+  const supplierAddressLines = splitAddressLines(
+    terminalConfig?.supplierAddress ||
+      terminalConfig?.supplierAddressLine1 ||
+      "1187, PARULAN, PLARIDEL|BULACAN, PHILIPPINES",
+  );
+
+  const supplierTin = terminalConfig?.supplierTin || "626717559-000";
+  const supplierBirAccNo =
+    terminalConfig?.supplierBirAccNo || "25A6267175592023091853";
+  const supplierDateIssued =
+    terminalConfig?.supplierDateIssued || "12/04/2023";
+
   const receipt = (
     <html>
       <head>
@@ -199,23 +249,23 @@ export function BuildPosPaymentReceiptHtml({
             padding-bottom: calc(4px * var(--s));
           }
 
-            .label-col {
-          width: 38%;
-          white-space: normal;
-          word-break: break-word;
-          overflow-wrap: anywhere;
-          padding-right: calc(4px * var(--s));
-        }
+          .label-col {
+            width: 38%;
+            white-space: normal;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            padding-right: calc(4px * var(--s));
+          }
 
-        .value-col {
-          width: 62%;
-          text-align: right;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: clip;
-          padding-right: calc(12px * var(--s));
-          padding-left: 0;
-        }
+          .value-col {
+            width: 62%;
+            text-align: right;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: clip;
+            padding-right: calc(12px * var(--s));
+            padding-left: 0;
+          }
 
           .item-table th,
           .item-table td {
@@ -306,24 +356,28 @@ export function BuildPosPaymentReceiptHtml({
       <body>
         <div className="print-root">
           <div className="center">
-            <div className="header-title">
-              {String(
-                terminalConfig?.corpName || "CRABS N CRACK SEAFOOD HOUSE",
-              ).toUpperCase()}
-            </div>
+            <div className="header-title">{businessUnitName}</div>
 
-            <div className="sub-title">
-              {terminalConfig?.businessUnitName ||
-                "AND SHAKING CRABS - STA. MARIA"}
-            </div>
+            <div className="sub-title">{String(companyName).toUpperCase()}</div>
 
-            <div className="sub-title">ARU FOOD CORP.</div>
+            {legalEntityName ? (
+              <div className="sub-title">{String(legalEntityName).toUpperCase()}</div>
+            ) : null}
 
-            <div className="small" style={{ marginTop: "8px" }}>
-              BYPASS ROAD TABING BAKOD P. STA MARIA
-            </div>
-            <div className="small">BULACAN</div>
-            <div className="small">VAT REG TIN: 634-742-586-00012</div>
+            {addressLines.map((line, index) => (
+              <div
+                key={`address-${index}`}
+                className="small"
+                style={index === 0 ? { marginTop: "8px" } : undefined}
+              >
+                {line}
+              </div>
+            ))}
+
+            {vatTin ? (
+              <div className="small">VAT REG TIN: {vatTin}</div>
+            ) : null}
+
             <div className="small">
               MIN: {terminalConfig?.machineNumber || "-"}
             </div>
@@ -351,9 +405,7 @@ export function BuildPosPaymentReceiptHtml({
               </tr>
               <tr>
                 <td className="bold label-col">INV#:</td>
-                <td className="value-col">
-                  {safeTransaction?.invoice_no || "-"}
-                </td>
+                <td className="value-col">{safeTransaction?.invoice_no || "-"}</td>
               </tr>
               <tr>
                 <td className="bold label-col">Trans. Date:</td>
@@ -377,15 +429,11 @@ export function BuildPosPaymentReceiptHtml({
               </tr>
               <tr>
                 <td className="bold label-col">Order Type:</td>
-                <td className="value-col">
-                  {safeTransaction?.order_type || "-"}
-                </td>
+                <td className="value-col">{safeTransaction?.order_type || "-"}</td>
               </tr>
               <tr>
                 <td className="bold label-col">Ref./Tag #:</td>
-                <td className="value-col">
-                  {safeTransaction?.table_number || "-"}
-                </td>
+                <td className="value-col">{safeTransaction?.table_number || "-"}</td>
               </tr>
               <tr>
                 <td className="bold label-col">Cashier:</td>
@@ -466,8 +514,7 @@ export function BuildPosPaymentReceiptHtml({
               {safeOtherCharges.map((charge, index) => (
                 <tr key={`${charge.particulars}-${index}`}>
                   <td className="bold label-col">
-                    {String(charge.particulars || "OTHER CHARGE").toUpperCase()}
-                    :
+                    {String(charge.particulars || "OTHER CHARGE").toUpperCase()}:
                   </td>
                   <td className="value-col">{peso(charge.amount)}</td>
                 </tr>
@@ -519,15 +566,11 @@ export function BuildPosPaymentReceiptHtml({
               </tr>
               <tr>
                 <td className="bold label-col">VAT EXEMPTION:</td>
-                <td className="value-col">
-                  {peso(computed?.totalVatExemption)}
-                </td>
+                <td className="value-col">{peso(computed?.totalVatExemption)}</td>
               </tr>
               <tr>
                 <td className="bold label-col">ZERO RATED SALES:</td>
-                <td className="value-col">
-                  {peso(computed?.vatZeroRatedSales)}
-                </td>
+                <td className="value-col">{peso(computed?.vatZeroRatedSales)}</td>
               </tr>
             </tbody>
           </table>
@@ -572,25 +615,19 @@ export function BuildPosPaymentReceiptHtml({
                         <td className="bold label-col">
                           {getDiscountAmountLabel(entry)}
                         </td>
-                        <td className="value-col">
-                          {peso(entry?.discountAmount)}
-                        </td>
+                        <td className="value-col">{peso(entry?.discountAmount)}</td>
                       </tr>
                     </React.Fragment>
                   ))}
 
                   <tr>
                     <td className="bold label-col">Discountable Gross:</td>
-                    <td className="value-col">
-                      {peso(computed?.discountableGross)}
-                    </td>
+                    <td className="value-col">{peso(computed?.discountableGross)}</td>
                   </tr>
 
                   <tr>
                     <td className="bold label-col">Discountable Base:</td>
-                    <td className="value-col">
-                      {peso(computed?.discountableBase)}
-                    </td>
+                    <td className="value-col">{peso(computed?.discountableBase)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -641,14 +678,17 @@ export function BuildPosPaymentReceiptHtml({
           </div>
 
           <div className="supplier-block">
-            <div className="bold">SUPPLIER: LIGHTEM SOLUTIONS INCORPORATED</div>
-            <div>1187, PARULAN, PLARIDEL</div>
-            <div>BULACAN, PHILIPPINES</div>
-            <div>TIN: 626717559-000</div>
-            <div>BIR ACC#: 25A6267175592023091853</div>
-            <div>DATE ISSUED: 12/04/2023</div>
-            <div>PTU: {terminalConfig?.ptuNumber || ""}</div>
-            <div>DATE ISSUED: {terminalConfig?.ptuDateIssued || ""}</div>
+            {supplierName ? <div className="bold">SUPPLIER: {supplierName}</div> : null}
+            {supplierAddressLines.map((line, index) => (
+              <div key={`supplier-${index}`}>{line}</div>
+            ))}
+            {supplierTin ? <div>TIN: {supplierTin}</div> : null}
+            {supplierBirAccNo ? <div>BIR ACC#: {supplierBirAccNo}</div> : null}
+            {supplierDateIssued ? <div>DATE ISSUED: {supplierDateIssued}</div> : null}
+            {terminalConfig?.ptuNumber ? <div>PTU: {terminalConfig.ptuNumber}</div> : null}
+            {terminalConfig?.ptuDateIssued ? (
+              <div>PTU DATE ISSUED: {terminalConfig.ptuDateIssued}</div>
+            ) : null}
           </div>
         </div>
       </body>

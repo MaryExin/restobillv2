@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 const peso = (value) =>
   Number(value || 0).toLocaleString("en-PH", {
@@ -7,6 +7,45 @@ const peso = (value) =>
   });
 
 const signedNegativePeso = (value) => `- ${peso(value)}`;
+
+const isValidValue = (value) => {
+  if (value === null || value === undefined) return false;
+  const str = String(value).trim();
+  return (
+    str !== "" &&
+    str !== "null" &&
+    str !== "undefined" &&
+    str !== "N/A" &&
+    str !== "0000-00-00" &&
+    str !== "0000-00-00 00:00:00"
+  );
+};
+
+const pickFirstValid = (...values) => {
+  for (const value of values) {
+    if (isValidValue(value)) return String(value);
+  }
+  return "";
+};
+
+const formatApiDate = (value) => {
+  if (!isValidValue(value)) return "";
+
+  const raw = String(value).trim();
+
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) return raw;
+
+  const normalized = raw.includes("T") ? raw : raw.replace(" ", "T");
+  const date = new Date(normalized);
+
+  if (Number.isNaN(date.getTime())) return raw;
+
+  return date.toLocaleDateString("en-US", {
+    month: "2-digit",
+    day: "2-digit",
+    year: "numeric",
+  });
+};
 
 const PosPaymentReceipt = React.forwardRef(
   (
@@ -23,6 +62,7 @@ const PosPaymentReceipt = React.forwardRef(
       unitCode = "",
       terminalNumber = "",
       corpName = "",
+      userId = "",
     },
     ref,
   ) => {
@@ -38,6 +78,54 @@ const PosPaymentReceipt = React.forwardRef(
       ptuDateIssued: "",
     });
 
+    const [shiftDetails, setShiftDetails] = useState(null);
+
+    useEffect(() => {
+      if (!apiHost) return;
+
+      const resolvedUserId =
+        userId ||
+        localStorage.getItem("user_id") ||
+        localStorage.getItem("userid") ||
+        localStorage.getItem("userId") ||
+        "";
+
+      if (!resolvedUserId) return;
+
+      let isMounted = true;
+
+      const loadShiftDetails = async () => {
+        try {
+          const response = await fetch(
+            `${apiHost}/api/get_shift_details.php?user_id=${encodeURIComponent(
+              resolvedUserId,
+            )}`,
+            {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json",
+              },
+            },
+          );
+
+          const result = await response.json();
+
+          if (!isMounted) return;
+
+          setShiftDetails(result || null);
+        } catch (error) {
+          if (!isMounted) return;
+          console.error("Failed to load shift details:", error);
+        }
+      };
+
+      loadShiftDetails();
+
+      return () => {
+        isMounted = false;
+      };
+    }, [apiHost, userId]);
+
     useEffect(() => {
       if (!apiHost) return;
 
@@ -46,10 +134,25 @@ const PosPaymentReceipt = React.forwardRef(
       const loadTerminalConfig = async () => {
         try {
           const params = new URLSearchParams({
-            unitCode: unitCode || transaction?.Unit_Code || "",
+            unitCode:
+              unitCode ||
+              transaction?.Unit_Code ||
+              shiftDetails?.Unit_Code ||
+              shiftDetails?.terminal?.unitCode ||
+              "",
             terminalNumber:
-              terminalNumber || transaction?.terminal_number || "1",
-            categoryCode: categoryCode || transaction?.Category_Code || "",
+              terminalNumber ||
+              transaction?.terminal_number ||
+              shiftDetails?.terminalinalNumber ||
+              shiftDetails?.terminal?.terminalNumber ||
+              shiftDetails?.terminal?.id ||
+              "1",
+            categoryCode:
+              categoryCode ||
+              transaction?.Category_Code ||
+              shiftDetails?.Category_Code ||
+              shiftDetails?.terminal?.categoryCode ||
+              "",
           });
 
           const response = await fetch(
@@ -79,21 +182,26 @@ const PosPaymentReceipt = React.forwardRef(
               cfg.categoryCode ??
                 categoryCode ??
                 transaction?.Category_Code ??
+                shiftDetails?.Category_Code ??
                 "",
             ),
             unitCode: String(
-              cfg.unitCode ?? unitCode ?? transaction?.Unit_Code ?? "",
+              cfg.unitCode ??
+                unitCode ??
+                transaction?.Unit_Code ??
+                shiftDetails?.Unit_Code ??
+                "",
             ),
             businessUnitName: String(cfg.businessUnitName ?? ""),
             terminalNumber: String(
               cfg.terminalNumber ??
                 terminalNumber ??
                 transaction?.terminal_number ??
+                shiftDetails?.terminalinalNumber ??
+                shiftDetails?.terminal?.terminalNumber ??
                 "1",
             ),
-            corpName: String(
-              cfg.corpName ?? corpName ?? transaction?.corp_name ?? "",
-            ),
+            corpName: String(cfg.corpName ?? corpName ?? transaction?.corp_name ?? ""),
             machineNumber: String(cfg.machineNumber ?? ""),
             serialNumber: String(cfg.serialNumber ?? ""),
             ptuNumber: String(cfg.ptuNumber ?? ""),
@@ -105,13 +213,26 @@ const PosPaymentReceipt = React.forwardRef(
           setTerminalConfig((prev) => ({
             ...prev,
             categoryCode:
-              categoryCode || transaction?.Category_Code || prev.categoryCode,
-            unitCode: unitCode || transaction?.Unit_Code || prev.unitCode,
+              categoryCode ||
+              transaction?.Category_Code ||
+              shiftDetails?.Category_Code ||
+              prev.categoryCode,
+            unitCode:
+              unitCode ||
+              transaction?.Unit_Code ||
+              shiftDetails?.Unit_Code ||
+              prev.unitCode,
             terminalNumber:
               terminalNumber ||
               transaction?.terminal_number ||
+              shiftDetails?.terminalinalNumber ||
+              shiftDetails?.terminal?.terminalNumber ||
               prev.terminalNumber,
-            corpName: corpName || transaction?.corp_name || prev.corpName,
+            corpName:
+              corpName ||
+              transaction?.corp_name ||
+              shiftDetails?.terminal?.corpName ||
+              prev.corpName,
           }));
         }
       };
@@ -127,11 +248,83 @@ const PosPaymentReceipt = React.forwardRef(
       unitCode,
       terminalNumber,
       corpName,
+      shiftDetails,
       transaction?.Category_Code,
       transaction?.Unit_Code,
       transaction?.terminal_number,
       transaction?.corp_name,
     ]);
+console.log(shiftDetails?.terminal);
+    const receiptInfo = useMemo(() => {
+      const terminal = shiftDetails?.terminal || {};
+
+      return {
+        corpName: pickFirstValid(
+          terminalConfig.corpName,
+          terminal.corpName,
+          shiftDetails?.corpName,
+          corpName,
+          transaction?.corp_name,
+          "",
+        ),
+        businessUnitName: pickFirstValid(
+          terminalConfig.businessUnitName,
+          shiftDetails?.Unit_Name,
+          terminal.businessUnitName,
+          transaction?.business_unit_name,
+          "",
+        ),
+        unitAddressLine1: pickFirstValid(
+          shiftDetails?.Unit_Address,
+          terminal.unitAddress,
+          "",
+        ),
+        unitAddressLine2: pickFirstValid(
+          shiftDetails?.Unit_Address_2,
+          terminal.unitAddress2,
+          "",
+        ),
+        unitTin: pickFirstValid(
+          shiftDetails?.Unit_TIN,
+          terminal.unitTin,
+          transaction?.unit_tin,
+          "",
+        ),
+        machineNumber: pickFirstValid(
+          terminal.machineNumber,
+          shiftDetails?.machineNumber,
+          terminalConfig.machineNumber,
+          "-",
+        ),
+        serialNumber: pickFirstValid(
+          terminal.serialNumber,
+          shiftDetails?.serialNumber,
+          terminalConfig.serialNumber,
+          "-",
+        ),
+        terminalNumber: pickFirstValid(
+          transaction?.terminal_number,
+          terminal.terminalNumber,
+          shiftDetails?.terminalinalNumber,
+          terminalConfig.terminalNumber,
+          "1",
+        ),
+        ptuNumber: pickFirstValid(
+          terminal.ptuNumber,
+          shiftDetails?.ptuNumber,
+          terminalConfig.ptuNumber,
+          "",
+        ),
+        ptuDateIssued: formatApiDate(
+          pickFirstValid(
+            terminal.ptuDateIssued,
+            shiftDetails?.ptuDateIssued,
+            terminalConfig.ptuDateIssued,
+            "",
+          ),
+        ),
+      };
+    }, [corpName, shiftDetails, terminalConfig, transaction]);
 
     const paymentLabel =
       payments.length > 0
@@ -191,33 +384,34 @@ const PosPaymentReceipt = React.forwardRef(
           <div
             style={{ fontWeight: "900", fontSize: "15px", lineHeight: 1.15 }}
           >
-            {String(
-              terminalConfig.corpName || "CRABS N CRACK SEAFOOD HOUSE",
-            ).toUpperCase()}
+            {String(receiptInfo.corpName || "CRABS N CRACK SEAFOOD HOUSE").toUpperCase()}
           </div>
 
           <div
             style={{ fontWeight: "700", fontSize: "12px", marginTop: "2px" }}
           >
-            {terminalConfig.businessUnitName ||
-              "AND SHAKING CRABS - STA. MARIA"}
+            {receiptInfo.businessUnitName || "AND SHAKING CRABS - STA. MARIA"}
           </div>
 
           <div style={{ fontWeight: "700", fontSize: "12px" }}>
-            ARU FOOD CORP.
+            {receiptInfo.corpName || "ARU FOOD CORP."}
           </div>
 
           <div style={{ marginTop: "8px", fontSize: "10px" }}>
-            BYPASS ROAD TABING BAKOD P. STA MARIA
+            {receiptInfo.unitAddressLine1 || "-"}
           </div>
-          <div style={{ fontSize: "10px" }}>BULACAN</div>
-          <div style={{ fontSize: "10px" }}>VAT REG TIN: 634-742-586-00012</div>
+          <div style={{ fontSize: "10px" }}>
+            {receiptInfo.unitAddressLine2 || ""}
+          </div>
+          <div style={{ fontSize: "10px" }}>
+            VAT REG TIN: {receiptInfo.unitTin || "-"}
+          </div>
 
           <div style={{ fontSize: "10px" }}>
-            MIN: {terminalConfig.machineNumber || "-"}
+            MIN: {receiptInfo.machineNumber || "-"}
           </div>
           <div style={{ fontSize: "10px" }}>
-            S/N: {terminalConfig.serialNumber || "-"}
+            S/N: {receiptInfo.serialNumber || "-"}
           </div>
         </div>
 
@@ -290,9 +484,7 @@ const PosPaymentReceipt = React.forwardRef(
                 Terminal No.:
               </td>
               <td style={{ textAlign: "right", padding: "1px 0" }}>
-                {transaction?.terminal_number ||
-                  terminalConfig.terminalNumber ||
-                  "-"}
+                {receiptInfo.terminalNumber || "-"}
               </td>
             </tr>
             <tr>
@@ -314,7 +506,7 @@ const PosPaymentReceipt = React.forwardRef(
             <tr>
               <td style={{ fontWeight: "700", padding: "1px 0" }}>Cashier:</td>
               <td style={{ textAlign: "right", padding: "1px 0" }}>
-                {transaction?.cashier || "-"}
+                {transaction?.cashier || shiftDetails?.userName || localStorage.getItem("Cashier") || "-"}
               </td>
             </tr>
           </tbody>
@@ -345,10 +537,7 @@ const PosPaymentReceipt = React.forwardRef(
               return (
                 <tr key={item.ID || index}>
                   <td style={{ padding: "2px 0", verticalAlign: "top" }}>
-                    •{" "}
-                    {String(
-                      item.item_name || item.product_id || "-",
-                    ).toUpperCase()}
+                    • {String(item.item_name || item.product_id || "-").toUpperCase()}
                   </td>
                   <td
                     style={{
@@ -526,9 +715,7 @@ const PosPaymentReceipt = React.forwardRef(
 
         {shouldShowDiscountSummary ? (
           <>
-            <div
-              style={{ borderTop: "1px solid #000", margin: "10px 0 8px" }}
-            />
+            <div style={{ borderTop: "1px solid #000", margin: "10px 0 8px" }} />
 
             <table
               style={{
@@ -559,15 +746,6 @@ const PosPaymentReceipt = React.forwardRef(
                     )}
                   </td>
                 </tr>
-
-                {/* <tr>
-                  <td style={{ fontWeight: "700", padding: "1px 0" }}>
-                    Statutory Qualified:
-                  </td>
-                  <td style={{ textAlign: "right", padding: "1px 0" }}>
-                    {Number(computed?.statutoryQualifiedCount || 0)}
-                  </td>
-                </tr> */}
 
                 {activeBreakdown.map((entry) => (
                   <React.Fragment key={`summary-${entry.key}`}>
@@ -615,9 +793,7 @@ const PosPaymentReceipt = React.forwardRef(
 
         {customerCards.length > 0 ? (
           <>
-            <div
-              style={{ borderTop: "1px solid #000", margin: "10px 0 8px" }}
-            />
+            <div style={{ borderTop: "1px solid #000", margin: "10px 0 8px" }} />
 
             <div
               style={{
@@ -672,17 +848,6 @@ const PosPaymentReceipt = React.forwardRef(
           </>
         ) : null}
 
-        {/* <div style={{ marginTop: "12px", fontSize: "10px" }}>
-          <div style={{ fontWeight: "700" }}>Customer Signature:</div>
-          <div
-            style={{
-              borderBottom: "1px solid #000",
-              height: "18px",
-              marginTop: "3px",
-            }}
-          />
-        </div> */}
-
         <div style={{ borderTop: "1px solid #000", margin: "10px 0 8px" }} />
 
         <div style={{ textAlign: "center", fontSize: "10px" }}>
@@ -701,8 +866,8 @@ const PosPaymentReceipt = React.forwardRef(
           <div>TIN: 626717559-000</div>
           <div>BIR ACC#: 25A6267175592023091853</div>
           <div>DATE ISSUED: 12/04/2023</div>
-          <div>PTU: {terminalConfig.ptuNumber}</div>
-          <div>DATE ISSUED: {terminalConfig.ptuDateIssued}</div>
+          <div>PTU: {receiptInfo.ptuNumber || "-"}</div>
+          <div>DATE ISSUED: {receiptInfo.ptuDateIssued || "-"}</div>
         </div>
       </div>
     );
