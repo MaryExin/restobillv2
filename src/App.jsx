@@ -42,12 +42,12 @@ const App = () => {
         <Route exact path="/poscorehomescreen" element={<PosHomeScreen />} />
         <Route exact path="/payments" element={<PosPayment />} />
         {/* Private Routes */}
-        <Route
+        {/* <Route
           path="/pricesyncing"
           element={<PrivateRoute routename={"/pricesyncing"} />}
-        >
-          <Route path="/pricesyncing" element={<SyncProductsAndPricing />} />
-        </Route>
+        > */}
+        <Route path="/pricesyncing" element={<SyncProductsAndPricing />} />
+        {/* </Route> */}
         {/* Private Routes */}
         <Route
           path="/salesrecordssyncing"

@@ -15,12 +15,18 @@ import {
 } from "react-icons/fa";
 import { useTheme } from "../../context/ThemeContext";
 import useApiHost from "../../hooks/useApiHost";
+import ProductImage from "../Common/ProductImage";
 
 const ProductList = () => {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const navigate = useNavigate();
   const apiHost = useApiHost();
+
+  const imageBaseUrl = useMemo(() => {
+    if (!apiHost) return "";
+    return `${apiHost}/item_pictures/`;
+  }, [apiHost]);
 
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState("");
@@ -37,7 +43,7 @@ const ProductList = () => {
   const [passError, setPassError] = useState(false);
 
   const ADMIN_PASSWORD = "1324";
-  console.log(passwordInput);
+
   const handlePasswordSubmit = (e) => {
     e.preventDefault();
     if (passwordInput === ADMIN_PASSWORD) {
@@ -54,7 +60,7 @@ const ProductList = () => {
     setIsLoading(true);
     try {
       const response = await fetch(`${apiHost}/api/get_product_masterlist.php`);
-      if (!response.ok) throw new Error();
+      if (!response.ok) throw new Error("Failed to fetch products.");
       const data = await response.json();
       setProducts(Array.isArray(data) ? data : []);
     } catch (error) {
@@ -115,6 +121,7 @@ const ProductList = () => {
         alert("Update failed: " + result.message);
       }
     } catch (error) {
+      console.error("Bulk update error:", error);
       setProducts(previousState);
     }
   };
@@ -138,6 +145,7 @@ const ProductList = () => {
       const result = await response.json();
       if (result.status !== "success") setProducts(previousState);
     } catch (error) {
+      console.error("Toggle status error:", error);
       setProducts(previousState);
     }
   };
@@ -184,19 +192,31 @@ const ProductList = () => {
   if (!isAuthenticated) {
     return (
       <div
-        className={`min-h-screen flex items-center justify-center p-6 ${isDark ? "bg-[#0f172a]" : "bg-[#f8fafc]"}`}
+        className={`min-h-screen flex items-center justify-center p-6 ${
+          isDark ? "bg-[#0f172a]" : "bg-[#f8fafc]"
+        }`}
       >
         <div
-          className={`w-full max-w-md p-8 rounded-[40px] border-2 transition-all duration-500 ${isDark ? "bg-slate-900 border-white/10 shadow-2xl" : "bg-white border-blue-500/20 shadow-xl"}`}
+          className={`w-full max-w-md p-8 rounded-[40px] border-2 transition-all duration-500 ${
+            isDark
+              ? "bg-slate-900 border-white/10 shadow-2xl"
+              : "bg-white border-blue-500/20 shadow-xl"
+          }`}
         >
           <div className="flex flex-col items-center text-center">
             <div
-              className={`w-20 h-20 rounded-3xl flex items-center justify-center mb-6 border-2 ${isDark ? "bg-white/5 border-white/10 text-white" : "bg-blue-50 border-blue-100 text-blue-600"}`}
+              className={`w-20 h-20 rounded-3xl flex items-center justify-center mb-6 border-2 ${
+                isDark
+                  ? "bg-white/5 border-white/10 text-white"
+                  : "bg-blue-50 border-blue-100 text-blue-600"
+              }`}
             >
               <FaLock size={32} />
             </div>
             <h2
-              className={`text-2xl font-black uppercase tracking-tight ${isDark ? "text-white" : "text-slate-800"}`}
+              className={`text-2xl font-black uppercase tracking-tight ${
+                isDark ? "text-white" : "text-slate-800"
+              }`}
             >
               Restricted Access
             </h2>
@@ -206,7 +226,9 @@ const ProductList = () => {
             <form onSubmit={handlePasswordSubmit} className="w-full space-y-4">
               <div className="relative">
                 <FaKey
-                  className={`absolute left-5 top-1/2 -translate-y-1/2 ${isDark ? "text-slate-500" : "text-slate-400"}`}
+                  className={`absolute left-5 top-1/2 -translate-y-1/2 ${
+                    isDark ? "text-slate-500" : "text-slate-400"
+                  }`}
                   size={16}
                 />
                 <input
@@ -218,7 +240,13 @@ const ProductList = () => {
                     setPasswordInput(e.target.value);
                   }}
                   autoFocus
-                  className={`w-full pl-14 pr-6 py-4 rounded-2xl outline-none border-2 transition-all font-bold ${passError ? "border-rose-500 bg-rose-500/5 text-rose-500" : isDark ? "bg-slate-800 border-white/5 text-white focus:border-blue-500" : "bg-slate-50 border-slate-200 text-slate-800 focus:border-blue-500"}`}
+                  className={`w-full pl-14 pr-6 py-4 rounded-2xl outline-none border-2 transition-all font-bold ${
+                    passError
+                      ? "border-rose-500 bg-rose-500/5 text-rose-500"
+                      : isDark
+                        ? "bg-slate-800 border-white/5 text-white focus:border-blue-500"
+                        : "bg-slate-50 border-slate-200 text-slate-800 focus:border-blue-500"
+                  }`}
                 />
               </div>
               {passError && (
@@ -235,7 +263,11 @@ const ProductList = () => {
               <button
                 type="button"
                 onClick={() => navigate(-1)}
-                className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] ${isDark ? "text-slate-500 hover:text-white" : "text-slate-400 hover:text-slate-600"}`}
+                className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] ${
+                  isDark
+                    ? "text-slate-500 hover:text-white"
+                    : "text-slate-400 hover:text-slate-600"
+                }`}
               >
                 Go Back
               </button>
@@ -248,27 +280,40 @@ const ProductList = () => {
 
   return (
     <div
-      className={`min-h-screen flex flex-col ${isDark ? "bg-[#0f172a]" : "bg-[#f8fafc]"}`}
+      className={`min-h-screen flex flex-col ${
+        isDark ? "bg-[#0f172a]" : "bg-[#f8fafc]"
+      }`}
     >
-      {/* --- CONFIRMATION MODAL OVERLAY --- */}
       {showConfirm && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 backdrop-blur-sm bg-black/40 animate-in fade-in duration-300">
           <div
-            className={`w-full max-w-sm p-8 rounded-[35px] shadow-2xl border-2 transform animate-in zoom-in-95 duration-300 ${isDark ? "bg-slate-900 border-white/10" : "bg-white border-slate-200"}`}
+            className={`w-full max-w-sm p-8 rounded-[35px] shadow-2xl border-2 transform animate-in zoom-in-95 duration-300 ${
+              isDark
+                ? "bg-slate-900 border-white/10"
+                : "bg-white border-slate-200"
+            }`}
           >
             <div className="flex flex-col items-center text-center">
               <div
-                className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-5 ${pendingStatus === "1" ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"}`}
+                className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-5 ${
+                  pendingStatus === "1"
+                    ? "bg-emerald-500/10 text-emerald-500"
+                    : "bg-rose-500/10 text-rose-500"
+                }`}
               >
                 <FaExclamationTriangle size={28} />
               </div>
               <h3
-                className={`text-lg font-black uppercase tracking-tight mb-2 ${isDark ? "text-white" : "text-slate-800"}`}
+                className={`text-lg font-black uppercase tracking-tight mb-2 ${
+                  isDark ? "text-white" : "text-slate-800"
+                }`}
               >
                 Bulk Update
               </h3>
               <p
-                className={`text-xs font-bold uppercase mb-8 leading-relaxed ${isDark ? "text-slate-400" : "text-slate-500"}`}
+                className={`text-xs font-bold uppercase mb-8 leading-relaxed ${
+                  isDark ? "text-slate-400" : "text-slate-500"
+                }`}
               >
                 Are you sure you want to{" "}
                 <span
@@ -284,13 +329,21 @@ const ProductList = () => {
               <div className="flex w-full gap-3">
                 <button
                   onClick={() => setShowConfirm(false)}
-                  className={`flex-1 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest border-2 transition-all ${isDark ? "border-white/5 text-slate-500 hover:bg-white/5" : "border-slate-100 text-slate-400 hover:bg-slate-50"}`}
+                  className={`flex-1 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest border-2 transition-all ${
+                    isDark
+                      ? "border-white/5 text-slate-500 hover:bg-white/5"
+                      : "border-slate-100 text-slate-400 hover:bg-slate-50"
+                  }`}
                 >
                   Cancel
                 </button>
                 <button
                   onClick={executeBulkUpdate}
-                  className={`flex-1 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest text-white transition-all shadow-lg active:scale-95 ${pendingStatus === "1" ? "bg-emerald-500 shadow-emerald-500/30 hover:bg-emerald-600" : "bg-rose-500 shadow-rose-500/30 hover:bg-rose-600"}`}
+                  className={`flex-1 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest text-white transition-all shadow-lg active:scale-95 ${
+                    pendingStatus === "1"
+                      ? "bg-emerald-500 shadow-emerald-500/30 hover:bg-emerald-600"
+                      : "bg-rose-500 shadow-rose-500/30 hover:bg-rose-600"
+                  }`}
                 >
                   Confirm
                 </button>
@@ -300,22 +353,31 @@ const ProductList = () => {
         </div>
       )}
 
-      {/* HEADER SECTION */}
       <div
-        className={`sticky top-0 z-30 border-b-2 ${isDark ? "bg-slate-900/95 border-white/10" : "bg-white/95 border-slate-200"} backdrop-blur-md px-6 py-4`}
+        className={`sticky top-0 z-30 border-b-2 ${
+          isDark
+            ? "bg-slate-900/95 border-white/10"
+            : "bg-white/95 border-slate-200"
+        } backdrop-blur-md px-6 py-4`}
       >
         <div className="max-w-[1600px] mx-auto">
           <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
             <div className="flex items-center w-full gap-4 md:w-auto">
               <button
                 onClick={() => navigate(-1)}
-                className={`p-3 rounded-2xl border-2 transition-all ${isDark ? "bg-white/5 border-white/10 text-white" : "bg-slate-100 border-slate-200 text-slate-600"}`}
+                className={`p-3 rounded-2xl border-2 transition-all ${
+                  isDark
+                    ? "bg-white/5 border-white/10 text-white"
+                    : "bg-slate-100 border-slate-200 text-slate-600"
+                }`}
               >
                 <FaArrowLeft size={18} />
               </button>
               <div>
                 <h1
-                  className={`text-xl font-black uppercase tracking-tight ${isDark ? "text-white" : "text-slate-800"}`}
+                  className={`text-xl font-black uppercase tracking-tight ${
+                    isDark ? "text-white" : "text-slate-800"
+                  }`}
                 >
                   PRODUCT LIST
                 </h1>
@@ -326,9 +388,14 @@ const ProductList = () => {
             </div>
 
             <div className="flex items-center w-full gap-3 md:w-auto">
-              {/* BULK TOGGLE BUTTONS */}
               <div
-                className={`flex items-center gap-2 pr-3 mr-2 border-r-2 ${isDark ? "border-white/10" : "border-slate-200"} ${selectedCategory === "ALL" ? "opacity-20 grayscale pointer-events-none" : ""}`}
+                className={`flex items-center gap-2 pr-3 mr-2 border-r-2 ${
+                  isDark ? "border-white/10" : "border-slate-200"
+                } ${
+                  selectedCategory === "ALL"
+                    ? "opacity-20 grayscale pointer-events-none"
+                    : ""
+                }`}
               >
                 <button
                   onClick={() => triggerBulkConfirm("1")}
@@ -354,12 +421,20 @@ const ProductList = () => {
                   placeholder="Search products..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className={`pl-12 pr-6 py-3 rounded-2xl text-sm w-full md:w-[280px] outline-none border-2 transition-all ${isDark ? "bg-slate-800 border-white/10 text-white focus:border-blue-500" : "bg-slate-50 border-slate-200 focus:border-blue-500"}`}
+                  className={`pl-12 pr-6 py-3 rounded-2xl text-sm w-full md:w-[280px] outline-none border-2 transition-all ${
+                    isDark
+                      ? "bg-slate-800 border-white/10 text-white focus:border-blue-500"
+                      : "bg-slate-50 border-slate-200 focus:border-blue-500"
+                  }`}
                 />
               </div>
               <button
                 onClick={fetchProducts}
-                className={`p-3.5 rounded-2xl border-2 transition-all active:scale-95 ${isDark ? "border-white/10 text-slate-400 hover:bg-white/5" : "border-slate-200 text-slate-500 hover:bg-slate-50"}`}
+                className={`p-3.5 rounded-2xl border-2 transition-all active:scale-95 ${
+                  isDark
+                    ? "border-white/10 text-slate-400 hover:bg-white/5"
+                    : "border-slate-200 text-slate-500 hover:bg-slate-50"
+                }`}
               >
                 <FaSyncAlt
                   className={isLoading ? "animate-spin" : ""}
@@ -368,14 +443,17 @@ const ProductList = () => {
               </button>
               <button
                 onClick={() => setIsAuthenticated(false)}
-                className={`p-3.5 rounded-2xl border-2 transition-all ${isDark ? "border-white/10 text-rose-500 hover:bg-rose-500/10" : "border-slate-200 text-rose-500 hover:bg-rose-50"}`}
+                className={`p-3.5 rounded-2xl border-2 transition-all ${
+                  isDark
+                    ? "border-white/10 text-rose-500 hover:bg-rose-500/10"
+                    : "border-slate-200 text-rose-500 hover:bg-rose-50"
+                }`}
               >
                 <FaLock size={16} />
               </button>
             </div>
           </div>
 
-          {/* --- GANDAHAN NATING CATEGORY BUTTONS --- */}
           <div className="flex items-center gap-3 pb-2 mt-6 overflow-x-auto no-scrollbar scroll-smooth">
             {categories.map((cat) => {
               const isActive = selectedCategory === cat;
@@ -388,17 +466,13 @@ const ProductList = () => {
                 <button
                   key={cat}
                   onClick={() => setSelectedCategory(cat)}
-                  className={`
-                    relative flex items-center gap-3 px-6 py-3 rounded-2xl text-[11px] font-black uppercase tracking-wider
-                    transition-all duration-300 whitespace-nowrap group
-                    ${
-                      isActive
-                        ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-[0_10px_25px_-5px_rgba(59,130,246,0.5)] scale-105 z-10"
-                        : isDark
-                          ? "bg-slate-800/50 border-2 border-white/5 text-slate-400 hover:border-blue-500/30 hover:text-white"
-                          : "bg-white border-2 border-slate-100 text-slate-500 hover:border-blue-400/30 hover:text-blue-600 shadow-sm"
-                    }
-                  `}
+                  className={`relative flex items-center gap-3 px-6 py-3 rounded-2xl text-[11px] font-black uppercase tracking-wider transition-all duration-300 whitespace-nowrap group ${
+                    isActive
+                      ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-[0_10px_25px_-5px_rgba(59,130,246,0.5)] scale-105 z-10"
+                      : isDark
+                        ? "bg-slate-800/50 border-2 border-white/5 text-slate-400 hover:border-blue-500/30 hover:text-white"
+                        : "bg-white border-2 border-slate-100 text-slate-500 hover:border-blue-400/30 hover:text-blue-600 shadow-sm"
+                  }`}
                 >
                   {cat === "ALL" ? (
                     <FaThLarge
@@ -408,23 +482,18 @@ const ProductList = () => {
                   ) : null}
                   {cat}
 
-                  {/* Item Count Bubble */}
                   <span
-                    className={`
-                    px-2 py-0.5 rounded-lg text-[9px] font-bold transition-all duration-300
-                    ${
+                    className={`px-2 py-0.5 rounded-lg text-[9px] font-bold transition-all duration-300 ${
                       isActive
                         ? "bg-white/20 text-white"
                         : isDark
                           ? "bg-white/5 text-slate-500 group-hover:bg-blue-500/20 group-hover:text-blue-400"
                           : "bg-slate-100 text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-500"
-                    }
-                  `}
+                    }`}
                   >
                     {count}
                   </span>
 
-                  {/* Underline Indicator (Active only) */}
                   {isActive && (
                     <div className="absolute w-8 h-1 -translate-x-1/2 bg-white rounded-full -bottom-1 left-1/2"></div>
                   )}
@@ -435,7 +504,6 @@ const ProductList = () => {
         </div>
       </div>
 
-      {/* MAIN GRID */}
       <div className="flex-grow p-6 overflow-auto">
         <div className="max-w-[1600px] mx-auto">
           {isLoading && products.length === 0 ? (
@@ -449,46 +517,69 @@ const ProductList = () => {
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
               {filteredProducts.map((item) => {
                 const isActive = item.status === "1";
+
                 return (
                   <div
                     key={item.product_id}
-                    className={`group relative rounded-[35px] p-6 border-2 transition-all duration-500 ${!isActive ? "bg-slate-100/80 grayscale opacity-60 border-slate-300" : isDark ? "bg-slate-900/60 border-white/20 hover:border-white hover:-translate-y-2 hover:shadow-[0_20px_60px_rgba(255,255,255,0.08)]" : "bg-white border-blue-500/40 hover:border-blue-600 hover:-translate-y-2 hover:shadow-2xl hover:shadow-blue-500/20"}`}
+                    className={`group relative rounded-[35px] p-6 border-2 transition-all duration-500 ${
+                      !isActive
+                        ? "bg-slate-100/80 grayscale opacity-60 border-slate-300"
+                        : isDark
+                          ? "bg-slate-900/60 border-white/20 hover:border-white hover:-translate-y-2 hover:shadow-[0_20px_60px_rgba(255,255,255,0.08)]"
+                          : "bg-white border-blue-500/40 hover:border-blue-600 hover:-translate-y-2 hover:shadow-2xl hover:shadow-blue-500/20"
+                    }`}
                   >
                     <div
-                      className={`absolute top-6 right-6 px-3 py-1 rounded-full text-[9px] font-black uppercase flex items-center gap-1.5 z-10 border ${isActive ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500" : "bg-rose-500/10 border-rose-500/20 text-rose-500"}`}
+                      className={`absolute top-6 right-6 px-3 py-1 rounded-full text-[9px] font-black uppercase flex items-center gap-1.5 z-10 border ${
+                        isActive
+                          ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500"
+                          : "bg-rose-500/10 border-rose-500/20 text-rose-500"
+                      }`}
                     >
                       <div
-                        className={`w-1.5 h-1.5 rounded-full ${isActive ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`}
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          isActive
+                            ? "bg-emerald-500 animate-pulse"
+                            : "bg-rose-500"
+                        }`}
                       ></div>
                       {isActive ? "Active" : "Inactive"}
                     </div>
+
                     <div
-                      className={`w-full aspect-square rounded-[28px] flex items-center justify-center mb-6 overflow-hidden border-2 transition-all duration-500 group-hover:scale-[1.03] ${isActive ? (isDark ? "bg-slate-800 border-white/10" : "bg-slate-50 border-blue-500/10") : "bg-slate-200 border-slate-300"}`}
+                      className={`w-full aspect-square rounded-[28px] flex items-center justify-center mb-6 overflow-hidden border-2 transition-all duration-500 group-hover:scale-[1.03] ${
+                        isActive
+                          ? isDark
+                            ? "bg-slate-800 border-white/10"
+                            : "bg-slate-50 border-blue-500/10"
+                          : "bg-slate-200 border-slate-300"
+                      }`}
                     >
-                      <img
-                        src={`${apiHost}/item_pictures/${item.product_id}.jpg`}
+                      <ProductImage
+                        src={`${imageBaseUrl}${item.product_id}.png`}
                         alt={item.item_name}
                         className="object-cover w-full h-full"
-                        onError={(e) => {
-                          const defaultPath = `${apiHost}/item_pictures/Default.jpg`;
-                          if (e.target.src !== defaultPath)
-                            e.target.src = defaultPath;
-                        }}
+                        wrapperClassName="w-full h-full overflow-hidden rounded-[26px]"
                       />
                     </div>
+
                     <div className="px-1">
                       <h3
-                        className={`font-black text-sm uppercase mb-1.5 truncate tracking-tight ${isDark && isActive ? "text-white" : "text-slate-800"}`}
+                        className={`font-black text-sm uppercase mb-1.5 truncate tracking-tight ${
+                          isDark && isActive ? "text-white" : "text-slate-800"
+                        }`}
                       >
                         {item.item_name}
                       </h3>
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em] flex items-center gap-2 mb-6">
-                        <FaTag className="text-blue-500" size={10} />{" "}
+                        <FaTag className="text-blue-500" size={10} />
                         {item.unit_of_measure}
                       </p>
                       <div className="flex items-center justify-between pt-5 border-t-2 border-slate-100/10">
                         <p
-                          className={`text-xl font-black tracking-tighter ${isActive ? "text-blue-600" : "text-slate-400"}`}
+                          className={`text-xl font-black tracking-tighter ${
+                            isActive ? "text-blue-600" : "text-slate-400"
+                          }`}
                         >
                           ₱
                           {parseFloat(item.selling_price || 0).toLocaleString(
@@ -498,10 +589,16 @@ const ProductList = () => {
                         </p>
                         <button
                           onClick={() => toggleStatus(item.product_id)}
-                          className={`relative w-14 h-7 rounded-full transition-all duration-300 flex items-center p-1.5 border-2 ${isActive ? "bg-emerald-500 border-emerald-400 shadow-lg shadow-emerald-500/30" : "bg-slate-400 border-slate-500 shadow-inner"}`}
+                          className={`relative w-14 h-7 rounded-full transition-all duration-300 flex items-center p-1.5 border-2 ${
+                            isActive
+                              ? "bg-emerald-500 border-emerald-400 shadow-lg shadow-emerald-500/30"
+                              : "bg-slate-400 border-slate-500 shadow-inner"
+                          }`}
                         >
                           <div
-                            className={`w-3.5 h-3.5 bg-white rounded-full shadow-md transform transition-transform duration-300 ${isActive ? "translate-x-7" : "translate-x-0"}`}
+                            className={`w-3.5 h-3.5 bg-white rounded-full shadow-md transform transition-transform duration-300 ${
+                              isActive ? "translate-x-7" : "translate-x-0"
+                            }`}
                           ></div>
                         </button>
                       </div>
@@ -514,9 +611,10 @@ const ProductList = () => {
         </div>
       </div>
 
-      {/* FOOTER STATS */}
       <div
-        className={`p-8 border-t-2 ${isDark ? "bg-slate-900 border-white/10" : "bg-white border-slate-200"}`}
+        className={`p-8 border-t-2 ${
+          isDark ? "bg-slate-900 border-white/10" : "bg-white border-slate-200"
+        }`}
       >
         <div className="max-w-[1600px] mx-auto">
           <div className="flex items-center gap-3 mb-6">
@@ -531,10 +629,16 @@ const ProductList = () => {
             {Object.keys(displayStats).map((cat) => (
               <div
                 key={cat}
-                className={`min-w-[200px] p-5 rounded-[24px] border-2 transition-all duration-300 ${isDark ? "bg-white/5 border-white/10 hover:border-white/30" : "bg-slate-50 border-blue-500/20 hover:border-blue-500/40"}`}
+                className={`min-w-[200px] p-5 rounded-[24px] border-2 transition-all duration-300 ${
+                  isDark
+                    ? "bg-white/5 border-white/10 hover:border-white/30"
+                    : "bg-slate-50 border-blue-500/20 hover:border-blue-500/40"
+                }`}
               >
                 <p
-                  className={`text-[9px] font-black uppercase mb-2 truncate tracking-widest ${isDark ? "text-slate-500" : "text-slate-400"}`}
+                  className={`text-[9px] font-black uppercase mb-2 truncate tracking-widest ${
+                    isDark ? "text-slate-500" : "text-slate-400"
+                  }`}
                 >
                   {cat}
                 </p>
