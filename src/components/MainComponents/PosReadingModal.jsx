@@ -466,8 +466,9 @@ export default function PosReadingModal({
       <body>
         <div class="receipt">
           <div class="center">
-            <div class="title">${terminalConfig.corpName}</div>
-            <div class="subtitle">${data.businessUnitName || terminalConfig.businessUnitName || ""}</div>
+           
+            <div class="title">${data.businessUnitName || terminalConfig.businessUnitName || ""}</div>
+            <div class="subtitle">${terminalConfig.corpName}</div>
             <div class="subtitle">${data.businessUnitAddress || ""}</div>
             <div class="subtitle">${data.tinLabel || ""}</div>
             <div class="subtitle">MIN: ${terminalConfig.machineNumber}</div>
@@ -535,8 +536,8 @@ export default function PosReadingModal({
         <body>
           <div class="receipt">
             <div class="center">
-              <div class="title">${terminalConfig.corpName}</div>
-              <div class="subtitle">${data.businessUnitName || terminalConfig.businessUnitName || ""}</div>
+              <div class="title">${data.businessUnitName || terminalConfig.businessUnitName || ""}</div>
+               <div class="subtitle">${terminalConfig.corpName}</div>
               <div class="subtitle">${data.businessUnitAddress || ""}</div>
               <div class="subtitle">${data.tinLabel || ""}</div>
               <div class="subtitle">MIN: ${terminalConfig.machineNumber}</div>

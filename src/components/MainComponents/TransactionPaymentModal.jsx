@@ -1659,7 +1659,7 @@ export default function TransactionPaymentModal({
   const [receiptSnapshot, setReceiptSnapshot] = useState(null);
   const [printerName, setPrinterName] = useState("");
   const [printers, setPrinters] = useState([]);
-
+  const [shiftDetails, setShiftDetails] = useState(null);
   useEffect(() => {
     if (!isOpen) return;
 
@@ -1696,7 +1696,7 @@ export default function TransactionPaymentModal({
           "Electron default printer:",
           fallbackElectronDefault?.name || "(none)",
         );
-        console.log("Resolved printer:", resolvedPrinterName);
+        // console.log("Resolved printer:", resolvedPrinterName);
       } catch (error) {
         console.error("Failed to load printers:", error);
         setPrinterName(String(defaultPrinterName || "").trim());
@@ -1705,6 +1705,106 @@ export default function TransactionPaymentModal({
 
     loadPrinters();
   }, [isOpen, defaultPrinterName]);
+
+  useEffect(() => {
+    if (!isOpen || !apiHost || !loggedUserId) return;
+
+    let cancelled = false;
+
+    const fetchShiftDetails = async () => {
+      try {
+        const response = await fetch(
+          `${apiHost}/api/get_shift_details.php?user_id=${encodeURIComponent(
+            loggedUserId,
+          )}`,
+        );
+
+        const result = await response.json();
+
+        if (!cancelled) {
+          setShiftDetails(result || null);
+
+          if (result?.userName) {
+            localStorage.setItem("Cashier", result.userName);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to load shift details:", error);
+        if (!cancelled) {
+          setShiftDetails(null);
+        }
+      }
+    };
+
+    fetchShiftDetails();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, apiHost]);
+
+  const terminalConfig = useMemo(() => {
+    const terminal = shiftDetails?.terminal || {};
+
+    return {
+      categoryCode:
+        shiftDetails?.Category_Code ||
+        transaction?.Category_Code ||
+        "",
+      unitCode:
+        shiftDetails?.Unit_Code ||
+        transaction?.Unit_Code ||
+        "",
+      businessUnitName:
+        shiftDetails?.Unit_Name ||
+        terminal?.businessUnitName ||
+        transaction?.Unit_Name ||
+        "",
+      terminalNumber:
+        shiftDetails?.terminal_number ||
+        terminal?.terminalNumber ||
+        transaction?.terminal_number ||
+        "1",
+      corpName:
+        terminal?.corpName ||
+        shiftDetails?.corpName ||
+        "Crabs N Crack Seafood House",
+      unitAddress:
+        shiftDetails?.Unit_Address ||
+        terminal?.unitAddress ||
+        transaction?.Unit_Address ||
+        "",
+      vatTin:
+        shiftDetails?.Unit_TIN ||
+        terminal?.vatTin ||
+        transaction?.Unit_TIN ||
+        "",
+      machineNumber:
+        terminal?.machineNumber ||
+        terminal?.machine_number ||
+        shiftDetails?.machineNumber ||
+        shiftDetails?.machine_number ||
+        "",
+      serialNumber:
+        terminal?.serialNumber ||
+        terminal?.serial_number ||
+        shiftDetails?.serialNumber ||
+        shiftDetails?.serial_number ||
+        "",
+      ptuNumber:
+        terminal?.ptuNumber ||
+        terminal?.ptu_number ||
+        shiftDetails?.ptuNumber ||
+        shiftDetails?.ptu_number ||
+        "",
+      ptuDateIssued:
+        terminal?.ptuDateIssued ||
+        terminal?.ptu_date_issued ||
+        shiftDetails?.ptuDateIssued ||
+        shiftDetails?.ptu_date_issued ||
+        "",
+    };
+  }, [shiftDetails, transaction]);
 
   const handleElectronPrint = async (snapshotOverride = null) => {
     try {
@@ -1726,11 +1826,7 @@ export default function TransactionPaymentModal({
         otherCharges: snapshot.otherCharges || otherCharges,
         customerCards: snapshot.customerCards || customerCards,
         isDuplicateCopy: snapshot.isDuplicateCopy || false,
-        apiHost,
-        categoryCode: transaction?.Category_Code || "",
-        unitCode: transaction?.Unit_Code || "",
-        terminalNumber: transaction?.terminal_number || "1",
-        corpName: "Crabs N Crack Seafood House",
+        terminalConfig,
       });
 
       const result = await window.electronAPI.printReceipt({
