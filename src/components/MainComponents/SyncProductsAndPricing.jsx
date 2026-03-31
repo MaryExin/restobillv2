@@ -39,6 +39,22 @@ const peso = (value) =>
     maximumFractionDigits: 2,
   });
 
+const getDisplayBusunitName = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw) return "No target busunit";
+
+  const parts = raw
+    .split(/\s*-\s*/)
+    .map((v) => v.trim())
+    .filter(Boolean);
+
+  if (parts.length >= 2) {
+    return parts[parts.length - 1];
+  }
+
+  return raw;
+};
+
 const normalize = (v) =>
   String(v || "")
     .trim()
@@ -239,7 +255,7 @@ const InfoStrip = ({ isDark, title, message, tone = "blue" }) => {
         <div className="text-xs font-black uppercase tracking-[0.2em] mb-1">
           {title}
         </div>
-        <div className="text-sm">{message}</div>
+        <div className="text-sm whitespace-pre-line">{message}</div>
       </div>
     </div>
   );
@@ -491,7 +507,7 @@ const SyncingOverlay = ({ isDark }) => {
         >
           <div className="mx-auto mb-5 h-20 w-20 rounded-full border-4 border-blue-500/20 border-t-blue-500 animate-spin" />
           <div className="text-3xl font-black tracking-tight">
-            Syncing products and pricing...
+            Syncing products, pricing, sales types, and mappings...
           </div>
           <div className="mt-3 text-sm text-slate-500">
             Please wait while selected changes are being applied.
@@ -770,12 +786,19 @@ const SyncProductsAndPricing = () => {
     () => readData?.pricing_options || [],
     [readData],
   );
+
   const offlineExistingPricingCodes = useMemo(
     () => new Set(readData?.offline_existing_pricing_codes || []),
     [readData],
   );
-  const onlineExistingPricingCodes = useMemo(
-    () => new Set((readData?.pricing_options || []).map((p) => p.pricing_code)),
+
+  const busunitMappedPricingCodes = useMemo(
+    () => new Set(readData?.busunit_mapped_pricing_codes || []),
+    [readData],
+  );
+
+  const busunitSalesTypePricingRows = useMemo(
+    () => readData?.busunit_sales_type_pricing_rows || [],
     [readData],
   );
 
@@ -789,21 +812,36 @@ const SyncProductsAndPricing = () => {
     [readData],
   );
 
+  const salesTypeSummaryText = useMemo(() => {
+    if (!busunitSalesTypePricingRows.length) return "";
+
+    const grouped = busunitSalesTypePricingRows.reduce((acc, row) => {
+      const label =
+        row.sales_type_description || row.sales_type_id || "Unknown Sales Type";
+      if (!acc[label]) acc[label] = [];
+      acc[label].push(row.pricing_label || row.pricing_code || "—");
+      return acc;
+    }, {});
+
+    return Object.entries(grouped)
+      .map(([salesType, pricingLabels]) => {
+        const uniq = [...new Set(pricingLabels)];
+        return `${salesType}: ${uniq.join(", ")}`;
+      })
+      .join("\n");
+  }, [busunitSalesTypePricingRows]);
+
   useEffect(() => {
     if (selectedPricingCodes.length === 0 && pricingOptions.length > 0) {
       const defaults = pricingOptions
-        .filter((opt) => offlineExistingPricingCodes.has(opt.pricing_code))
+        .filter((opt) => busunitMappedPricingCodes.has(opt.pricing_code))
         .map((opt) => opt.pricing_code);
 
       setSelectedPricingCodes(
         defaults.length > 0 ? defaults : [pricingOptions[0].pricing_code],
       );
     }
-  }, [
-    pricingOptions,
-    offlineExistingPricingCodes,
-    selectedPricingCodes.length,
-  ]);
+  }, [pricingOptions, busunitMappedPricingCodes, selectedPricingCodes.length]);
 
   const runRefresh = useCallback(() => {
     if (isSyncing) return;
@@ -958,22 +996,10 @@ const SyncProductsAndPricing = () => {
 
   const requestPricingCodeToggle = (pricingCode) => {
     if (isSyncing) return;
+
     const next = selectedPricingCodes.includes(pricingCode)
       ? selectedPricingCodes.filter((c) => c !== pricingCode)
       : [...selectedPricingCodes, pricingCode];
-
-    const newlyAdded = next.filter(
-      (code) =>
-        !selectedPricingCodes.includes(code) &&
-        !offlineExistingPricingCodes.has(code),
-    );
-
-    if (newlyAdded.length > 0) {
-      setPendingPricingCodes(next);
-      setWarningMode("pricing_code");
-      setYesNoModalOpen(true);
-      return;
-    }
 
     setSelectedPricingCodes(next);
   };
@@ -981,17 +1007,6 @@ const SyncProductsAndPricing = () => {
   const requestCheckAllPricingCodes = () => {
     if (isSyncing) return;
     const allCodes = pricingOptions.map((p) => p.pricing_code);
-    const missingOffline = allCodes.filter(
-      (code) => !offlineExistingPricingCodes.has(code),
-    );
-
-    if (missingOffline.length > 0) {
-      setPendingPricingCodes(allCodes);
-      setWarningMode("check_all_pricing");
-      setYesNoModalOpen(true);
-      return;
-    }
-
     setSelectedPricingCodes(allCodes);
   };
 
@@ -1054,24 +1069,6 @@ const SyncProductsAndPricing = () => {
   };
 
   const modalMessage = useMemo(() => {
-    if (warningMode === "pricing_code") {
-      const missing = pendingPricingCodes.filter(
-        (c) => !offlineExistingPricingCodes.has(c),
-      );
-      return `The selected pricing code(s) ${missing.join(
-        ", ",
-      )} exist in ONLINE but not yet in OFFLINE. Continuing will include them for initial pricing sync. Continue?`;
-    }
-
-    if (warningMode === "check_all_pricing") {
-      const missing = pendingPricingCodes.filter(
-        (c) => !offlineExistingPricingCodes.has(c),
-      );
-      return `Some pricing code(s) selected by Check All do not yet exist in OFFLINE: ${missing.join(
-        ", ",
-      )}. Continue loading them for initial sync?`;
-    }
-
     const priceChangeCount = selectedRows.filter(
       (r) => r.action === "price_change",
     ).length;
@@ -1086,13 +1083,10 @@ const SyncProductsAndPricing = () => {
 
 Price changes: ${priceChangeCount}
 New products: ${newProductCount}
-Set inactive: ${inactiveCount}`;
-  }, [
-    warningMode,
-    pendingPricingCodes,
-    offlineExistingPricingCodes,
-    selectedRows,
-  ]);
+Set inactive: ${inactiveCount}
+
+This will also replace OFFLINE lkp_sales_type and tbl_pricing_by_sales_type using WEB mappings for the selected business unit.`;
+  }, [selectedRows]);
 
   const readMessage = readData?.message || "";
   const isRemoteOffline = readMessage === "Offline";
@@ -1289,7 +1283,7 @@ Set inactive: ${inactiveCount}`;
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5 mb-8">
           <StatCard
             title="Target Business Unit"
-            value={readData?.target?.busunit_name || "No target busunit"}
+            value={getDisplayBusunitName(readData?.target?.busunit_name)}
             subtitle={readData?.target?.busunitcode || "—"}
             icon={<FiPackage size={20} />}
             isDark={isDark}
@@ -1350,7 +1344,9 @@ Set inactive: ${inactiveCount}`;
                     ONLINE pricing codes
                   </div>
                   <div className="text-sm text-slate-500 mt-1">
-                    Existing OFFLINE pricing codes are checked automatically.
+                    Check state now comes from WEB{" "}
+                    <code>tbl_pricing_by_sales_type_per_bu</code> for the
+                    selected business unit.
                   </div>
                 </div>
 
@@ -1384,6 +1380,9 @@ Set inactive: ${inactiveCount}`;
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {pricingOptions.map((opt) => {
                   const checked = selectedPricingCodes.includes(
+                    opt.pricing_code,
+                  );
+                  const mappedToSelectedBu = busunitMappedPricingCodes.has(
                     opt.pricing_code,
                   );
                   const existsOffline = offlineExistingPricingCodes.has(
@@ -1430,14 +1429,24 @@ Set inactive: ${inactiveCount}`;
                         </div>
                       </div>
 
-                      <div className="mt-3">
-                        {existsOffline ? (
+                      <div className="mt-3 space-y-1">
+                        {mappedToSelectedBu ? (
                           <div className="text-xs font-black uppercase tracking-wider text-emerald-500">
-                            Already in POS
+                            Mapped in WEB selected BU
                           </div>
                         ) : (
                           <div className="text-xs font-black uppercase tracking-wider text-amber-500">
-                            ONLINE only — will warn before adding
+                            Not mapped in WEB selected BU
+                          </div>
+                        )}
+
+                        {existsOffline ? (
+                          <div className="text-[11px] font-bold text-indigo-200">
+                            Already exists in OFFLINE mapping table
+                          </div>
+                        ) : (
+                          <div className="text-[11px] font-bold text-indigo-200">
+                            Not currently in OFFLINE mapping table
                           </div>
                         )}
                       </div>
@@ -1449,6 +1458,15 @@ Set inactive: ${inactiveCount}`;
           </div>
 
           <div className="grid gap-4">
+            {busunitSalesTypePricingRows.length > 0 ? (
+              <InfoStrip
+                isDark={isDark}
+                tone="emerald"
+                title="Selected BU sales type → pricing mapping from WEB"
+                message={salesTypeSummaryText}
+              />
+            ) : null}
+
             {offlineOnlyPricingCodes.length > 0 ? (
               <InfoStrip
                 isDark={isDark}
