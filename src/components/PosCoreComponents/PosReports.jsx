@@ -30,6 +30,7 @@ import VoidsModal from "../MainComponents/ReportsModal/VoidsModal";
 import CustomersModal from "../MainComponents/ReportsModal/CustomersModal";
 import LogsModal from "../MainComponents/ReportsModal/LogsModal";
 import ModalXml from "../Modals/ModalXml";
+import ReprintModal from "../MainComponents/ReportsModal/ReprintModal";
 
 const MenuCard = ({
   icon: Icon,
@@ -48,8 +49,8 @@ const MenuCard = ({
           ? "cursor-not-allowed border-slate-800 bg-slate-900/70 opacity-60"
           : "cursor-not-allowed border-slate-200 bg-slate-100 opacity-70"
         : isDark
-          ? "border-white/10 bg-white/[0.04] hover:-translate-y-1 hover:border-blue-400/30 hover:bg-white/[0.08] hover:shadow-[0_18px_45px_rgba(0,0,0,0.28)]"
-          : "border-slate-200 bg-white hover:-translate-y-1 hover:border-blue-300 hover:bg-slate-50 hover:shadow-[0_18px_40px_rgba(15,23,42,0.10)]"
+        ? "border-white/10 bg-white/[0.04] hover:-translate-y-1 hover:border-blue-400/30 hover:bg-white/[0.08] hover:shadow-[0_18px_45px_rgba(0,0,0,0.28)]"
+        : "border-slate-200 bg-white hover:-translate-y-1 hover:border-blue-300 hover:bg-slate-50 hover:shadow-[0_18px_40px_rgba(15,23,42,0.10)]"
     }`}
   >
     <div
@@ -71,8 +72,8 @@ const MenuCard = ({
             ? "text-slate-500"
             : "text-slate-400"
           : isDark
-            ? "text-slate-200"
-            : "text-slate-700"
+          ? "text-slate-200"
+          : "text-slate-700"
       }`}
     >
       {label}
@@ -90,7 +91,8 @@ const MenuCard = ({
   </button>
 );
 
-const PosReports = ({ open, onClose }) => {
+// Idinagdag ang terminalNumber, categoryCode, unitCode sa props
+const PosReports = ({ open, onClose, terminalNumber, categoryCode, unitCode }) => {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const [activeModal, setActiveModal] = useState(null);
@@ -138,7 +140,7 @@ const PosReports = ({ open, onClose }) => {
       label: "Z-Reading",
       icon: FaPrint,
       color: "text-yellow-500",
-      comingSoon: true,
+      action: () => setActiveModal("reprint"),
     },
     {
       label: "Customers",
@@ -292,8 +294,17 @@ const PosReports = ({ open, onClose }) => {
         isOpen={activeModal === "xml"}
         onClose={() => setActiveModal(null)}
       />
+      
+      {/* Ipinasa ang mga IDs para sa ReprintModal fetching */}
+      <ReprintModal
+        isOpen={activeModal === "reprint"}
+        onClose={() => setActiveModal(null)}
+        terminalNumber={terminalNumber}
+        categoryCode={categoryCode}
+        unitCode={unitCode}
+      />
     </>,
-    document.body,
+    document.body
   );
 };
 
