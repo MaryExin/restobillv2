@@ -601,79 +601,93 @@ const SalesDashboard = () => {
     return arr;
   }, [hourlyPerProductAll]);
 
-  const dailyChart = useMemo(() => {
-    const labels = dailyGraph.map((r) => r["Date"]);
-    const gross = dailyGraph.map((r) => Number(r["Gross Sales"] || 0));
-    const net = dailyGraph.map((r) => Number(r["Net Sales"] || 0));
-    const disc = dailyGraph.map(
-      (r) =>
-        Number(r["SRC Disc."] || 0) +
-        Number(r["PWD Disc."] || 0) +
-        Number(r["NAAC Disc."] || 0) +
-        Number(r["Solo Parent Disc."] || 0) +
-        Number(r["Other Disc."] || 0),
-    );
+const dailyChart = useMemo(() => {
+  const labels = dailyGraph.map((r) => r["Date"]);
+  const gross = dailyGraph.map((r) => Number(r["Gross Sales"] || 0));
+  const net = dailyGraph.map((r) => Number(r["Net Sales"] || 0));
+  const disc = dailyGraph.map(
+    (r) =>
+      Number(r["SRC Disc."] || 0) +
+      Number(r["PWD Disc."] || 0) +
+      Number(r["NAAC Disc."] || 0) +
+      Number(r["Solo Parent Disc."] || 0) +
+      Number(r["Other Disc."] || 0),
+  );
 
-    return {
-      labels,
-      datasets: [
-        {
-          label: "Gross Sales",
-          data: gross,
-          fill: true,
-          borderColor: "rgba(59,130,246,1)",
-          backgroundColor: "rgba(59,130,246,0.14)",
-          tension: 0.35,
-          pointRadius: 0,
-        },
-        {
-          label: "Net Sales",
-          data: net,
-          fill: false,
-          borderColor: "rgba(34,197,94,1)",
-          backgroundColor: "transparent",
-          tension: 0.35,
-          pointRadius: 0,
-        },
-        {
-          label: "Discounts",
-          data: disc,
-          fill: false,
-          borderColor: "rgba(234,179,8,1)",
-          backgroundColor: "transparent",
-          tension: 0.35,
-          pointRadius: 0,
-        },
-      ],
-    };
-  }, [dailyGraph]);
+  return {
+    labels,
+    datasets: [
+      {
+        label: "Gross Sales",
+        data: gross,
+        fill: true,
+        borderColor: "rgba(37,99,235,1)",
+        backgroundColor: "rgba(37,99,235,0.14)",
+        tension: 0.35,
+        pointRadius: 0,
+        pointHoverRadius: 6,
+        pointHitRadius: 16,
+      },
+      {
+        label: "Net Sales",
+        data: net,
+        fill: false,
+        borderColor: "rgba(34,197,94,1)",
+        backgroundColor: "transparent",
+        tension: 0.35,
+        pointRadius: 0,
+        pointHoverRadius: 6,
+        pointHitRadius: 16,
+      },
+      {
+        label: "Discounts",
+        data: disc,
+        fill: false,
+        borderColor: "rgba(234,179,8,1)",
+        backgroundColor: "transparent",
+        tension: 0.35,
+        pointRadius: 0,
+        pointHoverRadius: 6,
+        pointHitRadius: 16,
+      },
+    ],
+  };
+}, [dailyGraph]);
 
   const lineOptions = useMemo(
     () => ({
       maintainAspectRatio: false,
+      interaction: {
+        mode: "index",
+        intersect: false,
+      },
       plugins: {
-        legend: { labels: { color: theme === "dark" ? "#cbd5e1" : "#334155" } },
+        legend: { labels: { color: "#334155" } },
+        tooltip: {
+          enabled: true,
+          callbacks: {
+            title: (items) => items?.[0]?.label || "",
+            label: (ctx) => `${ctx.dataset.label}: ${peso0(ctx.parsed.y)}`,
+          },
+        },
       },
       scales: {
         x: {
-          ticks: { color: theme === "dark" ? "#94a3b8" : "#64748b" },
+          ticks: { color: "#64748b" },
           grid: { display: false },
         },
         y: {
           ticks: {
-            color: theme === "dark" ? "#94a3b8" : "#64748b",
+            color: "#64748b",
             callback: (v) => peso0(v),
           },
           grid: {
-            color:
-              theme === "dark"
-                ? "rgba(148,163,184,0.12)"
-                : "rgba(148,163,184,0.22)",
+            color: "rgba(148,163,184,0.18)",
           },
         },
       },
     }),
-    [theme],
+    [],
   );
 
   const hourlyTotals = useMemo(() => {
