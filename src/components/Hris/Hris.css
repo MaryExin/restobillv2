@@ -1,0 +1,25 @@
+/* For screens with a minimum width of 1024px (large screens) */
+@media screen and (min-width: 1024px) {
+  .header_circle {
+    clip-path: polygon(0 0, 100% 0, 100% 57%, 0 74%);
+  }
+}
+
+.text_shadow {
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* Default styles for the iframe */
+iframe {
+  margin-left: -30px;
+  width: 280px;
+  height: 150px;
+}
+
+/* Media query for larger screens (e.g., screens with a minimum width of 768px) */
+@media screen and (min-width: 768px) {
+  iframe {
+    width: 800px;
+    height: 400px; /* You can adjust the height as needed */
+  }
+}
