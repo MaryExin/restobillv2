@@ -780,7 +780,11 @@ const MemberQueings = () => {
         <TopNav
           activeNavView={activeNavView}
           setActiveNavView={setActiveNavView}
-          onBack={() => navigate(-1)}
+          onBack={() =>
+        navigate("/poscorehomescreen", {
+          state: { openSettings: true },
+        })
+        }
         />
 
         <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8 pt-6 sm:pt-10 pb-24">
