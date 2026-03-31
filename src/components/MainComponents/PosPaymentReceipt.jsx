@@ -254,7 +254,7 @@ const PosPaymentReceipt = React.forwardRef(
       transaction?.terminal_number,
       transaction?.corp_name,
     ]);
-console.log(shiftDetails?.terminal);
+
     const receiptInfo = useMemo(() => {
       const terminal = shiftDetails?.terminal || {};
 

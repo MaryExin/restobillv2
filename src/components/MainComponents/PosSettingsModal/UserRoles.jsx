@@ -3,10 +3,17 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FiEye, FiX } from "react-icons/fi";
-import { FaUserShield } from "react-icons/fa6";
+import { FaUserShield, FaArrowLeft } from "react-icons/fa6";
+import {
+  HiOutlineMoon,
+  HiOutlineViewColumns,
+  HiOutlineSquares2X2,
+} from "react-icons/hi2";
+import { useNavigate } from "react-router-dom";
 
 import InfiniteScrollComponent from "../../../components/InfiniteScrolling/InfiniteScrollComponent";
 import CmpUserRolesSetup from "../../../components/Setup/CmpUserRolesSetup";
+import ModalYesNoReusable from "../../Modals/ModalYesNoReusable";
 
 import { useQueryClient } from "@tanstack/react-query";
 import useCustomInfiniteQuery from "../../../hooks/useCustomInfiniteQuery";
@@ -91,23 +98,50 @@ const FloatingReadButton = ({ onOpen, disabled = false }) => {
   );
 };
 
+const TopNav = ({ activeNavView, setActiveNavView }) => {
+  const navigate = useNavigate();
+
+  return (
+    <div className="sticky top-0 z-30 bg-[#eeeeef]/90 backdrop-blur-xl">
+      <div className="mx-auto flex w-full max-w-[1450px] items-center justify-between pt-8 sm:px-6 lg:px-10 mr-8">
+        <button
+          type="button"
+          onClick={() => navigate("/poscorehomescreen")}
+          className="group inline-flex items-center gap-3 rounded-full border border-slate-300/90 bg-white px-7 py-5 text-slate-600 shadow-[0_8px_30px_rgba(15,23,42,0.05)] transition-all duration-200 hover:-translate-y-[1px] hover:text-slate-900"
+        >
+          <FaArrowLeft
+            size={16}
+            className="transition-transform duration-200 group-hover:-translate-x-0.5"
+          />
+          <span className="text-[13px] font-extrabold uppercase tracking-[0.01em]">
+            Back to Dashboard
+          </span>
+        </button>
+      </div>
+    </div>
+  );
+};
+
 /* -------------------------------------------------------------------------- */
-/* Main Page                                                                    */
+/* Main Page                                                                   */
 /* -------------------------------------------------------------------------- */
 const UserRoles = () => {
-
-
   const [isReadModalOpen, setIsReadModalOpen] = useState(false);
+  const [activeNavView, setActiveNavView] = useState("grid");
 
   return (
     <>
-
-      <div className="relative w-full min-h-screen overflow-x-hidden overflow-y-auto mt-[6vh] bg-slate-50 pb-10">
+      <div className="relative w-full min-h-screen overflow-x-hidden overflow-y-auto bg-[#eeeeef] pb-10">
         <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-white via-white to-[#faf7f5]" />
-          <div className="absolute -top-36 -left-40 h-[520px] w-[520px] rounded-full bg-[radial-gradient(circle_at_30%_30%,rgba(215,85,41,0.14),transparent_55%)] blur-2xl" />
-          <div className="absolute -bottom-44 -right-44 h-[600px] w-[600px] rounded-full bg-[radial-gradient(circle_at_70%_70%,rgba(168,85,247,0.12),transparent_58%)] blur-2xl" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#f0f0f1] via-[#efeff0] to-[#faf7f5]" />
+          <div className="absolute -top-36 -left-40 h-[520px] w-[520px] rounded-full bg-[radial-gradient(circle_at_30%_30%,rgba(215,85,41,0.08),transparent_55%)] blur-2xl" />
+          <div className="absolute -bottom-44 -right-44 h-[600px] w-[600px] rounded-full bg-[radial-gradient(circle_at_70%_70%,rgba(168,85,247,0.08),transparent_58%)] blur-2xl" />
         </div>
+
+        <TopNav
+          activeNavView={activeNavView}
+          setActiveNavView={setActiveNavView}
+        />
 
         <div className="mx-auto w-full max-w-7xl px-4 lg:px-10">
           <motion.div
@@ -120,7 +154,7 @@ const UserRoles = () => {
                 <div className="space-y-2">
                   <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600">
                     <span className="h-2 w-2 rounded-full bg-orange-600" />
-                    Exinnov • User Access Control
+                    Lightem • User Access Control
                   </div>
 
                   <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-slate-900">
@@ -130,9 +164,8 @@ const UserRoles = () => {
                   </h1>
 
                   <p className="text-sm text-slate-600">
-                    Assign access faster: choose the user, pick a{" "}
-                    <b>Function</b>, then fine-tune routes, business units, and
-                    teams.
+                    Assign access faster: choose the user, pick a <b>Function</b>
+                    , then fine-tune routes, business units, and teams.
                   </p>
                 </div>
 
@@ -232,8 +265,8 @@ const UserRoles = () => {
                   </div>
                   <div className="mt-2 text-xs text-slate-600">
                     If you want a user to access a module, ensure they have its{" "}
-                    <b>route role</b> plus any business unit or team
-                    restrictions your system requires.
+                    <b>route role</b> plus any business unit or team restrictions
+                    your system requires.
                   </div>
                 </div>
               </div>
@@ -255,10 +288,28 @@ const UserRoles = () => {
 export default UserRoles;
 
 /* -------------------------------------------------------------------------- */
-/* Read Modal                                                                   */
+/* Read Modal                                                                  */
 /* -------------------------------------------------------------------------- */
 const ReadUserRolesModal = ({ isOpen, onClose }) => {
   const queryClient = useQueryClient();
+
+  const apiHost = useMemo(() => {
+    const stored = localStorage.getItem("apiendpoint");
+
+    if (!stored || stored === "null" || stored === "undefined") {
+      return "http://localhost";
+    }
+
+    return stored;
+  }, []);
+
+  const infiniteUserRoleUrl = useMemo(() => {
+    return `${apiHost}${import.meta.env.VITE_INFINITE_USER_ROLE_ENDPOINT}`;
+  }, [apiHost]);
+
+  const mutateUserRolesUrl = useMemo(() => {
+    return `${apiHost}${import.meta.env.VITE_MUTATE_USER_ROLES_ENDPOINT}`;
+  }, [apiHost]);
 
   const [localSearch, setLocalSearch] = useState("");
   const [searchRole, setSearchRole] = useState("");
@@ -283,10 +334,6 @@ const ReadUserRolesModal = ({ isOpen, onClose }) => {
     [searchRole, pageItems],
   );
 
-  const infiniteUrl =
-    localStorage.getItem("apiendpoint") +
-    import.meta.env.VITE_INFINITE_USER_ROLE_ENDPOINT;
-
   const {
     data: readUserRoleData,
     fetchNextPage,
@@ -294,14 +341,18 @@ const ReadUserRolesModal = ({ isOpen, onClose }) => {
     isFetchingNextPage,
     refetch,
     isFetching,
-  } = useCustomInfiniteQuery(infiniteUrl, queryKey, searchRole, pageItems);
+  } = useCustomInfiniteQuery(
+    infiniteUserRoleUrl,
+    queryKey,
+    searchRole,
+    pageItems,
+  );
 
-  const { data: deleteRoleData, isLoading: deleteRoleIsLoading, mutate: deleteRole } =
-    useSecuredMutation(
-      localStorage.getItem("apiendpoint") +
-        import.meta.env.VITE_MUTATE_USER_ROLES_ENDPOINT,
-      "DELETE",
-    );
+  const {
+    data: deleteRoleData,
+    isLoading: deleteRoleIsLoading,
+    mutate: deleteRole,
+  } = useSecuredMutation(mutateUserRolesUrl, "DELETE");
 
   const classOptions = useMemo(() => {
     const values = new Set();
@@ -323,6 +374,11 @@ const ReadUserRolesModal = ({ isOpen, onClose }) => {
 
   const postResetToSupabase = async (rowForEmail) => {
     try {
+      if (typeof supabase === "undefined") {
+        setSupabasePostMsg("Skipped Supabase insert (supabase not configured)");
+        return;
+      }
+
       const companycode = localStorage.getItem("companycode") || "";
       const emailFromRow = rowForEmail?.email || "";
       const emailFallback = localStorage.getItem("email") || "";
@@ -561,9 +617,9 @@ const ReadUserRolesModal = ({ isOpen, onClose }) => {
                                 String(roleClassFilter)
                               );
                             })
-                            .map((item) => (
+                            .map((item, index) => (
                               <tr
-                                key={item.uuid}
+                                key={`${item.uuid}-${index}`}
                                 className="hover:bg-slate-50 transition"
                               >
                                 <td className="px-5 py-3 text-sm text-slate-900">

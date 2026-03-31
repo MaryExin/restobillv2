@@ -15,7 +15,10 @@ import ProductList from "./components/MainComponents/Productlist";
 import SyncProductsAndPricing from "./components/MainComponents/SyncProductsAndPricing";
 import PrivateRoute from "./routes/PrivateRoute";
 import SyncOfflineSalesToWeb from "./components/MainComponents/SyncOfflineSalesToWeb";
-
+import UserRoles from "./components/MainComponents/PosSettingsModal/UserRoles";
+import CmpEmployeeInfo from "./components/Hris/CmpEmployeeInfo";
+import MemberQueings from "../src/pages/Admin/MemberQueings";
+import MemberProfile from "./components/Hris/MemberProfile";
 const App = () => {
   return (
     <HashRouter>
@@ -58,6 +61,35 @@ const App = () => {
             element={<SyncOfflineSalesToWeb />}
           />
         </Route>
+
+        <Route
+          path="/employeeinfo"
+          element={<PrivateRoute routename={"/pricesyncing"} />}
+        >
+          <Route path="/employeeinfo" element={<CmpEmployeeInfo />} />
+        </Route>
+
+        <Route
+          path="/userroles"
+          element={<PrivateRoute routename={"/pricesyncing"} />}
+        >
+          <Route path="/userroles" element={<UserRoles />} />
+        </Route>
+
+        <Route
+          path="/userqueu"
+          element={<PrivateRoute routename={"/pricesyncing"} />}
+        >
+          <Route path="/userqueu" element={<MemberQueings />} />
+        </Route>
+
+          <Route
+            path="/"
+            element={<PrivateRoute routename={"/pricesyncing"} />}
+          >
+            <Route path="/memberprofile/:id" element={<MemberProfile />} />
+          </Route>
+
       </Routes>
 
       <GlobalThemeToggle />
