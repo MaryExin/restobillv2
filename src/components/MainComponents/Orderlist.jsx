@@ -689,7 +689,9 @@ const Orderlist = ({
   );
 
   const buildCartMergeKey = (item) => {
-    const code = String(item?.code || "").trim().toLowerCase();
+    const code = String(item?.code || "")
+      .trim()
+      .toLowerCase();
     const instruction = String(item?.itemInstruction || "")
       .trim()
       .toLowerCase();
@@ -725,7 +727,9 @@ const Orderlist = ({
   const visibleAdditionalCartItems = useMemo(() => {
     if (additionalCartItems.length === 0) return [];
 
-    const loadedKeys = new Set(loadedCartItems.map((item) => buildCartMergeKey(item)));
+    const loadedKeys = new Set(
+      loadedCartItems.map((item) => buildCartMergeKey(item)),
+    );
 
     return additionalCartItems.filter(
       (item) => !loadedKeys.has(buildCartMergeKey(item)),
@@ -821,7 +825,8 @@ const Orderlist = ({
       const nextItems = [...items];
       const additionalIndex = nextItems.findIndex(
         (entry) =>
-          entry.isLoadedFromDB !== true && buildCartMergeKey(entry) === mergedKey,
+          entry.isLoadedFromDB !== true &&
+          buildCartMergeKey(entry) === mergedKey,
       );
 
       if (additionalIndex >= 0) {
@@ -1563,7 +1568,9 @@ const Orderlist = ({
       ]);
 
       if (mergedTables.length === 0) {
-        alert("Please select at least one table to merge or type a custom table name.");
+        alert(
+          "Please select at least one table to merge or type a custom table name.",
+        );
         return;
       }
     }
@@ -1610,7 +1617,8 @@ const Orderlist = ({
       let finalTransactionType = "";
 
       if (transferMode === "fixed") {
-        finalTableValue = customTransferTableName.trim() || selectedTransferTable;
+        finalTableValue =
+          customTransferTableName.trim() || selectedTransferTable;
         finalRemarks = `Transferred from table ${tableselected} to ${finalTableValue}`;
         finalTransactionType = "TRANSFER TABLE";
       } else if (transferMode === "merge") {
@@ -2315,7 +2323,8 @@ const Orderlist = ({
                               isDark ? "text-slate-400" : "text-slate-500"
                             }`}
                           >
-                            Choose fixed table, merge tables, or type a special table name.
+                            Choose fixed table, merge tables, or type a special
+                            table name.
                           </p>
                         </div>
 
@@ -2380,7 +2389,9 @@ const Orderlist = ({
                               type="text"
                               placeholder="Search fixed table..."
                               value={transferSearch}
-                              onChange={(e) => setTransferSearch(e.target.value)}
+                              onChange={(e) =>
+                                setTransferSearch(e.target.value)
+                              }
                               className={`w-full rounded-xl py-3 pl-11 pr-4 text-sm focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${
                                 isDark
                                   ? "bg-slate-900/50 border border-slate-800 text-white focus:border-blue-500/40"
@@ -2408,25 +2419,28 @@ const Orderlist = ({
                               {transferTableList.filter((table) =>
                                 String(table.table_name || "")
                                   .toLowerCase()
-                                  .includes(transferSearch.toLowerCase())
+                                  .includes(transferSearch.toLowerCase()),
                               ).length > 0 ? (
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                                   {transferTableList
                                     .filter((table) =>
                                       String(table.table_name || "")
                                         .toLowerCase()
-                                        .includes(transferSearch.toLowerCase())
+                                        .includes(transferSearch.toLowerCase()),
                                     )
                                     .map((table) => {
                                       const tableName = table.table_name;
                                       const isSelected =
-                                        String(selectedTransferTable) === String(tableName);
+                                        String(selectedTransferTable) ===
+                                        String(tableName);
 
                                       return (
                                         <button
                                           key={table.ID ?? tableName}
                                           type="button"
-                                          onClick={() => setSelectedTransferTable(tableName)}
+                                          onClick={() =>
+                                            setSelectedTransferTable(tableName)
+                                          }
                                           className={`group relative rounded-xl px-3 py-3 text-left transition-all duration-200 border shadow-sm hover:scale-[1.01] active:scale-[0.98] ${
                                             isSelected
                                               ? isDark
@@ -2471,7 +2485,9 @@ const Orderlist = ({
                                               {isSelected ? (
                                                 <FaCheck size={9} />
                                               ) : (
-                                                <span className="text-[9px] font-bold">+</span>
+                                                <span className="text-[9px] font-bold">
+                                                  +
+                                                </span>
                                               )}
                                             </div>
                                           </div>
@@ -2506,7 +2522,9 @@ const Orderlist = ({
                               type="text"
                               placeholder="e.g. VIP Table, Function Hall"
                               value={customTransferTableName}
-                              onChange={(e) => setCustomTransferTableName(e.target.value)}
+                              onChange={(e) =>
+                                setCustomTransferTableName(e.target.value)
+                              }
                               className={`w-full rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${
                                 isDark
                                   ? "bg-slate-900/50 border border-slate-800 text-white placeholder:text-slate-500 focus:border-blue-500/40"
@@ -2561,7 +2579,9 @@ const Orderlist = ({
                               type="text"
                               placeholder="Search tables to merge..."
                               value={transferSearch}
-                              onChange={(e) => setTransferSearch(e.target.value)}
+                              onChange={(e) =>
+                                setTransferSearch(e.target.value)
+                              }
                               className={`w-full rounded-xl py-3 pl-11 pr-4 text-sm focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${
                                 isDark
                                   ? "bg-slate-900/50 border border-slate-800 text-white focus:border-blue-500/40"
@@ -2593,19 +2613,22 @@ const Orderlist = ({
                                     const isSelected = selectedMergeTables.some(
                                       (item) =>
                                         normalizeTableName(item) ===
-                                        normalizeTableName(tableName)
+                                        normalizeTableName(tableName),
                                     );
-                                    const isCurrentTable = currentTableParts.some(
-                                      (item) =>
-                                        normalizeTableName(item) ===
-                                        normalizeTableName(tableName)
-                                    );
+                                    const isCurrentTable =
+                                      currentTableParts.some(
+                                        (item) =>
+                                          normalizeTableName(item) ===
+                                          normalizeTableName(tableName),
+                                      );
 
                                     return (
                                       <button
                                         key={table.ID ?? tableName}
                                         type="button"
-                                        onClick={() => toggleMergeTableSelection(tableName)}
+                                        onClick={() =>
+                                          toggleMergeTableSelection(tableName)
+                                        }
                                         className={`group relative rounded-xl px-3 py-3 text-left transition-all duration-200 border shadow-sm hover:scale-[1.01] active:scale-[0.98] ${
                                           isSelected
                                             ? isDark
@@ -2629,7 +2652,9 @@ const Orderlist = ({
                                                     : "text-slate-400"
                                               }`}
                                             >
-                                              {isCurrentTable ? "Current" : "Table"}
+                                              {isCurrentTable
+                                                ? "Current"
+                                                : "Table"}
                                             </p>
                                             <p className="text-sm font-extrabold leading-tight break-words">
                                               {tableName}
@@ -2650,7 +2675,9 @@ const Orderlist = ({
                                             {isSelected ? (
                                               <FaCheck size={9} />
                                             ) : (
-                                              <span className="text-[9px] font-bold">+</span>
+                                              <span className="text-[9px] font-bold">
+                                                +
+                                              </span>
                                             )}
                                           </div>
                                         </div>
@@ -2685,7 +2712,9 @@ const Orderlist = ({
                               type="text"
                               placeholder="e.g. VIP Table, Function Hall"
                               value={customMergeTableName}
-                              onChange={(e) => setCustomMergeTableName(e.target.value)}
+                              onChange={(e) =>
+                                setCustomMergeTableName(e.target.value)
+                              }
                               className={`w-full rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${
                                 isDark
                                   ? "bg-slate-900/50 border border-slate-800 text-white placeholder:text-slate-500 focus:border-blue-500/40"
