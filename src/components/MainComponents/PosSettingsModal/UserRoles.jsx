@@ -106,7 +106,11 @@ const TopNav = ({ activeNavView, setActiveNavView }) => {
       <div className="mx-auto flex w-full max-w-[1450px] items-center justify-between pt-8 sm:px-6 lg:px-10 mr-8">
         <button
           type="button"
-          onClick={() => navigate("/poscorehomescreen")}
+          onClick={() =>
+          navigate("/poscorehomescreen", {
+            state: { openSettings: true },
+          })
+          }
           className="group inline-flex items-center gap-3 rounded-full border border-slate-300/90 bg-white px-7 py-5 text-slate-600 shadow-[0_8px_30px_rgba(15,23,42,0.05)] transition-all duration-200 hover:-translate-y-[1px] hover:text-slate-900"
         >
           <FaArrowLeft

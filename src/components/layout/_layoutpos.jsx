@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FaHome,
@@ -44,7 +44,8 @@ const HEADER_HEIGHT = 96;
 const FOOTER_HEIGHT = 118;
 
 const LayoutPos = ({ children }) => {
-  const navigate = useNavigate();
+const navigate = useNavigate();
+const location = useLocation();
   const apiHost = useApiHost();
   const { theme } = useTheme();
   const isDark = theme === "dark";
@@ -79,6 +80,17 @@ const LayoutPos = ({ children }) => {
       setIsLoading(false);
     }
   }, [userId, apiHost]);
+
+  useEffect(() => {
+  if (location.state?.openSettings) {
+    setIsSettingsOpen(true);
+
+    navigate(location.pathname, {
+      replace: true,
+      state: {},
+    });
+  }
+}, [location, navigate]);
 
   useEffect(() => {
     fetchShiftData();
