@@ -77,10 +77,10 @@ const App = () => {
         </Route>
 
         <Route
-          path="/userqueu"
+          path="/usersqueu"
           element={<PrivateRoute routename={"/pricesyncing"} />}
         >
-          <Route path="/userqueu" element={<MemberQueings />} />
+          <Route path="/usersqueu" element={<MemberQueings />} />
         </Route>
 
           <Route

@@ -60,7 +60,7 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
   const navItems = [
     { id: "My Account", icon: FiUser },
     { id: "User Accounts", icon: FiUsers, route: "/employeeinfo" },
-    { id: "User Approval", icon: FiUsers, route: "/userqueu" },
+    { id: "User Approval", icon: FiUsers, route: "/usersqueu" },
     { id: "User Roles", icon: FiShield, route: "/userroles" },
     { id: "Registry Sales", icon: FiTrendingUp },
     { id: "Expenses & Petty", icon: FiCreditCard },
