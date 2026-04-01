@@ -224,15 +224,15 @@ export function BuildPrintableDiscountReceiptHtml({
         <div className="print-root">
           <div className="center">
             <div className="black bigger">CRABS N CRACK SEAFOOD HOUSE</div>
-            <div className="bold text-12 mt-2">
-              AND SHAKING CRABS - STA. MARIA
+            <div className="mt-2 bold text-12">
+              AND SHAKING CRABS - GUIGUINTO
             </div>
             <div className="bold text-12">ARU FOOD CORP.</div>
           </div>
 
           <div className="divider" />
 
-          <div className="center black big mb-8">BILLING</div>
+          <div className="mb-8 center black big">BILLING</div>
 
           <table>
             <tbody>
@@ -294,9 +294,9 @@ export function BuildPrintableDiscountReceiptHtml({
           <table>
             <thead>
               <tr>
-                <th className="left item-col pb-4">Item</th>
-                <th className="qty-col pb-4">Qty</th>
-                <th className="amt-col pb-4">Amt</th>
+                <th className="pb-4 left item-col">Item</th>
+                <th className="pb-4 qty-col">Qty</th>
+                <th className="pb-4 amt-col">Amt</th>
               </tr>
             </thead>
             <tbody>
@@ -365,7 +365,7 @@ export function BuildPrintableDiscountReceiptHtml({
 
           <div className="divider" />
 
-          <div className="amount-due mb-8">
+          <div className="mb-8 amount-due">
             <span className="amount-due-label">AMOUNT DUE:</span>
             <span className="amount-due-value">
               {peso(computed?.netAfterDiscount)}

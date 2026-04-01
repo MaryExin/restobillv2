@@ -390,7 +390,7 @@ const PosPaymentReceipt = React.forwardRef(
           <div
             style={{ fontWeight: "700", fontSize: "12px", marginTop: "2px" }}
           >
-            {receiptInfo.businessUnitName || "AND SHAKING CRABS - STA. MARIA"}
+            {receiptInfo.businessUnitName || "AND SHAKING CRABS - GUIGUINTO"}
           </div>
 
           <div style={{ fontWeight: "700", fontSize: "12px" }}>

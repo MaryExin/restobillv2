@@ -87,7 +87,7 @@ export function BuildPosPaymentReceiptHtml({
     terminalConfig?.corpName || "CRABS N CRACK SEAFOOD HOUSE";
 
   const businessUnitName =
-    terminalConfig?.businessUnitName || "AND SHAKING CRABS - STA. MARIA";
+    terminalConfig?.businessUnitName || "AND SHAKING CRABS - GUIGUINTO";
 
   const legalEntityName =
     terminalConfig?.legalEntityName ||

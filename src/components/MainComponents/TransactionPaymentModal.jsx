@@ -255,7 +255,7 @@ const YesNoModal = ({
           <p className="mt-2 text-sm text-slate-500">{message}</p>
         </div>
 
-        <div className="mt-6 grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 mt-6">
           <button
             type="button"
             onClick={onClose}
@@ -313,12 +313,12 @@ const SuccessModal = ({
           <p className="mt-2 text-sm text-slate-500">{message}</p>
         </div>
 
-        <div className="mt-6 grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 mt-6">
           <ButtonComponent
             type="button"
             onClick={onClose}
             variant={isDark ? "dark" : "secondary"}
-            className="px-6 py-3 text-sm mb-0"
+            className="px-6 py-3 mb-0 text-sm"
             disabled={isPrinting}
           >
             Continue
@@ -329,7 +329,7 @@ const SuccessModal = ({
             onClick={onPrint}
             variant="primary"
             icon={<FiPrinter size={15} />}
-            className="px-6 py-3 text-sm mb-0"
+            className="px-6 py-3 mb-0 text-sm"
             isLoading={isPrinting}
             loadingText="Printing..."
             disabled={isPrinting}
@@ -398,12 +398,12 @@ const PaymentMethodPickerModal = ({
                   <img
                     src={buildImagePath(method.mop)}
                     alt={method.mop}
-                    className="h-12 w-12 object-contain"
+                    className="object-contain w-12 h-12"
                     onError={(e) => {
                       e.currentTarget.style.display = "none";
                     }}
                   />
-                  <span className="text-center text-sm font-semibold leading-tight">
+                  <span className="text-sm font-semibold leading-tight text-center">
                     {method.mop}
                   </span>
                 </div>
@@ -412,10 +412,10 @@ const PaymentMethodPickerModal = ({
           </div>
         )}
 
-        <div className="mt-6 flex justify-center">
+        <div className="flex justify-center mt-6">
           <button
             onClick={onClose}
-            className="rounded-2xl bg-blue-600 px-10 py-3 text-sm font-black text-white transition hover:bg-blue-500"
+            className="px-10 py-3 text-sm font-black text-white transition bg-blue-600 rounded-2xl hover:bg-blue-500"
           >
             Close
           </button>
@@ -470,7 +470,7 @@ const OtherChargesModal = ({
         </p>
       </div>
 
-      <div className="space-y-4 p-5 md:p-6">
+      <div className="p-5 space-y-4 md:p-6">
         {rows.map((row, index) => (
           <div
             key={index}
@@ -484,7 +484,7 @@ const OtherChargesModal = ({
               type="button"
               onClick={() => removeRow(index)}
               disabled={readOnly}
-              className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white transition hover:bg-blue-500 disabled:opacity-50"
+              className="flex items-center justify-center text-white transition bg-blue-600 h-11 w-11 rounded-2xl hover:bg-blue-500 disabled:opacity-50"
             >
               <FiTrash2 size={16} />
             </button>
@@ -549,7 +549,7 @@ const OtherChargesModal = ({
 
           <button
             onClick={onClose}
-            className="rounded-2xl bg-blue-600 px-10 py-3 text-sm font-black text-white transition hover:bg-blue-500"
+            className="px-10 py-3 text-sm font-black text-white transition bg-blue-600 rounded-2xl hover:bg-blue-500"
           >
             Continue
           </button>
@@ -597,7 +597,7 @@ const CustomerInfoModal = ({
       zIndex="z-[100002]"
     >
       <div className="p-5 md:p-6">
-        <div className="mb-5 flex items-start justify-between gap-4">
+        <div className="flex items-start justify-between gap-4 mb-5">
           <div className="flex items-center gap-3">
             <div
               className={`flex h-12 w-12 items-center justify-center rounded-2xl ${
@@ -653,7 +653,7 @@ const CustomerInfoModal = ({
               </div>
             </div>
 
-            <div className="hidden items-center justify-center md:flex">
+            <div className="items-center justify-center hidden md:flex">
               <div
                 className={`flex h-24 w-24 items-center justify-center rounded-full ${
                   isDark
@@ -690,7 +690,7 @@ const CustomerInfoModal = ({
                       : "border-slate-200 bg-slate-50"
                   }`}
                 >
-                  <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="flex items-center justify-between gap-3 mb-3">
                     <div>
                       <h3 className="text-sm font-black">
                         Discount Customer #{index + 1}
@@ -704,7 +704,7 @@ const CustomerInfoModal = ({
                       <button
                         type="button"
                         onClick={() => clearCard(index)}
-                        className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white transition hover:bg-blue-500"
+                        className="flex items-center justify-center text-white transition bg-blue-600 h-11 w-11 rounded-2xl hover:bg-blue-500"
                       >
                         <FiTrash2 size={16} />
                       </button>
@@ -785,10 +785,10 @@ const CustomerInfoModal = ({
           )}
         </div>
 
-        <div className="mt-5 flex justify-center">
+        <div className="flex justify-center mt-5">
           <button
             onClick={onClose}
-            className="rounded-2xl bg-blue-600 px-10 py-3 text-sm font-black text-white transition hover:bg-blue-500"
+            className="px-10 py-3 text-sm font-black text-white transition bg-blue-600 rounded-2xl hover:bg-blue-500"
           >
             Continue
           </button>
@@ -894,10 +894,10 @@ const DiscountSetupModal = ({
         </div>
       </div>
 
-      <div className="space-y-4 p-5">
+      <div className="p-5 space-y-4">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <SectionCard isDark={isDark}>
-            <div className="mb-3 flex items-center gap-2">
+            <div className="flex items-center gap-2 mb-3">
               <FiFileText size={14} className="text-slate-500" />
               <h3 className="text-sm font-black">Customer Count</h3>
             </div>
@@ -993,27 +993,27 @@ const DiscountSetupModal = ({
           </SectionCard>
 
           <SectionCard isDark={isDark}>
-            <div className="mb-3 flex items-center gap-2">
+            <div className="flex items-center gap-2 mb-3">
               <FiTag size={14} className="text-slate-500" />
               <h3 className="text-sm font-black">Computation Summary</h3>
             </div>
 
             <div className="space-y-2 text-[13px]">
-              <div className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
+              <div className="flex items-center justify-between gap-2 pb-2 border-b border-dashed border-slate-300/20">
                 <span className="text-slate-500">Discountable Gross</span>
                 <span className="font-semibold">
                   {peso(computed.discountableGross)}
                 </span>
               </div>
 
-              <div className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
+              <div className="flex items-center justify-between gap-2 pb-2 border-b border-dashed border-slate-300/20">
                 <span className="text-slate-500">Discountable Base</span>
                 <span className="font-semibold">
                   {peso(computed.discountableBase)}
                 </span>
               </div>
 
-              <div className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
+              <div className="flex items-center justify-between gap-2 pb-2 border-b border-dashed border-slate-300/20">
                 <span className="text-slate-500">Statutory Qualified</span>
                 <span className="font-semibold">
                   {computed.statutoryQualifiedCount} /{" "}
@@ -1030,7 +1030,7 @@ const DiscountSetupModal = ({
                 .map((entry) => (
                   <div
                     key={entry.key}
-                    className="rounded-2xl bg-emerald-500/10 px-3 py-3"
+                    className="px-3 py-3 rounded-2xl bg-emerald-500/10"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-[12px] font-bold">
@@ -1047,21 +1047,21 @@ const DiscountSetupModal = ({
                   </div>
                 ))}
 
-              <div className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
+              <div className="flex items-center justify-between gap-2 pb-2 border-b border-dashed border-slate-300/20">
                 <span className="text-slate-500">Total Discount</span>
                 <span className="font-semibold text-red-500">
                   {negativePeso(computed.totalDiscount)}
                 </span>
               </div>
 
-              <div className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
+              <div className="flex items-center justify-between gap-2 pb-2 border-b border-dashed border-slate-300/20">
                 <span className="text-slate-500">Total VAT Exemption</span>
                 <span className="font-semibold text-red-500">
                   {negativePeso(computed.totalVatExemption)}
                 </span>
               </div>
 
-              <div className="flex items-center justify-between gap-2 rounded-2xl bg-blue-500/10 px-3 py-3">
+              <div className="flex items-center justify-between gap-2 px-3 py-3 rounded-2xl bg-blue-500/10">
                 <span className="text-[12px] font-bold">Amount Due</span>
                 <span className="text-[16px] font-black text-blue-500">
                   {peso(computed.totalAmountDue)}
@@ -1074,7 +1074,7 @@ const DiscountSetupModal = ({
         <div className="flex justify-end">
           <button
             onClick={onClose}
-            className="rounded-2xl bg-blue-600 px-10 py-3 text-sm font-black text-white transition hover:bg-blue-500"
+            className="px-10 py-3 text-sm font-black text-white transition bg-blue-600 rounded-2xl hover:bg-blue-500"
           >
             Continue
           </button>
@@ -1326,12 +1326,12 @@ const InputPaymentsModal = ({
             </div>
 
             <div className="max-h-[calc(92vh-72px)] overflow-y-auto">
-              <div className="space-y-4 px-5 py-2 md:px-6">
+              <div className="px-5 py-2 space-y-4 md:px-6">
                 <div className="grid gap-3 md:grid-cols-2 md:items-center">
                   <div className="text-xl font-black text-slate-700 dark:text-slate-200">
                     TOTAL AMOUNT DUE
                   </div>
-                  <div className="text-right text-2xl font-black text-emerald-500">
+                  <div className="text-2xl font-black text-right text-emerald-500">
                     {pesoLocal(totalAmountDue)}
                   </div>
                 </div>
@@ -1343,14 +1343,14 @@ const InputPaymentsModal = ({
                       : "border-slate-200 bg-slate-50"
                   }`}
                 >
-                  <div className="mb-2 flex items-center justify-between gap-3">
+                  <div className="flex items-center justify-between gap-3 mb-2">
                     <p className="text-sm font-bold text-slate-500">Payments</p>
 
                     {!readOnly ? (
                       <button
                         type="button"
                         onClick={handleAddPaymentMethod}
-                        className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-xs font-bold text-white transition hover:bg-blue-500"
+                        className="inline-flex items-center gap-2 px-4 py-3 text-xs font-bold text-white transition bg-blue-600 rounded-2xl hover:bg-blue-500"
                       >
                         <FiPlus size={14} />
                         Add Payment Method
@@ -1392,7 +1392,7 @@ const InputPaymentsModal = ({
                                 removeRow(index);
                               }}
                               disabled={readOnly}
-                              className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white transition hover:bg-blue-500 disabled:opacity-50"
+                              className="flex items-center justify-center text-white transition bg-blue-600 h-11 w-11 rounded-2xl hover:bg-blue-500 disabled:opacity-50"
                             >
                               <FiTrash2 size={16} />
                             </button>
@@ -1407,13 +1407,13 @@ const InputPaymentsModal = ({
                               <img
                                 src={buildImagePathLocal(row.payment_method)}
                                 alt={row.payment_method}
-                                className="h-10 w-10 object-contain"
+                                className="object-contain w-10 h-10"
                                 onError={(e) => {
                                   e.currentTarget.style.display = "none";
                                 }}
                               />
                               <div className="min-w-0">
-                                <p className="truncate text-sm font-black">
+                                <p className="text-sm font-black truncate">
                                   {row.payment_method || "No method"}
                                 </p>
                                 <p className="text-[11px] text-slate-500">
@@ -1500,7 +1500,7 @@ const InputPaymentsModal = ({
                         : "border-slate-200 bg-white"
                     }`}
                   >
-                    <div className="my-4 grid gap-3 md:grid-cols-2">
+                    <div className="grid gap-3 my-4 md:grid-cols-2">
                       <div
                         className={`rounded-2xl border p-4 ${
                           isDark
@@ -1532,7 +1532,7 @@ const InputPaymentsModal = ({
                       </div>
                     </div>
 
-                    <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
                       <div>
                         <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">
                           Shared Quick Amount Input
@@ -1589,23 +1589,23 @@ const InputPaymentsModal = ({
                         disabled={readOnly || payments.length === 0}
                         onMouseDown={(e) => {
                           e.preventDefault();
-                          setExactAmountForActiveRow();
+
+                          if (remaining > 0) {
+                            setExactAmountForActiveRow();
+                          } else {
+                            onClose();
+                          }
                         }}
-                        className="col-span-2 rounded-2xl bg-emerald-500 px-8 py-5 text-lg font-black tracking-wide text-emerald-100 shadow-lg transition hover:bg-emerald-700 disabled:opacity-50"
+                        className={`col-span-2 rounded-2xl px-8 py-5 text-lg font-black tracking-wide text-white shadow-lg transition disabled:opacity-50 ${
+                          remaining > 0
+                            ? "bg-emerald-500 hover:bg-emerald-700"
+                            : "bg-blue-600 hover:bg-blue-700"
+                        }`}
                       >
-                        Exact
+                        {remaining > 0 ? "Exact" : "Continue"}
                       </button>
                     </div>
                   </div>
-                </div>
-
-                <div className="flex justify-center pb-5">
-                  <button
-                    onClick={onClose}
-                    className="rounded-2xl bg-blue-600 px-10 py-3 text-sm font-black text-white transition hover:bg-blue-500"
-                  >
-                    Continue
-                  </button>
                 </div>
               </div>
             </div>
@@ -2446,7 +2446,7 @@ export default function TransactionPaymentModal({
                   Transaction {transaction?.transaction_id || "-"}
                 </h2>
 
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 mt-2">
                   <InfoPill isDark={isDark}>
                     Table: {transaction?.table_number || "-"}
                   </InfoPill>
@@ -2476,7 +2476,7 @@ export default function TransactionPaymentModal({
           </div>
         </div>
 
-        <div className="min-h-0 overflow-y-auto p-4">
+        <div className="min-h-0 p-4 overflow-y-auto">
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
             <div className="space-y-4">
               <SectionCard isDark={isDark}>
@@ -2535,7 +2535,7 @@ export default function TransactionPaymentModal({
               </SectionCard>
 
               <SectionCard isDark={isDark}>
-                <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="flex items-center justify-between gap-3 mb-3">
                   <div>
                     <h3 className="text-sm font-black">Ordered Items</h3>
                     <p className="mt-1 text-xs text-slate-500">
@@ -2583,7 +2583,7 @@ export default function TransactionPaymentModal({
                           } md:grid-cols-[minmax(0,1fr)_56px_95px_110px]`}
                         >
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-bold">
+                            <p className="text-sm font-bold truncate">
                               {item.item_name || item.product_id}
                             </p>
                             <p className="mt-1 text-[11px] text-slate-500">
@@ -2727,13 +2727,13 @@ export default function TransactionPaymentModal({
               </SectionCard>
 
               {errorMessage ? (
-                <div className="rounded-2xl bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-500">
+                <div className="px-4 py-3 text-sm font-semibold text-red-500 rounded-2xl bg-red-500/10">
                   {errorMessage}
                 </div>
               ) : null}
 
               {!isPaidMode && !canSave && payments.length > 0 ? (
-                <div className="rounded-2xl bg-blue-500/10 px-4 py-3 text-sm font-semibold text-blue-500">
+                <div className="px-4 py-3 text-sm font-semibold text-blue-500 rounded-2xl bg-blue-500/10">
                   Total paid must be at least equal to total amount due.
                 </div>
               ) : null}
