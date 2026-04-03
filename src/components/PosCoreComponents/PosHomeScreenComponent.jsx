@@ -15,46 +15,40 @@ const PosHomeScreenComponent = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   // Fetch data
-useEffect(() => {
+  useEffect(() => {
+    const fetchShiftData = async () => {
+      if (!userId) return;
 
-  const fetchShiftData = async () => {
+      try {
+        const response = await fetch(
+          `${apiHost}/api/get_shift_details.php?user_id=${userId}`,
+        );
 
-    if (!userId) return;
+        const result = await response.json();
 
-    try {
+        if (result.userName) {
+          localStorage.setItem("Cashier", result.userName);
+        }
 
-      const response = await fetch(
-        `${apiHost}/api/get_shift_details.php?user_id=${userId}`
-      );
-
-      const result = await response.json();
-
-      if (result.userName) {
-        localStorage.setItem("Cashier", result.userName);
+        setDateSelection(result);
+      } catch (error) {
+        console.error("Error fetching POS data:", error);
       }
+    };
 
-      setDateSelection(result);
+    fetchShiftData();
 
-    } catch (error) {
-
-      console.error("Error fetching POS data:", error);
-
-    }
-
-  };
-
-  fetchShiftData();
-
-  // expose refresh function globally
-  window.refreshShiftPanel = fetchShiftData;
-
-}, [userId, apiHost]);
+    // expose refresh function globally
+    window.refreshShiftPanel = fetchShiftData;
+  }, [userId, apiHost]);
 
   const formatDisplayDate = (dateValue) => {
-    if (!dateValue || 
-        dateValue === "0000-00-00 00:00:00" || 
-        dateValue === "0000-00-00" || 
-        dateValue === "N/A") {
+    if (
+      !dateValue ||
+      dateValue === "0000-00-00 00:00:00" ||
+      dateValue === "0000-00-00" ||
+      dateValue === "N/A"
+    ) {
       return "N/A";
     }
     const date = new Date(dateValue);
@@ -72,7 +66,7 @@ useEffect(() => {
   const branchInfo = useMemo(() => {
     // Standardize status to handle case sensitivity
     const status = dateselection?.Shift_Status || "Closed";
-    
+
     return {
       title: "Point of Sales",
       subtitle: "Restaurant (Version: 1.0.1-1) Offline",
@@ -86,9 +80,11 @@ useEffect(() => {
         ? formatDisplayDate(dateselection.Opening_DateTime)
         : "N/A",
       openedBy: dateselection?.opened_by_name || "N/A",
-      closedDate: dateselection?.Closing_DateTime && dateselection.Closing_DateTime !== "0000-00-00 00:00:00"
-        ? formatDisplayDate(dateselection.Closing_DateTime)
-        : "N/A",
+      closedDate:
+        dateselection?.Closing_DateTime &&
+        dateselection.Closing_DateTime !== "0000-00-00 00:00:00"
+          ? formatDisplayDate(dateselection.Closing_DateTime)
+          : "N/A",
       closedBy: dateselection?.closed_by_name || "N/A",
     };
   }, [dateselection]);
@@ -104,9 +100,13 @@ useEffect(() => {
     };
 
     if (userSelectedTheme && userSelectedTheme.length > 0) {
-      const themeSelected = userSelectedTheme.filter((item) => item.userid === userId);
+      const themeSelected = userSelectedTheme.filter(
+        (item) => item.userid === userId,
+      );
       if (themeSelected.length > 0) {
-        const palette = colorSchemes.find((c) => c.name === themeSelected[0].theme);
+        const palette = colorSchemes.find(
+          (c) => c.name === themeSelected[0].theme,
+        );
         applyPalette(palette || colorSchemes[0]);
       } else {
         applyPalette(colorSchemes[0]);
@@ -119,21 +119,15 @@ useEffect(() => {
   return (
     <div className="flex justify-end">
       <div className="w-full max-w-[390px] rounded-[24px] p-[1px] shadow-[0_20px_50px_rgba(0,0,0,0.18)] sm:rounded-[28px]">
-        <div
-          className="rounded-[24px] px-4 py-4 text-white sm:rounded-[28px] sm:px-6 sm:py-5"
-          style={{
-            background:
-              "linear-gradient(135deg, rgba(111,63,220,0.92) 0%, rgba(110,105,243,0.86) 38%, rgba(92,168,255,0.82) 100%)",
-          }}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="text-[20px] font-black tracking-tight sm:text-[24px]">
+        <div className="rounded-[24px] px-4 py-4 text-white sm:rounded-[28px] sm:px-6 sm:py-5">
+          <div className=" flex items-start justify-between gap-3">
+            <div className=" pos-terminal-fixed  text-[20px] font-black tracking-tight sm:text-[24px]">
               Recent Shift
             </div>
             {/* FIX: Ensuring the color logic checks for "Open" correctly */}
             <div
               className={`text-[24px] font-black leading-none sm:text-[32px] ${
-                branchInfo.shiftStatus.toLowerCase() === "open" 
+                branchInfo.shiftStatus.toLowerCase() === "open"
                   ? "text-[#22c55e]" // bright green
                   : "text-[#f97316]" // bright orange
               }`}
@@ -142,7 +136,7 @@ useEffect(() => {
             </div>
           </div>
 
-          <div className="mt-4 space-y-2.5 text-[12px] sm:text-[14px]">
+          <div className="pos-terminal-fixed  mt-4 space-y-2.5 text-[12px] sm:text-[14px]">
             {[
               ["Terminal#:", branchInfo.terminalNo],
               ["Shift #:", branchInfo.shiftNo],
