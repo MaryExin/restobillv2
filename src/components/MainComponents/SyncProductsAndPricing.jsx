@@ -9,7 +9,6 @@ import {
   FaSyncAlt,
   FaCheckCircle,
   FaExclamationTriangle,
-  FaCloudDownloadAlt,
   FaList,
   FaThLarge,
 } from "react-icons/fa";
@@ -17,10 +16,8 @@ import {
   FiRefreshCw,
   FiWifiOff,
   FiPackage,
-  FiTag,
   FiPlusCircle,
   FiSlash,
-  FiAlertTriangle,
   FiInfo,
 } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
@@ -59,6 +56,22 @@ const normalize = (v) =>
   String(v || "")
     .trim()
     .toLowerCase();
+
+const pairKey = (productId, pricingCode) => `${productId}||${pricingCode}`;
+
+const sameText = (a, b) =>
+  String(a || "")
+    .trim()
+    .toLowerCase() ===
+  String(b || "")
+    .trim()
+    .toLowerCase();
+
+const sameNumber = (a, b, epsilon = 0.0001) => {
+  if (a == null && b == null) return true;
+  if (a == null || b == null) return false;
+  return Math.abs(Number(a) - Number(b)) < epsilon;
+};
 
 const badgeMap = {
   price_change: {
@@ -710,9 +723,6 @@ const SyncProductsAndPricing = () => {
   const { theme } = useTheme();
   const isDark = theme === "dark";
 
-  const imageBaseUrl =
-    import.meta.env.VITE_WEBAPIENDPOINT + import.meta.env.VITE_PRODUCT_IMAGES;
-
   const [viewMode, setViewMode] = useState("table");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("price_change");
@@ -738,25 +748,43 @@ const SyncProductsAndPricing = () => {
     return params.toString();
   }, [selectedPricingCodes]);
 
-  const readUrl = useMemo(() => {
+  const imageBaseUrl =
+    import.meta.env.VITE_WEBAPIENDPOINT + import.meta.env.VITE_PRODUCT_IMAGES;
+
+  const localReadUrl = useMemo(() => {
     const base =
       import.meta.env.VITE_LOCALAPIENDPOINT +
-      import.meta.env.VITE_PRODUCT_SYNC_RECONCILE_READ_ENDPOINT;
+      import.meta.env.VITE_PRODUCT_SYNC_LOCAL_READ_ENDPOINT;
 
     return pricingQueryString ? `${base}?${pricingQueryString}` : base;
   }, [pricingQueryString]);
 
-  const {
-    data: readData,
-    isLoading,
-    refetch,
-  } = useCustomQuery(readUrl, ["product-sync-reconcile", pricingQueryString]);
+  const webReadUrl =
+    import.meta.env.VITE_WEBAPIENDPOINT +
+    import.meta.env.VITE_PRODUCT_SYNC_WEB_READ_ENDPOINT;
 
-  const { mutate: productsQueueMutate, data: productsQueueMutateData } =
-    useCustomSecuredMutation(
-      import.meta.env.VITE_LOCALAPIENDPOINT +
-        import.meta.env.VITE_MUTATE_PRODUCTS_QUEUE_ENDPOINT,
-    );
+  const webExportUrl =
+    import.meta.env.VITE_WEBAPIENDPOINT +
+    import.meta.env.VITE_PRODUCT_SYNC_WEB_EXPORT_ENDPOINT;
+
+  const localMutateUrl =
+    import.meta.env.VITE_LOCALAPIENDPOINT +
+    import.meta.env.VITE_PRODUCT_SYNC_LOCAL_MUTATE_ENDPOINT;
+
+  const {
+    data: localReadData,
+    isLoading: isLocalLoading,
+    refetch: refetchLocal,
+  } = useCustomQuery(localReadUrl, [
+    "product-sync-local-read",
+    pricingQueryString,
+  ]);
+
+  const { mutate: webReadMutate, data: webReadData } =
+    useCustomSecuredMutation(webReadUrl);
+
+  const { mutate: webExportMutate } = useCustomSecuredMutation(webExportUrl);
+  const { mutate: localMutate } = useCustomSecuredMutation(localMutateUrl);
 
   useEffect(() => {
     const goOnline = () => setIsOnline(true);
@@ -782,35 +810,57 @@ const SyncProductsAndPricing = () => {
     return () => window.removeEventListener("resize", updateHeight);
   }, []);
 
+  useEffect(() => {
+    const busunitcode = localReadData?.target?.busunitcode || "";
+    if (!busunitcode) return;
+
+    webReadMutate({
+      busunitcode,
+      pricing_codes: selectedPricingCodes,
+    });
+  }, [localReadData?.target?.busunitcode, selectedPricingCodes, webReadMutate]);
+
   const pricingOptions = useMemo(
-    () => readData?.pricing_options || [],
-    [readData],
+    () => webReadData?.pricing_options || [],
+    [webReadData],
   );
 
   const offlineExistingPricingCodes = useMemo(
-    () => new Set(readData?.offline_existing_pricing_codes || []),
-    [readData],
+    () => new Set(localReadData?.offline_existing_pricing_codes || []),
+    [localReadData],
   );
 
   const busunitMappedPricingCodes = useMemo(
-    () => new Set(readData?.busunit_mapped_pricing_codes || []),
-    [readData],
+    () => new Set(webReadData?.busunit_mapped_pricing_codes || []),
+    [webReadData],
   );
 
   const busunitSalesTypePricingRows = useMemo(
-    () => readData?.busunit_sales_type_pricing_rows || [],
-    [readData],
+    () => webReadData?.busunit_sales_type_pricing_rows || [],
+    [webReadData],
   );
 
-  const offlineOnlyPricingCodes = useMemo(
-    () => readData?.offline_only_pricing_codes || [],
-    [readData],
-  );
+  const onlinePricingCodes = useMemo(() => {
+    return (webReadData?.pricing_options || [])
+      .map((row) => String(row.pricing_code || "").trim())
+      .filter(Boolean);
+  }, [webReadData]);
 
-  const onlineOnlyPricingCodes = useMemo(
-    () => readData?.online_only_pricing_codes || [],
-    [readData],
-  );
+  const offlinePricingCodes = useMemo(() => {
+    return localReadData?.offline_existing_pricing_codes || [];
+  }, [localReadData]);
+
+  const offlineOnlyPricingCodes = useMemo(() => {
+    return offlinePricingCodes.filter(
+      (code) => !onlinePricingCodes.includes(code),
+    );
+  }, [offlinePricingCodes, onlinePricingCodes]);
+
+  const onlineOnlyPricingCodes = useMemo(() => {
+    return onlinePricingCodes.filter(
+      (code) => !offlinePricingCodes.includes(code),
+    );
+  }, [onlinePricingCodes, offlinePricingCodes]);
 
   const salesTypeSummaryText = useMemo(() => {
     if (!busunitSalesTypePricingRows.length) return "";
@@ -845,10 +895,189 @@ const SyncProductsAndPricing = () => {
 
   const runRefresh = useCallback(() => {
     if (isSyncing) return;
-    refetch?.();
-  }, [refetch, isSyncing]);
+    refetchLocal?.();
+  }, [refetchLocal, isSyncing]);
 
-  const rows = useMemo(() => readData?.rows || [], [readData]);
+  const rows = useMemo(() => {
+    const webRows = webReadData?.web_rows || [];
+    const offlineProducts = localReadData?.offline_products || [];
+    const offlinePricingRows = localReadData?.offline_pricing_rows || [];
+    const currentPricingOptions = webReadData?.pricing_options || [];
+
+    const pricingLabels = {};
+    currentPricingOptions.forEach((opt) => {
+      pricingLabels[String(opt.pricing_code || "")] = String(
+        opt.pricing_label || opt.pricing_code || "",
+      );
+    });
+
+    const offlineProductMap = {};
+    offlineProducts.forEach((row) => {
+      const productId = String(row.product_id || "").trim();
+      if (productId) offlineProductMap[productId] = row;
+    });
+
+    const offlinePricingMap = {};
+    offlinePricingRows.forEach((row) => {
+      const invCode = String(row.inv_code || "").trim();
+      const pricingCode = String(row.pricing_code || "").trim();
+      if (invCode && pricingCode) {
+        offlinePricingMap[pairKey(invCode, pricingCode)] = row;
+      }
+    });
+
+    const requestedPricingCodes =
+      selectedPricingCodes.length > 0
+        ? selectedPricingCodes
+        : webReadData?.selected_pricing_codes || [];
+
+    const builtRows = [];
+    const seen = new Set();
+
+    requestedPricingCodes.forEach((pricingCode) => {
+      webRows.forEach((webRow) => {
+        const currentPricingCode = String(webRow.pricing_code || "").trim();
+        if (currentPricingCode !== pricingCode) return;
+
+        const productId = String(webRow.product_id || "").trim();
+        if (!productId) return;
+
+        const rowKey = pairKey(productId, pricingCode);
+        const localProduct = offlineProductMap[productId] || null;
+        const localPricing = offlinePricingMap[rowKey] || null;
+
+        const diff = {
+          price_changed: !sameNumber(webRow.selling_price, localPricing?.srp),
+          cost_changed: !sameNumber(
+            webRow.unit_cost,
+            localPricing?.cost_per_uom,
+          ),
+          name_changed: !sameText(webRow.item_name, localProduct?.item_name),
+          category_changed: !sameText(
+            webRow.item_category,
+            localProduct?.item_category,
+          ),
+          uom_changed: !sameText(
+            webRow.unit_of_measure,
+            localProduct?.unit_of_measure,
+          ),
+        };
+
+        let action = "no_price_change";
+        if (!localPricing) {
+          action = "new_product";
+        } else if (diff.price_changed || diff.cost_changed) {
+          action = "price_change";
+        }
+
+        builtRows.push({
+          row_key: rowKey,
+          product_id: productId,
+          pricing_code: pricingCode,
+          pricing_label: pricingLabels[pricingCode] || pricingCode,
+          action,
+          online_presence: true,
+          offline_presence: !!localProduct,
+          offline_status: String(localProduct?.status || "Missing"),
+          offline_only: false,
+          online: {
+            product_id: productId,
+            pricing_code: pricingCode,
+            pricing_label: String(
+              webRow.pricing_label || pricingLabels[pricingCode] || pricingCode,
+            ),
+            item_name: String(webRow.item_name || ""),
+            item_category: String(webRow.item_category || ""),
+            unit_of_measure: String(webRow.unit_of_measure || ""),
+            unit_value: String(webRow.unit_value || ""),
+            unit_cost:
+              webRow.unit_cost != null ? Number(webRow.unit_cost) : null,
+            selling_price:
+              webRow.selling_price != null
+                ? Number(webRow.selling_price)
+                : null,
+            inventory_type: String(webRow.inventory_type || "PRODUCT"),
+            vatable: String(webRow.vatable || ""),
+            expiry_days: Number(webRow.expiry_days || 0),
+            item_brand: String(webRow.item_brand || ""),
+            isDiscountable: String(webRow.isDiscountable || "No"),
+          },
+          offline: {
+            item_name: localProduct?.item_name ?? null,
+            item_category: localProduct?.item_category ?? null,
+            unit_of_measure: localProduct?.unit_of_measure ?? null,
+            unit_cost:
+              localPricing?.cost_per_uom != null
+                ? Number(localPricing.cost_per_uom)
+                : null,
+            selling_price:
+              localPricing?.srp != null ? Number(localPricing.srp) : null,
+            inventory_type: localProduct?.inventory_type ?? null,
+            vatable: localProduct?.vatable ?? null,
+            item_brand: localProduct?.item_brand ?? null,
+            isDiscountable: localProduct?.isDiscountable ?? null,
+          },
+          diff,
+        });
+
+        seen.add(rowKey);
+      });
+    });
+
+    requestedPricingCodes.forEach((pricingCode) => {
+      Object.values(offlinePricingMap).forEach((localPricing) => {
+        if (String(localPricing.pricing_code || "") !== String(pricingCode)) {
+          return;
+        }
+
+        const productId = String(localPricing.inv_code || "").trim();
+        const rowKey = pairKey(productId, pricingCode);
+
+        if (seen.has(rowKey)) return;
+
+        const localProduct = offlineProductMap[productId] || null;
+
+        builtRows.push({
+          row_key: rowKey,
+          product_id: productId,
+          pricing_code: pricingCode,
+          pricing_label: pricingLabels[pricingCode] || pricingCode,
+          action: "inactive_product",
+          online_presence: false,
+          offline_presence: !!localProduct,
+          offline_status: String(localProduct?.status || "Active"),
+          offline_only: true,
+          online: null,
+          offline: {
+            item_name: localProduct?.item_name ?? null,
+            item_category: localProduct?.item_category ?? null,
+            unit_of_measure: localProduct?.unit_of_measure ?? null,
+            unit_cost:
+              localPricing?.cost_per_uom != null
+                ? Number(localPricing.cost_per_uom)
+                : null,
+            selling_price:
+              localPricing?.srp != null ? Number(localPricing.srp) : null,
+            inventory_type: localProduct?.inventory_type ?? null,
+            vatable: localProduct?.vatable ?? null,
+            item_brand: localProduct?.item_brand ?? null,
+            isDiscountable: localProduct?.isDiscountable ?? null,
+          },
+          diff: {
+            price_changed: false,
+            cost_changed: false,
+            name_changed: false,
+            category_changed: false,
+            uom_changed: false,
+          },
+        });
+
+        seen.add(rowKey);
+      });
+    });
+
+    return builtRows;
+  }, [webReadData, localReadData, selectedPricingCodes]);
 
   const summary = useMemo(() => {
     return {
@@ -869,29 +1098,6 @@ const SyncProductsAndPricing = () => {
 
     setSelectedRowKeys(auto);
   }, [rows]);
-
-  useEffect(() => {
-    if (!productsQueueMutateData) return;
-
-    setIsSyncing(false);
-
-    const message = productsQueueMutateData?.message || "";
-    if (["Success", "Synced", "Completed"].includes(message)) {
-      setReturnmessage({
-        message:
-          productsQueueMutateData?.summary_message ||
-          `Synced ${productsQueueMutateData?.affected_rows || 0} operation(s).`,
-      });
-      setshowhidesuccess(true);
-      runRefresh();
-      return;
-    }
-
-    if (message) {
-      setReturnmessage({ message });
-      setshowhidesuccess(true);
-    }
-  }, [productsQueueMutateData, runRefresh]);
 
   const filteredRows = useMemo(() => {
     let data = [...rows];
@@ -1038,7 +1244,7 @@ const SyncProductsAndPricing = () => {
       return;
     }
 
-    if (!readData?.target?.busunitcode) {
+    if (!localReadData?.target?.busunitcode) {
       setReturnmessage({
         message: "No active business unit / pricing mapping found.",
       });
@@ -1054,15 +1260,51 @@ const SyncProductsAndPricing = () => {
 
     setIsSyncing(true);
 
-    productsQueueMutate(
+    webExportMutate(
       {
-        busunitcode: readData.target.busunitcode,
-        rows: selectedRows,
+        busunitcode: localReadData?.target?.busunitcode,
+        rows: selectedRows.map((row) => ({
+          row_key: row.row_key,
+          product_id: row.product_id,
+          pricing_code: row.pricing_code,
+          action: row.action,
+        })),
         selected_pricing_codes: selectedPricingCodes,
       },
       {
-        onError: () => {
+        onSuccess: (exportPayload) => {
+          localMutate(exportPayload, {
+            onSuccess: async (localResult) => {
+              setIsSyncing(false);
+              setReturnmessage({
+                message:
+                  localResult?.summary_message ||
+                  `Synced ${localResult?.affected_rows || 0} operation(s).`,
+              });
+              setshowhidesuccess(true);
+              runRefresh();
+            },
+            onError: (err) => {
+              setIsSyncing(false);
+              setReturnmessage({
+                message:
+                  err?.response?.data?.message ||
+                  err?.message ||
+                  "LOCAL mutate failed.",
+              });
+              setshowhidesuccess(true);
+            },
+          });
+        },
+        onError: (err) => {
           setIsSyncing(false);
+          setReturnmessage({
+            message:
+              err?.response?.data?.message ||
+              err?.message ||
+              "WEB export failed.",
+          });
+          setshowhidesuccess(true);
         },
       },
     );
@@ -1088,9 +1330,16 @@ Set inactive: ${inactiveCount}
 This will also replace OFFLINE lkp_sales_type and tbl_pricing_by_sales_type using WEB mappings for the selected business unit.`;
   }, [selectedRows]);
 
-  const readMessage = readData?.message || "";
-  const isRemoteOffline = readMessage === "Offline";
-  const noBusinessUnit = readMessage === "NoBusinessUnit";
+  const localReadMessage = localReadData?.message || "";
+  const webReadMessage = webReadData?.message || "";
+
+  const isLocalFailed = localReadMessage === "Failed";
+  const isWebFailed = webReadMessage === "Failed";
+  const isRemoteOffline = isWebFailed;
+  const noBusinessUnit = localReadMessage === "NoBusinessUnit";
+
+  const isLoading =
+    isLocalLoading || (!webReadData && !!localReadData?.target?.busunitcode);
 
   const listData = useMemo(
     () => ({
@@ -1283,8 +1532,14 @@ This will also replace OFFLINE lkp_sales_type and tbl_pricing_by_sales_type usin
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5 mb-8">
           <StatCard
             title="Target Business Unit"
-            value={getDisplayBusunitName(readData?.target?.busunit_name)}
-            subtitle={readData?.target?.busunitcode || "—"}
+            value={
+              webReadData?.busunit_names?.[
+                localReadData?.target?.busunitcode
+              ] ||
+              getDisplayBusunitName(localReadData?.target?.busunit_name) ||
+              "No target busunit"
+            }
+            subtitle={localReadData?.target?.busunitcode || "—"}
             icon={<FiPackage size={20} />}
             isDark={isDark}
           />
@@ -1530,6 +1785,7 @@ This will also replace OFFLINE lkp_sales_type and tbl_pricing_by_sales_type usin
                   disabled={
                     isSyncing ||
                     !isOnline ||
+                    isLocalFailed ||
                     isRemoteOffline ||
                     noBusinessUnit ||
                     selectedRows.length === 0
@@ -1537,6 +1793,7 @@ This will also replace OFFLINE lkp_sales_type and tbl_pricing_by_sales_type usin
                   className={`w-full rounded-2xl px-5 py-3 font-bold transition-all ${
                     isSyncing ||
                     !isOnline ||
+                    isLocalFailed ||
                     isRemoteOffline ||
                     noBusinessUnit ||
                     selectedRows.length === 0
@@ -1572,7 +1829,7 @@ This will also replace OFFLINE lkp_sales_type and tbl_pricing_by_sales_type usin
 
                 <div
                   className={`rounded-2xl px-4 py-3 flex items-center gap-3 ${
-                    isRemoteOffline
+                    isRemoteOffline || isLocalFailed
                       ? isDark
                         ? "bg-rose-500/10 border border-rose-500/20 text-rose-400"
                         : "bg-rose-50 border border-rose-200 text-rose-700"
@@ -1587,11 +1844,13 @@ This will also replace OFFLINE lkp_sales_type and tbl_pricing_by_sales_type usin
                 >
                   <FaExclamationTriangle size={16} />
                   <span className="font-bold">
-                    {isRemoteOffline
-                      ? "WEB database unreachable"
-                      : noBusinessUnit
-                        ? "No active local BU pricing mapping"
-                        : "WEB reconciliation ready"}
+                    {isLocalFailed
+                      ? "LOCAL read failed"
+                      : isRemoteOffline
+                        ? "WEB database unreachable"
+                        : noBusinessUnit
+                          ? "No active local BU pricing mapping"
+                          : "WEB reconciliation ready"}
                   </span>
                 </div>
               </div>
@@ -1637,6 +1896,21 @@ This will also replace OFFLINE lkp_sales_type and tbl_pricing_by_sales_type usin
             <div className="font-semibold">
               Cannot reach the WEB database right now. Reconciliation and sync
               are blocked.
+            </div>
+          </div>
+        )}
+
+        {isLocalFailed && (
+          <div
+            className={`mb-8 rounded-[2rem] p-5 flex items-center gap-3 ${
+              isDark
+                ? "bg-rose-500/10 border border-rose-500/20 text-rose-300"
+                : "bg-rose-50 border border-rose-200 text-rose-700"
+            }`}
+          >
+            <FaExclamationTriangle size={18} />
+            <div className="font-semibold">
+              Cannot read OFFLINE product and pricing snapshot right now.
             </div>
           </div>
         )}
@@ -1746,6 +2020,10 @@ This will also replace OFFLINE lkp_sales_type and tbl_pricing_by_sales_type usin
           message={returnmessage.message}
           button="Save"
           setIsModalOpen={setshowhidesuccess}
+          resetForm={async () => {
+            setReturnmessage({ message: "" });
+            await runRefresh();
+          }}
         />
       )}
     </div>
