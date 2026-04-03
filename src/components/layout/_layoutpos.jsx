@@ -39,13 +39,13 @@ import PosQuickActionTile from "../MainComponents/Common/PosQuickActionTile";
 import useZustandLoginCred from "../../context/useZustandLoginCred";
 import useApiHost from "../../hooks/useApiHost";
 
-const POS_HOME_BG = ".//pos-home-bg.png";
+const POS_HOME_BG = "./pos-home-bg.png";
 const HEADER_HEIGHT = 96;
 const FOOTER_HEIGHT = 118;
 
 const LayoutPos = ({ children }) => {
-const navigate = useNavigate();
-const location = useLocation();
+  const navigate = useNavigate();
+  const location = useLocation();
   const apiHost = useApiHost();
   const { theme } = useTheme();
   const isDark = theme === "dark";
@@ -82,15 +82,15 @@ const location = useLocation();
   }, [userId, apiHost]);
 
   useEffect(() => {
-  if (location.state?.openSettings) {
-    setIsSettingsOpen(true);
+    if (location.state?.openSettings) {
+      setIsSettingsOpen(true);
 
-    navigate(location.pathname, {
-      replace: true,
-      state: {},
-    });
-  }
-}, [location, navigate]);
+      navigate(location.pathname, {
+        replace: true,
+        state: {},
+      });
+    }
+  }, [location, navigate]);
 
   useEffect(() => {
     fetchShiftData();
@@ -313,7 +313,7 @@ const location = useLocation();
 
   return (
     <div
-      className={`theme-page relative h-screen w-full overflow-hidden transition-colors duration-300 ${isDark ? "bg-[#0f172a]" : "bg-[#dfe4ef]"}`}
+      className={`relative h-screen w-full overflow-hidden transition-colors duration-300 ${isDark ? "bg-[#0f172a]" : "bg-transparent"}`}
     >
       {isLogoutConfirmOpen && (
         <ModalYesNoReusable
@@ -437,33 +437,25 @@ const location = useLocation();
 
       <div className="relative z-10 w-full h-screen overflow-hidden">
         <header
-          className="fixed top-0 left-0 right-0 z-40 px-3 py-2 border-b sm:px-4"
+          className="pos-header-fixed fixed top-0 left-0 right-0 z-40 px-3 py-2 border-b sm:px-4 text-white"
           style={{
             height: `${HEADER_HEIGHT}px`,
-            background: isDark
-              ? "linear-gradient(180deg, rgba(15,23,42,0.95) 0%, rgba(30,41,59,0.92) 100%)"
-              : "linear-gradient(180deg, rgba(102,213,215,0.96) 0%, rgba(125,217,222,0.92) 100%)",
-            borderColor: isDark
-              ? "rgba(255,255,255,0.08)"
-              : "rgba(255,255,255,0.75)",
+            background: "transparent",
+            borderColor: "transparent",
             backdropFilter: "blur(6px)",
           }}
         >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <div
-                className={`text-[18px] leading-none font-black sm:text-[20px] ${isDark ? "text-white" : "text-slate-800"}`}
-              >
+              <div className="text-[18px] leading-none font-black sm:text-[20px]">
                 {branchInfo.title}
               </div>
-              <div
-                className={`mt-1 text-[10px] font-medium sm:text-[12px] ${isDark ? "text-slate-300" : "text-slate-600"}`}
-              >
+
+              <div className="mt-1 text-[10px] font-medium sm:text-[12px]">
                 {branchInfo.subtitle}
               </div>
-              <div
-                className={`mt-2 flex items-center gap-2 ${isDark ? "text-white" : "text-slate-800"}`}
-              >
+
+              <div className="mt-2 flex items-center gap-2">
                 <HiOutlineStatusOnline
                   className="text-[17px]"
                   style={{ color: COLORS.brandSecondary }}
@@ -473,24 +465,27 @@ const location = useLocation();
                 </div>
               </div>
             </div>
+
             <div className="flex items-start gap-2 sm:gap-3">
               <div className="hidden pr-1 text-right sm:block">
-                <div
-                  className={`text-[14px] font-black ${isDark ? "text-white" : "text-slate-800"}`}
-                >
+                <div className="text-[14px] font-black">
                   {branchInfo.userName}
                 </div>
-                <div
-                  className={`text-[12px] font-medium ${isDark ? "text-slate-300" : "text-slate-700"}`}
-                >
+                <div className="text-[12px] font-medium">
                   {branchInfo.userRole}
                 </div>
               </div>
+
               <div
-                className={`grid h-11 w-11 place-items-center rounded-full border shadow-[0_10px_24px_rgba(0,0,0,0.12)] sm:h-12 sm:w-12 ${isDark ? "border-white/10 bg-white/10" : "border-white/75 bg-white/90"}`}
+                className={`grid h-11 w-11 place-items-center rounded-full border shadow-[0_10px_24px_rgba(0,0,0,0.12)] sm:h-12 sm:w-12 ${
+                  isDark
+                    ? "border-white/10 bg-white/10"
+                    : "border-white/75 bg-white/20"
+                }`}
               >
                 <FaUserCircle className="text-[30px] text-blue-500 sm:text-[34px]" />
               </div>
+
               <button
                 type="button"
                 onClick={handleClose}
@@ -504,17 +499,16 @@ const location = useLocation();
               </button>
             </div>
           </div>
+
           <div className="absolute left-0 right-0 flex items-center justify-between px-4 -bottom-6">
-            <div
-              className={`flex gap-4 rounded-full border px-3 py-1 text-[10px] font-bold backdrop-blur-md ${isDark ? "border-white/10 bg-white/10 text-slate-200" : "border-white/50 bg-white/40 text-slate-700"}`}
-            >
+            <div className="flex gap-4 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-bold text-white backdrop-blur-md">
               <span>Terminal: {branchInfo.terminalNo}</span>
               <span>Shift: {branchInfo.shiftNo}</span>
               <span
                 className={
                   branchInfo.shiftStatus === "Open"
-                    ? "text-green-600"
-                    : "text-orange-500"
+                    ? "text-green-400"
+                    : "text-orange-400"
                 }
               >
                 Status: {branchInfo.shiftStatus}
@@ -524,7 +518,7 @@ const location = useLocation();
         </header>
 
         <main
-          className="h-full px-3 overflow-y-auto sm:px-4"
+          className="h-full px-3 overflow-y-auto sm:px-4 "
           style={{
             paddingTop: `${HEADER_HEIGHT + 28}px`,
             paddingBottom: `${FOOTER_HEIGHT + 18}px`,
@@ -532,13 +526,10 @@ const location = useLocation();
         >
           {children}
         </main>
-
         <div
           className="fixed bottom-0 left-0 right-0 z-40 px-3 pt-2 pb-3 sm:px-4 sm:pb-4"
           style={{
-            background: isDark
-              ? "linear-gradient(180deg, rgba(15,23,42,0.08) 0%, rgba(15,23,42,0.92) 20%, rgba(15,23,42,0.98) 100%)"
-              : "linear-gradient(180deg, rgba(223,228,239,0.10) 0%, rgba(223,228,239,0.92) 20%, rgba(223,228,239,0.98) 100%)",
+            background: "transparent",
             backdropFilter: "blur(6px)",
           }}
         >
@@ -546,7 +537,7 @@ const location = useLocation();
         </div>
 
         {/* GEAR ICON */}
-        <div className="fixed z-50 bottom-3 right-3 sm:bottom-4 sm:right-4">
+        <div className="fixed z-50 bottom-3 right-3 sm:bottom-4 sm:right-4 ">
           <button
             onClick={() => setIsSettingsOpen(true)}
             className={`grid h-12 w-12 place-items-center rounded-full border shadow-[0_12px_30px_rgba(0,0,0,0.18)] transition-transform hover:scale-110 active:scale-95 sm:h-14 sm:w-14 ${isDark ? "border-white/10 bg-slate-900/85" : "border-white/75 bg-white/88"}`}

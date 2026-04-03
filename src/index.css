@@ -282,3 +282,13 @@ body {
 [data-theme="light"] [class*="shadow-red-600"] {
   box-shadow: 0 10px 25px rgba(15, 23, 42, 0.12) !important;
 }
+
+[data-theme="light"] .pos-header-fixed,
+[data-theme="light"] .pos-header-fixed * {
+  color: #fff !important;
+}
+
+[data-theme="light"] .pos-terminal-fixed,
+[data-theme="light"] .pos-terminal-fixed * {
+  color: lightgray !important;
+}
