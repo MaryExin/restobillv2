@@ -215,7 +215,6 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
             </button>
           </div>
         </div>
-
       </div>
     </div>
   );
