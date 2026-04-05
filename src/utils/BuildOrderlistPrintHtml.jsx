@@ -61,7 +61,7 @@ export function BuildOrderReceiptHtml({
 
           .print-root {
             width: 76.5mm;
-            padding: calc(8px * var(--s)) calc(5px * var(--s)) calc(8px * var(--s)) calc(2px * var(--s));
+            padding: calc(8px * var(--s)) calc(16px * var(--s)) calc(8px * var(--s)) calc(1px * var(--s));
             font-size: calc(10.5px * var(--s));
             line-height: 1.18;
             margin: 0;
