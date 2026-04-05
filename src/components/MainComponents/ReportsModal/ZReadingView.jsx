@@ -13,7 +13,23 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
     }).format(n || 0);
 
   const line = "========================================";
-  const dashLine = "----------------------------------------";
+
+  // Dummy Data for visual representation if reportData is empty
+  const displayData = {
+    reportDate: reportData?.reportDate || "03/17/26",
+    reportTime: reportData?.reportTime || "03:11 PM",
+    startDateTime: reportData?.startDateTime || "03/17/26 08:00 AM",
+    endDateTime: reportData?.endDateTime || "03/17/26 03:11 PM",
+    begInv: reportData?.begInv || "INV-00001",
+    endInv: reportData?.endInv || "INV-00050",
+    begVoid: reportData?.begVoid || "V-00001",
+    endVoid: reportData?.endVoid || "V-00002",
+    begRefund: reportData?.begRefund || "R-00000",
+    endRefund: reportData?.endRefund || "R-00000",
+    resetCounter: reportData?.resetCounter || "001",
+    zCounter: reportData?.zCounter || "00045",
+    ...reportData
+  };
 
   const handleFilter = () => {
     if (onFilter) onFilter(selectedDate);
@@ -54,7 +70,7 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
           </div>
 
           <div className="p-4 mt-8 border-2 border-blue-50 bg-blue-50/50 rounded-xl">
-            <p className="text-[10px] text-blue-700 leading-relaxed italic">
+            <p className="text-[10px] text-blue-700 leading-relaxed italic font-bold">
               * Select a specific date to retrieve historical Z-Reading data from the server.
             </p>
           </div>
@@ -64,15 +80,15 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
         <div className="flex flex-col flex-1 h-full min-w-0">
           
           {/* Header Controls */}
-          <div className="flex items-center justify-between mb-3 text-[11px] font-medium tracking-[0.2em] text-white uppercase px-1">
-            <span>Electronic Journal Preview</span>
+          <div className="flex items-center justify-between mb-3 text-[11px] font-bold tracking-[0.2em] text-white uppercase px-1">
+            <span>Reprint Z-Reading</span>
             <button onClick={onClose} className="flex items-center gap-1.5 hover:text-rose-400 transition-colors">
               CLOSE <FaTimes size={18} />
             </button>
           </div>
 
-          {/* Receipt Content */}
-          <div className="bg-[#fefefe] text-slate-900 shadow-[0_0_50px_rgba(0,0,0,0.3)] overflow-y-auto rounded-sm flex-1 p-8 font-mono text-[11px] leading-tight border-2 border-blue-100
+          {/* Receipt Content - All text set to font-bold */}
+          <div className="bg-[#fefefe] text-slate-900 shadow-[0_0_50px_rgba(0,0,0,0.3)] overflow-y-auto rounded-sm flex-1 p-8 font-mono text-[11px] leading-tight border-2 border-blue-100 font-bold
                           scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent">
             
             {isLoading ? (
@@ -84,86 +100,107 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
               <div className="max-w-[340px] mx-auto">
                 
                 {/* HEADER SECTION */}
-                <div className="font-bold text-center">
-                  <div className="text-blue-200">{line}</div>
-                  <div className="my-1 text-sm text-blue-600">Z-READING REPORT</div>
-                  <div className="text-[10px] font-normal text-slate-500">(Reprint: {reportData?.reprintDateTime})</div>
-                  <div className="text-blue-200">{line}</div>
+                <div className="text-center">
+                  <div className="text-slate-300">{line}</div>
+                  <div className="my-1 text-sm">Z-Reading Report</div>
+                  <div className="text-[10px] font-bold text-slate-500">(Reprint: {displayData.reprintDateTime || '03/17/26 03:11 PM'})</div>
+                  <div className="mt-2 text-slate-300">{line}</div>
                 </div>
 
-                {/* BASIC INFO */}
-                <div className="mt-4 space-y-1">
-                  <div className="flex justify-between"><span>Report Date:</span><span className="font-bold">{reportData?.reportDate}</span></div>
-                  <div className="flex justify-between"><span>Report Time:</span><span>{reportData?.reportTime}</span></div>
-                  <div className="flex justify-between"><span>Start Date & Time:</span><span className="text-[10px]">{reportData?.startDateTime}</span></div>
-                  <div className="flex justify-between"><span>End Date & Time:</span><span className="text-[10px]">{reportData?.endDateTime}</span></div>
-                  <div className="flex justify-between pt-1 mt-1 border-t border-blue-50"><span>Beg. INV #:</span><span>{reportData?.begInv}</span></div>
-                  <div className="flex justify-between"><span>End INV #:</span><span>{reportData?.endInv}</span></div>
-                  <div className="flex justify-between"><span>Beg. VOID #:</span><span>{reportData?.begVoid}</span></div>
-                  <div className="flex justify-between"><span>End VOID #:</span><span>{reportData?.endVoid}</span></div>
-                  <div className="flex justify-between"><span>Beg. REFUND #:</span><span>{reportData?.begRefund}</span></div>
-                  <div className="flex justify-between"><span>End. REFUND #:</span><span>{reportData?.endRefund}</span></div>
+                {/* BASIC INFO WITH DUMMY DATA */}
+                <div className="mt-4 space-y-0.5">
+                  <div className="flex justify-between"><span>Report Date:</span><span>{displayData.reportDate}</span></div>
+                  <div className="flex justify-between"><span>Report Time:</span><span>{displayData.reportTime}</span></div>
+                  <div className="flex justify-between"><span>Start Date & Time:</span><span>{displayData.startDateTime}</span></div>
+                  <div className="flex justify-between"><span>End Date & Time:</span><span>{displayData.endDateTime}</span></div>
+                  <div className="flex justify-between pt-1"><span>Beg. INV#:</span><span>{displayData.begInv}</span></div>
+                  <div className="flex justify-between"><span>End INV#:</span><span>{displayData.endInv}</span></div>
+                  <div className="flex justify-between"><span>Beg. VOID #:</span><span>{displayData.begVoid}</span></div>
+                  <div className="flex justify-between"><span>End VOID #:</span><span>{displayData.endVoid}</span></div>
+                  <div className="flex justify-between"><span>Beg. REFUND #:</span><span>{displayData.begRefund}</span></div>
+                  <div className="flex justify-between"><span>End. REFUND #:</span><span>{displayData.endRefund}</span></div>
+                  
+                  <div className="flex justify-between pt-3"><span>Reset Counter No.</span><span>{displayData.resetCounter}</span></div>
+                  <div className="flex justify-between"><span>Z Counter No.:</span><span>{displayData.zCounter}</span></div>
                 </div>
 
-                <div className="my-3 font-bold text-center text-blue-100">{dashLine}</div>
+                <div className="my-2 text-slate-300">{line}</div>
 
-                {/* COUNTERS */}
-                <div className="space-y-1">
-                  <div className="flex justify-between"><span>Reset Counter No.</span><span>{reportData?.resetCounter}</span></div>
-                  <div className="flex justify-between font-bold text-blue-600"><span>Z Counter No.</span><span>{reportData?.zCounter}</span></div>
+                {/* SALES SUMMARY SECTION */}
+                <div className="space-y-0.5">
+                  <div className="flex justify-between"><span>Present Accum. Sales:</span><span>{f(displayData.presentSales)}</span></div>
+                  <div className="flex justify-between"><span>Previous Accum. Sales:</span><span>{f(displayData.previousSales)}</span></div>
+                  <div className="flex justify-between"><span>Sales for the Day:</span><span>{f(displayData.dailySales)}</span></div>
                 </div>
 
-                <div className="my-3 font-bold text-center text-blue-200">{line}</div>
-
-                {/* SALES SECTION */}
-                <div className="space-y-1">
-                  <div className="flex justify-between"><span>Present Accum. Sales:</span><span>{f(reportData?.presentSales)}</span></div>
-                  <div className="flex justify-between"><span>Previous Accum. Sales:</span><span>{f(reportData?.previousSales)}</span></div>
-                  <div className="flex justify-between pt-2 mt-2 text-sm font-bold text-blue-700 border-t-2 border-blue-100 border-dashed">
-                    <span>SALES FOR THE DAY:</span>
-                    <span>{f(reportData?.dailySales)}</span>
-                  </div>
+                <div className="my-2 text-slate-300">{line}</div>
+                <div className="mb-2 text-center">BREAKDOWN OF SALES</div>
+                <div className="space-y-0.5">
+                  <div className="flex justify-between"><span>VATABLE SALES:</span><span>{f(displayData.vatableSales)}</span></div>
+                  <div className="flex justify-between"><span>VAT AMOUNT:</span><span>{f(displayData.vatAmount)}</span></div>
+                  <div className="flex justify-between"><span>VAT-EXEMPT SALES:</span><span>{f(displayData.vatExemptSales)}</span></div>
+                  <div className="flex justify-between"><span>VAT EXEMPTION:</span><span>{f(displayData.vatExemption)}</span></div>
+                  <div className="flex justify-between"><span>ZERO RATED SALES:</span><span>{f(displayData.zeroRated)}</span></div>
+                  <div className="flex justify-between"><span>OTHER CHARGES:</span><span>{f(displayData.otherCharges)}</span></div>
                 </div>
 
-                <div className="mt-5 font-bold text-center uppercase tracking-widest text-[10px] bg-blue-50 text-blue-600 py-1.5 rounded">Breakdown of Sales</div>
-                <div className="mt-2 space-y-1">
-                  <div className="flex justify-between"><span>VATABLE SALES:</span><span>{f(reportData?.vatableSales)}</span></div>
-                  <div className="flex justify-between"><span>VAT AMOUNT:</span><span>{f(reportData?.vatAmount)}</span></div>
-                  <div className="flex justify-between"><span>VAT-EXEMPT SALES:</span><span>{f(reportData?.vatExemptSales)}</span></div>
-                  <div className="flex justify-between"><span>VAT EXEMPTION:</span><span>{f(reportData?.vatExemption)}</span></div>
-                  <div className="flex justify-between"><span>ZERO RATED SALES:</span><span>{f(reportData?.zeroRated)}</span></div>
-                  <div className="flex justify-between"><span>OTHER CHARGES:</span><span>{f(reportData?.otherCharges)}</span></div>
+                <div className="my-2 text-slate-300">{line}</div>
+                <div className="space-y-0.5">
+                  <div className="flex justify-between"><span>Gross Amount:</span><span>{f(displayData.gross)}</span></div>
+                  <div className="flex justify-between"><span>Discount:</span><span>{f(displayData.discount)}</span></div>
+                  <div className="flex justify-between"><span>VAT Exemption:</span><span>{f(displayData.vatExemption)}</span></div>
+                  <div className="flex justify-between"><span>Refund:</span><span>{f(displayData.refund)}</span></div>
+                  <div className="flex justify-between"><span>Void:</span><span>{f(displayData.void)}</span></div>
+                  <div className="flex justify-between"><span>VAT Adjustment:</span><span>{f(displayData.vatAdjustment)}</span></div>
+                  <div className="flex justify-between"><span>Net Amount:</span><span>{f(displayData.net)}</span></div>
                 </div>
 
-                <div className="my-3 font-bold text-center text-blue-200">{line}</div>
-
-                {/* AMOUNTS & ADJUSTMENTS */}
-                <div className="space-y-1">
-                  <div className="flex justify-between"><span>Gross Amount:</span><span>{f(reportData?.gross)}</span></div>
-                  <div className="flex justify-between font-medium text-rose-600"><span>Discount:</span><span>-{f(reportData?.discount)}</span></div>
-                  <div className="flex justify-between font-medium text-rose-600"><span>VAT Exemption:</span><span>-{f(reportData?.vatExemption)}</span></div>
-                  <div className="flex justify-between font-medium text-rose-600"><span>Refund:</span><span>-{f(reportData?.refund)}</span></div>
-                  <div className="flex justify-between font-medium text-rose-600"><span>Void:</span><span>-{f(reportData?.void)}</span></div>
-                  <div className="flex justify-between"><span>VAT Adjustment:</span><span>{f(reportData?.vatAdjustment)}</span></div>
-                  <div className="flex justify-between pt-2 mt-2 text-sm font-bold text-blue-800 border-t-2 border-blue-100 border-dashed">
-                    <span>NET AMOUNT:</span>
-                    <span>{f(reportData?.net)}</span>
-                  </div>
+                <div className="my-2 text-slate-300">{line}</div>
+                <div className="mb-2 text-center">DISCOUNT SUMMARY</div>
+                <div className="space-y-0.5">
+                  <div className="flex justify-between"><span>SC. DISC. :</span><span>{f(displayData.scDisc)}</span></div>
+                  <div className="flex justify-between"><span>PWD DISC. :</span><span>{f(displayData.pwdDisc)}</span></div>
+                  <div className="flex justify-between"><span>NAAC DISC. :</span><span>{f(displayData.naacDisc)}</span></div>
+                  <div className="flex justify-between"><span>SOLO PARENT DISC. :</span><span>{f(displayData.soloDisc)}</span></div>
+                  <div className="flex justify-between"><span>OTHER DISC. :</span><span>{f(displayData.otherDisc)}</span></div>
                 </div>
 
-                {/* TRANSACTION SUMMARY */}
-                <div className="mt-5 font-bold text-center uppercase tracking-widest text-[10px] bg-blue-50 text-blue-600 py-1.5 rounded">Transaction Summary</div>
-                <div className="px-1 mt-2 space-y-1">
-                  <div className="flex justify-between"><span>Cash in Drawer:</span><span>{f(reportData?.cash)}</span></div>
-                  <div className="flex justify-between pt-1 border-t border-blue-50"><span>Opening Fund:</span><span>{f(reportData?.openingFund)}</span></div>
-                  <div className="flex justify-between font-medium text-rose-600"><span>Withdrawal:</span><span>-{f(reportData?.withdrawal)}</span></div>
-                  <div className="flex justify-between font-bold text-blue-700"><span>SHORT / OVER:</span><span>{f(reportData?.shortOver)}</span></div>
+                <div className="my-2 text-slate-300">{line}</div>
+                <div className="mb-2 text-center">SALES ADJUSTMENT</div>
+                <div className="space-y-0.5">
+                  <div className="flex justify-between"><span>VOID:</span><span>{f(displayData.void)}</span></div>
+                  <div className="flex justify-between"><span>REFUND:</span><span>{f(displayData.refund)}</span></div>
                 </div>
 
-                <div className="mt-6 text-center">
-                  <div className="font-bold text-blue-100">{line}</div>
-                  <div className="text-[9px] text-slate-400 italic mt-1 uppercase tracking-tighter">*** End of Transaction Record ***</div>
+                <div className="my-2 text-slate-300">{line}</div>
+                <div className="mb-2 text-center">VAT ADJUSTMENT</div>
+                <div className="space-y-0.5">
+                  <div className="flex justify-between"><span>SC TRANS. :</span><span>{f(displayData.scTrans)}</span></div>
+                  <div className="flex justify-between"><span>PWD TRANS. :</span><span>{f(displayData.pwdTrans)}</span></div>
+                  <div className="flex justify-between"><span>REG. DISC. TRANS. :</span><span>{f(displayData.regDisc)}</span></div>
+                  <div className="flex justify-between"><span>ZERO RATED TRANS. :</span><span>{f(displayData.zeroRatedTrans)}</span></div>
+                  <div className="flex justify-between"><span>VAT ON RETURN :</span><span>{f(displayData.vatOnReturn)}</span></div>
+                  <div className="flex justify-between"><span>OTHER VAT ADJ. :</span><span>{f(displayData.otherVatAdj)}</span></div>
                 </div>
+
+                <div className="my-2 text-slate-300">{line}</div>
+                <div className="mb-2 text-center">TRANSACTION SUMMARY</div>
+                <div className="space-y-0.5">
+                  <div className="flex justify-between"><span>Cash in Drawer:</span><span>{f(displayData.cash)}</span></div>
+                  <div className="flex justify-between"><span>CHEQUE:</span><span>{f(displayData.cheque)}</span></div>
+                  <div className="flex justify-between"><span>CREDIT CARD:</span><span>{f(displayData.creditCard)}</span></div>
+                  <div className="flex justify-between"><span>OTHER PAYMENTS:</span><span>{f(displayData.otherPayments)}</span></div>
+                  <div className="flex justify-between"><span>Opening Fund:</span><span>{f(displayData.openingFund)}</span></div>
+                  <div className="flex justify-between"><span>Withdrawal:</span><span>{f(displayData.withdrawal)}</span></div>
+                  <div className="flex justify-between"><span>Payments Received:</span><span>{f(displayData.paymentsReceived)}</span></div>
+                </div>
+
+                <div className="my-2 text-slate-300">{line}</div>
+                <div className="flex justify-between">
+                  <span>SHORT / OVER:</span>
+                  <span>{f(displayData.shortOver)}</span>
+                </div>
+                <div className="mt-2 text-slate-300">{line}</div>
               </div>
             )}
           </div>
