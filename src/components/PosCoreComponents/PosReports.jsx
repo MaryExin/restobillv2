@@ -30,7 +30,7 @@ import VoidsModal from "../MainComponents/ReportsModal/VoidsModal";
 import CustomersModal from "../MainComponents/ReportsModal/CustomersModal";
 import LogsModal from "../MainComponents/ReportsModal/LogsModal";
 import ModalXml from "../Modals/ModalXml";
-import ReprintModal from "../MainComponents/ReportsModal/ReprintModal";
+import ZReadingView from "../MainComponents/ReportsModal/ZReadingView";
 
 const MenuCard = ({
   icon: Icon,
@@ -43,14 +43,14 @@ const MenuCard = ({
   <button
     onClick={disabled ? undefined : onClick}
     disabled={disabled}
-    className={`group relative flex min-h-[140px] flex-col items-center justify-center gap-4 rounded-[24px] border p-6 text-center transition-all duration-300 ${
+    className={`group relative flex min-h-[140px] flex-col items-center justify-center gap-4 rounded-[24px] border-2 p-6 text-center transition-all duration-300 ${
       disabled
         ? isDark
           ? "cursor-not-allowed border-slate-800 bg-slate-900/70 opacity-60"
           : "cursor-not-allowed border-slate-200 bg-slate-100 opacity-70"
         : isDark
-        ? "border-white/10 bg-white/[0.04] hover:-translate-y-1 hover:border-blue-400/30 hover:bg-white/[0.08] hover:shadow-[0_18px_45px_rgba(0,0,0,0.28)]"
-        : "border-slate-200 bg-white hover:-translate-y-1 hover:border-blue-300 hover:bg-slate-50 hover:shadow-[0_18px_40px_rgba(15,23,42,0.10)]"
+        ? "border-blue-500/30 bg-white/[0.04] hover:-translate-y-1 hover:border-blue-500 hover:bg-white/[0.08] hover:shadow-[0_18px_45px_rgba(59,130,246,0.2)]"
+        : "border-blue-100 bg-white hover:-translate-y-1 hover:border-blue-500 hover:bg-slate-50 hover:shadow-[0_18px_40px_rgba(59,130,246,0.15)]"
     }`}
   >
     <div
@@ -59,8 +59,9 @@ const MenuCard = ({
           ? isDark
             ? "text-slate-600"
             : "text-slate-400"
-          : `${color} group-hover:scale-110`
+          : "group-hover:scale-110"
       }`}
+      style={{ color: !disabled ? color : undefined }}
     >
       <Icon />
     </div>
@@ -91,93 +92,48 @@ const MenuCard = ({
   </button>
 );
 
-// Idinagdag ang terminalNumber, categoryCode, unitCode sa props
 const PosReports = ({ open, onClose, terminalNumber, categoryCode, unitCode }) => {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const [activeModal, setActiveModal] = useState(null);
+  const [zReadingData, setZReadingData] = useState(null);
 
   if (!open) return null;
 
+  const handleZReadingClick = () => {
+    setActiveModal("zreadingview");
+    setZReadingData({
+      parReportDate: new Date().toLocaleDateString(),
+      parReportTime: new Date().toLocaleTimeString(),
+      parZCounterNo: "000001",
+      parBegOR: "000001",
+      parEndOR: "000050",
+      parGrossAmount: 1500.00,
+      parDiscount: 150.00,
+      parReturn: 0.00,
+      parNetAmount: 1350.00,
+      parVATableSales: 1205.36,
+      parVATAmount: 144.64,
+      parVATExemptSales: 0.00,
+      parPreviousAccumSales: 10000.00,
+      parPresentAccumSales: 11350.00
+    });
+  };
+
   const reportItems = [
-    {
-      label: "Dashboard",
-      icon: FaChartLine,
-      color: "text-blue-500",
-      action: () => setActiveModal("dashboard"),
-    },
-    {
-      label: "Daily Sales",
-      icon: FaCalendarDay,
-      color: "text-violet-500",
-      action: () => setActiveModal("daily"),
-    },
-    {
-      label: "Hourly Sales",
-      icon: FaClock,
-      color: "text-amber-500",
-      action: () => setActiveModal("hourly"),
-    },
-    {
-      label: "Transactions",
-      icon: FaHistory,
-      color: "text-sky-500",
-      action: () => setActiveModal("transactions"),
-    },
-    {
-      label: "Sales Per Item",
-      icon: FaBoxOpen,
-      color: "text-orange-500",
-      action: () => setActiveModal("perProduct"),
-    },
-    {
-      label: "BIR E-Sales",
-      icon: FaFileInvoice,
-      color: "text-cyan-500",
-      action: () => setActiveModal("birESales"),
-    },
-    {
-      label: "Z-Reading",
-      icon: FaPrint,
-      color: "text-yellow-500",
-      action: () => setActiveModal("reprint"),
-    },
-    {
-      label: "Customers",
-      icon: FaUsers,
-      color: "text-indigo-500",
-      action: () => setActiveModal("customers"),
-    },
-    {
-      label: "Refunds",
-      icon: FaUndo,
-      color: "text-orange-600",
-      action: () => setActiveModal("refunds"),
-    },
-    {
-      label: "Voids",
-      icon: FaTrashAlt,
-      color: "text-rose-500",
-      action: () => setActiveModal("voids"),
-    },
-    {
-      label: "Logs",
-      icon: FaListUl,
-      color: "text-slate-500",
-      action: () => setActiveModal("logs"),
-    },
-    {
-      label: "Sync Data",
-      icon: FaSyncAlt,
-      color: "text-blue-400",
-      comingSoon: true,
-    },
-    {
-      label: "XML",
-      icon: FaCode,
-      color: "text-emerald-500",
-      action: () => setActiveModal("xml"),
-    },
+    { label: "Dashboard", icon: FaChartLine, color: "#3b82f6", action: () => setActiveModal("dashboard") },
+    { label: "Daily Sales", icon: FaCalendarDay, color: "#8b5cf6", action: () => setActiveModal("daily") },
+    { label: "Hourly Sales", icon: FaClock, color: "#f59e0b", action: () => setActiveModal("hourly") },
+    { label: "Transactions", icon: FaHistory, color: "#0ea5e9", action: () => setActiveModal("transactions") },
+    { label: "Sales Per Item", icon: FaBoxOpen, color: "#f97316", action: () => setActiveModal("perProduct") },
+    { label: "BIR E-Sales", icon: FaFileInvoice, color: "#06b6d4", action: () => setActiveModal("birESales") },
+    { label: "Z-Reading", icon: FaPrint, color: "#eab308", action: handleZReadingClick },
+    { label: "Customers", icon: FaUsers, color: "#6366f1", action: () => setActiveModal("customers") },
+    { label: "Refunds", icon: FaUndo, color: "#ea580c", action: () => setActiveModal("refunds") },
+    { label: "Voids", icon: FaTrashAlt, color: "#f43f5e", action: () => setActiveModal("voids") },
+    { label: "Logs", icon: FaListUl, color: "#64748b", action: () => setActiveModal("logs") },
+    { label: "Sync Data", icon: FaSyncAlt, color: "#60a5fa", comingSoon: true },
+    { label: "XML", icon: FaCode, color: "#10b981", action: () => setActiveModal("xml") },
   ];
 
   return createPortal(
@@ -189,26 +145,18 @@ const PosReports = ({ open, onClose, terminalNumber, categoryCode, unitCode }) =
         onClick={(e) => e.target === e.currentTarget && onClose()}
       >
         <div
-          className={`relative flex w-full max-w-[980px] flex-col overflow-hidden rounded-[30px] border shadow-2xl ${
-            isDark
-              ? "border-white/10 bg-[#0f172a]"
-              : "border-slate-200 bg-[#f8fafc]"
+          className={`relative flex w-full max-w-[980px] flex-col overflow-hidden rounded-[30px] border-2 shadow-2xl ${
+            isDark ? "bg-[#0f172a] border-blue-500/20" : "bg-[#f8fafc] border-blue-100"
           }`}
         >
           <div
-            className={`border-b px-6 py-6 sm:px-8 ${
-              isDark
-                ? "border-white/10 bg-white/[0.03]"
-                : "border-slate-200 bg-white"
+            className={`border-b-2 px-6 py-6 sm:px-8 ${
+              isDark ? "border-white/10 bg-white/[0.03]" : "border-slate-200 bg-white"
             }`}
           >
             <div className="flex items-start justify-between gap-4">
               <div>
-                <div
-                  className={`text-sm font-semibold ${
-                    isDark ? "text-blue-400" : "text-blue-600"
-                  }`}
-                >
+                <div className="text-sm font-semibold text-blue-500">
                   Reports
                 </div>
 
@@ -223,10 +171,10 @@ const PosReports = ({ open, onClose, terminalNumber, categoryCode, unitCode }) =
 
               <button
                 onClick={onClose}
-                className={`flex h-11 w-11 items-center justify-center rounded-2xl border transition ${
+                className={`flex h-11 w-11 items-center justify-center rounded-2xl border-2 transition-all active:scale-90 ${
                   isDark
-                    ? "border-white/10 bg-white/[0.04] text-slate-300 hover:bg-rose-500 hover:text-white"
-                    : "border-slate-200 bg-white text-slate-500 hover:bg-rose-500 hover:text-white"
+                    ? "bg-white/[0.04] border-white/10 text-slate-300 hover:bg-rose-500 hover:border-rose-500 hover:text-white"
+                    : "bg-white border-slate-200 text-slate-500 hover:bg-rose-500 hover:border-rose-500 hover:text-white"
                 }`}
               >
                 <FaTimes size={16} />
@@ -250,59 +198,27 @@ const PosReports = ({ open, onClose, terminalNumber, categoryCode, unitCode }) =
         </div>
       </div>
 
-      <DashboardModal
-        isOpen={activeModal === "dashboard"}
-        onClose={() => setActiveModal(null)}
-      />
-      <DailySalesModal
-        isOpen={activeModal === "daily"}
-        onClose={() => setActiveModal(null)}
-      />
-      <HourlySalesModal
-        isOpen={activeModal === "hourly"}
-        onClose={() => setActiveModal(null)}
-      />
-      <SalesPerProductModal
-        isOpen={activeModal === "perProduct"}
-        onClose={() => setActiveModal(null)}
-      />
-      <TransactionsModal
-        isOpen={activeModal === "transactions"}
-        onClose={() => setActiveModal(null)}
-      />
-      <BirESalesModal
-        isOpen={activeModal === "birESales"}
-        onClose={() => setActiveModal(null)}
-      />
-      <RefundsModal
-        isOpen={activeModal === "refunds"}
-        onClose={() => setActiveModal(null)}
-      />
-      <VoidsModal
-        isOpen={activeModal === "voids"}
-        onClose={() => setActiveModal(null)}
-      />
-      <CustomersModal
-        isOpen={activeModal === "customers"}
-        onClose={() => setActiveModal(null)}
-      />
-      <LogsModal
-        isOpen={activeModal === "logs"}
-        onClose={() => setActiveModal(null)}
-      />
-      <ModalXml
-        isOpen={activeModal === "xml"}
-        onClose={() => setActiveModal(null)}
-      />
+      <DashboardModal isOpen={activeModal === "dashboard"} onClose={() => setActiveModal(null)} />
+      <DailySalesModal isOpen={activeModal === "daily"} onClose={() => setActiveModal(null)} />
+      <HourlySalesModal isOpen={activeModal === "hourly"} onClose={() => setActiveModal(null)} />
+      <SalesPerProductModal isOpen={activeModal === "perProduct"} onClose={() => setActiveModal(null)} />
+      <TransactionsModal isOpen={activeModal === "transactions"} onClose={() => setActiveModal(null)} />
+      <BirESalesModal isOpen={activeModal === "birESales"} onClose={() => setActiveModal(null)} />
       
-      {/* Ipinasa ang mga IDs para sa ReprintModal fetching */}
-      <ReprintModal
-        isOpen={activeModal === "reprint"}
-        onClose={() => setActiveModal(null)}
-        terminalNumber={terminalNumber}
-        categoryCode={categoryCode}
-        unitCode={unitCode}
+      <ZReadingView 
+        isOpen={activeModal === "zreadingview"} 
+        onClose={() => {
+          setActiveModal(null);
+          setZReadingData(null);
+        }} 
+        reportData={zReadingData} 
       />
+
+      <RefundsModal isOpen={activeModal === "refunds"} onClose={() => setActiveModal(null)} />
+      <VoidsModal isOpen={activeModal === "voids"} onClose={() => setActiveModal(null)} />
+      <CustomersModal isOpen={activeModal === "customers"} onClose={() => setActiveModal(null)} />
+      <LogsModal isOpen={activeModal === "logs"} onClose={() => setActiveModal(null)} />
+      <ModalXml isOpen={activeModal === "xml"} onClose={() => setActiveModal(null)} />
     </>,
     document.body
   );
