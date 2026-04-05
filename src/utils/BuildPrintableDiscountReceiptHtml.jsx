@@ -17,24 +17,26 @@ export function BuildPrintableDiscountReceiptHtml({
   scale = 0.85,
   businessInfo = {},
 }) {
+  const safeTransaction = transaction || {};
+  const safeComputed = computed || {};
+  const safeItems = Array.isArray(items) ? items : [];
+
   const companyName = String(businessInfo?.companyName || "COMPANY").trim();
   const storeName = String(businessInfo?.storeName || "STORE").trim();
   const corpName = String(businessInfo?.corpName || "CORPORATION").trim();
 
-  const activeBreakdown = Array.isArray(computed?.discountBreakdown)
-    ? computed.discountBreakdown.filter(
+  const activeBreakdown = Array.isArray(safeComputed?.discountBreakdown)
+    ? safeComputed.discountBreakdown.filter(
         (entry) =>
           Number(entry?.qualifiedCount || 0) > 0 ||
           Number(entry?.discountAmount || 0) > 0,
       )
     : [];
 
-  const totalQualifiedAll = Number(computed?.totalQualifiedAll || 0);
+  const totalQualifiedAll = Number(safeComputed?.totalQualifiedAll || 0);
   const statutoryQualifiedCount = Number(
-    computed?.statutoryQualifiedCount || 0,
+    safeComputed?.statutoryQualifiedCount || 0,
   );
-
-  const safeItems = Array.isArray(items) ? items : [];
 
   const receipt = (
     <html>
@@ -50,16 +52,22 @@ export function BuildPrintableDiscountReceiptHtml({
             box-sizing: border-box;
           }
 
+          @page {
+            margin: 0;
+          }
+
           html,
           body {
             margin: 0;
             padding: 0;
             width: 80mm;
+            min-width: 80mm;
             background: #ffffff;
             color: #000000;
             font-family: Arial, Helvetica, sans-serif;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
+            overflow: visible;
           }
 
           body {
@@ -68,11 +76,23 @@ export function BuildPrintableDiscountReceiptHtml({
 
           .print-root {
             width: 76.5mm;
-            padding: calc(8px * var(--s)) calc(5px * var(--s)) calc(14px * var(--s)) calc(2px * var(--s));
+            margin: 0;
+            padding: calc(8px * var(--s)) calc(16px * var(--s)) calc(20px * var(--s)) calc(1px * var(--s));
+            background: #ffffff;
+            color: #000000;
             font-size: calc(10.5px * var(--s));
             line-height: 1.18;
-            margin: 0;
             overflow: visible;
+          }
+
+          .section {
+            display: block;
+            width: 100%;
+          }
+
+          .keep-together {
+            page-break-inside: avoid;
+            break-inside: avoid;
           }
 
           .divider {
@@ -87,23 +107,33 @@ export function BuildPrintableDiscountReceiptHtml({
             font-size: calc(9.6px * var(--s));
           }
 
+          thead {
+            display: table-header-group;
+          }
+
+          tbody {
+            display: table-row-group;
+          }
+
           td,
           th {
             padding: 0;
             vertical-align: top;
             line-height: 1.1;
+            page-break-inside: auto;
+            break-inside: auto;
           }
 
           .center {
             text-align: center;
           }
 
-          .right {
-            text-align: right;
-          }
-
           .left {
             text-align: left;
+          }
+
+          .right {
+            text-align: right;
           }
 
           .bold {
@@ -153,22 +183,25 @@ export function BuildPrintableDiscountReceiptHtml({
           }
 
           .label-col {
-            width: 32%;
-            white-space: nowrap;
-            padding-right: 0;
+            width: 34%;
+            white-space: normal;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            padding-right: calc(4px * var(--s));
           }
 
           .value-col {
-            width: 68%;
+            width: 66%;
             text-align: right;
             white-space: nowrap;
             overflow: visible;
-            padding-right: calc(14px * var(--s));
+            padding-right: calc(16px * var(--s));
             padding-left: 0;
           }
 
           .item-col {
             width: 44%;
+            text-align: left;
             word-break: break-word;
             overflow-wrap: break-word;
             padding-right: calc(1px * var(--s));
@@ -176,7 +209,7 @@ export function BuildPrintableDiscountReceiptHtml({
           }
 
           .qty-col {
-            width: 8%;
+            width: 10%;
             text-align: center;
             white-space: nowrap;
             padding-right: 0;
@@ -184,11 +217,15 @@ export function BuildPrintableDiscountReceiptHtml({
           }
 
           .amt-col {
-            width: 44%;
+            width: 46%;
             text-align: right;
             white-space: nowrap;
-            padding-right: calc(12px * var(--s));
+            padding-right: calc(16px * var(--s));
             padding-left: 0;
+          }
+
+          .item-table th {
+            padding-bottom: calc(4px * var(--s));
           }
 
           .item-row td {
@@ -197,46 +234,6 @@ export function BuildPrintableDiscountReceiptHtml({
 
           .nowrap {
             white-space: nowrap;
-          }
-
-          .print-section {
-            display: block;
-            width: 100%;
-            overflow: visible;
-            page-break-inside: avoid;
-            break-inside: avoid;
-          }
-
-          .item-section {
-            display: block;
-            width: 100%;
-            overflow: visible;
-          }
-
-          .item-table {
-            width: 100%;
-            border-collapse: collapse;
-            table-layout: fixed;
-          }
-
-          .summary-table {
-            width: 100%;
-            border-collapse: collapse;
-            table-layout: fixed;
-            page-break-inside: avoid;
-            break-inside: avoid;
-          }
-
-          .summary-table tr {
-            page-break-inside: avoid;
-            break-inside: avoid;
-          }
-
-          .amount-due-block {
-            display: block;
-            width: 100%;
-            page-break-inside: avoid;
-            break-inside: avoid;
           }
 
           .amount-due-table {
@@ -255,81 +252,86 @@ export function BuildPrintableDiscountReceiptHtml({
           .amount-due-value-cell {
             text-align: right;
             white-space: nowrap;
-            padding-right: calc(14px * var(--s));
-          }
-
-          @page {
-            size: 80mm auto;
-            margin: 0;
+            padding-right: calc(16px * var(--s));
           }
         `}</style>
       </head>
       <body>
         <div className="print-root">
-          <div className="center">
-            <div className="black bigger">{companyName}</div>
-            <div className="mt-2 bold text-12">{storeName}</div>
-            <div className="bold text-12">{corpName}</div>
+          <div className="section keep-together">
+            <div className="center">
+              <div className="black bigger">{companyName}</div>
+              <div className="mt-2 bold text-12">{storeName}</div>
+              <div className="bold text-12">{corpName}</div>
+            </div>
           </div>
 
           <div className="divider" />
 
-          <div className="mb-8 center black big">BILLING</div>
+          <div className="section keep-together">
+            <div className="mb-8 center black big">BILLING</div>
+          </div>
 
-          <div className="print-section">
-            <table className="summary-table">
+          <div className="section">
+            <table>
               <tbody>
                 <tr>
                   <td className="bold label-col">Trans. No.:</td>
                   <td className="value-col">
-                    {transaction?.transaction_id || "-"}
+                    {safeTransaction?.transaction_id || "-"}
                   </td>
                 </tr>
                 <tr>
                   <td className="bold label-col">Billing No.:</td>
                   <td className="value-col">
-                    {transaction?.billing_no || transaction?.billingNo || "-"}
+                    {safeTransaction?.billing_no ||
+                      safeTransaction?.billingNo ||
+                      "-"}
                   </td>
                 </tr>
                 <tr>
                   <td className="bold label-col">Invoice No.:</td>
                   <td className="value-col">
-                    {transaction?.invoice_no || transaction?.invoiceNo || "-"}
+                    {safeTransaction?.invoice_no ||
+                      safeTransaction?.invoiceNo ||
+                      "-"}
                   </td>
                 </tr>
                 <tr>
                   <td className="bold label-col">Trans. Date:</td>
                   <td className="value-col">
-                    {transaction?.transaction_date || dateFrom || "-"}
+                    {safeTransaction?.transaction_date || dateFrom || "-"}
                   </td>
                 </tr>
                 <tr>
                   <td className="bold label-col">Trans. Time:</td>
                   <td className="value-col">
-                    {transaction?.transaction_time || "-"}
+                    {safeTransaction?.transaction_time || "-"}
                   </td>
                 </tr>
                 <tr>
                   <td className="bold label-col">Terminal No.:</td>
                   <td className="value-col">
-                    {transaction?.terminal_number || "-"}
+                    {safeTransaction?.terminal_number || "-"}
                   </td>
                 </tr>
                 <tr>
                   <td className="bold label-col">Order Type:</td>
                   <td className="value-col">
-                    {transaction?.order_type || "-"}
+                    {safeTransaction?.order_type || "-"}
                   </td>
                 </tr>
                 <tr>
                   <td className="bold label-col">Ref./Tag #:</td>
                   <td className="value-col">
-                    {transaction?.table_number || "-"}
+                    {safeTransaction?.table_number || "-"}
                   </td>
                 </tr>
                 <tr>
                   <td className="bold label-col">Cashier:</td>
-                  <td className="value-col">{transaction?.cashier || "-"}</td>
+                  <td className="value-col">
+                    {safeTransaction?.cashier || "-"}
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -337,7 +339,7 @@ export function BuildPrintableDiscountReceiptHtml({
 
           <div className="divider" />
 
-          <div className="print-section item-section">
+          <div className="section">
             <table className="item-table">
               <thead>
                 <tr>
@@ -380,12 +382,14 @@ export function BuildPrintableDiscountReceiptHtml({
 
           <div className="divider" />
 
-          <div className="print-section">
-            <table className="summary-table">
+          <div className="section">
+            <table>
               <tbody>
                 <tr>
                   <td className="bold label-col">TOTAL SALES:</td>
-                  <td className="value-col">{peso(computed?.grossTotal)}</td>
+                  <td className="value-col">
+                    {peso(safeComputed?.grossTotal)}
+                  </td>
                 </tr>
 
                 {activeBreakdown.map((entry) =>
@@ -401,11 +405,11 @@ export function BuildPrintableDiscountReceiptHtml({
                   ) : null,
                 )}
 
-                {Number(computed?.totalVatExemption || 0) > 0 ? (
+                {Number(safeComputed?.totalVatExemption || 0) > 0 ? (
                   <tr>
                     <td className="bold label-col">VAT EXEMPTION:</td>
                     <td className="value-col">
-                      {signedNegativePeso(computed?.totalVatExemption)}
+                      {signedNegativePeso(safeComputed?.totalVatExemption)}
                     </td>
                   </tr>
                 ) : null}
@@ -415,13 +419,13 @@ export function BuildPrintableDiscountReceiptHtml({
 
           <div className="divider" />
 
-          <div className="print-section amount-due-block mb-8">
-            <table className="summary-table amount-due-table">
+          <div className="section keep-together mb-8">
+            <table className="amount-due-table">
               <tbody>
                 <tr>
                   <td className="amount-due-label-cell">AMOUNT DUE:</td>
                   <td className="amount-due-value-cell">
-                    {peso(computed?.netAfterDiscount)}
+                    {peso(safeComputed?.netAfterDiscount)}
                   </td>
                 </tr>
               </tbody>
@@ -430,35 +434,37 @@ export function BuildPrintableDiscountReceiptHtml({
 
           <div className="divider" />
 
-          <div className="print-section">
-            <table className="summary-table">
+          <div className="section">
+            <table>
               <tbody>
                 <tr>
                   <td className="bold label-col">VATABLE SALES:</td>
-                  <td className="value-col">{peso(computed?.vatableSales)}</td>
+                  <td className="value-col">
+                    {peso(safeComputed?.vatableSales)}
+                  </td>
                 </tr>
                 <tr>
                   <td className="bold label-col">VAT AMOUNT:</td>
                   <td className="value-col">
-                    {peso(computed?.vatableSalesVat)}
+                    {peso(safeComputed?.vatableSalesVat)}
                   </td>
                 </tr>
                 <tr>
                   <td className="bold label-col">VAT EXEMPT SALES:</td>
                   <td className="value-col">
-                    {peso(computed?.vatExemptSales)}
+                    {peso(safeComputed?.vatExemptSales)}
                   </td>
                 </tr>
                 <tr>
                   <td className="bold label-col">VAT EXEMPTION:</td>
                   <td className="value-col">
-                    {peso(computed?.totalVatExemption)}
+                    {peso(safeComputed?.totalVatExemption)}
                   </td>
                 </tr>
                 <tr>
                   <td className="bold label-col">ZERO RATED SALES:</td>
                   <td className="value-col">
-                    {peso(computed?.vatZeroRatedSales)}
+                    {peso(safeComputed?.vatZeroRatedSales)}
                   </td>
                 </tr>
               </tbody>
@@ -467,13 +473,13 @@ export function BuildPrintableDiscountReceiptHtml({
 
           <div className="divider" />
 
-          <div className="print-section">
-            <table className="summary-table">
+          <div className="section">
+            <table>
               <tbody>
                 <tr>
                   <td className="bold label-col">Total Customers:</td>
                   <td className="value-col">
-                    {computed?.safeCustomerCount ?? 0}
+                    {safeComputed?.safeCustomerCount ?? 0}
                   </td>
                 </tr>
                 <tr>
@@ -503,27 +509,27 @@ export function BuildPrintableDiscountReceiptHtml({
                 <tr>
                   <td className="bold label-col">Discountable Gross:</td>
                   <td className="value-col">
-                    {peso(computed?.discountableGross)}
+                    {peso(safeComputed?.discountableGross)}
                   </td>
                 </tr>
                 <tr>
                   <td className="bold label-col">Discountable Base:</td>
                   <td className="value-col">
-                    {peso(computed?.discountableBase)}
+                    {peso(safeComputed?.discountableBase)}
                   </td>
                 </tr>
               </tbody>
             </table>
           </div>
 
-          <div className="mt-12 text-10">
+          <div className="section keep-together mt-12 text-10">
             <div className="bold">Customer Signature:</div>
             <div className="signature-line" />
           </div>
 
           <div className="divider" />
 
-          <div className="center text-10">
+          <div className="section keep-together center text-10">
             <div className="bold">Thank you</div>
             <div className="bold">Please come again.</div>
           </div>

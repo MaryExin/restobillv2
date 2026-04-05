@@ -5,6 +5,15 @@ const fs = require("fs");
 const OPEN_DEVTOOLS_IN_PACKAGED = false;
 const DEV_SERVER_URL = "http://localhost:5173";
 
+const RECEIPT_WINDOW_WIDTH_PX = 420;
+const MIN_PRINT_WINDOW_HEIGHT_PX = 1400;
+const MAX_PRINT_WINDOW_HEIGHT_PX = 12000;
+const EXTRA_RENDER_HEIGHT_PX = 120;
+const EXTRA_PAGE_HEIGHT_PX = 80;
+const RECEIPT_WIDTH_MICRONS = 80000;
+const MIN_RECEIPT_HEIGHT_MICRONS = 50000;
+const MAX_RECEIPT_HEIGHT_MICRONS = 1200000;
+
 protocol.registerSchemesAsPrivileged([
   {
     scheme: "asset",
@@ -36,6 +45,18 @@ const DEFAULT_BUSINESS_INFO = {
   posProviderPTUNo: "FP022026-25B0584602-00012",
   posProviderPTUDateIssued: "2/13/2026",
 };
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function cssPxToMicrons(px) {
+  return Math.ceil((Number(px) || 0) * (25400 / 96));
+}
 
 function createWindow() {
   win = new BrowserWindow({
@@ -194,6 +215,105 @@ async function getPrintersFromWindow(targetWindow) {
   if (!targetWindow || targetWindow.isDestroyed()) return [];
   const printers = await targetWindow.webContents.getPrintersAsync();
   return Array.isArray(printers) ? printers : [];
+}
+
+async function waitForReceiptLayout(targetWindow) {
+  if (!targetWindow || targetWindow.isDestroyed()) return;
+
+  await targetWindow.webContents.executeJavaScript(`
+    new Promise((resolve) => {
+      const finish = () => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(resolve);
+        });
+      };
+
+      const start = () => {
+        const fontPromise = document.fonts?.ready
+          ? document.fonts.ready.then(() => undefined).catch(() => undefined)
+          : Promise.resolve();
+
+        Promise.resolve(fontPromise).then(() => {
+          setTimeout(finish, 60);
+        });
+      };
+
+      if (document.readyState === "complete") {
+        start();
+      } else {
+        window.addEventListener("load", start, { once: true });
+      }
+    });
+  `);
+
+  await delay(120);
+}
+
+async function getReceiptMetrics(targetWindow) {
+  if (!targetWindow || targetWindow.isDestroyed()) {
+    return {
+      bodyScrollHeight: 0,
+      bodyOffsetHeight: 0,
+      docScrollHeight: 0,
+      docOffsetHeight: 0,
+      bodyScrollWidth: 0,
+      docScrollWidth: 0,
+      bodyRectHeight: 0,
+      bodyRectWidth: 0,
+      devicePixelRatio: 1,
+    };
+  }
+
+  return targetWindow.webContents.executeJavaScript(`
+    (() => {
+      const body = document.body;
+      const doc = document.documentElement;
+      const bodyRect = body ? body.getBoundingClientRect() : { height: 0, width: 0 };
+
+      return {
+        bodyScrollHeight: body ? body.scrollHeight : 0,
+        bodyOffsetHeight: body ? body.offsetHeight : 0,
+        docScrollHeight: doc ? doc.scrollHeight : 0,
+        docOffsetHeight: doc ? doc.offsetHeight : 0,
+        bodyScrollWidth: body ? body.scrollWidth : 0,
+        docScrollWidth: doc ? doc.scrollWidth : 0,
+        bodyRectHeight: Math.ceil(bodyRect.height || 0),
+        bodyRectWidth: Math.ceil(bodyRect.width || 0),
+        devicePixelRatio: window.devicePixelRatio || 1,
+      };
+    })();
+  `);
+}
+
+async function resizePrintWindowToContent(targetWindow, contentHeightPx) {
+  if (!targetWindow || targetWindow.isDestroyed()) return;
+
+  const targetHeight = clamp(
+    Math.ceil((Number(contentHeightPx) || 0) + EXTRA_RENDER_HEIGHT_PX),
+    MIN_PRINT_WINDOW_HEIGHT_PX,
+    MAX_PRINT_WINDOW_HEIGHT_PX,
+  );
+
+  targetWindow.setContentSize(RECEIPT_WINDOW_WIDTH_PX, targetHeight);
+  await delay(250);
+}
+
+async function printWithOptions(targetWindow, options) {
+  return new Promise((resolve) => {
+    try {
+      targetWindow.webContents.print(options, (success, failureReason) => {
+        resolve({
+          success,
+          failureReason: failureReason || "",
+        });
+      });
+    } catch (error) {
+      resolve({
+        success: false,
+        failureReason: error?.message || "Print call threw an error.",
+      });
+    }
+  });
 }
 
 app.whenReady().then(() => {
@@ -357,8 +477,8 @@ app.whenReady().then(() => {
 
       printWindow = new BrowserWindow({
         show: false,
-        width: 500,
-        height: 3000,
+        width: RECEIPT_WINDOW_WIDTH_PX,
+        height: MIN_PRINT_WINDOW_HEIGHT_PX,
         autoHideMenuBar: true,
         backgroundColor: "#ffffff",
         icon: app.isPackaged
@@ -386,18 +506,55 @@ app.whenReady().then(() => {
         "data:text/html;charset=utf-8," + encodeURIComponent(html),
       );
 
-      const metrics = await printWindow.webContents.executeJavaScript(`
-      ({
-        bodyScrollHeight: document.body ? document.body.scrollHeight : 0,
-        bodyClientHeight: document.body ? document.body.clientHeight : 0,
-        docScrollHeight: document.documentElement ? document.documentElement.scrollHeight : 0,
-        docClientHeight: document.documentElement ? document.documentElement.clientHeight : 0
-      })
-    `);
+      await waitForReceiptLayout(printWindow);
 
-      console.log("Receipt layout metrics:", metrics);
+      const metricsBeforeResize = await getReceiptMetrics(printWindow);
 
-      await new Promise((resolve) => setTimeout(resolve, 1200));
+      const measuredContentHeightBeforeResize = Math.max(
+        metricsBeforeResize.bodyScrollHeight,
+        metricsBeforeResize.bodyOffsetHeight,
+        metricsBeforeResize.docScrollHeight,
+        metricsBeforeResize.docOffsetHeight,
+        metricsBeforeResize.bodyRectHeight,
+      );
+
+      await resizePrintWindowToContent(
+        printWindow,
+        measuredContentHeightBeforeResize,
+      );
+
+      await waitForReceiptLayout(printWindow);
+
+      const metricsAfterResize = await getReceiptMetrics(printWindow);
+
+      const measuredContentHeightPx =
+        Math.max(
+          metricsBeforeResize.bodyScrollHeight,
+          metricsBeforeResize.bodyOffsetHeight,
+          metricsBeforeResize.docScrollHeight,
+          metricsBeforeResize.docOffsetHeight,
+          metricsBeforeResize.bodyRectHeight,
+          metricsAfterResize.bodyScrollHeight,
+          metricsAfterResize.bodyOffsetHeight,
+          metricsAfterResize.docScrollHeight,
+          metricsAfterResize.docOffsetHeight,
+          metricsAfterResize.bodyRectHeight,
+        ) + EXTRA_PAGE_HEIGHT_PX;
+
+      const customPageHeightMicrons = clamp(
+        cssPxToMicrons(measuredContentHeightPx),
+        MIN_RECEIPT_HEIGHT_MICRONS,
+        MAX_RECEIPT_HEIGHT_MICRONS,
+      );
+
+      console.log("Receipt layout metrics:", {
+        before: metricsBeforeResize,
+        after: metricsAfterResize,
+        measuredContentHeightPx,
+        customPageHeightMicrons,
+      });
+
+      await delay(300);
 
       const visiblePrinters = await getPrintersFromWindow(printWindow);
       const visiblePrinterNames = visiblePrinters.map((p) => p.name);
@@ -416,29 +573,48 @@ app.whenReady().then(() => {
         };
       }
 
-      const result = await new Promise((resolve) => {
-        printWindow.webContents.print(
-          {
-            silent,
-            deviceName: resolvedPrinterName,
-            copies,
-            printBackground: true,
-            margins: {
-              marginType: "none",
-            },
-            usePrinterDefaultPageSize: true,
-            pageRanges: [],
-          },
-          (success, failureReason) => {
-            resolve({
-              success,
-              failureReason: failureReason || "",
-            });
-          },
-        );
+      const customPrintOptions = {
+        silent,
+        deviceName: resolvedPrinterName,
+        copies,
+        printBackground: true,
+        margins: {
+          marginType: "none",
+        },
+        pageSize: {
+          width: RECEIPT_WIDTH_MICRONS,
+          height: customPageHeightMicrons,
+        },
+      };
+
+      let result = await printWithOptions(printWindow, customPrintOptions);
+
+      console.log("Custom print result:", {
+        result,
+        customPrintOptions,
       });
 
-      console.log("Print result from main:", result);
+      if (!result.success) {
+        const fallbackPrintOptions = {
+          silent,
+          deviceName: resolvedPrinterName,
+          copies,
+          printBackground: true,
+          margins: {
+            marginType: "none",
+          },
+          usePrinterDefaultPageSize: true,
+        };
+
+        await delay(250);
+
+        result = await printWithOptions(printWindow, fallbackPrintOptions);
+
+        console.log("Fallback print result:", {
+          result,
+          fallbackPrintOptions,
+        });
+      }
 
       if (!result.success) {
         return {
@@ -447,7 +623,7 @@ app.whenReady().then(() => {
         };
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await delay(1000);
 
       return {
         success: true,
