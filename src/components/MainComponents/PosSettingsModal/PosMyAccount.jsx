@@ -15,6 +15,7 @@ const PosMyAccount = ({ isDark, accent }) => {
   const apiHost = useApiHost();
   const [isLoading, setIsLoading] = useState(true);
   const [profile, setProfile] = useState(null);
+  const [imgError, setImgError] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -43,6 +44,10 @@ const PosMyAccount = ({ isDark, accent }) => {
     fetchProfile();
   }, [apiHost]);
 
+  useEffect(() => {
+    setImgError(false);
+  }, [profile?.profile_pic_url]);
+
   const theme = {
     panel: isDark
       ? "bg-slate-900/40 border-white/5"
@@ -56,8 +61,8 @@ const PosMyAccount = ({ isDark, accent }) => {
   };
 
   const profileImage = profile?.profile_pic_url
-    ? `${apiHost}/${profile.profile_pic_url}?t=${new Date().getTime()}`
-    : `${apiHost}/item_pictures/Default.jpg`;
+    ? `${apiHost}/${profile.profile_pic_url}`
+    : "";
 
   if (isLoading) {
     return (
@@ -160,7 +165,6 @@ const PosMyAccount = ({ isDark, accent }) => {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      {/* HERO */}
       <div
         className={`relative overflow-hidden rounded-[32px] border p-6 sm:p-8 lg:p-10 ${theme.panel}`}
       >
@@ -180,17 +184,24 @@ const PosMyAccount = ({ isDark, accent }) => {
                   : "bg-slate-100 border-slate-200"
               } shadow-xl`}
             >
-              <img
-                src={profileImage}
-                className="object-cover w-full h-full"
-                alt="Profile"
-                onError={(e) => {
-                  const defaultPath = `${apiHost}/item_pictures/Default.jpg`;
-                  if (e.target.src !== defaultPath) {
-                    e.target.src = defaultPath;
-                  }
-                }}
-              />
+              {String(profileImage || "").trim() && !imgError ? (
+                <img
+                  src={profileImage}
+                  className="object-cover w-full h-full"
+                  alt="Profile"
+                  onError={() => setImgError(true)}
+                />
+              ) : (
+                <div
+                  className={`flex items-center justify-center w-full h-full ${
+                    isDark
+                      ? "bg-slate-950 text-slate-500"
+                      : "bg-slate-100 text-slate-400"
+                  }`}
+                >
+                  <FiUser size={52} style={{ color: accent }} />
+                </div>
+              )}
             </div>
           </div>
 
@@ -237,7 +248,6 @@ const PosMyAccount = ({ isDark, accent }) => {
         </div>
       </div>
 
-      {/* QUICK INFO */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {infoCards.map((item, index) => {
           const Icon = item.icon;
@@ -277,7 +287,6 @@ const PosMyAccount = ({ isDark, accent }) => {
         })}
       </div>
 
-      {/* PROFILE SUMMARY PANEL */}
       <div className={`rounded-[32px] border p-6 sm:p-8 ${theme.panelSoft}`}>
         <p
           className={`text-[10px] font-black tracking-[0.24em] uppercase ${theme.textSoft}`}

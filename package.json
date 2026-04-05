@@ -127,6 +127,10 @@
       {
         "from": "build/icon.ico",
         "to": "icon.ico"
+      },
+      {
+        "from": "public/businessInfo.json",
+        "to": "businessInfo.json"
       }
     ],
     "win": {

@@ -11,8 +11,9 @@ import {
   FiAlertTriangle,
 } from "react-icons/fi";
 import ButtonComponent from "./Common/ButtonComponent";
-import { BuildPrintableDiscountReceiptHtml } from "../../utils/buildPrintableDiscountReceiptHtml";
+import { BuildPrintableDiscountReceiptHtml } from "../../utils/BuildPrintableDiscountReceiptHtml";
 import useGetDefaultPrinter from "../../hooks/useGetDefaultPrinter";
+import useBusinessInfo from "../../hooks/useBusinessInfo";
 
 const peso = (value) =>
   Number(value || 0).toLocaleString("en-PH", {
@@ -402,6 +403,7 @@ const ModalDiscountTransaction = ({
   billingNo,
 }) => {
   const defaultPrinterName = useGetDefaultPrinter();
+  const { businessInfo, isBusInfoLoading } = useBusinessInfo();
 
   const [printerName, setPrinterName] = useState("");
   const [printers, setPrinters] = useState([]);
@@ -1001,6 +1003,7 @@ const ModalDiscountTransaction = ({
         computed,
         items,
         scale: 1,
+        businessInfo,
       });
 
       const result = await window.electronAPI.printReceipt({

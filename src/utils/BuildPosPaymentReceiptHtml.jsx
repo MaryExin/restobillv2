@@ -18,6 +18,7 @@ export function BuildPosPaymentReceiptHtml({
   customerCards = [],
   isDuplicateCopy = false,
   terminalConfig = {},
+  businessInfo = {},
 }) {
   const yesNoToBool = (value) =>
     String(value || "")
@@ -79,49 +80,60 @@ export function BuildPosPaymentReceiptHtml({
       .map((line) => line.trim())
       .filter(Boolean);
 
-    if (raw.length > 0) return raw;
-    return [];
+    return raw;
   };
 
-  const companyName =
-    terminalConfig?.corpName || "CRABS N CRACK SEAFOOD HOUSE";
+  const companyName = String(businessInfo?.companyName || "COMPANY").trim();
+  const storeName = String(businessInfo?.storeName || "STORE").trim();
+  const corpName = String(businessInfo?.corpName || "CORPORATION").trim();
 
-  const businessUnitName =
-    terminalConfig?.businessUnitName || "AND SHAKING CRABS - GUIGUINTO";
-
-  const legalEntityName =
-    terminalConfig?.legalEntityName ||
-    terminalConfig?.companyName ||
-    terminalConfig?.registeredName ||
-    "";
-
-  const addressLines = splitAddressLines(
-    terminalConfig?.unitAddress ||
-      terminalConfig?.address ||
-      terminalConfig?.businessAddress ||
-      "",
+  const storeAddress = splitAddressLines(
+    businessInfo?.address || terminalConfig?.unitAddress || "ADDRESS",
   );
 
-  const vatTin =
-    terminalConfig?.vatTin ||
-    terminalConfig?.tin ||
-    terminalConfig?.vatRegTin ||
-    "";
+  const storeTin = String(
+    businessInfo?.tin || terminalConfig?.vatTin || "STORE TIN",
+  ).trim();
 
-  const supplierName =
-    terminalConfig?.supplierName || "LIGHTEM SOLUTIONS INCORPORATED";
+  const machineNumber = String(
+    businessInfo?.machineNumber ||
+      terminalConfig?.machineNumber ||
+      "MACHINE NUMBER",
+  ).trim();
 
-  const supplierAddressLines = splitAddressLines(
-    terminalConfig?.supplierAddress ||
-      terminalConfig?.supplierAddressLine1 ||
-      "1187, PARULAN, PLARIDEL|BULACAN, PHILIPPINES",
+  const serialNumber = String(
+    businessInfo?.serialNumber ||
+      terminalConfig?.serialNumber ||
+      "SERIAL NUMBER",
+  ).trim();
+
+  const posProviderName = String(
+    businessInfo?.posProviderName || "POS PROVIDER NAME",
+  ).trim();
+
+  const posProviderAddress = splitAddressLines(
+    businessInfo?.posProviderAddress || "POS PROVIDER ADDRESS",
   );
 
-  const supplierTin = terminalConfig?.supplierTin || "626717559-000";
-  const supplierBirAccNo =
-    terminalConfig?.supplierBirAccNo || "25A6267175592023091853";
-  const supplierDateIssued =
-    terminalConfig?.supplierDateIssued || "12/04/2023";
+  const posProviderTin = String(
+    businessInfo?.posProviderTin || "POS PROVIDER TIN",
+  ).trim();
+
+  const posProviderBirAccreNo = String(
+    businessInfo?.posProviderBirAccreNo || "POS PROVIDER ACCRE NO.",
+  ).trim();
+
+  const posProviderAccreDateIssued = String(
+    businessInfo?.posProviderAccreDateIssued || "ACCRE DATE ISSUED",
+  ).trim();
+
+  const posProviderPTUNo = String(
+    businessInfo?.posProviderPTUNo || "PTU No.",
+  ).trim();
+
+  const posProviderPTUDateIssued = String(
+    businessInfo?.posProviderPTUDateIssued || "PTU DATE ISSUED",
+  ).trim();
 
   const receipt = (
     <html>
@@ -153,17 +165,18 @@ export function BuildPosPaymentReceiptHtml({
           }
 
           body {
-            overflow: hidden;
+            overflow: visible;
           }
 
           .print-root {
             width: 76.5mm;
-            padding: calc(8px * var(--s)) calc(5px * var(--s)) calc(8px * var(--s)) calc(2px * var(--s));
+            padding: calc(8px * var(--s)) calc(5px * var(--s)) calc(18px * var(--s)) calc(2px * var(--s));
             font-size: calc(10.5px * var(--s));
             line-height: 1.18;
             margin: 0;
             background: #ffffff;
             color: #000000;
+            overflow: visible;
           }
 
           table {
@@ -261,7 +274,7 @@ export function BuildPosPaymentReceiptHtml({
             width: 62%;
             text-align: right;
             white-space: nowrap;
-            overflow: hidden;
+            overflow: visible;
             text-overflow: clip;
             padding-right: calc(12px * var(--s));
             padding-left: 0;
@@ -305,25 +318,57 @@ export function BuildPosPaymentReceiptHtml({
             padding-bottom: calc(1px * var(--s));
           }
 
-          .amount-due {
-            display: flex;
-            justify-content: space-between;
-            align-items: baseline;
-            gap: calc(4px * var(--s));
+          .print-section {
+            display: block;
+            width: 100%;
+            overflow: visible;
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+
+          .item-section {
+            display: block;
+            width: 100%;
+            overflow: visible;
+          }
+
+          .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+
+          .summary-table tr {
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+
+          .amount-due-block {
+            display: block;
+            width: 100%;
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+
+          .amount-due-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
             font-weight: 900;
             font-size: calc(16px * var(--s));
           }
 
-          .amount-due-label {
+          .amount-due-label-cell {
+            text-align: left;
             white-space: nowrap;
-            flex: 0 0 auto;
           }
 
-          .amount-due-value {
-            white-space: nowrap;
+          .amount-due-value-cell {
             text-align: right;
+            white-space: nowrap;
             padding-right: calc(16px * var(--s));
-            flex: 1 1 auto;
           }
 
           .customer-section-title {
@@ -339,8 +384,11 @@ export function BuildPosPaymentReceiptHtml({
 
           .supplier-block {
             margin-top: calc(10px * var(--s));
+            padding-bottom: calc(12px * var(--s));
             text-align: center;
             font-size: calc(10px * var(--s));
+            page-break-inside: avoid;
+            break-inside: avoid;
           }
 
           .supplier-block .bold {
@@ -356,15 +404,14 @@ export function BuildPosPaymentReceiptHtml({
       <body>
         <div className="print-root">
           <div className="center">
-            <div className="header-title">{businessUnitName}</div>
+            <div className="header-title">{companyName}</div>
+            <div className="sub-title">{String(storeName).toUpperCase()}</div>
 
-            <div className="sub-title">{String(companyName).toUpperCase()}</div>
-
-            {legalEntityName ? (
-              <div className="sub-title">{String(legalEntityName).toUpperCase()}</div>
+            {corpName ? (
+              <div className="sub-title">{String(corpName).toUpperCase()}</div>
             ) : null}
 
-            {addressLines.map((line, index) => (
+            {storeAddress.map((line, index) => (
               <div
                 key={`address-${index}`}
                 className="small"
@@ -374,16 +421,11 @@ export function BuildPosPaymentReceiptHtml({
               </div>
             ))}
 
-            {vatTin ? (
-              <div className="small">VAT REG TIN: {vatTin}</div>
+            {storeTin ? (
+              <div className="small">VAT REG TIN: {storeTin}</div>
             ) : null}
-
-            <div className="small">
-              MIN: {terminalConfig?.machineNumber || "-"}
-            </div>
-            <div className="small">
-              S/N: {terminalConfig?.serialNumber || "-"}
-            </div>
+            <div className="small">MIN: {machineNumber || "-"}</div>
+            <div className="small">S/N: {serialNumber || "-"}</div>
           </div>
 
           <div className="divider" />
@@ -394,243 +436,285 @@ export function BuildPosPaymentReceiptHtml({
             <div className="duplicate-copy">DUPLICATE INVOICE COPY</div>
           ) : null}
 
-          <table className="meta-table">
-            <MetaColGroup />
-            <tbody>
-              <tr>
-                <td className="bold label-col">Trans. No.:</td>
-                <td className="value-col">
-                  {safeTransaction?.transaction_id || "-"}
-                </td>
-              </tr>
-              <tr>
-                <td className="bold label-col">INV#:</td>
-                <td className="value-col">{safeTransaction?.invoice_no || "-"}</td>
-              </tr>
-              <tr>
-                <td className="bold label-col">Trans. Date:</td>
-                <td className="value-col">
-                  {safeTransaction?.transaction_date || "-"}
-                </td>
-              </tr>
-              <tr>
-                <td className="bold label-col">Trans. Time:</td>
-                <td className="value-col">
-                  {safeTransaction?.transaction_time || "-"}
-                </td>
-              </tr>
-              <tr>
-                <td className="bold label-col">Terminal No.:</td>
-                <td className="value-col">
-                  {safeTransaction?.terminal_number ||
-                    terminalConfig?.terminalNumber ||
-                    "-"}
-                </td>
-              </tr>
-              <tr>
-                <td className="bold label-col">Order Type:</td>
-                <td className="value-col">{safeTransaction?.order_type || "-"}</td>
-              </tr>
-              <tr>
-                <td className="bold label-col">Ref./Tag #:</td>
-                <td className="value-col">{safeTransaction?.table_number || "-"}</td>
-              </tr>
-              <tr>
-                <td className="bold label-col">Cashier:</td>
-                <td className="value-col">{safeTransaction?.cashier || "-"}</td>
-              </tr>
-            </tbody>
-          </table>
-
-          <div className="divider" />
-
-          <table className="item-table">
-            <thead>
-              <tr>
-                <th className="item-col">Item</th>
-                <th className="qty-col">Qty</th>
-                <th className="amt-col">Amt</th>
-              </tr>
-            </thead>
-            <tbody>
-              {safeItems.map((item, index) => {
-                const qty = Number(item.sales_quantity || 0);
-                const price = Number(item.selling_price || 0);
-                const lineTotal = qty * price;
-
-                const isDiscountable = yesNoToBool(item.isDiscountable);
-                const itemLabel = String(
-                  item.item_name || item.product_id || "-",
-                ).toUpperCase();
-
-                return (
-                  <tr key={item.ID || index} className="item-row">
-                    <td className="item-col">
-                      • {itemLabel}
-                      {isDiscountable ? " (D)" : ""}
-                    </td>
-                    <td className="qty-col">
-                      {qty} {item.unit_of_measure || ""}
-                    </td>
-                    <td className="amt-col">{peso(lineTotal)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-
-          <div className="divider" />
-
-          <table className="meta-table">
-            <MetaColGroup />
-            <tbody>
-              <tr>
-                <td className="bold label-col">TOTAL SALES:</td>
-                <td className="value-col">{peso(computed?.grossTotal)}</td>
-              </tr>
-
-              {activeBreakdown.map((entry) =>
-                Number(entry?.discountAmount || 0) > 0 ? (
-                  <tr key={entry.key}>
-                    <td className="bold label-col">
-                      {String(entry?.label || "DISCOUNT").toUpperCase()}:
-                    </td>
-                    <td className="value-col">
-                      {signedNegativePeso(entry?.discountAmount)}
-                    </td>
-                  </tr>
-                ) : null,
-              )}
-
-              {Number(computed?.totalVatExemption || 0) > 0 ? (
+          <div className="print-section">
+            <table className="meta-table summary-table">
+              <MetaColGroup />
+              <tbody>
                 <tr>
-                  <td className="bold label-col">VAT EXEMPTION:</td>
+                  <td className="bold label-col">Trans. No.:</td>
                   <td className="value-col">
-                    {signedNegativePeso(computed?.totalVatExemption)}
+                    {safeTransaction?.transaction_id || "-"}
                   </td>
                 </tr>
-              ) : null}
-
-              {safeOtherCharges.map((charge, index) => (
-                <tr key={`${charge.particulars}-${index}`}>
-                  <td className="bold label-col">
-                    {String(charge.particulars || "OTHER CHARGE").toUpperCase()}:
+                <tr>
+                  <td className="bold label-col">INV#:</td>
+                  <td className="value-col">
+                    {safeTransaction?.invoice_no || "-"}
                   </td>
-                  <td className="value-col">{peso(charge.amount)}</td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+                <tr>
+                  <td className="bold label-col">Trans. Date:</td>
+                  <td className="value-col">
+                    {safeTransaction?.transaction_date || "-"}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="bold label-col">Trans. Time:</td>
+                  <td className="value-col">
+                    {safeTransaction?.transaction_time || "-"}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="bold label-col">Terminal No.:</td>
+                  <td className="value-col">
+                    {safeTransaction?.terminal_number ||
+                      terminalConfig?.terminalNumber ||
+                      "-"}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="bold label-col">Order Type:</td>
+                  <td className="value-col">
+                    {safeTransaction?.order_type || "-"}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="bold label-col">Ref./Tag #:</td>
+                  <td className="value-col">
+                    {safeTransaction?.table_number || "-"}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="bold label-col">Cashier:</td>
+                  <td className="value-col">
+                    {safeTransaction?.cashier || "-"}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-          <div className="divider-tight" />
+          <div className="divider" />
 
-          <div className="amount-due">
-            <span className="amount-due-label">AMOUNT DUE:</span>
-            <span className="amount-due-value">
-              {peso(computed?.totalAmountDue)}
-            </span>
+          <div className="print-section item-section">
+            <table className="item-table">
+              <thead>
+                <tr>
+                  <th className="item-col">Item</th>
+                  <th className="qty-col">Qty</th>
+                  <th className="amt-col">Amt</th>
+                </tr>
+              </thead>
+              <tbody>
+                {safeItems.map((item, index) => {
+                  const qty = Number(item.sales_quantity || 0);
+                  const price = Number(item.selling_price || 0);
+                  const lineTotal = qty * price;
+
+                  const isDiscountable = yesNoToBool(item.isDiscountable);
+                  const itemLabel = String(
+                    item.item_name || item.product_id || "-",
+                  ).toUpperCase();
+
+                  return (
+                    <tr key={item.ID || index} className="item-row">
+                      <td className="item-col">
+                        • {itemLabel}
+                        {isDiscountable ? " (D)" : ""}
+                      </td>
+                      <td className="qty-col">
+                        {qty} {item.unit_of_measure || ""}
+                      </td>
+                      <td className="amt-col">{peso(lineTotal)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="divider" />
+
+          <div className="print-section">
+            <table className="meta-table summary-table">
+              <MetaColGroup />
+              <tbody>
+                <tr>
+                  <td className="bold label-col">TOTAL SALES:</td>
+                  <td className="value-col">{peso(computed?.grossTotal)}</td>
+                </tr>
+
+                {activeBreakdown.map((entry) =>
+                  Number(entry?.discountAmount || 0) > 0 ? (
+                    <tr key={entry.key}>
+                      <td className="bold label-col">
+                        {String(entry?.label || "DISCOUNT").toUpperCase()}:
+                      </td>
+                      <td className="value-col">
+                        {signedNegativePeso(entry?.discountAmount)}
+                      </td>
+                    </tr>
+                  ) : null,
+                )}
+
+                {Number(computed?.totalVatExemption || 0) > 0 ? (
+                  <tr>
+                    <td className="bold label-col">VAT EXEMPTION:</td>
+                    <td className="value-col">
+                      {signedNegativePeso(computed?.totalVatExemption)}
+                    </td>
+                  </tr>
+                ) : null}
+
+                {safeOtherCharges.map((charge, index) => (
+                  <tr key={`${charge.particulars}-${index}`}>
+                    <td className="bold label-col">
+                      {String(
+                        charge.particulars || "OTHER CHARGE",
+                      ).toUpperCase()}
+                      :
+                    </td>
+                    <td className="value-col">{peso(charge.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
 
           <div className="divider-tight" />
 
-          <table className="meta-table">
-            <MetaColGroup />
-            <tbody>
-              <tr>
-                <td className="bold label-col">PAYMENT ({paymentLabel}):</td>
-                <td className="value-col">{peso(computed?.totalPaid)}</td>
-              </tr>
-              <tr>
-                <td className="bold label-col">CHANGE:</td>
-                <td className="value-col">{peso(computed?.changeAmount)}</td>
-              </tr>
-            </tbody>
-          </table>
+          <div className="print-section amount-due-block">
+            <table className="summary-table amount-due-table">
+              <tbody>
+                <tr>
+                  <td className="amount-due-label-cell">AMOUNT DUE:</td>
+                  <td className="amount-due-value-cell">
+                    {peso(computed?.totalAmountDue)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
           <div className="divider-tight" />
 
-          <table className="meta-table">
-            <MetaColGroup />
-            <tbody>
-              <tr>
-                <td className="bold label-col">VATABLE SALES:</td>
-                <td className="value-col">{peso(computed?.vatableSales)}</td>
-              </tr>
-              <tr>
-                <td className="bold label-col">VAT AMOUNT:</td>
-                <td className="value-col">{peso(computed?.vatableSalesVat)}</td>
-              </tr>
-              <tr>
-                <td className="bold label-col">VAT EXEMPT SALES:</td>
-                <td className="value-col">{peso(computed?.vatExemptSales)}</td>
-              </tr>
-              <tr>
-                <td className="bold label-col">VAT EXEMPTION:</td>
-                <td className="value-col">{peso(computed?.totalVatExemption)}</td>
-              </tr>
-              <tr>
-                <td className="bold label-col">ZERO RATED SALES:</td>
-                <td className="value-col">{peso(computed?.vatZeroRatedSales)}</td>
-              </tr>
-            </tbody>
-          </table>
+          <div className="print-section">
+            <table className="meta-table summary-table">
+              <MetaColGroup />
+              <tbody>
+                <tr>
+                  <td className="bold label-col">PAYMENT ({paymentLabel}):</td>
+                  <td className="value-col">{peso(computed?.totalPaid)}</td>
+                </tr>
+                <tr>
+                  <td className="bold label-col">CHANGE:</td>
+                  <td className="value-col">{peso(computed?.changeAmount)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className="divider-tight" />
+
+          <div className="print-section">
+            <table className="meta-table summary-table">
+              <MetaColGroup />
+              <tbody>
+                <tr>
+                  <td className="bold label-col">VATABLE SALES:</td>
+                  <td className="value-col">{peso(computed?.vatableSales)}</td>
+                </tr>
+                <tr>
+                  <td className="bold label-col">VAT AMOUNT:</td>
+                  <td className="value-col">
+                    {peso(computed?.vatableSalesVat)}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="bold label-col">VAT EXEMPT SALES:</td>
+                  <td className="value-col">
+                    {peso(computed?.vatExemptSales)}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="bold label-col">VAT EXEMPTION:</td>
+                  <td className="value-col">
+                    {peso(computed?.totalVatExemption)}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="bold label-col">ZERO RATED SALES:</td>
+                  <td className="value-col">
+                    {peso(computed?.vatZeroRatedSales)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
           {shouldShowDiscountSummary ? (
             <>
               <div className="divider" />
+              <div className="print-section">
+                <table className="meta-table summary-table">
+                  <MetaColGroup />
+                  <tbody>
+                    <tr>
+                      <td className="bold label-col">Total Customers:</td>
+                      <td className="value-col">
+                        {Number(computed?.safeCustomerCount || 0)}
+                      </td>
+                    </tr>
 
-              <table className="meta-table">
-                <MetaColGroup />
-                <tbody>
-                  <tr>
-                    <td className="bold label-col">Total Customers:</td>
-                    <td className="value-col">
-                      {Number(computed?.safeCustomerCount || 0)}
-                    </td>
-                  </tr>
+                    <tr>
+                      <td className="bold label-col">Total Qualified:</td>
+                      <td className="value-col">
+                        {Number(
+                          computed?.totalQualifiedCount ||
+                            computed?.totalQualifiedAll ||
+                            0,
+                        )}
+                      </td>
+                    </tr>
 
-                  <tr>
-                    <td className="bold label-col">Total Qualified:</td>
-                    <td className="value-col">
-                      {Number(
-                        computed?.totalQualifiedCount ||
-                          computed?.totalQualifiedAll ||
-                          0,
-                      )}
-                    </td>
-                  </tr>
+                    {activeBreakdown.map((entry) => (
+                      <React.Fragment key={`summary-${entry.key}`}>
+                        <tr>
+                          <td className="bold label-col">
+                            {getDiscountCountLabel(entry)}
+                          </td>
+                          <td className="value-col">
+                            {Number(entry?.qualifiedCount || 0)}
+                          </td>
+                        </tr>
 
-                  {activeBreakdown.map((entry) => (
-                    <React.Fragment key={`summary-${entry.key}`}>
-                      <tr>
-                        <td className="bold label-col">
-                          {getDiscountCountLabel(entry)}
-                        </td>
-                        <td className="value-col">
-                          {Number(entry?.qualifiedCount || 0)}
-                        </td>
-                      </tr>
+                        <tr>
+                          <td className="bold label-col">
+                            {getDiscountAmountLabel(entry)}
+                          </td>
+                          <td className="value-col">
+                            {peso(entry?.discountAmount)}
+                          </td>
+                        </tr>
+                      </React.Fragment>
+                    ))}
 
-                      <tr>
-                        <td className="bold label-col">
-                          {getDiscountAmountLabel(entry)}
-                        </td>
-                        <td className="value-col">{peso(entry?.discountAmount)}</td>
-                      </tr>
-                    </React.Fragment>
-                  ))}
+                    <tr>
+                      <td className="bold label-col">Discountable Gross:</td>
+                      <td className="value-col">
+                        {peso(computed?.discountableGross)}
+                      </td>
+                    </tr>
 
-                  <tr>
-                    <td className="bold label-col">Discountable Gross:</td>
-                    <td className="value-col">{peso(computed?.discountableGross)}</td>
-                  </tr>
-
-                  <tr>
-                    <td className="bold label-col">Discountable Base:</td>
-                    <td className="value-col">{peso(computed?.discountableBase)}</td>
-                  </tr>
-                </tbody>
-              </table>
+                    <tr>
+                      <td className="bold label-col">Discountable Base:</td>
+                      <td className="value-col">
+                        {peso(computed?.discountableBase)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </>
           ) : null}
 
@@ -642,31 +726,35 @@ export function BuildPosPaymentReceiptHtml({
                 DISCOUNT CUSTOMER DETAILS
               </div>
 
-              {safeCustomerCards.map((card, index) => (
-                <table
-                  key={index}
-                  className="meta-table"
-                  style={{ marginBottom: "6px" }}
-                >
-                  <MetaColGroup />
-                  <tbody>
-                    <tr>
-                      <td className="label-col bold">Name:</td>
-                      <td className="value-col">{card.customer_name || ""}</td>
-                    </tr>
-                    <tr>
-                      <td className="label-col bold">ID:</td>
-                      <td className="value-col">
-                        {card.customer_exclusive_id || ""}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="label-col bold">Signature:</td>
-                      <td className="value-col"></td>
-                    </tr>
-                  </tbody>
-                </table>
-              ))}
+              <div className="print-section">
+                {safeCustomerCards.map((card, index) => (
+                  <table
+                    key={index}
+                    className="meta-table summary-table"
+                    style={{ marginBottom: "6px" }}
+                  >
+                    <MetaColGroup />
+                    <tbody>
+                      <tr>
+                        <td className="label-col bold">Name:</td>
+                        <td className="value-col">
+                          {card.customer_name || ""}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="label-col bold">ID:</td>
+                        <td className="value-col">
+                          {card.customer_exclusive_id || ""}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="label-col bold">Signature:</td>
+                        <td className="value-col"></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                ))}
+              </div>
             </>
           ) : null}
 
@@ -678,16 +766,22 @@ export function BuildPosPaymentReceiptHtml({
           </div>
 
           <div className="supplier-block">
-            {supplierName ? <div className="bold">SUPPLIER: {supplierName}</div> : null}
-            {supplierAddressLines.map((line, index) => (
+            {posProviderName ? (
+              <div className="bold">SUPPLIER: {posProviderName}</div>
+            ) : null}
+            {posProviderAddress.map((line, index) => (
               <div key={`supplier-${index}`}>{line}</div>
             ))}
-            {supplierTin ? <div>TIN: {supplierTin}</div> : null}
-            {supplierBirAccNo ? <div>BIR ACC#: {supplierBirAccNo}</div> : null}
-            {supplierDateIssued ? <div>DATE ISSUED: {supplierDateIssued}</div> : null}
-            {terminalConfig?.ptuNumber ? <div>PTU: {terminalConfig.ptuNumber}</div> : null}
-            {terminalConfig?.ptuDateIssued ? (
-              <div>PTU DATE ISSUED: {terminalConfig.ptuDateIssued}</div>
+            {posProviderTin ? <div>TIN: {posProviderTin}</div> : null}
+            {posProviderBirAccreNo ? (
+              <div>BIR ACC#: {posProviderBirAccreNo}</div>
+            ) : null}
+            {posProviderAccreDateIssued ? (
+              <div>DATE ISSUED: {posProviderAccreDateIssued}</div>
+            ) : null}
+            {posProviderPTUNo ? <div>PTU: {posProviderPTUNo}</div> : null}
+            {posProviderPTUDateIssued ? (
+              <div>PTU DATE ISSUED: {posProviderPTUDateIssued}</div>
             ) : null}
           </div>
         </div>
