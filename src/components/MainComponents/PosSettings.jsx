@@ -13,6 +13,7 @@ import {
   FiMenu,
   FiDatabase,
   FiChevronRight,
+  FiInfo,
 } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "../../context/ThemeContext";
@@ -26,6 +27,7 @@ import PosSystemLogs from "./PosSettingsModal/PosSystemLogs";
 import PosExpenses from "./PosSettingsModal/PosExpenses";
 import PosReportingModal from "./PosSettingsModal/PosReportingModal";
 import PosBackupModal from "./PosSettingsModal/PosBackupModal";
+import PosBusinessInfoManager from "./PosSettingsModal/PosBusinessInfoManager";
 
 const PosSettings = ({ isOpen, onClose, branchInfo }) => {
   const { theme, setTheme } = useTheme();
@@ -65,6 +67,7 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
     { id: "Registry Sales", icon: FiTrendingUp },
     { id: "Expenses & Petty", icon: FiCreditCard },
     { id: "Email Reports", icon: FiMail },
+    { id: "Business Info", icon: FiInfo },
     { id: "Data & Security", icon: FiDatabase },
     { id: "Appearance", icon: FiLayers },
   ];
@@ -118,6 +121,10 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
 
     if (activeTab === "Email Reports") {
       return <PosReportingModal isDark={isDark} accent={accentColor} />;
+    }
+
+    if (activeTab === "Business Info") {
+      return <PosBusinessInfoManager isDark={isDark} accent={accentColor} />;
     }
 
     if (activeTab === "Data & Security") {

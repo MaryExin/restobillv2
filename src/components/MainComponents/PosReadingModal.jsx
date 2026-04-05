@@ -7,6 +7,7 @@ import { FiX } from "react-icons/fi";
 import useApiHost from "../../hooks/useApiHost";
 import useGetDefaultPrinter from "../../hooks/useGetDefaultPrinter";
 import ButtonComponent from "./Common/ButtonComponent";
+import useBusinessInfo from "../../hooks/useBusinessInfo";
 
 export default function PosReadingModal({
   open = true,
@@ -16,7 +17,6 @@ export default function PosReadingModal({
   categoryCode = "",
   unitCode = "",
   terminalNumber = "",
-  corpName = "",
   shiftingDate = "",
   xEndpoint = "/api/generate_x_reading_pdf.php",
   zEndpoint = "/api/generate_z_reading_data.php",
@@ -25,6 +25,12 @@ export default function PosReadingModal({
   const defaultPrinterName = useGetDefaultPrinter();
   const [printerName, setPrinterName] = useState("");
   const [printers, setPrinters] = useState([]);
+
+  const {
+    businessInfo,
+    isLoading: isBusInfoLoading,
+    error: businessInfoError,
+  } = useBusinessInfo();
 
   useEffect(() => {
     if (!open) return;
@@ -51,21 +57,6 @@ export default function PosReadingModal({
     loadPrinters();
   }, [open, defaultPrinterName]);
 
-  const [terminalConfig, setTerminalConfig] = useState({
-    categoryCode: categoryCode || "",
-    unitCode: unitCode || "",
-    businessUnitName: "",
-    terminalNumber: terminalNumber || "1",
-    corpName: corpName || "",
-    machineNumber: "",
-    serialNumber: "",
-    ptuNumber: "",
-    ptuDateIssued: "",
-  });
-
-  const [isTerminalConfigLoading, setIsTerminalConfigLoading] = useState(false);
-  const [terminalConfigError, setTerminalConfigError] = useState("");
-
   const [activeType, setActiveType] = useState(null);
   const [values, setValues] = useState({
     cashDrawerAmount: "",
@@ -82,87 +73,6 @@ export default function PosReadingModal({
     title: "",
     message: "",
   });
-
-  useEffect(() => {
-    if (!apiHost) return;
-
-    let isMounted = true;
-
-    const loadTerminalConfig = async () => {
-      try {
-        setIsTerminalConfigLoading(true);
-        setTerminalConfigError("");
-
-        const params = new URLSearchParams({
-          unitCode: unitCode || "",
-          terminalNumber: terminalNumber || "1",
-          categoryCode: categoryCode || "",
-        });
-
-        const response = await fetch(
-          `${apiHost}/api/read_pos_terminal_config.php?${params.toString()}`,
-          {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-            },
-          },
-        );
-
-        const result = await response.json();
-
-        if (!isMounted) return;
-
-        if (!response.ok || !result.success) {
-          throw new Error(
-            result?.message || "Failed to load POS terminal configuration.",
-          );
-        }
-
-        const cfg = result.data || {};
-
-        setTerminalConfig({
-          categoryCode: String(cfg.categoryCode ?? categoryCode ?? ""),
-          unitCode: String(cfg.unitCode ?? unitCode ?? ""),
-          businessUnitName: String(cfg.businessUnitName ?? ""),
-          terminalNumber: String(cfg.terminalNumber ?? terminalNumber ?? "1"),
-          corpName: String(cfg.corpName ?? corpName ?? ""),
-          machineNumber: String(cfg.machineNumber ?? ""),
-          serialNumber: String(cfg.serialNumber ?? ""),
-          ptuNumber: String(cfg.ptuNumber ?? ""),
-          ptuDateIssued: String(cfg.ptuDateIssued ?? ""),
-        });
-      } catch (error) {
-        if (!isMounted) return;
-
-        setTerminalConfigError(
-          error?.message || "Unable to load terminal configuration.",
-        );
-
-        setTerminalConfig({
-          categoryCode: categoryCode || "",
-          unitCode: unitCode || "",
-          businessUnitName: "",
-          terminalNumber: terminalNumber || "1",
-          corpName: corpName || "",
-          machineNumber: "",
-          serialNumber: "",
-          ptuNumber: "",
-          ptuDateIssued: "",
-        });
-      } finally {
-        if (isMounted) {
-          setIsTerminalConfigLoading(false);
-        }
-      }
-    };
-
-    loadTerminalConfig();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [apiHost, categoryCode, unitCode, terminalNumber, corpName]);
 
   const parsedCashDrawer = useMemo(
     () => Number(values.cashDrawerAmount || 0),
@@ -232,10 +142,9 @@ export default function PosReadingModal({
         },
         body: JSON.stringify({
           transaction_date: normalizedShiftDate,
-          category_code: terminalConfig.categoryCode || categoryCode || "",
-          unit_code: terminalConfig.unitCode || unitCode || "",
-          terminal_number:
-            terminalConfig.terminalNumber || terminalNumber || "1",
+          category_code: categoryCode || "",
+          unit_code: unitCode || "",
+          terminal_number: terminalNumber || "1",
         }),
       },
     );
@@ -369,11 +278,15 @@ export default function PosReadingModal({
       font-weight: 900;
       font-size: calc(15px * var(--s));
       line-height: 1.15;
+      word-break: break-word;
+      overflow-wrap: break-word;
     }
 
     .subtitle {
       font-size: calc(10px * var(--s));
       line-height: 1.3;
+      word-break: break-word;
+      overflow-wrap: break-word;
     }
 
     .line {
@@ -466,14 +379,13 @@ export default function PosReadingModal({
       <body>
         <div class="receipt">
           <div class="center">
-           
-            <div class="title">${data.businessUnitName || terminalConfig.businessUnitName || ""}</div>
-            <div class="subtitle">${terminalConfig.corpName}</div>
-            <div class="subtitle">${data.businessUnitAddress || ""}</div>
-            <div class="subtitle">${data.tinLabel || ""}</div>
-            <div class="subtitle">MIN: ${terminalConfig.machineNumber}</div>
-            <div class="subtitle">S/N: ${terminalConfig.serialNumber}</div>
-           
+            <div class="title">${data.companyName || ""}</div>
+            <div class="subtitle">${data.storeName || ""}</div>
+            <div class="subtitle">${data.corpName || ""}</div>
+            <div class="subtitle">${data.address || ""}</div>
+            <div class="subtitle">TIN: ${data.tin || ""}</div>
+            <div class="subtitle">MIN: ${data.machineNumber || ""}</div>
+            <div class="subtitle">S/N: ${data.serialNumber || ""}</div>
             <div class="title" style="margin-top:8px;">X-READING</div>
           </div>
 
@@ -536,12 +448,13 @@ export default function PosReadingModal({
         <body>
           <div class="receipt">
             <div class="center">
-              <div class="title">${data.businessUnitName || terminalConfig.businessUnitName || ""}</div>
-               <div class="subtitle">${terminalConfig.corpName}</div>
-              <div class="subtitle">${data.businessUnitAddress || ""}</div>
-              <div class="subtitle">${data.tinLabel || ""}</div>
-              <div class="subtitle">MIN: ${terminalConfig.machineNumber}</div>
-              <div class="subtitle">S/N: ${terminalConfig.serialNumber}</div>           
+              <div class="title">${data.companyName || ""}</div>
+              <div class="subtitle">${data.storeName || ""}</div>
+              <div class="subtitle">${data.corpName || ""}</div>
+              <div class="subtitle">${data.address || ""}</div>
+              <div class="subtitle">TIN: ${data.tin || ""}</div>
+              <div class="subtitle">MIN: ${data.machineNumber || ""}</div>
+              <div class="subtitle">S/N: ${data.serialNumber || ""}</div>
               <div class="title" style="margin-top:8px;">Z-READING</div>
             </div>
 
@@ -665,16 +578,16 @@ export default function PosReadingModal({
   const handlePrint = async () => {
     if (!validate()) return;
 
-    if (isTerminalConfigLoading) {
+    if (isBusInfoLoading) {
       openBlockerModal(
-        "Configuration Loading",
-        "Terminal configuration is still loading.",
+        "Business Info Loading",
+        "Business information is still loading.",
       );
       return;
     }
 
-    if (terminalConfigError) {
-      openBlockerModal("Configuration Error", terminalConfigError);
+    if (businessInfoError) {
+      openBlockerModal("Business Info Error", businessInfoError);
       return;
     }
 
@@ -694,16 +607,15 @@ export default function PosReadingModal({
           selectedCashier,
           cashDrawerAmount: Number(values.cashDrawerAmount || 0),
           verifyAmount: Number(values.verifyAmount || 0),
-          categoryCode: terminalConfig.categoryCode || categoryCode || "",
-          unitCode: terminalConfig.unitCode || unitCode || "",
-          terminalNumber:
-            terminalConfig.terminalNumber || terminalNumber || "1",
-          corpName: terminalConfig.corpName || corpName || "",
+          categoryCode: categoryCode || "",
+          unitCode: unitCode || "",
+          terminalNumber: terminalNumber || "1",
+          corpName: businessInfo.corpName || "",
           shiftingDate: normalizedShiftDate,
-          machineNumber: terminalConfig.machineNumber || "",
-          serialNumber: terminalConfig.serialNumber || "",
-          ptuNumber: terminalConfig.ptuNumber || "",
-          ptuDateIssued: terminalConfig.ptuDateIssued || "",
+          machineNumber: businessInfo.machineNumber || "",
+          serialNumber: businessInfo.serialNumber || "",
+          ptuNumber: businessInfo.posProviderPTUNo || "",
+          ptuDateIssued: businessInfo.posProviderPTUDateIssued || "",
           user_id: localStorage.getItem("user_id") || "",
           user_name: localStorage.getItem("Cashier") || "Store Crew",
           cashier_name: localStorage.getItem("username") || "Store Crew",
@@ -718,16 +630,22 @@ export default function PosReadingModal({
 
       const payload = {
         ...result.data,
-        corpName: terminalConfig.corpName || corpName || "",
-        businessUnitName:
-          result.data?.businessUnitName ||
-          terminalConfig.businessUnitName ||
-          "",
-        machineNumber: terminalConfig.machineNumber || "10000000001",
-        serialNumber: terminalConfig.serialNumber || "10000000001",
-        terminalNumber: terminalConfig.terminalNumber || "1",
-        ptuNumber: terminalConfig.ptuNumber || "00000000-000-0000000-00000",
-        ptuDateIssued: terminalConfig.ptuDateIssued || "01/01/2023",
+        companyName: businessInfo.companyName || "",
+        storeName: businessInfo.storeName || "",
+        corpName: businessInfo.corpName || "",
+        address: businessInfo.address || "",
+        tin: businessInfo.tin || "",
+        machineNumber: businessInfo.machineNumber || "",
+        serialNumber: businessInfo.serialNumber || "",
+        terminalNumber: terminalNumber || "1",
+        ptuNumber: businessInfo.posProviderPTUNo || "",
+        ptuDateIssued: businessInfo.posProviderPTUDateIssued || "",
+        posProviderName: businessInfo.posProviderName || "",
+        posProviderAddress: businessInfo.posProviderAddress || "",
+        posProviderTin: businessInfo.posProviderTin || "",
+        posProviderBirAccreNo: businessInfo.posProviderBirAccreNo || "",
+        posProviderAccreDateIssued:
+          businessInfo.posProviderAccreDateIssued || "",
         summaryCashInDrawer: Number(values.cashDrawerAmount || 0),
         cashInDrawer: Number(values.cashDrawerAmount || 0),
         vatExemption:
@@ -834,15 +752,15 @@ export default function PosReadingModal({
             <div className="mt-4 text-center text-sm text-zinc-500">
               {isCheckingBlockers
                 ? "Checking pending transactions..."
-                : isTerminalConfigLoading
-                  ? "Loading terminal configuration..."
+                : isBusInfoLoading
+                  ? "Loading business information..."
                   : normalizedShiftDate
                     ? `Shift Date: ${normalizedShiftDate}`
                     : "No shift date found."}
             </div>
 
             <div className="mt-2 text-center text-xs text-zinc-400">
-              {terminalConfig.businessUnitName || ""}
+              {businessInfo.companyName || ""}
             </div>
 
             <div className="mt-16 flex justify-center">

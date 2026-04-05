@@ -201,7 +201,9 @@ const PosPaymentReceipt = React.forwardRef(
                 shiftDetails?.terminal?.terminalNumber ??
                 "1",
             ),
-            corpName: String(cfg.corpName ?? corpName ?? transaction?.corp_name ?? ""),
+            corpName: String(
+              cfg.corpName ?? corpName ?? transaction?.corp_name ?? "",
+            ),
             machineNumber: String(cfg.machineNumber ?? ""),
             serialNumber: String(cfg.serialNumber ?? ""),
             ptuNumber: String(cfg.ptuNumber ?? ""),
@@ -384,7 +386,9 @@ const PosPaymentReceipt = React.forwardRef(
           <div
             style={{ fontWeight: "900", fontSize: "15px", lineHeight: 1.15 }}
           >
-            {String(receiptInfo.corpName || "CRABS N CRACK SEAFOOD HOUSE").toUpperCase()}
+            {String(
+              receiptInfo.corpName || "CRABS N CRACK SEAFOOD HOUSE",
+            ).toUpperCase()}
           </div>
 
           <div
@@ -506,7 +510,10 @@ const PosPaymentReceipt = React.forwardRef(
             <tr>
               <td style={{ fontWeight: "700", padding: "1px 0" }}>Cashier:</td>
               <td style={{ textAlign: "right", padding: "1px 0" }}>
-                {transaction?.cashier || shiftDetails?.userName || localStorage.getItem("Cashier") || "-"}
+                {transaction?.cashier ||
+                  shiftDetails?.userName ||
+                  localStorage.getItem("Cashier") ||
+                  "-"}
               </td>
             </tr>
           </tbody>
@@ -537,7 +544,10 @@ const PosPaymentReceipt = React.forwardRef(
               return (
                 <tr key={item.ID || index}>
                   <td style={{ padding: "2px 0", verticalAlign: "top" }}>
-                    • {String(item.item_name || item.product_id || "-").toUpperCase()}
+                    •{" "}
+                    {String(
+                      item.item_name || item.product_id || "-",
+                    ).toUpperCase()}
                   </td>
                   <td
                     style={{
@@ -715,7 +725,9 @@ const PosPaymentReceipt = React.forwardRef(
 
         {shouldShowDiscountSummary ? (
           <>
-            <div style={{ borderTop: "1px solid #000", margin: "10px 0 8px" }} />
+            <div
+              style={{ borderTop: "1px solid #000", margin: "10px 0 8px" }}
+            />
 
             <table
               style={{
@@ -793,7 +805,9 @@ const PosPaymentReceipt = React.forwardRef(
 
         {customerCards.length > 0 ? (
           <>
-            <div style={{ borderTop: "1px solid #000", margin: "10px 0 8px" }} />
+            <div
+              style={{ borderTop: "1px solid #000", margin: "10px 0 8px" }}
+            />
 
             <div
               style={{

@@ -14,6 +14,7 @@ import { FaMoneyBill } from "react-icons/fa";
 import ButtonComponent from "./Common/ButtonComponent";
 import BuildPosPaymentReceiptHtml from "../../utils/BuildPosPaymentReceiptHtml";
 import useGetDefaultPrinter from "../../hooks/useGetDefaultPrinter";
+import useBusinessInfo from "../../hooks/useBusinessInfo";
 
 const loggedUserId = localStorage.getItem("user_id") || "";
 const loggedUserName =
@@ -1628,6 +1629,7 @@ export default function TransactionPaymentModal({
   mode = "pending",
 }) {
   const defaultPrinterName = useGetDefaultPrinter();
+  const { businessInfo, isBusInfoLoading } = useBusinessInfo();
 
   const [isPrinting, setIsPrinting] = useState(false);
 
@@ -1748,13 +1750,8 @@ export default function TransactionPaymentModal({
 
     return {
       categoryCode:
-        shiftDetails?.Category_Code ||
-        transaction?.Category_Code ||
-        "",
-      unitCode:
-        shiftDetails?.Unit_Code ||
-        transaction?.Unit_Code ||
-        "",
+        shiftDetails?.Category_Code || transaction?.Category_Code || "",
+      unitCode: shiftDetails?.Unit_Code || transaction?.Unit_Code || "",
       businessUnitName:
         shiftDetails?.Unit_Name ||
         terminal?.businessUnitName ||
@@ -1827,6 +1824,7 @@ export default function TransactionPaymentModal({
         customerCards: snapshot.customerCards || customerCards,
         isDuplicateCopy: snapshot.isDuplicateCopy || false,
         terminalConfig,
+        businessInfo,
       });
 
       const result = await window.electronAPI.printReceipt({

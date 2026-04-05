@@ -15,7 +15,12 @@ export function BuildPrintableDiscountReceiptHtml({
   computed,
   items,
   scale = 0.85,
+  businessInfo = {},
 }) {
+  const companyName = String(businessInfo?.companyName || "COMPANY").trim();
+  const storeName = String(businessInfo?.storeName || "STORE").trim();
+  const corpName = String(businessInfo?.corpName || "CORPORATION").trim();
+
   const activeBreakdown = Array.isArray(computed?.discountBreakdown)
     ? computed.discountBreakdown.filter(
         (entry) =>
@@ -58,28 +63,30 @@ export function BuildPrintableDiscountReceiptHtml({
           }
 
           body {
-            overflow: hidden;
+            overflow: visible;
           }
 
-       .print-root {
-          width: 76.5mm;
-          padding: calc(8px * var(--s)) calc(5px * var(--s)) calc(8px * var(--s)) calc(2px * var(--s));
-          font-size: calc(10.5px * var(--s));
-          line-height: 1.18;
-          margin: 0;
-        }
+          .print-root {
+            width: 76.5mm;
+            padding: calc(8px * var(--s)) calc(5px * var(--s)) calc(14px * var(--s)) calc(2px * var(--s));
+            font-size: calc(10.5px * var(--s));
+            line-height: 1.18;
+            margin: 0;
+            overflow: visible;
+          }
 
           .divider {
             border-top: 1px solid #000;
             margin: calc(8px * var(--s)) 0 calc(7px * var(--s));
           }
 
-        table {
-          width: 100%;
-          border-collapse: collapse;
-          table-layout: fixed;
-          font-size: calc(9.6px * var(--s));
-        }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            font-size: calc(9.6px * var(--s));
+          }
+
           td,
           th {
             padding: 0;
@@ -145,73 +152,110 @@ export function BuildPrintableDiscountReceiptHtml({
             margin-top: calc(3px * var(--s));
           }
 
-      .label-col {
-          width: 32%;
-          white-space: nowrap;
-          padding-right: 0;
-        }
+          .label-col {
+            width: 32%;
+            white-space: nowrap;
+            padding-right: 0;
+          }
 
-        .value-col {
-          width: 68%;
-          text-align: right;
-          white-space: nowrap;
-          overflow: visible;
-          padding-right: calc(14px * var(--s));
-          padding-left: 0;
-        }
+          .value-col {
+            width: 68%;
+            text-align: right;
+            white-space: nowrap;
+            overflow: visible;
+            padding-right: calc(14px * var(--s));
+            padding-left: 0;
+          }
 
-        .amount-due {
-          display: flex;
-          justify-content: space-between;
-          align-items: baseline;
-          gap: calc(4px * var(--s));
-          font-weight: 900;
-          font-size: calc(14px * var(--s));
-        }
+          .item-col {
+            width: 44%;
+            word-break: break-word;
+            overflow-wrap: break-word;
+            padding-right: calc(1px * var(--s));
+            padding-left: 0;
+          }
 
-        .amount-due-label {
-          white-space: nowrap;
-          flex: 0 0 auto;
-        }
+          .qty-col {
+            width: 8%;
+            text-align: center;
+            white-space: nowrap;
+            padding-right: 0;
+            padding-left: 0;
+          }
 
-        .amount-due-value {
-          white-space: nowrap;
-          text-align: right;
-          padding-right: calc(14px * var(--s));
-          flex: 1 1 auto;
-        }
+          .amt-col {
+            width: 44%;
+            text-align: right;
+            white-space: nowrap;
+            padding-right: calc(12px * var(--s));
+            padding-left: 0;
+          }
 
-      .item-col {
-        width: 44%;
-        word-break: break-word;
-        overflow-wrap: break-word;
-        padding-right: calc(1px * var(--s));
-        padding-left: 0;
-      }
-
-      .qty-col {
-        width: 8%;
-        text-align: center;
-        white-space: nowrap;
-        padding-right: 0;
-        padding-left: 0;
-      }
-
-      .amt-col {
-        width: 44%;
-        text-align: right;
-        white-space: nowrap;
-        padding-right: calc(12px * var(--s));
-        padding-left: 0;
-      }
-                  
-
-     .item-row td {
-        padding-bottom: calc(1px * var(--s));
-      }
+          .item-row td {
+            padding-bottom: calc(1px * var(--s));
+          }
 
           .nowrap {
             white-space: nowrap;
+          }
+
+          .print-section {
+            display: block;
+            width: 100%;
+            overflow: visible;
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+
+          .item-section {
+            display: block;
+            width: 100%;
+            overflow: visible;
+          }
+
+          .item-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+          }
+
+          .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+
+          .summary-table tr {
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+
+          .amount-due-block {
+            display: block;
+            width: 100%;
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+
+          .amount-due-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            font-weight: 900;
+            font-size: calc(14px * var(--s));
+          }
+
+          .amount-due-label-cell {
+            text-align: left;
+            white-space: nowrap;
+          }
+
+          .amount-due-value-cell {
+            text-align: right;
+            white-space: nowrap;
+            padding-right: calc(14px * var(--s));
           }
 
           @page {
@@ -223,232 +267,254 @@ export function BuildPrintableDiscountReceiptHtml({
       <body>
         <div className="print-root">
           <div className="center">
-            <div className="black bigger">CRABS N CRACK SEAFOOD HOUSE</div>
-            <div className="mt-2 bold text-12">
-              AND SHAKING CRABS - GUIGUINTO
-            </div>
-            <div className="bold text-12">ARU FOOD CORP.</div>
+            <div className="black bigger">{companyName}</div>
+            <div className="mt-2 bold text-12">{storeName}</div>
+            <div className="bold text-12">{corpName}</div>
           </div>
 
           <div className="divider" />
 
           <div className="mb-8 center black big">BILLING</div>
 
-          <table>
-            <tbody>
-              <tr>
-                <td className="bold label-col">Trans. No.:</td>
-                <td className="value-col">
-                  {transaction?.transaction_id || "-"}
-                </td>
-              </tr>
-              <tr>
-                <td className="bold label-col">Billing No.:</td>
-                <td className="value-col">
-                  {transaction?.billing_no || transaction?.billingNo || "-"}
-                </td>
-              </tr>
-              <tr>
-                <td className="bold label-col">Invoice No.:</td>
-                <td className="value-col">
-                  {transaction?.invoice_no || transaction?.invoiceNo || "-"}
-                </td>
-              </tr>
-              <tr>
-                <td className="bold label-col">Trans. Date:</td>
-                <td className="value-col">
-                  {transaction?.transaction_date || dateFrom || "-"}
-                </td>
-              </tr>
-              <tr>
-                <td className="bold label-col">Trans. Time:</td>
-                <td className="value-col">
-                  {transaction?.transaction_time || "-"}
-                </td>
-              </tr>
-              <tr>
-                <td className="bold label-col">Terminal No.:</td>
-                <td className="value-col">
-                  {transaction?.terminal_number || "-"}
-                </td>
-              </tr>
-              <tr>
-                <td className="bold label-col">Order Type:</td>
-                <td className="value-col">{transaction?.order_type || "-"}</td>
-              </tr>
-              <tr>
-                <td className="bold label-col">Ref./Tag #:</td>
-                <td className="value-col">
-                  {transaction?.table_number || "-"}
-                </td>
-              </tr>
-              <tr>
-                <td className="bold label-col">Cashier:</td>
-                <td className="value-col">{transaction?.cashier || "-"}</td>
-              </tr>
-            </tbody>
-          </table>
-
-          <div className="divider" />
-
-          <table>
-            <thead>
-              <tr>
-                <th className="pb-4 left item-col">Item</th>
-                <th className="pb-4 qty-col">Qty</th>
-                <th className="pb-4 amt-col">Amt</th>
-              </tr>
-            </thead>
-            <tbody>
-              {safeItems.map((item, index) => {
-                const qty = Number(item.sales_quantity || 0);
-                const price = Number(item.selling_price || 0);
-                const lineTotal = qty * price;
-
-                const isDiscountable =
-                  String(item.isDiscountable || "")
-                    .trim()
-                    .toLowerCase() === "yes";
-
-                const itemLabel = String(
-                  item.item_name || item.product_id || "-",
-                ).toUpperCase();
-
-                return (
-                  <tr key={item.ID || index} className="item-row">
-                    <td className="item-col">
-                      • {itemLabel}
-                      {isDiscountable ? " (D)" : ""}
-                    </td>
-                    <td className="qty-col nowrap">
-                      {qty} {item.unit_of_measure || ""}
-                    </td>
-                    <td className="amt-col nowrap">{peso(lineTotal)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-
-          <div className="divider" />
-
-          <table>
-            <tbody>
-              <tr>
-                <td className="bold label-col">TOTAL SALES:</td>
-                <td className="value-col">{peso(computed?.grossTotal)}</td>
-              </tr>
-
-              {activeBreakdown.map((entry) =>
-                Number(entry?.discountAmount || 0) > 0 ? (
-                  <tr key={`disc-${entry.key}`}>
-                    <td className="bold label-col">
-                      {String(entry?.label || "DISCOUNT").toUpperCase()}:
-                    </td>
-                    <td className="value-col">
-                      {signedNegativePeso(entry?.discountAmount)}
-                    </td>
-                  </tr>
-                ) : null,
-              )}
-
-              {Number(computed?.totalVatExemption || 0) > 0 ? (
+          <div className="print-section">
+            <table className="summary-table">
+              <tbody>
                 <tr>
-                  <td className="bold label-col">VAT EXEMPTION:</td>
+                  <td className="bold label-col">Trans. No.:</td>
                   <td className="value-col">
-                    {signedNegativePeso(computed?.totalVatExemption)}
+                    {transaction?.transaction_id || "-"}
                   </td>
                 </tr>
-              ) : null}
-            </tbody>
-          </table>
-
-          <div className="divider" />
-
-          <div className="mb-8 amount-due">
-            <span className="amount-due-label">AMOUNT DUE:</span>
-            <span className="amount-due-value">
-              {peso(computed?.netAfterDiscount)}
-            </span>
+                <tr>
+                  <td className="bold label-col">Billing No.:</td>
+                  <td className="value-col">
+                    {transaction?.billing_no || transaction?.billingNo || "-"}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="bold label-col">Invoice No.:</td>
+                  <td className="value-col">
+                    {transaction?.invoice_no || transaction?.invoiceNo || "-"}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="bold label-col">Trans. Date:</td>
+                  <td className="value-col">
+                    {transaction?.transaction_date || dateFrom || "-"}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="bold label-col">Trans. Time:</td>
+                  <td className="value-col">
+                    {transaction?.transaction_time || "-"}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="bold label-col">Terminal No.:</td>
+                  <td className="value-col">
+                    {transaction?.terminal_number || "-"}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="bold label-col">Order Type:</td>
+                  <td className="value-col">
+                    {transaction?.order_type || "-"}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="bold label-col">Ref./Tag #:</td>
+                  <td className="value-col">
+                    {transaction?.table_number || "-"}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="bold label-col">Cashier:</td>
+                  <td className="value-col">{transaction?.cashier || "-"}</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
 
           <div className="divider" />
 
-          <table>
-            <tbody>
-              <tr>
-                <td className="bold label-col">VATABLE SALES:</td>
-                <td className="value-col">{peso(computed?.vatableSales)}</td>
-              </tr>
-              <tr>
-                <td className="bold label-col">VAT AMOUNT:</td>
-                <td className="value-col">{peso(computed?.vatableSalesVat)}</td>
-              </tr>
-              <tr>
-                <td className="bold label-col">VAT EXEMPT SALES:</td>
-                <td className="value-col">{peso(computed?.vatExemptSales)}</td>
-              </tr>
-              <tr>
-                <td className="bold label-col">VAT EXEMPTION:</td>
-                <td className="value-col">
-                  {peso(computed?.totalVatExemption)}
-                </td>
-              </tr>
-              <tr>
-                <td className="bold label-col">ZERO RATED SALES:</td>
-                <td className="value-col">
-                  {peso(computed?.vatZeroRatedSales)}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <div className="print-section item-section">
+            <table className="item-table">
+              <thead>
+                <tr>
+                  <th className="pb-4 left item-col">Item</th>
+                  <th className="pb-4 qty-col">Qty</th>
+                  <th className="pb-4 amt-col">Amt</th>
+                </tr>
+              </thead>
+              <tbody>
+                {safeItems.map((item, index) => {
+                  const qty = Number(item.sales_quantity || 0);
+                  const price = Number(item.selling_price || 0);
+                  const lineTotal = qty * price;
+
+                  const isDiscountable =
+                    String(item.isDiscountable || "")
+                      .trim()
+                      .toLowerCase() === "yes";
+
+                  const itemLabel = String(
+                    item.item_name || item.product_id || "-",
+                  ).toUpperCase();
+
+                  return (
+                    <tr key={item.ID || index} className="item-row">
+                      <td className="item-col">
+                        • {itemLabel}
+                        {isDiscountable ? " (D)" : ""}
+                      </td>
+                      <td className="qty-col nowrap">
+                        {qty} {item.unit_of_measure || ""}
+                      </td>
+                      <td className="amt-col nowrap">{peso(lineTotal)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
 
           <div className="divider" />
 
-          <table>
-            <tbody>
-              <tr>
-                <td className="bold label-col">Total Customers:</td>
-                <td className="value-col">
-                  {computed?.safeCustomerCount ?? 0}
-                </td>
-              </tr>
-              <tr>
-                <td className="bold label-col">Total Qualified:</td>
-                <td className="value-col">{totalQualifiedAll}</td>
-              </tr>
-              <tr>
-                <td className="bold label-col">Statutory Qualified:</td>
-                <td className="value-col">{statutoryQualifiedCount}</td>
-              </tr>
+          <div className="print-section">
+            <table className="summary-table">
+              <tbody>
+                <tr>
+                  <td className="bold label-col">TOTAL SALES:</td>
+                  <td className="value-col">{peso(computed?.grossTotal)}</td>
+                </tr>
 
-              {activeBreakdown.map((entry) => (
-                <React.Fragment key={`print-breakdown-${entry.key}`}>
-                  <tr>
-                    <td className="bold label-col">{entry.label} Count:</td>
-                    <td className="value-col">{entry.qualifiedCount}</td>
-                  </tr>
-                  <tr>
-                    <td className="bold label-col">{entry.label} Amount:</td>
-                    <td className="value-col">{peso(entry.discountAmount)}</td>
-                  </tr>
-                </React.Fragment>
-              ))}
+                {activeBreakdown.map((entry) =>
+                  Number(entry?.discountAmount || 0) > 0 ? (
+                    <tr key={`disc-${entry.key}`}>
+                      <td className="bold label-col">
+                        {String(entry?.label || "DISCOUNT").toUpperCase()}:
+                      </td>
+                      <td className="value-col">
+                        {signedNegativePeso(entry?.discountAmount)}
+                      </td>
+                    </tr>
+                  ) : null,
+                )}
 
-              <tr>
-                <td className="bold label-col">Discountable Gross:</td>
-                <td className="value-col">
-                  {peso(computed?.discountableGross)}
-                </td>
-              </tr>
-              <tr>
-                <td className="bold label-col">Discountable Base:</td>
-                <td className="value-col">
-                  {peso(computed?.discountableBase)}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                {Number(computed?.totalVatExemption || 0) > 0 ? (
+                  <tr>
+                    <td className="bold label-col">VAT EXEMPTION:</td>
+                    <td className="value-col">
+                      {signedNegativePeso(computed?.totalVatExemption)}
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="divider" />
+
+          <div className="print-section amount-due-block mb-8">
+            <table className="summary-table amount-due-table">
+              <tbody>
+                <tr>
+                  <td className="amount-due-label-cell">AMOUNT DUE:</td>
+                  <td className="amount-due-value-cell">
+                    {peso(computed?.netAfterDiscount)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className="divider" />
+
+          <div className="print-section">
+            <table className="summary-table">
+              <tbody>
+                <tr>
+                  <td className="bold label-col">VATABLE SALES:</td>
+                  <td className="value-col">{peso(computed?.vatableSales)}</td>
+                </tr>
+                <tr>
+                  <td className="bold label-col">VAT AMOUNT:</td>
+                  <td className="value-col">
+                    {peso(computed?.vatableSalesVat)}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="bold label-col">VAT EXEMPT SALES:</td>
+                  <td className="value-col">
+                    {peso(computed?.vatExemptSales)}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="bold label-col">VAT EXEMPTION:</td>
+                  <td className="value-col">
+                    {peso(computed?.totalVatExemption)}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="bold label-col">ZERO RATED SALES:</td>
+                  <td className="value-col">
+                    {peso(computed?.vatZeroRatedSales)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className="divider" />
+
+          <div className="print-section">
+            <table className="summary-table">
+              <tbody>
+                <tr>
+                  <td className="bold label-col">Total Customers:</td>
+                  <td className="value-col">
+                    {computed?.safeCustomerCount ?? 0}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="bold label-col">Total Qualified:</td>
+                  <td className="value-col">{totalQualifiedAll}</td>
+                </tr>
+                <tr>
+                  <td className="bold label-col">Statutory Qualified:</td>
+                  <td className="value-col">{statutoryQualifiedCount}</td>
+                </tr>
+
+                {activeBreakdown.map((entry) => (
+                  <React.Fragment key={`print-breakdown-${entry.key}`}>
+                    <tr>
+                      <td className="bold label-col">{entry.label} Count:</td>
+                      <td className="value-col">{entry.qualifiedCount}</td>
+                    </tr>
+                    <tr>
+                      <td className="bold label-col">{entry.label} Amount:</td>
+                      <td className="value-col">
+                        {peso(entry.discountAmount)}
+                      </td>
+                    </tr>
+                  </React.Fragment>
+                ))}
+
+                <tr>
+                  <td className="bold label-col">Discountable Gross:</td>
+                  <td className="value-col">
+                    {peso(computed?.discountableGross)}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="bold label-col">Discountable Base:</td>
+                  <td className="value-col">
+                    {peso(computed?.discountableBase)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
           <div className="mt-12 text-10">
             <div className="bold">Customer Signature:</div>

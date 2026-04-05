@@ -2,10 +2,9 @@ const { app, BrowserWindow, ipcMain, protocol } = require("electron");
 const path = require("path");
 const fs = require("fs");
 
-const OPEN_DEVTOOLS_IN_PACKAGED = false; // set false in production if you do not want DevTools
+const OPEN_DEVTOOLS_IN_PACKAGED = false;
 const DEV_SERVER_URL = "http://localhost:5173";
 
-// Register custom protocol before app is ready
 protocol.registerSchemesAsPrivileged([
   {
     scheme: "asset",
@@ -20,6 +19,23 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 let win = null;
+
+const DEFAULT_BUSINESS_INFO = {
+  companyName: "",
+  storeName: "",
+  corpName: "",
+  address: "",
+  tin: "",
+  machineNumber: "",
+  serialNumber: "",
+  posProviderName: "LIGHTEM SOLUTIONS INCORPORATED",
+  posProviderAddress: "1187, PARULAN, PLARIDEL|BULACAN, PHILIPPINES",
+  posProviderTin: "626717559-000",
+  posProviderBirAccreNo: "25A6267175592023091853",
+  posProviderAccreDateIssued: "12/04/2023",
+  posProviderPTUNo: "FP022026-25B0584602-00012",
+  posProviderPTUDateIssued: "2/13/2026",
+};
 
 function createWindow() {
   win = new BrowserWindow({
@@ -64,11 +80,95 @@ function getPrinterFilePath() {
     : path.join(__dirname, "..", "public", "printer.txt");
 }
 
+function getBusinessInfoFilePath() {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, "businessInfo.json")
+    : path.join(__dirname, "..", "public", "businessInfo.json");
+}
+
+function getBusinessInfoBackupDir() {
+  const dir = app.isPackaged
+    ? path.join(process.resourcesPath, "business-info-backups")
+    : path.join(__dirname, "..", "public", "business-info-backups");
+
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  return dir;
+}
+
 function readTextFileSafe(filePath) {
   try {
     return fs.readFileSync(filePath, "utf8").trim();
   } catch (error) {
     console.error(`Failed to read file: ${filePath}`, error);
+    return "";
+  }
+}
+
+function readJsonFileSafe(filePath, fallback = {}) {
+  try {
+    const raw = fs.readFileSync(filePath, "utf8");
+    return JSON.parse(raw);
+  } catch (error) {
+    console.error(`Failed to read JSON file: ${filePath}`, error);
+    return fallback;
+  }
+}
+
+function writeJsonFileSafe(filePath, data) {
+  try {
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf8");
+    return true;
+  } catch (error) {
+    console.error(`Failed to write JSON file: ${filePath}`, error);
+    return false;
+  }
+}
+
+function normalizeBusinessInfo(payload = {}) {
+  return {
+    companyName: String(payload?.companyName || "").trim(),
+    storeName: String(payload?.storeName || "").trim(),
+    corpName: String(payload?.corpName || "").trim(),
+    address: String(payload?.address || "").trim(),
+    tin: String(payload?.tin || "").trim(),
+    machineNumber: String(payload?.machineNumber || "").trim(),
+    serialNumber: String(payload?.serialNumber || "").trim(),
+    posProviderName: String(payload?.posProviderName || "").trim(),
+    posProviderAddress: String(payload?.posProviderAddress || "").trim(),
+    posProviderTin: String(payload?.posProviderTin || "").trim(),
+    posProviderBirAccreNo: String(payload?.posProviderBirAccreNo || "").trim(),
+    posProviderAccreDateIssued: String(
+      payload?.posProviderAccreDateIssued || "",
+    ).trim(),
+    posProviderPTUNo: String(payload?.posProviderPTUNo || "").trim(),
+    posProviderPTUDateIssued: String(
+      payload?.posProviderPTUDateIssued || "",
+    ).trim(),
+  };
+}
+
+function createBusinessInfoBackup(data) {
+  try {
+    const backupDir = getBusinessInfoBackupDir();
+    const now = new Date();
+    const stamp = [
+      now.getFullYear(),
+      String(now.getMonth() + 1).padStart(2, "0"),
+      String(now.getDate()).padStart(2, "0"),
+      "_",
+      String(now.getHours()).padStart(2, "0"),
+      String(now.getMinutes()).padStart(2, "0"),
+      String(now.getSeconds()).padStart(2, "0"),
+    ].join("");
+
+    const backupPath = path.join(backupDir, `businessInfo_${stamp}.json`);
+    fs.writeFileSync(backupPath, JSON.stringify(data, null, 2), "utf8");
+    return backupPath;
+  } catch (error) {
+    console.error("Failed to create business info backup:", error);
     return "";
   }
 }
@@ -114,6 +214,84 @@ app.whenReady().then(() => {
     } catch (error) {
       console.error("Failed to read printer.txt:", error);
       return "";
+    }
+  });
+
+  ipcMain.handle("get-business-info", () => {
+    try {
+      const businessInfoPath = getBusinessInfoFilePath();
+      console.log("Reading businessInfo.json from:", businessInfoPath);
+      return readJsonFileSafe(businessInfoPath, DEFAULT_BUSINESS_INFO);
+    } catch (error) {
+      console.error("Failed to read businessInfo.json:", error);
+      return DEFAULT_BUSINESS_INFO;
+    }
+  });
+
+  ipcMain.handle("save-business-info", async (_event, payload) => {
+    try {
+      const businessInfoPath = getBusinessInfoFilePath();
+      const previousData = readJsonFileSafe(
+        businessInfoPath,
+        DEFAULT_BUSINESS_INFO,
+      );
+      const safePayload = normalizeBusinessInfo(payload);
+
+      const backupPath = createBusinessInfoBackup(previousData);
+      const ok = writeJsonFileSafe(businessInfoPath, safePayload);
+
+      if (!ok) {
+        return {
+          success: false,
+          message: "Failed to save businessInfo.json",
+        };
+      }
+
+      return {
+        success: true,
+        message: "Business information saved successfully.",
+        data: safePayload,
+        backupPath,
+      };
+    } catch (error) {
+      console.error("Failed to save businessInfo.json:", error);
+      return {
+        success: false,
+        message: error?.message || "Failed to save business info.",
+      };
+    }
+  });
+
+  ipcMain.handle("reset-business-info-defaults", async () => {
+    try {
+      const businessInfoPath = getBusinessInfoFilePath();
+      const previousData = readJsonFileSafe(
+        businessInfoPath,
+        DEFAULT_BUSINESS_INFO,
+      );
+
+      const backupPath = createBusinessInfoBackup(previousData);
+      const ok = writeJsonFileSafe(businessInfoPath, DEFAULT_BUSINESS_INFO);
+
+      if (!ok) {
+        return {
+          success: false,
+          message: "Failed to reset business info defaults.",
+        };
+      }
+
+      return {
+        success: true,
+        message: "Business information reset to defaults.",
+        data: DEFAULT_BUSINESS_INFO,
+        backupPath,
+      };
+    } catch (error) {
+      console.error("Failed to reset business info:", error);
+      return {
+        success: false,
+        message: error?.message || "Failed to reset business info.",
+      };
     }
   });
 
@@ -179,8 +357,8 @@ app.whenReady().then(() => {
 
       printWindow = new BrowserWindow({
         show: false,
-        width: 420,
-        height: 900,
+        width: 500,
+        height: 3000,
         autoHideMenuBar: true,
         backgroundColor: "#ffffff",
         icon: app.isPackaged
@@ -204,19 +382,22 @@ app.whenReady().then(() => {
         },
       );
 
-      printWindow.webContents.on("dom-ready", () => {
-        console.log("Print window dom-ready");
-      });
-
-      printWindow.webContents.on("did-finish-load", () => {
-        console.log("Print window did-finish-load");
-      });
-
       await printWindow.loadURL(
         "data:text/html;charset=utf-8," + encodeURIComponent(html),
       );
 
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      const metrics = await printWindow.webContents.executeJavaScript(`
+      ({
+        bodyScrollHeight: document.body ? document.body.scrollHeight : 0,
+        bodyClientHeight: document.body ? document.body.clientHeight : 0,
+        docScrollHeight: document.documentElement ? document.documentElement.scrollHeight : 0,
+        docClientHeight: document.documentElement ? document.documentElement.clientHeight : 0
+      })
+    `);
+
+      console.log("Receipt layout metrics:", metrics);
+
+      await new Promise((resolve) => setTimeout(resolve, 1200));
 
       const visiblePrinters = await getPrintersFromWindow(printWindow);
       const visiblePrinterNames = visiblePrinters.map((p) => p.name);
@@ -266,7 +447,7 @@ app.whenReady().then(() => {
         };
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 800));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
       return {
         success: true,
