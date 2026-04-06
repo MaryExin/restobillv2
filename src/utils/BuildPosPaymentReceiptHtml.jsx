@@ -511,7 +511,9 @@ export function BuildPosPaymentReceiptHtml({
                       <td className="qty-col">
                         {qty} {item.unit_of_measure || ""}
                       </td>
-                      <td className="amt-col">{peso(lineTotal)}</td>
+                      <td className="amt-col">
+                        {peso(lineTotal)}{item.vatable === "Yes" ? "V" : ""}
+                      </td>                   
                     </tr>
                   );
                 })}
