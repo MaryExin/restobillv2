@@ -35,7 +35,11 @@ export function BuildPosPaymentReceiptHtml({
   const paymentLabel =
     safePayments.length > 0
       ? [
-          ...new Set(safePayments.map((p) => p.payment_method).filter(Boolean)),
+          ...new Set(
+            safePayments
+              .map((p) => String(p?.payment_method || "").trim())
+              .filter(Boolean),
+          ),
         ].join(", ")
       : safeTransaction?.payment_method || "Cash";
 
@@ -45,6 +49,27 @@ export function BuildPosPaymentReceiptHtml({
           Number(entry?.qualifiedCount || 0) > 0 ||
           Number(entry?.discountAmount || 0) > 0,
       )
+    : [];
+
+  // PAYMENT BREAKDOWN
+  const paymentBreakdown = Array.isArray(safePayments)
+    ? Object.entries(
+        safePayments.reduce((acc, payment) => {
+          const method =
+            String(payment?.payment_method || "Cash").trim() || "Cash";
+          const amount = Number(payment?.payment_amount || 0);
+
+          if (!acc[method]) {
+            acc[method] = 0;
+          }
+
+          acc[method] += amount;
+          return acc;
+        }, {}),
+      ).map(([method, amount]) => ({
+        method,
+        amount,
+      }))
     : [];
 
   const getDiscountCountLabel = (entry) => {
@@ -512,8 +537,9 @@ export function BuildPosPaymentReceiptHtml({
                         {qty} {item.unit_of_measure || ""}
                       </td>
                       <td className="amt-col">
-                        {peso(lineTotal)}{item.vatable === "Yes" ? "V" : ""}
-                      </td>                   
+                        {peso(lineTotal)}
+                        {item.vatable === "Yes" ? "V" : ""}
+                      </td>
                     </tr>
                   );
                 })}
@@ -592,10 +618,41 @@ export function BuildPosPaymentReceiptHtml({
             <table className="meta-table">
               <MetaColGroup />
               <tbody>
-                <tr>
-                  <td className="bold label-col">PAYMENT ({paymentLabel}):</td>
-                  <td className="value-col">{peso(safeComputed?.totalPaid)}</td>
-                </tr>
+                {paymentBreakdown.length > 0 ? (
+                  <>
+                    <tr>
+                      <td className="bold label-col">PAYMENT:</td>
+                      <td className="value-col"></td>
+                    </tr>
+
+                    {paymentBreakdown.map((payment, index) => (
+                      <tr key={`${payment.method}-${index}`}>
+                        <td className="label-col">
+                          {index === paymentBreakdown.length - 1
+                            ? `(${payment.method}):`
+                            : `${payment.method}:`}
+                        </td>
+                        <td className="value-col">{peso(payment.amount)}</td>
+                      </tr>
+                    ))}
+
+                    <tr>
+                      <td className="bold label-col">TOTAL PAYMENT:</td>
+                      <td className="value-col">
+                        {peso(safeComputed?.totalPaid)}
+                      </td>
+                    </tr>
+                  </>
+                ) : (
+                  <tr>
+                    <td className="bold label-col">
+                      PAYMENT ({paymentLabel}):
+                    </td>
+                    <td className="value-col">
+                      {peso(safeComputed?.totalPaid)}
+                    </td>
+                  </tr>
+                )}
                 <tr>
                   <td className="bold label-col">CHANGE:</td>
                   <td className="value-col">
