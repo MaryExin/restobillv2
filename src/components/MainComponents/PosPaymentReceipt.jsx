@@ -565,7 +565,7 @@ const PosPaymentReceipt = React.forwardRef(
                       verticalAlign: "top",
                     }}
                   >
-                    {peso(lineTotal)}
+                    {peso(lineTotal)}{item.vatable === "Yes" ? "V" : ""}
                   </td>
                 </tr>
               );
