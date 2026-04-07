@@ -235,5 +235,4 @@ const PosMyAccount = ({ isDark, accent }) => {
     </div>
   );
 };
-
 export default PosMyAccount;
