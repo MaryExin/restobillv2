@@ -18,6 +18,7 @@ import {
   FiDatabase,
   FiLock,
   FiEyeOff,
+  FiChevronDown,
 } from "react-icons/fi";
 import { FaMoneyBill, FaArrowLeft } from "react-icons/fa";
 import { useTheme } from "../../context/ThemeContext";
@@ -404,6 +405,10 @@ function ActionRemarksModal({
   setRemarks,
   adminPassword,
   setAdminPassword,
+  selectedAdminId,
+  setSelectedAdminId,
+  adminAccounts,
+  isLoadingAdmins,
   isDark,
   actionType,
   activeRow,
@@ -445,9 +450,6 @@ function ActionRemarksModal({
           >
             {activeRow?.transaction_id || "-"}
           </h3>
-          <p className="mt-2 text-sm text-slate-500">
-            Please enter remarks before continuing.
-          </p>
         </div>
 
         <div
@@ -462,9 +464,7 @@ function ActionRemarksModal({
               <div className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
                 Transaction ID
               </div>
-              <div className="mt-1 font-bold">
-                {activeRow?.transaction_id || "-"}
-              </div>
+              <div className="mt-1">{activeRow?.transaction_id || "-"}</div>
             </div>
 
             <div>
@@ -538,6 +538,53 @@ function ActionRemarksModal({
               isDark ? "text-slate-200" : "text-slate-700"
             }`}
           >
+            Select Admin
+          </label>
+          <div className="relative">
+            <select
+              value={selectedAdminId}
+              onChange={(e) => setSelectedAdminId(e.target.value)}
+              disabled={isSubmitting || isLoadingAdmins}
+              className={`w-full appearance-none rounded-[22px] border px-4 py-4 pr-12 text-sm outline-none transition ${
+                isDark
+                  ? "border-slate-700 bg-slate-950 text-white focus:border-blue-500"
+                  : "border-slate-200 bg-slate-50 text-slate-900 focus:border-blue-400"
+              } ${isSubmitting || isLoadingAdmins ? "opacity-70" : ""}`}
+            >
+              <option value="">
+                {isLoadingAdmins
+                  ? "Loading admins..."
+                  : adminAccounts.length > 0
+                    ? "Select admin to authorize"
+                    : "No admin accounts found"}
+              </option>
+              {adminAccounts.map((admin) => (
+                <option
+                  key={admin.id || admin.uuid || admin.username || admin.email}
+                  value={
+                    admin.id || admin.uuid || admin.username || admin.email
+                  }
+                >
+                  {admin.name || admin.username || admin.email}{" "}
+                  {admin.userRole ? `(${admin.userRole})` : ""}
+                </option>
+              ))}
+            </select>
+            <FiChevronDown
+              size={18}
+              className={`pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 ${
+                isDark ? "text-slate-400" : "text-slate-500"
+              }`}
+            />
+          </div>
+        </div>
+
+        <div className="mt-5">
+          <label
+            className={`mb-2 block text-sm font-bold ${
+              isDark ? "text-slate-200" : "text-slate-700"
+            }`}
+          >
             Admin Password
           </label>
           <div
@@ -601,14 +648,6 @@ function ActionRemarksModal({
                 ? "Processing Refund..."
                 : "Processing Void..."
               : title}
-          </ButtonComponent>
-          <ButtonComponent
-            onClick={onClose}
-            isLoading={isSubmitting}
-            loadingText="Cancel..."
-            variant="secondary"
-          >
-            Cancel
           </ButtonComponent>
         </div>
       </div>
@@ -801,6 +840,9 @@ export default function PosPayment() {
   const [activeRow, setActiveRow] = useState(null);
   const [actionRemarks, setActionRemarks] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
+  const [selectedAdminId, setSelectedAdminId] = useState("");
+  const [adminAccounts, setAdminAccounts] = useState([]);
+  const [isLoadingAdmins, setIsLoadingAdmins] = useState(false);
 
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [successHeader, setSuccessHeader] = useState("Saved Successfully");
@@ -954,6 +996,50 @@ export default function PosPayment() {
     fetchAll();
   }, [fetchAll]);
 
+  const fetchShiftAdmins = useCallback(async () => {
+    if (!apiHost) {
+      setAdminAccounts([]);
+      return;
+    }
+
+    const currentUserId =
+      localStorage.getItem("userid") ||
+      localStorage.getItem("user_id") ||
+      localStorage.getItem("id") ||
+      "";
+
+    if (!currentUserId) {
+      setAdminAccounts([]);
+      return;
+    }
+
+    setIsLoadingAdmins(true);
+
+    try {
+      const response = await fetch(
+        `${apiHost}/api/get_shift_details.php?user_id=${encodeURIComponent(currentUserId)}`,
+      );
+      const result = await safeReadJson(response, "Shift details API");
+
+      if (!response.ok) {
+        throw new Error(result?.message || "Failed to load shift details.");
+      }
+
+      const accounts = Array.isArray(result?.accounts) ? result.accounts : [];
+      const admins = accounts.filter((account) => {
+        const role = String(account?.userRole || "").toUpperCase();
+        return role.includes("ADMIN");
+      });
+
+      setAdminAccounts(admins);
+    } catch (error) {
+      console.error("Failed to load admin accounts:", error);
+      setAdminAccounts([]);
+    } finally {
+      setIsLoadingAdmins(false);
+    }
+  }, [apiHost]);
+
   useEffect(() => {
     if (isActionModalOpen && remarksInputRef.current) {
       remarksInputRef.current.focus();
@@ -967,23 +1053,34 @@ export default function PosPayment() {
     setActiveRow(null);
     setActionRemarks("");
     setAdminPassword("");
+    setSelectedAdminId("");
   }, [isActionLoading]);
 
-  const openVoidModal = useCallback((row) => {
-    setActionType("void");
-    setActiveRow(row);
-    setActionRemarks("");
-    setAdminPassword("");
-    setIsActionModalOpen(true);
-  }, []);
+  const openVoidModal = useCallback(
+    (row) => {
+      setActionType("void");
+      setActiveRow(row);
+      setActionRemarks("");
+      setAdminPassword("");
+      setSelectedAdminId("");
+      setIsActionModalOpen(true);
+      fetchShiftAdmins();
+    },
+    [fetchShiftAdmins],
+  );
 
-  const openRefundModal = useCallback((row) => {
-    setActionType("refund");
-    setActiveRow(row);
-    setActionRemarks("");
-    setAdminPassword("");
-    setIsActionModalOpen(true);
-  }, []);
+  const openRefundModal = useCallback(
+    (row) => {
+      setActionType("refund");
+      setActiveRow(row);
+      setActionRemarks("");
+      setAdminPassword("");
+      setSelectedAdminId("");
+      setIsActionModalOpen(true);
+      fetchShiftAdmins();
+    },
+    [fetchShiftAdmins],
+  );
 
   const submitAction = useCallback(async () => {
     if (!apiHost) {
@@ -1003,6 +1100,7 @@ export default function PosPayment() {
 
     const trimmedRemarks = String(actionRemarks || "").trim();
     const trimmedAdminPassword = String(adminPassword || "").trim();
+    const trimmedSelectedAdminId = String(selectedAdminId || "").trim();
 
     if (!trimmedRemarks) {
       setFailureHeader("Missing Remarks");
@@ -1011,6 +1109,13 @@ export default function PosPayment() {
           ? "Please enter refund remarks."
           : "Please enter void remarks.",
       );
+      setIsFailureModalOpen(true);
+      return;
+    }
+
+    if (!trimmedSelectedAdminId) {
+      setFailureHeader("Admin Selection Required");
+      setFailureMessage("Please select an admin account first.");
       setIsFailureModalOpen(true);
       return;
     }
@@ -1029,6 +1134,12 @@ export default function PosPayment() {
       "";
 
     const userName = localStorage.getItem("Cashier") || "Store Crew";
+
+    const selectedAdmin = adminAccounts.find(
+      (admin) =>
+        String(admin.id || admin.uuid || admin.username || admin.email) ===
+        trimmedSelectedAdminId,
+    );
 
     const payload = {
       transaction_id: String(activeRow.transaction_id || "").trim(),
@@ -1051,6 +1162,14 @@ export default function PosPayment() {
       ).trim(),
       user_id: String(userId).trim(),
       admin_password: trimmedAdminPassword,
+      selected_admin_id: trimmedSelectedAdminId,
+      selected_admin_name: String(
+        selectedAdmin?.name ||
+          selectedAdmin?.username ||
+          selectedAdmin?.email ||
+          "",
+      ).trim(),
+      selected_admin_role: String(selectedAdmin?.userRole || "").trim(),
     };
 
     setIsActionLoading(true);
@@ -1143,6 +1262,8 @@ export default function PosPayment() {
     actionType,
     actionRemarks,
     adminPassword,
+    selectedAdminId,
+    adminAccounts,
     closeActionModal,
     fetchAll,
   ]);
@@ -1464,6 +1585,10 @@ export default function PosPayment() {
         setRemarks={setActionRemarks}
         adminPassword={adminPassword}
         setAdminPassword={setAdminPassword}
+        selectedAdminId={selectedAdminId}
+        setSelectedAdminId={setSelectedAdminId}
+        adminAccounts={adminAccounts}
+        isLoadingAdmins={isLoadingAdmins}
         isDark={isDark}
         actionType={actionType}
         activeRow={activeRow}
