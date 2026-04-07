@@ -16,6 +16,8 @@ import {
   FiRefreshCw,
   FiPrinter,
   FiDatabase,
+  FiLock,
+  FiEyeOff,
 } from "react-icons/fi";
 import { FaMoneyBill, FaArrowLeft } from "react-icons/fa";
 import { useTheme } from "../../context/ThemeContext";
@@ -25,6 +27,7 @@ import TransactionPaymentModal from "./TransactionPaymentModal";
 import ModalSuccessNavToSelf from "../Modals/ModalSuccessNavToSelf";
 import ButtonComponent from "./Common/ButtonComponent";
 import ModalYesNoReusable from "../Modals/ModalYesNoReusable";
+import { MdWarning } from "react-icons/md";
 
 const peso = (value) =>
   `₱ ${Number(value || 0).toLocaleString("en-PH", {
@@ -52,6 +55,60 @@ const safeReadJson = async (response, label) => {
     console.error(`${label} invalid JSON:`, text);
     throw new Error(`${label} returned invalid JSON.`);
   }
+};
+
+const InlineFailureModal = ({
+  isOpen,
+  header = "Action Failed",
+  message = "Something went wrong.",
+  button = "OK",
+  setIsModalOpen,
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        className="fixed inset-0 z-[120000] flex items-center justify-center bg-black/50 px-4"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+      >
+        <motion.div
+          className="w-11/12 max-w-md overflow-hidden rounded-md border-t-8 border-red-500 bg-white shadow-lg"
+          initial={{ opacity: 0, y: -30 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -30 }}
+          transition={{ type: "spring", stiffness: 260, damping: 20 }}
+        >
+          <div className="flex flex-col items-center p-6">
+            <motion.div
+              className="mb-4 flex h-16 w-16 items-center justify-center rounded-md bg-[#fee2e2]"
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: "spring", stiffness: 300, damping: 15 }}
+            >
+              <MdWarning className="h-8 w-8 text-red-500" />
+            </motion.div>
+
+            <h2 className="mb-2 text-2xl font-semibold text-gray-800">
+              {header}
+            </h2>
+            <p className="mb-6 text-center text-gray-600">{message}</p>
+
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setIsModalOpen(false)}
+              className="rounded-md bg-red-500 px-6 py-2 text-white shadow-md transition hover:bg-red-600"
+            >
+              {button}
+            </motion.button>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
 };
 
 const TABLE_COLUMN_TEMPLATE = "210px 200px 120px 140px 180px 170px 170px 190px";
@@ -345,6 +402,8 @@ function ActionRemarksModal({
   onSubmit,
   remarks,
   setRemarks,
+  adminPassword,
+  setAdminPassword,
   isDark,
   actionType,
   activeRow,
@@ -352,6 +411,7 @@ function ActionRemarksModal({
   remarksInputRef,
 }) {
   const [isYesNoModalOpen, setIsYesNoModalOpen] = useState(false);
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
 
   const title =
     actionType === "refund" ? "Refund Transaction" : "Void Transaction";
@@ -458,7 +518,7 @@ function ActionRemarksModal({
             ref={remarksInputRef}
             value={remarks}
             onChange={(e) => setRemarks(e.target.value)}
-            rows={5}
+            rows={2}
             placeholder={
               actionType === "refund"
                 ? "Enter refund remarks..."
@@ -470,6 +530,57 @@ function ActionRemarksModal({
                 : "border-slate-200 bg-slate-50 text-slate-900 placeholder:text-slate-400 focus:border-blue-400"
             }`}
           />
+        </div>
+
+        <div className="mt-5">
+          <label
+            className={`mb-2 block text-sm font-bold ${
+              isDark ? "text-slate-200" : "text-slate-700"
+            }`}
+          >
+            Admin Password
+          </label>
+          <div
+            className={`flex items-center gap-3 rounded-[22px] border px-4 py-3 transition ${
+              isDark
+                ? "border-slate-700 bg-slate-950 focus-within:border-blue-500"
+                : "border-slate-200 bg-slate-50 focus-within:border-blue-400"
+            }`}
+          >
+            <FiLock
+              size={18}
+              className={isDark ? "text-slate-400" : "text-slate-500"}
+            />
+            <input
+              type={showAdminPassword ? "text" : "password"}
+              value={adminPassword}
+              onChange={(e) => setAdminPassword(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  if (!isSubmitting) setIsYesNoModalOpen(true);
+                }
+              }}
+              placeholder="Enter admin password to continue"
+              className={`w-full bg-transparent text-sm outline-none ${
+                isDark
+                  ? "text-white placeholder:text-slate-500"
+                  : "text-slate-900 placeholder:text-slate-400"
+              }`}
+            />
+            <button
+              type="button"
+              onClick={() => setShowAdminPassword((prev) => !prev)}
+              className={`flex h-10 w-10 items-center justify-center rounded-2xl transition ${
+                isDark
+                  ? "bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-white"
+                  : "bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+              }`}
+              title={showAdminPassword ? "Hide password" : "Show password"}
+            >
+              {showAdminPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+            </button>
+          </div>
         </div>
 
         <div className="mt-6 flex flex-wrap justify-end gap-3">
@@ -506,7 +617,10 @@ function ActionRemarksModal({
           header="Submit Confirmation"
           message={`Are you sure you want to Submit this ${actionType === "refund" ? "refund" : "void"}?`}
           setYesNoModalOpen={setIsYesNoModalOpen}
-          triggerYesNoEvent={onSubmit}
+          triggerYesNoEvent={() => {
+            setIsYesNoModalOpen(false);
+            onSubmit();
+          }}
           isLoading={isSubmitting}
         />
       )}
@@ -686,12 +800,16 @@ export default function PosPayment() {
   const [actionType, setActionType] = useState("");
   const [activeRow, setActiveRow] = useState(null);
   const [actionRemarks, setActionRemarks] = useState("");
+  const [adminPassword, setAdminPassword] = useState("");
 
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [successHeader, setSuccessHeader] = useState("Saved Successfully");
   const [successMessage, setSuccessMessage] = useState(
     "Your changes have been saved.",
   );
+  const [isFailureModalOpen, setIsFailureModalOpen] = useState(false);
+  const [failureHeader, setFailureHeader] = useState("Action Failed");
+  const [failureMessage, setFailureMessage] = useState("Something went wrong.");
 
   const fetchAll = useCallback(async () => {
     if (!apiHost) return;
@@ -848,12 +966,14 @@ export default function PosPayment() {
     setActionType("");
     setActiveRow(null);
     setActionRemarks("");
+    setAdminPassword("");
   }, [isActionLoading]);
 
   const openVoidModal = useCallback((row) => {
     setActionType("void");
     setActiveRow(row);
     setActionRemarks("");
+    setAdminPassword("");
     setIsActionModalOpen(true);
   }, []);
 
@@ -861,6 +981,7 @@ export default function PosPayment() {
     setActionType("refund");
     setActiveRow(row);
     setActionRemarks("");
+    setAdminPassword("");
     setIsActionModalOpen(true);
   }, []);
 
@@ -881,13 +1002,23 @@ export default function PosPayment() {
     }
 
     const trimmedRemarks = String(actionRemarks || "").trim();
+    const trimmedAdminPassword = String(adminPassword || "").trim();
 
     if (!trimmedRemarks) {
-      window.alert(
+      setFailureHeader("Missing Remarks");
+      setFailureMessage(
         actionType === "refund"
           ? "Please enter refund remarks."
           : "Please enter void remarks.",
       );
+      setIsFailureModalOpen(true);
+      return;
+    }
+
+    if (!trimmedAdminPassword) {
+      setFailureHeader("Admin Password Required");
+      setFailureMessage("Please enter admin password to continue.");
+      setIsFailureModalOpen(true);
       return;
     }
 
@@ -919,6 +1050,7 @@ export default function PosPayment() {
         activeRow.Unit_Code || activeRow.unit_code || "",
       ).trim(),
       user_id: String(userId).trim(),
+      admin_password: trimmedAdminPassword,
     };
 
     setIsActionLoading(true);
@@ -946,12 +1078,31 @@ export default function PosPayment() {
       );
 
       if (!response.ok || !result?.success) {
-        throw new Error(
+        const backendMessage =
           result?.message ||
-            (actionType === "refund"
-              ? "Failed to refund transaction."
-              : "Failed to void transaction."),
+          (actionType === "refund"
+            ? "Failed to refund transaction."
+            : "Failed to void transaction.");
+
+        const isInvalidPassword = backendMessage
+          .toLowerCase()
+          .includes("invalid admin password");
+
+        setFailureHeader(
+          isInvalidPassword
+            ? "Incorrect Admin Password"
+            : actionType === "refund"
+              ? "Refund Failed"
+              : "Void Failed",
         );
+        setFailureMessage(backendMessage);
+
+        if (isInvalidPassword) {
+          setAdminPassword("");
+        }
+
+        setIsFailureModalOpen(true);
+        return;
       }
 
       closeActionModal();
@@ -973,12 +1124,16 @@ export default function PosPayment() {
         error,
       );
 
-      setErrorMessage(
+      setFailureHeader(
+        actionType === "refund" ? "Refund Failed" : "Void Failed",
+      );
+      setFailureMessage(
         error?.message ||
           (actionType === "refund"
             ? "Failed to refund transaction."
             : "Failed to void transaction."),
       );
+      setIsFailureModalOpen(true);
     } finally {
       setIsActionLoading(false);
     }
@@ -987,6 +1142,7 @@ export default function PosPayment() {
     activeRow,
     actionType,
     actionRemarks,
+    adminPassword,
     closeActionModal,
     fetchAll,
   ]);
@@ -1306,6 +1462,8 @@ export default function PosPayment() {
         onSubmit={submitAction}
         remarks={actionRemarks}
         setRemarks={setActionRemarks}
+        adminPassword={adminPassword}
+        setAdminPassword={setAdminPassword}
         isDark={isDark}
         actionType={actionType}
         activeRow={activeRow}
@@ -1325,6 +1483,14 @@ export default function PosPayment() {
           }}
         />
       )}
+
+      <InlineFailureModal
+        isOpen={isFailureModalOpen}
+        header={failureHeader}
+        message={failureMessage}
+        button="OK"
+        setIsModalOpen={setIsFailureModalOpen}
+      />
     </>
   );
 }
