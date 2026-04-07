@@ -77,6 +77,10 @@ const SalesPerProductModal = ({ isOpen, onClose }) => {
   }, [filteredData]);
 
   const handlePrint = () => {
+    if (filteredData.length === 0) {
+      alert("No data to print.");
+      return;
+    }
     window.print();
   };
 
@@ -98,56 +102,39 @@ const SalesPerProductModal = ({ isOpen, onClose }) => {
             #thermal-receipt { display: none; }
           }
 
+          /* Ito ang magtatago sa lahat ng screen elements habang nagpi-print */
           @media print {
-            body * { visibility: hidden; }
+            body > *:not(#thermal-receipt) {
+              display: none !important;
+            }
             .no-print { display: none !important; }
-
-            #thermal-receipt, #thermal-receipt * { 
-              visibility: visible; 
-              font-weight: 900 !important; /* Bold lahat lahat */
-              color: black !important;
-              text-transform: uppercase;
-            }
-
-            #thermal-receipt {
-              position: absolute;
-              left: 0;
-              top: 0;
-              width: 70mm; 
-              padding: 0;
-              margin: 0;
-              display: block !important;
-              font-family: 'Courier New', Courier, monospace;
-            }
-
+          }
+        `}
+        
+        {/* DYNAMIC PRINT CSS: Gagawa lang ng Page Size kung may data */}
+        {filteredData.length > 0 ? (
+          `@media print {
             @page {
               size: 70mm auto;
               margin: 0;
             }
-            
-            .t-table { 
-              width: 100%; 
-              border-collapse: collapse; 
-              table-layout: fixed;
+            #thermal-receipt {
+              display: block !important;
+              width: 70mm;
+              padding: 0;
+              margin: 0;
+              visibility: visible !important;
             }
-            
-            .t-divider { border-top: 2.5pt solid black; margin: 4px 0; }
-            
-            /* Column widths adjusted para magkatabi QTY at TOTAL */
-            .col-item { width: 55%; text-align: left; }
-            .col-qty { width: 15%; text-align: left; }
-            .col-total { width: 30%; text-align: left; }
-
-            .t-cell { 
-              padding: 2px 0; 
-              word-wrap: break-word; 
-              vertical-align: top;
-            }
-          }
-        `}
+          }`
+        ) : (
+          `@media print {
+            @page { size: 0; margin: 0; }
+            #thermal-receipt { display: none !important; }
+          }`
+        )}
       </style>
 
-      {/* SCREEN UI */}
+      {/* SCREEN UI (Non-printable) */}
       <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/40 backdrop-blur-sm no-print font-bold">
         <div className="w-full max-w-6xl h-[90vh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-800">
           
@@ -158,7 +145,13 @@ const SalesPerProductModal = ({ isOpen, onClose }) => {
               <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="px-2 py-1 text-sm border rounded outline-none" />
               <button onClick={fetchSales} className="p-2 rounded-lg bg-slate-200"><FaSyncAlt className={loading ? "animate-spin" : ""} /></button>
               <button onClick={exportToExcel} className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white rounded-lg bg-emerald-600"><FaFileExcel /> Excel</button>
-              <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-blue-600 rounded-lg"><FaPrint /> Print</button>
+              <button 
+                onClick={handlePrint} 
+                disabled={filteredData.length === 0}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-bold text-white rounded-lg ${filteredData.length === 0 ? 'bg-gray-400' : 'bg-blue-600'}`}
+              >
+                <FaPrint /> Print
+              </button>
               <button onClick={onClose} className="p-2 text-white rounded-lg bg-rose-500"><FaTimes /></button>
             </div>
           </div>
@@ -204,51 +197,49 @@ const SalesPerProductModal = ({ isOpen, onClose }) => {
         </div>
       </div>
 
-      {/* ================= THERMAL RECEIPT (BOLD, LEFT, TIGHT SPACING) ================= */}
-      <div id="thermal-receipt">
-        <div style={{ textAlign: 'center' }}>
-          <h2 style={{ margin: '0 0 2px 0', fontSize: '15px' }}>SALES REPORT</h2>
-          <p style={{ margin: 0, fontSize: '10px' }}>{dateFrom} - {dateTo}</p>
-        </div>
+      {/* ================= THERMAL RECEIPT ================= */}
+      {/* Ginagamit ang condition para hindi mag-render ang DOM element kapag empty */}
+      {filteredData.length > 0 && (
+        <div id="thermal-receipt" style={{ color: 'black', textTransform: 'uppercase', fontFamily: 'monospace' }}>
+          <div style={{ textAlign: 'center' }}>
+            <h2 style={{ margin: '0', fontSize: '15px', fontWeight: '900' }}>SALES REPORT</h2>
+            <p style={{ margin: '2px 0', fontSize: '10px' }}>{dateFrom} - {dateTo}</p>
+          </div>
 
-        <div className="t-divider" />
+          <div style={{ borderTop: '2pt solid black', margin: '4px 0' }} />
 
-        <table className="t-table">
-          <thead>
-            <tr style={{ fontSize: '11px' }}>
-              <th className="col-item">ITEM</th>
-              <th className="col-qty">QTY</th>
-              <th className="col-total">TOTAL</th>
-            </tr>
-          </thead>
-          <tbody style={{ fontSize: '12px' }}>
-            {filteredData.map((item, i) => (
-              <tr key={i}>
-                <td className="t-cell col-item">{item["Product Name"]}</td>
-                <td className="t-cell col-qty">{item["Total Qty Sold"]}</td>
-                <td className="t-cell col-total">
-                  {Number(item["Gross Sales"]).toLocaleString()}
-                </td>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', fontWeight: '900' }}>
+            <thead>
+              <tr style={{ fontSize: '11px' }}>
+                <th style={{ textAlign: 'left', width: '55%' }}>ITEM</th>
+                <th style={{ textAlign: 'left', width: '15%' }}>QTY</th>
+                <th style={{ textAlign: 'left', width: '30%' }}>TOTAL</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filteredData.map((item, i) => (
+                <tr key={i}>
+                  <td style={{ padding: '2px 0', wordBreak: 'break-all' }}>{item["Product Name"]}</td>
+                  <td>{item["Total Qty Sold"]}</td>
+                  <td>{Number(item["Gross Sales"]).toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
 
-        <div className="t-divider" />
+          <div style={{ borderTop: '2pt solid black', margin: '4px 0' }} />
 
-        <div style={{ display: 'flex', gap: '10px', fontSize: '12px' }}>
-          <span>TOTAL QTY: {totals.qty}</span>
-        </div>
-        <div style={{ display: 'flex', gap: '10px', fontSize: '12px', marginTop: '2px' }}>
-          <span>GRAND TOTAL: ₱{totals.amt.toLocaleString()}</span>
-        </div>
+          <div style={{ fontSize: '12px', fontWeight: '900' }}>
+            <div>TOTAL QTY: {totals.qty}</div>
+            <div>GRAND TOTAL: ₱{totals.amt.toLocaleString()}</div>
+          </div>
 
-        <div className="t-divider" />
-        <div style={{ textAlign: 'center', fontSize: '9px', marginTop: '5px' }}>
-          <p style={{ margin: 0 }}>DATE: {new Date().toLocaleString()}</p>
-          {searchTerm && <p style={{ margin: 0 }}>FILTER: "{searchTerm}"</p>}
+          <div style={{ borderTop: '1pt solid black', margin: '4px 0' }} />
+          <div style={{ textAlign: 'center', fontSize: '9px' }}>
+            <p style={{ margin: 0 }}>DATE: {new Date().toLocaleString()}</p>
+          </div>
         </div>
-      </div>
+      )}
     </>
   );
 };
