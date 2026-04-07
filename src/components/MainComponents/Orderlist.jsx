@@ -127,6 +127,13 @@ const Orderlist = ({
   const [customMergeTableName, setCustomMergeTableName] = useState("");
   const [transferTableList, setTransferTableList] = useState([]);
   const [transferLoading, setTransferLoading] = useState(false);
+  const [sourceTransactionSummary, setSourceTransactionSummary] = useState({});
+  const [transferItemSelections, setTransferItemSelections] = useState({});
+  const [destinationTransferSummary, setDestinationTransferSummary] =
+    useState(null);
+  const [destinationTransferItems, setDestinationTransferItems] = useState([]);
+  const [destinationTransferLoading, setDestinationTransferLoading] =
+    useState(false);
 
   const [newtransaction, setNewTransaction] = useState({
     business_info: {},
@@ -564,6 +571,8 @@ const Orderlist = ({
           isLoadedFromDB: true,
         }));
 
+        setSourceTransactionSummary(data.summary || {});
+
         setproductcart({
           customer: tableselected,
           items: mappedCart,
@@ -638,6 +647,64 @@ const Orderlist = ({
     );
   };
 
+  const getTransferTableName = (row) =>
+    String(
+      row?.table_name ||
+        row?.table_number ||
+        row?.table ||
+        row?.customer ||
+        row?.customer_name ||
+        "",
+    ).trim();
+
+  const getTransferTableStatus = (row) =>
+    String(
+      row?.status_label ||
+        row?.remarks ||
+        row?.order_status ||
+        row?.status ||
+        "",
+    )
+      .trim()
+      .toLowerCase();
+
+  const getTransferTransactionId = (row) =>
+    String(
+      row?.transaction_id ?? row?.Transaction_ID ?? row?.order_slip_no ?? "",
+    ).trim();
+
+  const mapPendingTableRows = (rows = []) => {
+    return rows
+      .map((row, index) => ({
+        ...row,
+        ID: row?.ID ?? row?.id ?? `pending-table-${index}`,
+        table_name: getTransferTableName(row),
+        pending_status: getTransferTableStatus(row),
+        pending_transaction_id: getTransferTransactionId(row),
+      }))
+      .filter((row) => {
+        if (!row.table_name) return false;
+
+        const isPending =
+          row.pending_status.includes("pending") ||
+          row.pending_status.includes("unpaid") ||
+          row.pending_status.includes("open");
+
+        const isCurrentTable = currentTableParts.some(
+          (part) =>
+            normalizeTableName(part) === normalizeTableName(row.table_name),
+        );
+
+        return isPending && !isCurrentTable;
+      })
+      .sort((a, b) =>
+        String(a.table_name).localeCompare(String(b.table_name), undefined, {
+          numeric: true,
+          sensitivity: "base",
+        }),
+      );
+  };
+
   const filteredTransferTables = useMemo(() => {
     return (transferTableList || []).filter((table) => {
       const rawTableName = table.table_name || "";
@@ -646,6 +713,16 @@ const Orderlist = ({
       return normalizedTableName.includes(normalizeTableName(transferSearch));
     });
   }, [transferTableList, transferSearch]);
+
+  const selectedTransferTableRow = useMemo(() => {
+    return (
+      transferTableList.find(
+        (table) =>
+          normalizeTableName(getTransferTableName(table)) ===
+          normalizeTableName(selectedTransferTable),
+      ) || null
+    );
+  }, [transferTableList, selectedTransferTable]);
 
   const mergeSelectableTables = useMemo(() => {
     const baseTables = Array.isArray(filteredTransferTables)
@@ -689,6 +766,51 @@ const Orderlist = ({
   const additionalCartItems = cartSummaryItems.filter(
     (item) => item.isLoadedFromDB !== true,
   );
+
+  const transferProductItems = useMemo(() => {
+    return (cartSummaryItems || []).map((item, index) => ({
+      ...item,
+      transferKey: item.lineId || `${item.code}-${index}`,
+      quantity: Number(item.quantity || 0),
+      price: Number(item.price || 0),
+    }));
+  }, [cartSummaryItems]);
+
+  const selectedTransferProductTotalQty = useMemo(() => {
+    return transferProductItems.reduce(
+      (sum, item) =>
+        sum +
+        Math.min(
+          Number(item.quantity || 0),
+          Number(transferItemSelections[item.transferKey] || 0),
+        ),
+      0,
+    );
+  }, [transferProductItems, transferItemSelections]);
+
+  const selectedTransferProductSubtotal = useMemo(() => {
+    return transferProductItems.reduce((sum, item) => {
+      const qty = Math.min(
+        Number(item.quantity || 0),
+        Number(transferItemSelections[item.transferKey] || 0),
+      );
+
+      return sum + qty * Number(item.price || 0);
+    }, 0);
+  }, [transferProductItems, transferItemSelections]);
+
+  const remainingTransferProductTotalQty = useMemo(() => {
+    return transferProductItems.reduce(
+      (sum, item) =>
+        sum +
+        Math.max(
+          0,
+          Number(item.quantity || 0) -
+            Number(transferItemSelections[item.transferKey] || 0),
+        ),
+      0,
+    );
+  }, [transferProductItems, transferItemSelections]);
 
   const buildCartMergeKey = (item) => {
     const code = String(item?.code || "")
@@ -1512,6 +1634,42 @@ const Orderlist = ({
     setSelectedMergeTables(buildUniqueTableNames(currentTableParts));
   };
 
+  const loadTransferTables = async (mode = "fixed") => {
+    if (!apiHost) return;
+
+    try {
+      setTransferLoading(true);
+      setTransferTableList([]);
+
+      if (mode === "transferItem") {
+        const selectedDateValue =
+          dateSelected ||
+          sourceTransactionSummary?.transaction_date?.slice?.(0, 10) ||
+          new Date().toISOString().slice(0, 10);
+
+        const response = await fetch(
+          `${apiHost}/api/table_list.php?date=${encodeURIComponent(selectedDateValue)}&onlyPending=true`,
+        );
+        const data = await response.json();
+        const pendingTables = mapPendingTableRows(
+          Array.isArray(data) ? data : [],
+        );
+        console.log("pendingTables from table_list.php", pendingTables, data);
+        setTransferTableList(pendingTables);
+        return;
+      }
+
+      const response = await fetch(`${apiHost}/api/master_table_list.php`);
+      const data = await response.json();
+      setTransferTableList(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Failed to load transfer tables:", error);
+      setTransferTableList([]);
+    } finally {
+      setTransferLoading(false);
+    }
+  };
+
   const resetTransferState = () => {
     setShowTransferModal(false);
     setTransferSearch("");
@@ -1529,27 +1687,78 @@ const Orderlist = ({
   const openTransferModal = async () => {
     if (!apiHost) return;
 
-    try {
-      setTransferLoading(true);
-      setShowTransferModal(true);
-      setTransferSearch("");
-      setSelectedTransferTable("");
-      setSelectedMergeTables(buildUniqueTableNames(currentTableParts));
-      setCustomTransferTableName("");
-      setCustomMergeTableName("");
-      setTransferMode("fixed");
+    setTransferLoading(true);
+    setShowTransferModal(true);
+    setTransferSearch("");
+    setSelectedTransferTable("");
+    setSelectedMergeTables(buildUniqueTableNames(currentTableParts));
+    setCustomTransferTableName("");
+    setCustomMergeTableName("");
+    setTransferMode("fixed");
 
-      const response = await fetch(`${apiHost}/api/master_table_list.php`);
-      const data = await response.json();
-
-      setTransferTableList(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error("Failed to load transfer tables:", error);
-      setTransferTableList([]);
-    } finally {
-      setTransferLoading(false);
-    }
+    await loadTransferTables("fixed");
   };
+
+  useEffect(() => {
+    if (!showTransferModal || !apiHost) return;
+    loadTransferTables(transferMode);
+  }, [showTransferModal, transferMode, apiHost]);
+
+  useEffect(() => {
+    if (
+      !showTransferModal ||
+      transferMode !== "transferItem" ||
+      !selectedTransferTableRow?.pending_transaction_id ||
+      !apiHost
+    ) {
+      setDestinationTransferSummary(null);
+      setDestinationTransferItems([]);
+      setDestinationTransferLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+
+    const fetchDestinationPreview = async () => {
+      try {
+        setDestinationTransferLoading(true);
+
+        const response = await fetch(
+          `${apiHost}/api/view_table_transaction.php?transaction_id=${encodeURIComponent(
+            selectedTransferTableRow.pending_transaction_id,
+          )}`,
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to load destination table order.");
+        }
+
+        const data = await response.json();
+
+        if (!isMounted) return;
+
+        setDestinationTransferSummary(data?.summary || null);
+        setDestinationTransferItems(
+          Array.isArray(data?.order_details) ? data.order_details : [],
+        );
+      } catch (error) {
+        console.error("Failed to load destination transfer preview:", error);
+        if (!isMounted) return;
+        setDestinationTransferSummary(null);
+        setDestinationTransferItems([]);
+      } finally {
+        if (isMounted) {
+          setDestinationTransferLoading(false);
+        }
+      }
+    };
+
+    fetchDestinationPreview();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [showTransferModal, transferMode, selectedTransferTableRow, apiHost]);
 
   const requestTransferConfirm = () => {
     if (!transactionId) {
@@ -1574,6 +1783,30 @@ const Orderlist = ({
         alert(
           "Please select at least one table to merge or type a custom table name.",
         );
+        return;
+      }
+    }
+
+    if (transferMode === "transferItem") {
+      if (!selectedTransferTable) {
+        alert("Please select a pending table.");
+        return;
+      }
+
+      if (!selectedTransferTableRow?.pending_transaction_id) {
+        alert(
+          "The selected pending table does not have a valid transaction id.",
+        );
+        return;
+      }
+
+      if (selectedTransferProductTotalQty <= 0) {
+        alert("Please select at least one product quantity to transfer.");
+        return;
+      }
+
+      if (remainingTransferProductTotalQty <= 0) {
+        alert("At least one product must remain on the current table.");
         return;
       }
     }
@@ -1608,12 +1841,278 @@ const Orderlist = ({
     return merged.length ? merged.join(" & ") : "None";
   }, [selectedMergeTables, customMergeTableName]);
 
+  const handleTransferProductQtyChange = (item, nextValue) => {
+    const safeMax = Number(item?.quantity || 0);
+    const numericValue = Number(String(nextValue || "").replace(/[^\d]/g, ""));
+    const safeValue = Number.isFinite(numericValue)
+      ? Math.min(safeMax, Math.max(0, numericValue))
+      : 0;
+
+    setTransferItemSelections((prev) => ({
+      ...prev,
+      [item.transferKey]: safeValue,
+    }));
+  };
+
+  const buildTransferMergeKey = (item) => {
+    const code = String(item?.product_id || item?.code || "")
+      .trim()
+      .toLowerCase();
+    const instruction = String(
+      item?.item_instruction || item?.itemInstruction || "",
+    )
+      .trim()
+      .toLowerCase();
+    const price = Number(item?.selling_price ?? item?.price ?? 0);
+
+    return `${code}__${instruction}__${price}`;
+  };
+
+  const mergeTransferOrderItems = (items = []) => {
+    const mergedMap = new Map();
+
+    items.forEach((item) => {
+      const key = buildTransferMergeKey(item);
+      const existing = mergedMap.get(key);
+      const quantity = Number(item?.sales_quantity ?? item?.quantity ?? 0);
+
+      if (quantity <= 0) return;
+
+      if (existing) {
+        existing.sales_quantity += quantity;
+        return;
+      }
+
+      mergedMap.set(key, {
+        product_id: item?.product_id || item?.code || "",
+        sku: item?.sku || item?.product_id || item?.code || "",
+        sales_quantity: quantity,
+        landing_cost: Number(item?.landing_cost || 0),
+        unit_cost: Number(item?.unit_cost || 0),
+        selling_price: Number(item?.selling_price ?? item?.price ?? 0),
+        vatable: item?.vatable || "Yes",
+        isDiscountable: item?.isDiscountable,
+        order_status: item?.order_status || "ACTIVE",
+        item_instruction: item?.item_instruction || item?.itemInstruction || "",
+      });
+    });
+
+    return Array.from(mergedMap.values());
+  };
+
+  const transferProductTransaction = async ({
+    source_transaction_id,
+    source_table_number,
+    destination_transaction_id,
+    destination_table_number,
+    source_items,
+    destination_items,
+    source_summary,
+    destination_summary,
+  }) => {
+    const formData = new FormData();
+
+    formData.append("Category_Code", "Crab & Crack");
+    formData.append("Unit_Code", unit_code);
+
+    formData.append("source_transaction_id", source_transaction_id);
+    formData.append("source_table_number", source_table_number || "");
+
+    formData.append("destination_transaction_id", destination_transaction_id);
+    formData.append("destination_table_number", destination_table_number || "");
+
+    formData.append(
+      "transaction_date",
+      dateSelected ||
+        source_summary?.transaction_date ||
+        destination_summary?.transaction_date ||
+        "",
+    );
+
+    formData.append(
+      "source_order_type",
+      source_summary?.order_type ||
+        selectedSalesTypeObject?.sales_type ||
+        selectedSalesTypeObject?.description ||
+        selectedSalesType ||
+        "DINE IN",
+    );
+
+    formData.append(
+      "destination_order_type",
+      destination_summary?.order_type ||
+        selectedSalesTypeObject?.sales_type ||
+        selectedSalesTypeObject?.description ||
+        selectedSalesType ||
+        "DINE IN",
+    );
+
+    formData.append(
+      "source_terminal_number",
+      source_summary?.terminal_number || "1",
+    );
+    formData.append(
+      "destination_terminal_number",
+      destination_summary?.terminal_number || "1",
+    );
+
+    formData.append(
+      "source_special_instructions",
+      source_summary?.special_instructions ||
+        source_summary?.instructions ||
+        instructions ||
+        "",
+    );
+
+    formData.append(
+      "destination_special_instructions",
+      destination_summary?.special_instructions ||
+        destination_summary?.instructions ||
+        "",
+    );
+
+    formData.append("cashier", userName);
+    formData.append("user_id", userId);
+    formData.append("user_name", email);
+
+    formData.append(
+      "source_items",
+      JSON.stringify(mergeTransferOrderItems(source_items)),
+    );
+    formData.append(
+      "destination_items",
+      JSON.stringify(mergeTransferOrderItems(destination_items)),
+    );
+
+    const response = await fetch(`${apiHost}/api/transfer_product.php`, {
+      method: "POST",
+      body: formData,
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || result?.status !== "success") {
+      throw new Error(result?.message || "Failed to transfer products.");
+    }
+
+    return result;
+  };
+
   const handleConfirmTransferTable = async () => {
     if (isTransferringTable) return;
     if (!apiHost || !transactionId) return;
 
     try {
       setIsTransferringTable(true);
+
+      if (transferMode === "transferItem") {
+        const destinationTxId =
+          selectedTransferTableRow?.pending_transaction_id;
+        const destinationTableName = getTransferTableName(
+          selectedTransferTableRow,
+        );
+
+        if (!destinationTxId || !destinationTableName) {
+          throw new Error("Please select a valid pending table.");
+        }
+
+        const sourceSelectedItems = [];
+        const sourceRemainingItems = [];
+
+        transferProductItems.forEach((item) => {
+          const selectedQty = Math.min(
+            Number(item.quantity || 0),
+            Number(transferItemSelections[item.transferKey] || 0),
+          );
+          const remainingQty = Math.max(
+            0,
+            Number(item.quantity || 0) - selectedQty,
+          );
+
+          if (selectedQty > 0) {
+            sourceSelectedItems.push({
+              product_id: item.code,
+              sku: item.code,
+              sales_quantity: selectedQty,
+              landing_cost: 0,
+              unit_cost: Number(item.unit_cost || 0),
+              selling_price: Number(item.price || 0),
+              vatable: item.vatable || "Yes",
+              isDiscountable: item.isDiscountable,
+              order_status: "ACTIVE",
+              item_instruction: item.itemInstruction || "",
+            });
+          }
+
+          if (remainingQty > 0) {
+            sourceRemainingItems.push({
+              product_id: item.code,
+              sku: item.code,
+              sales_quantity: remainingQty,
+              landing_cost: 0,
+              unit_cost: Number(item.unit_cost || 0),
+              selling_price: Number(item.price || 0),
+              vatable: item.vatable || "Yes",
+              isDiscountable: item.isDiscountable,
+              order_status: "ACTIVE",
+              item_instruction: item.itemInstruction || "",
+            });
+          }
+        });
+
+        if (sourceSelectedItems.length === 0) {
+          throw new Error("Please select at least one product to transfer.");
+        }
+
+        if (sourceRemainingItems.length === 0) {
+          throw new Error(
+            "At least one product must remain on the current table.",
+          );
+        }
+
+        const destinationResponse = await fetch(
+          `${apiHost}/api/view_table_transaction.php?transaction_id=${encodeURIComponent(destinationTxId)}`,
+        );
+
+        if (!destinationResponse.ok) {
+          throw new Error("Failed to load destination table order.");
+        }
+
+        const destinationData = await destinationResponse.json();
+        const destinationItems = Array.isArray(destinationData?.order_details)
+          ? destinationData.order_details
+          : [];
+
+        const mergedDestinationItems = mergeTransferOrderItems([
+          ...destinationItems,
+          ...sourceSelectedItems,
+        ]);
+
+        await transferProductTransaction({
+          source_transaction_id: transactionId,
+          source_table_number: tableselected,
+          destination_transaction_id: destinationTxId,
+          destination_table_number: destinationTableName,
+          source_items: sourceRemainingItems,
+          destination_items: mergedDestinationItems,
+          source_summary: sourceTransactionSummary || {},
+          destination_summary:
+            destinationData?.summary || destinationTransferSummary || {},
+        });
+
+        setShowTransferConfirmModal(false);
+        setShowTransferModal(false);
+        setSaveSuccessMessage(
+          `Selected products transferred from ${tableselected} to ${destinationTableName}.`,
+        );
+        setShowSaveSuccessModal(true);
+
+        setTimeout(() => {
+          setshoworderlist(false);
+        }, 1200);
+
+        return;
+      }
 
       let finalTableValue = "";
       let finalRemarks = "";
@@ -1634,8 +2133,7 @@ const Orderlist = ({
       }
 
       if (!finalTableValue) {
-        alert("Invalid transfer table.");
-        return;
+        throw new Error("Invalid transfer table.");
       }
 
       const formData = new FormData();
@@ -2344,7 +2842,7 @@ const Orderlist = ({
                       </div>
 
                       <div
-                        className={`grid grid-cols-2 gap-2 mb-4 p-1 rounded-2xl ${
+                        className={`grid grid-cols-3 gap-2 mb-4 p-1 rounded-2xl ${
                           isDark
                             ? "bg-slate-900/40 border border-white/5"
                             : "bg-slate-100 border border-slate-200"
@@ -2377,6 +2875,23 @@ const Orderlist = ({
                           }`}
                         >
                           Merge Table
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setTransferMode("transferItem");
+                            setSelectedTransferTable("");
+                            setTransferSearch("");
+                          }}
+                          className={`rounded-xl px-3 py-2.5 text-sm font-bold transition-all ${
+                            transferMode === "transferItem"
+                              ? "bg-blue-600 text-white"
+                              : isDark
+                                ? "text-slate-400 hover:text-white"
+                                : "text-slate-600 hover:text-slate-900"
+                          }`}
+                        >
+                          Transfer Product
                         </button>
                       </div>
 
@@ -2758,6 +3273,442 @@ const Orderlist = ({
                             </div>
                           </div>
                         </div>
+                      ) : transferMode === "transferItem" ? (
+                        <div className="grid gap-4 lg:grid-cols-[1.2fr,0.95fr]">
+                          <div className="space-y-4">
+                            <div
+                              className={`rounded-2xl px-4 py-4 ${
+                                isDark
+                                  ? "bg-slate-900/40 border border-white/5"
+                                  : "bg-slate-50 border border-slate-200"
+                              }`}
+                            >
+                              <div className="mb-3 flex items-center justify-between gap-3">
+                                <div>
+                                  <p
+                                    className={`text-[10px] font-black uppercase tracking-[0.25em] ${
+                                      isDark
+                                        ? "text-slate-500"
+                                        : "text-slate-500"
+                                    }`}
+                                  >
+                                    Current Order
+                                  </p>
+                                  <p
+                                    className={`mt-1 text-sm font-bold ${
+                                      isDark ? "text-white" : "text-slate-900"
+                                    }`}
+                                  >
+                                    Select Product to move from {tableselected}
+                                  </p>
+                                </div>
+
+                                <div
+                                  className={`rounded-xl px-3 py-2 text-right ${
+                                    isDark
+                                      ? "bg-slate-950/70 border border-white/5"
+                                      : "bg-white border border-slate-200"
+                                  }`}
+                                >
+                                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+                                    Selected
+                                  </p>
+                                  <p className="text-base font-black text-blue-500">
+                                    {selectedTransferProductTotalQty} item
+                                    {selectedTransferProductTotalQty !== 1
+                                      ? "s"
+                                      : ""}
+                                  </p>
+                                  <p className="text-xs text-slate-500">
+                                    ₱
+                                    {selectedTransferProductSubtotal.toLocaleString()}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="max-h-[360px] space-y-3 overflow-y-auto pr-1">
+                                {transferProductItems.length > 0 ? (
+                                  transferProductItems.map((item) => {
+                                    const selectedQty = Math.min(
+                                      Number(item.quantity || 0),
+                                      Number(
+                                        transferItemSelections[
+                                          item.transferKey
+                                        ] || 0,
+                                      ),
+                                    );
+                                    const remainingQty = Math.max(
+                                      0,
+                                      Number(item.quantity || 0) - selectedQty,
+                                    );
+
+                                    return (
+                                      <div
+                                        key={item.transferKey}
+                                        className={`rounded-2xl p-3 ${
+                                          isDark
+                                            ? "bg-slate-950/60 border border-white/5"
+                                            : "bg-white border border-slate-200"
+                                        }`}
+                                      >
+                                        <div className="flex items-start justify-between gap-3">
+                                          <div className="min-w-0 flex-1">
+                                            <p
+                                              className={`text-sm font-extrabold ${
+                                                isDark
+                                                  ? "text-white"
+                                                  : "text-slate-900"
+                                              }`}
+                                            >
+                                              {item.name}
+                                            </p>
+                                            <div className="mt-1 flex flex-wrap gap-2 text-[11px]">
+                                              <span
+                                                className={`rounded-full px-2 py-1 ${isDark ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-600"}`}
+                                              >
+                                                Qty:{" "}
+                                                {Number(item.quantity || 0)}
+                                              </span>
+                                              <span
+                                                className={`rounded-full px-2 py-1 ${isDark ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-600"}`}
+                                              >
+                                                Remaining: {remainingQty}
+                                              </span>
+                                              {item.item_category ? (
+                                                <span
+                                                  className={`rounded-full px-2 py-1 ${isDark ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-600"}`}
+                                                >
+                                                  {item.item_category}
+                                                </span>
+                                              ) : null}
+                                            </div>
+                                            {item.itemInstruction ? (
+                                              <p
+                                                className={`mt-2 text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}
+                                              >
+                                                Note: {item.itemInstruction}
+                                              </p>
+                                            ) : null}
+                                          </div>
+
+                                          <div className="w-[190px] shrink-0">
+                                            <label
+                                              className={`mb-2 block text-[10px] font-black uppercase tracking-[0.2em] ${
+                                                isDark
+                                                  ? "text-slate-500"
+                                                  : "text-slate-500"
+                                              }`}
+                                            >
+                                              Transfer Qty
+                                            </label>
+
+                                            <div
+                                              className={`rounded-2xl p-2 ${
+                                                isDark
+                                                  ? "border border-slate-800 bg-slate-900/90"
+                                                  : "border border-slate-300 bg-slate-50"
+                                              }`}
+                                            >
+                                              <div className="grid grid-cols-[50px_1fr_50px] gap-2">
+                                                <button
+                                                  type="button"
+                                                  onClick={() => {
+                                                    const currentQty = Number(
+                                                      transferItemSelections[
+                                                        item.transferKey
+                                                      ] || 0,
+                                                    );
+                                                    handleTransferProductQtyChange(
+                                                      item,
+                                                      Math.max(
+                                                        0,
+                                                        currentQty - 1,
+                                                      ),
+                                                    );
+                                                  }}
+                                                  className={`flex h-14 items-center justify-center rounded-2xl text-3xl font-black transition active:scale-95 ${
+                                                    isDark
+                                                      ? "bg-slate-800 text-white hover:bg-slate-700"
+                                                      : "bg-white text-slate-900 hover:bg-slate-100 border border-slate-200"
+                                                  }`}
+                                                >
+                                                  −
+                                                </button>
+
+                                                <div
+                                                  className={`flex h-15 flex-col items-center justify-center rounded-2xl ${
+                                                    isDark
+                                                      ? "bg-slate-950 text-white border border-white/5"
+                                                      : "bg-white text-slate-900 border border-slate-200"
+                                                  }`}
+                                                >
+                                                  <input
+                                                    type="number"
+                                                    min="0"
+                                                    max={Number(
+                                                      item.quantity || 0,
+                                                    )}
+                                                    inputMode="numeric"
+                                                    value={
+                                                      transferItemSelections[
+                                                        item.transferKey
+                                                      ] ?? 0
+                                                    }
+                                                    onChange={(e) =>
+                                                      handleTransferProductQtyChange(
+                                                        item,
+                                                        e.target.value,
+                                                      )
+                                                    }
+                                                    className={`w-full bg-transparent text-center text-2xl font-black outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
+                                                      isDark
+                                                        ? "text-white"
+                                                        : "text-slate-900"
+                                                    }`}
+                                                  />
+                                                  <span
+                                                    className={`text-[10px] font-bold uppercase tracking-[0.18em] ${
+                                                      isDark
+                                                        ? "text-slate-500"
+                                                        : "text-slate-400"
+                                                    }`}
+                                                  >
+                                                    selected
+                                                  </span>
+                                                </div>
+
+                                                <button
+                                                  type="button"
+                                                  onClick={() => {
+                                                    const currentQty = Number(
+                                                      transferItemSelections[
+                                                        item.transferKey
+                                                      ] || 0,
+                                                    );
+                                                    const maxQty = Number(
+                                                      item.quantity || 0,
+                                                    );
+                                                    handleTransferProductQtyChange(
+                                                      item,
+                                                      Math.min(
+                                                        maxQty,
+                                                        currentQty + 1,
+                                                      ),
+                                                    );
+                                                  }}
+                                                  className={`flex h-14 items-center justify-center rounded-2xl text-3xl font-black transition active:scale-95 ${
+                                                    isDark
+                                                      ? "bg-blue-600 text-white hover:bg-blue-500"
+                                                      : "bg-blue-600 text-white hover:bg-blue-500"
+                                                  }`}
+                                                >
+                                                  +
+                                                </button>
+                                              </div>
+
+                                              <div className="mt-2 grid grid-cols-2 gap-2">
+                                                <button
+                                                  type="button"
+                                                  onClick={() =>
+                                                    handleTransferProductQtyChange(
+                                                      item,
+                                                      0,
+                                                    )
+                                                  }
+                                                  className={`h-12 rounded-xl text-sm font-black transition active:scale-95 ${
+                                                    isDark
+                                                      ? "bg-slate-800 text-slate-200 hover:bg-slate-700"
+                                                      : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-200"
+                                                  }`}
+                                                >
+                                                  Clear
+                                                </button>
+
+                                                <button
+                                                  type="button"
+                                                  onClick={() =>
+                                                    handleTransferProductQtyChange(
+                                                      item,
+                                                      Number(
+                                                        item.quantity || 0,
+                                                      ),
+                                                    )
+                                                  }
+                                                  className={`h-12 rounded-xl text-sm font-black transition active:scale-95 ${
+                                                    isDark
+                                                      ? "bg-emerald-600 text-white hover:bg-emerald-500"
+                                                      : "bg-emerald-600 text-white hover:bg-emerald-500"
+                                                  }`}
+                                                >
+                                                  All
+                                                </button>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })
+                                ) : (
+                                  <div
+                                    className={`rounded-xl px-4 py-5 text-center text-sm ${
+                                      isDark
+                                        ? "bg-slate-800/50 text-slate-500"
+                                        : "bg-white text-slate-500 border border-dashed border-slate-200"
+                                    }`}
+                                  >
+                                    No order items available for transfer.
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="space-y-4">
+                            <div className="relative">
+                              <FaSearch
+                                className={`absolute left-4 top-1/2 -translate-y-1/2 ${
+                                  isDark ? "text-slate-600" : "text-slate-400"
+                                }`}
+                              />
+                              <input
+                                type="text"
+                                placeholder="Search pending tables..."
+                                value={transferSearch}
+                                onChange={(e) =>
+                                  setTransferSearch(e.target.value)
+                                }
+                                className={`w-full rounded-xl py-3 pl-11 pr-4 text-sm focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${
+                                  isDark
+                                    ? "bg-slate-900/50 border border-slate-800 text-white focus:border-blue-500/40"
+                                    : "bg-slate-50 border border-slate-300 text-slate-900 focus:border-blue-400"
+                                }`}
+                              />
+                            </div>
+
+                            <div
+                              className={`rounded-2xl p-3 ${
+                                isDark
+                                  ? "border border-white/5 bg-slate-900/30"
+                                  : "border border-slate-200 bg-slate-50"
+                              }`}
+                            >
+                              <div className="mb-3 flex items-center justify-between gap-2">
+                                <div>
+                                  <p
+                                    className={`text-[10px] font-black uppercase tracking-[0.25em] ${isDark ? "text-slate-500" : "text-slate-500"}`}
+                                  >
+                                    Pending Tables
+                                  </p>
+                                </div>
+                                <span
+                                  className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${isDark ? "bg-slate-950 text-slate-300" : "bg-white text-slate-600 border border-slate-200"}`}
+                                >
+                                  {filteredTransferTables.length}
+                                </span>
+                              </div>
+
+                              <div className="max-h-[220px] overflow-y-auto pr-1">
+                                {filteredTransferTables.length > 0 ? (
+                                  <div className="space-y-2">
+                                    {filteredTransferTables.map((table) => {
+                                      const tableName =
+                                        getTransferTableName(table);
+                                      const isSelected =
+                                        normalizeTableName(
+                                          selectedTransferTable,
+                                        ) === normalizeTableName(tableName);
+
+                                      return (
+                                        <button
+                                          key={table.ID ?? tableName}
+                                          type="button"
+                                          onClick={() =>
+                                            setSelectedTransferTable(tableName)
+                                          }
+                                          className={`w-full rounded-xl border px-3 py-3 text-left transition-all ${
+                                            isSelected
+                                              ? isDark
+                                                ? "border-blue-400/40 bg-blue-500/15 text-white"
+                                                : "border-blue-300 bg-blue-50 text-blue-700"
+                                              : isDark
+                                                ? "border-white/5 bg-slate-800/70 text-slate-200 hover:bg-slate-800"
+                                                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
+                                          }`}
+                                        >
+                                          <div className="flex items-start justify-between gap-3">
+                                            <div>
+                                              <p
+                                                className={`text-[10px] font-black uppercase tracking-[0.2em] ${isSelected ? (isDark ? "text-blue-300" : "text-blue-500") : isDark ? "text-slate-500" : "text-slate-400"}`}
+                                              >
+                                                Pending Table
+                                              </p>
+                                              <p className="mt-1 text-sm font-extrabold">
+                                                {tableName}
+                                              </p>
+                                            </div>
+                                            <div
+                                              className={`mt-1 flex h-5 w-5 items-center justify-center rounded-full ${isSelected ? (isDark ? "bg-blue-500 text-white" : "bg-blue-600 text-white") : isDark ? "bg-slate-700 text-slate-400" : "bg-slate-100 text-slate-400"}`}
+                                            >
+                                              {isSelected ? (
+                                                <FaCheck size={9} />
+                                              ) : (
+                                                <span className="text-[9px] font-bold">
+                                                  +
+                                                </span>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                ) : (
+                                  <div
+                                    className={`rounded-xl px-4 py-5 text-center text-sm ${
+                                      isDark
+                                        ? "bg-slate-800/50 text-slate-500"
+                                        : "bg-white text-slate-500 border border-dashed border-slate-200"
+                                    }`}
+                                  >
+                                    No pending tables found.
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <div
+                              className={`rounded-2xl p-4 ${
+                                isDark
+                                  ? "bg-slate-900/40 border border-white/5"
+                                  : "bg-slate-50 border border-slate-200"
+                              }`}
+                            >
+                              <p
+                                className={`text-[10px] font-black uppercase tracking-[0.25em] ${isDark ? "text-slate-500" : "text-slate-500"}`}
+                              >
+                                Destination Preview
+                              </p>
+                              <p
+                                className={`mt-1 text-lg font-bold ${isDark ? "text-white" : "text-slate-900"}`}
+                              >
+                                {selectedTransferTable ||
+                                  "No pending table selected"}
+                              </p>
+                              {destinationTransferLoading ? (
+                                <p
+                                  className={`mt-3 text-sm ${isDark ? "text-slate-400" : "text-slate-500"}`}
+                                >
+                                  Loading destination order...
+                                </p>
+                              ) : (
+                                <p
+                                  className={`mt-3 text-sm ${isDark ? "text-slate-400" : "text-slate-500"}`}
+                                ></p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
                       ) : null}
 
                       <div className="flex gap-2 pt-4">
@@ -2790,12 +3741,16 @@ const Orderlist = ({
                     header={
                       transferMode === "merge"
                         ? "Confirm Table Merge"
-                        : "Confirm Table Transfer"
+                        : transferMode === "transferItem"
+                          ? "Confirm Product Transfer"
+                          : "Confirm Table Transfer"
                     }
                     message={
                       transferMode === "merge"
                         ? `Are you sure you want to update this transaction table into ${mergePreview}?`
-                        : `Are you sure you want to transfer this order from ${tableselected} to ${customTransferTableName.trim() || selectedTransferTable}?`
+                        : transferMode === "transferItem"
+                          ? `Are you sure you want to transfer ${selectedTransferProductTotalQty} selected item${selectedTransferProductTotalQty !== 1 ? "s" : ""} from ${tableselected} to pending table ${selectedTransferTable}?`
+                          : `Are you sure you want to transfer this order from ${tableselected} to ${customTransferTableName.trim() || selectedTransferTable}?`
                     }
                     setYesNoModalOpen={setShowTransferConfirmModal}
                     triggerYesNoEvent={handleConfirmTransferTable}
