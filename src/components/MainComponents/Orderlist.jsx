@@ -112,6 +112,7 @@ const Orderlist = ({
   const userName = localStorage.getItem("Cashier") || "Store Crew";
   const email = localStorage.getItem("email") || "Store Crew";
   const unit_code = localStorage.getItem("posBusinessUnitCode") || "";
+  const category_code = localStorage.getItem("posBusinessCategoryCode") || "";
   const [salesTypeList, setSalesTypeList] = useState([]);
   const [selectedSalesType, setSelectedSalesType] = useState("");
   const [showTransferModal, setShowTransferModal] = useState(false);
@@ -1316,8 +1317,7 @@ const Orderlist = ({
       transStatus: "Pending for Payment", // or "Settled" if receipt/payment final
       category_code:
         transaction.Category_Code ||
-        transaction.category_code ||
-        "Crab & Crack",
+        transaction.category_code ,
       unit_code: transaction.Unit_Code || transaction.unit_code || "",
 
       TotalSales: Number(transaction.TotalSales || 0),
@@ -1429,7 +1429,7 @@ const Orderlist = ({
         "0";
 
       formData.append("transaction_id", txId);
-      formData.append("Category_Code", "Crab & Crack");
+      formData.append("Category_Code", category_code);
       formData.append("Unit_Code", unit_code);
       formData.append("transaction_type", "PRODUCT");
       formData.append("transaction_date", dateSelected);
@@ -2138,7 +2138,7 @@ const Orderlist = ({
 
       const formData = new FormData();
 
-      formData.append("Category_Code", "Crab & Crack");
+      formData.append("Category_Code", category_code);
       formData.append("Unit_Code", unit_code);
       formData.append("transaction_id", transactionId);
       formData.append("old_table_number", tableselected || "");
