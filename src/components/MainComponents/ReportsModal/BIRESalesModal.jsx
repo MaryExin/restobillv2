@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { FaSyncAlt, FaTimes, FaSearch, FaFileExcel, FaFilePdf } from "react-icons/fa";
+import { FaSyncAlt, FaTimes, FaSearch, FaFileExcel, FaFilePdf, FaDownload } from "react-icons/fa"; // Added FaDownload
 import { useTheme } from "../../../context/ThemeContext";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
@@ -15,7 +15,6 @@ const BirESalesModal = ({ isOpen, onClose }) => {
   const [dateFrom, setDateFrom] = useState(new Date().toISOString().split('T')[0]);
   const [dateTo, setDateTo] = useState(new Date().toISOString().split('T')[0]);
 
-  // Arial Font Style - Strictly normal weight, no italics
   const fontStyle = { 
     fontFamily: "Arial, Helvetica, sans-serif",
     fontWeight: "normal",
@@ -50,6 +49,35 @@ const BirESalesModal = ({ isOpen, onClose }) => {
   }, [activeTab, dateFrom, dateTo, isOpen]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // --- NEW EXPORT ALL LOGIC ---
+  const exportAllToExcel = async () => {
+    setLoading(true);
+    const wb = XLSX.utils.book_new();
+
+    try {
+      for (const tab of tabs) {
+        const response = await fetch(`http://localhost/api/bir_esales.php`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tab: tab.id, dateFrom, dateTo }),
+        });
+        const result = await response.json();
+        const sheetData = Array.isArray(result[tab.id]) ? result[tab.id] : [];
+        
+        const ws = XLSX.utils.json_to_sheet(sheetData);
+        XLSX.utils.book_append_sheet(wb, ws, tab.id);
+      }
+
+      XLSX.writeFile(wb, `Overall_ESales_Report_${dateFrom}_to_${dateTo}.xlsx`);
+    } catch (err) {
+      console.error("Export All Error:", err);
+      alert("Failed to export all data.");
+    } finally {
+      setLoading(false);
+    }
+  };
+  // ----------------------------
 
   const exportToExcel = () => {
     const ws = XLSX.utils.json_to_sheet(data);
@@ -95,7 +123,6 @@ const BirESalesModal = ({ isOpen, onClose }) => {
     if (activeTab === "E1") {
       return (
         <>
-          {/* STICKY DATE HEADER: Light/Dark background */}
           <th className={`sticky left-0 z-50 transition-colors ${darkMode ? "bg-slate-900" : "bg-slate-100"} ${headerClass}`}>Date</th>
           <th className={headerClass}>Beginning O.R.</th>
           <th className={headerClass}>Ending O.R.</th>
@@ -121,10 +148,10 @@ const BirESalesModal = ({ isOpen, onClose }) => {
           <th className={`${headerClass} text-right`}>Adjustments_VAT on Returns</th>
           <th className={headerClass}>Others</th>
           <th className={`${headerClass} text-right`}>Total VAT Adjustment</th>
-          <th className={`${headerClass} text-cyan-500 text-right`}>VAT Payable</th>
-          <th className={`${headerClass} text-green-600 text-right`}>Net Sales</th>
+          <th className={`${headerClass} text-right text-cyan-500`}>VAT Payable</th>
+          <th className={`${headerClass} text-right text-green-600`}>Net Sales</th>
           <th className={`${headerClass} text-right`}>Sales Overrun / Overflow</th>
-          <th className={`${headerClass} text-green-600 text-right`}>Total Income</th>
+          <th className={`${headerClass} text-right text-green-600`}>Total Income</th>
           <th className={`${headerClass} text-center`}>Reset Counter</th>
           <th className={`${headerClass} text-blue-500 text-center`}>Z-Counter</th>
           <th className={headerClass}>Remarks</th>
@@ -165,10 +192,20 @@ const BirESalesModal = ({ isOpen, onClose }) => {
           </div>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 pr-4 mr-4 border-r border-white/20">
-               <button onClick={exportToExcel} className="p-2.5 text-white bg-green-600/60 hover:bg-green-600 rounded-full transition-all active:scale-95 shadow-md">
+               {/* EXPORT ALL BUTTON */}
+               <button 
+                  onClick={exportAllToExcel} 
+                  disabled={loading}
+                  title="Export All (E1-E5)"
+                  className="flex items-center gap-2 px-3 py-2 text-[10px] font-bold text-white bg-blue-500/80 hover:bg-blue-600 rounded-full transition-all active:scale-95 shadow-md uppercase">
+                  <FaDownload size={12} />
+                  Export All
+               </button>
+
+               <button onClick={exportToExcel} className="p-2.5 text-white bg-green-600/60 hover:bg-green-600 rounded-full transition-all active:scale-95 shadow-md" title="Export Current Tab to Excel">
                   <FaFileExcel size={14} />
                </button>
-               <button onClick={exportToPDF} className="p-2.5 text-white bg-red-600/60 hover:bg-red-600 rounded-full transition-all active:scale-95 shadow-md">
+               <button onClick={exportToPDF} className="p-2.5 text-white bg-red-600/60 hover:bg-red-600 rounded-full transition-all active:scale-95 shadow-md" title="Export Current Tab to PDF">
                   <FaFilePdf size={14} />
                </button>
             </div>
@@ -181,7 +218,7 @@ const BirESalesModal = ({ isOpen, onClose }) => {
           </div>
         </div>
 
-        {/* Tabs */}
+        {/* Tabs and Table remain the same as your original code... */}
         <div className={`flex border-b shrink-0 overflow-x-auto transition-colors ${darkMode ? "bg-slate-800 border-white/5" : "bg-slate-50 border-slate-200"}`}>
           {tabs.map((tab) => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-8 py-3.5 text-[11px] font-normal uppercase transition-all whitespace-nowrap tracking-wider ${activeTab === tab.id ? "bg-blue-600 text-white shadow-[inset_0_-3px_0_white]" : `${darkMode ? "text-slate-400" : "text-slate-500"} hover:bg-blue-500/10 hover:text-blue-500`}`}>
@@ -190,7 +227,6 @@ const BirESalesModal = ({ isOpen, onClose }) => {
           ))}
         </div>
 
-        {/* Table Content */}
         <div className={`flex-1 p-4 overflow-hidden ${darkMode ? "bg-slate-950/20" : "bg-slate-50/50"}`}>
           <div className={`h-full overflow-auto rounded-xl border transition-colors shadow-sm ${darkMode ? "bg-[#0b1120] border-white/5" : "bg-white border-slate-200"}`}>
             <table className="w-full text-left border-separate border-spacing-0">
@@ -205,56 +241,53 @@ const BirESalesModal = ({ isOpen, onClose }) => {
                 ) : filteredData.length > 0 ? filteredData.map((row, idx) => (
                   <tr key={idx} className={`transition-colors ${darkMode ? "text-slate-300 hover:bg-white/5" : "text-slate-600 hover:bg-blue-50/50"}`}>
                     {activeTab === "E1" ? (
-                      <>
-                        {/* STICKY DATE CELL: Dynamic white in Light mode, slate in Dark mode */}
-                        <td className={`sticky left-0 p-2 border-r font-medium transition-colors z-[40] ${
-                          darkMode ? "bg-slate-900 border-white/10 text-slate-200" : "bg-white border-slate-200 text-slate-700"
-                        }`}>{row?.transaction_date}</td>
-                        <td className="p-2">{row?.Beg_OR}</td>
-                        <td className="p-2">{row?.End_OR}</td>
-                        <td className="p-2 text-right tabular-nums">{Number(row?.Grand_Accum_End || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
-                        <td className="p-2 text-right tabular-nums">{Number(row?.Grand_Accum_Beg || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
-                        <td className="p-2 text-right tabular-nums">{Number(row?.Gross_Sales || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
-                        <td className="p-2 text-right tabular-nums">{Number(row?.VATable_Sales || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
-                        <td className="p-2 text-right tabular-nums">{Number(row?.VAT_Amount || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
-                        <td className="p-2 text-right text-yellow-600 tabular-nums">{Number(row?.VAT_Exempt_Sales || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
-                        <td className="p-2 text-right text-yellow-600 tabular-nums">{Number(row?.VAT_Exemption || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
-                        <td className="p-2 text-right tabular-nums">0.00</td>
-                        <td className="p-2 text-right text-orange-500 tabular-nums">{Number(row?.SC_Discount || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
-                        <td className="p-2 text-right text-orange-500 tabular-nums">{Number(row?.PWD_Disc || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
-                        <td className="p-2 text-right text-orange-500 tabular-nums">{Number(row?.NAAC_Disc || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
-                        <td className="p-2 text-right text-orange-500 tabular-nums">{Number(row?.Solo_Parent_Disc || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
-                        <td className="p-2">{row?.Others}</td>
-                        <td className="p-2">0.00</td>
-                        <td className="p-2 text-right text-red-500 tabular-nums">{Number(row?.Voids || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
-                        <td className="p-2 text-right text-orange-600 tabular-nums">{Number(row?.Total_Deductions || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
-                        <td className="p-2 text-right tabular-nums">0.00</td>
-                        <td className="p-2 text-right tabular-nums">0.00</td>
-                        <td className="p-2 text-right tabular-nums">0.00</td>
-                        <td className="p-2 text-right tabular-nums">0.00</td>
-                        <td className="p-2">0.00</td>
-                        <td className="p-2 text-right tabular-nums">0.00</td>
-                        <td className="p-2 text-right tabular-nums text-cyan-500">{Number(row?.VAT_Payable || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
-                        <td className="p-2 text-right text-green-600 tabular-nums">{Number(row?.Net_Sales || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
-                        <td className="p-2 text-right tabular-nums">0.00</td>
-                        <td className="p-2 text-right text-green-600 tabular-nums">{Number(row?.Total_Income || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
-                        <td className="p-2 text-center">0</td>
-                        <td className="p-2 text-center text-blue-500 tabular-nums">{row?.Z_Counter}</td>
-                        <td className={`p-2 text-[9px] ${darkMode ? "text-slate-500" : "text-slate-400"}`}>{row?.Remarks}</td>
-                      </>
+                        <>
+                          <td className={`sticky left-0 p-2 border-r font-medium transition-colors z-[40] ${darkMode ? "bg-slate-900 border-white/10 text-slate-200" : "bg-white border-slate-200 text-slate-700"}`}>{row?.transaction_date}</td>
+                          <td className="p-2">{row?.Beg_OR}</td>
+                          <td className="p-2">{row?.End_OR}</td>
+                          <td className="p-2 text-right tabular-nums">{Number(row?.Grand_Accum_End || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                          <td className="p-2 text-right tabular-nums">{Number(row?.Grand_Accum_Beg || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                          <td className="p-2 text-right tabular-nums">{Number(row?.Gross_Sales || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                          <td className="p-2 text-right tabular-nums">{Number(row?.VATable_Sales || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                          <td className="p-2 text-right tabular-nums">{Number(row?.VAT_Amount || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                          <td className="p-2 text-right text-yellow-600 tabular-nums">{Number(row?.VAT_Exempt_Sales || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                          <td className="p-2 text-right text-yellow-600 tabular-nums">{Number(row?.VAT_Exemption || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                          <td className="p-2 text-right tabular-nums">0.00</td>
+                          <td className="p-2 text-right text-orange-500 tabular-nums">{Number(row?.SC_Discount || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                          <td className="p-2 text-right text-orange-500 tabular-nums">{Number(row?.PWD_Disc || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                          <td className="p-2 text-right text-orange-500 tabular-nums">{Number(row?.NAAC_Disc || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                          <td className="p-2 text-right text-orange-500 tabular-nums">{Number(row?.Solo_Parent_Disc || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                          <td className="p-2">{row?.Others}</td>
+                          <td className="p-2">0.00</td>
+                          <td className="p-2 text-right text-red-500 tabular-nums">{Number(row?.Voids || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                          <td className="p-2 text-right text-orange-600 tabular-nums">{Number(row?.Total_Deductions || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                          <td className="p-2 text-right tabular-nums">0.00</td>
+                          <td className="p-2 text-right tabular-nums">0.00</td>
+                          <td className="p-2 text-right tabular-nums">0.00</td>
+                          <td className="p-2 text-right tabular-nums">0.00</td>
+                          <td className="p-2">0.00</td>
+                          <td className="p-2 text-right tabular-nums">0.00</td>
+                          <td className="p-2 text-right tabular-nums text-cyan-500">{Number(row?.VAT_Payable || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                          <td className="p-2 text-right text-green-600 tabular-nums">{Number(row?.Net_Sales || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                          <td className="p-2 text-right tabular-nums">0.00</td>
+                          <td className="p-2 text-right text-green-600 tabular-nums">{Number(row?.Total_Income || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                          <td className="p-2 text-center">0</td>
+                          <td className="p-2 text-center text-blue-500 tabular-nums">{row?.Z_Counter}</td>
+                          <td className={`p-2 text-[9px] ${darkMode ? "text-slate-500" : "text-slate-400"}`}>{row?.Remarks}</td>
+                        </>
                     ) : (
-                      <>
-                        <td className="p-3">{row?.transaction_date}</td>
-                        <td className={`p-3 uppercase font-medium ${darkMode ? "text-slate-100" : "text-slate-700"}`}>{row?.customer_name}</td>
-                        <td className="p-3">{row?.id_no}</td>
-                        <td className="p-3">{row?.trans_no}</td>
-                        <td className="p-3 text-blue-500">{row?.or_no}</td>
-                        <td className="p-3 text-right tabular-nums">{Number(row?.sales_inc_vat || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
-                        <td className="p-3 text-right tabular-nums">{Number(row?.vat_amount || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
-                        <td className="p-3 text-right tabular-nums">{Number(row?.vat_exempt_sales || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
-                        <td className="p-3 text-right tabular-nums text-rose-500">{Number(row?.discount_20 || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
-                        <td className="p-3 text-right tabular-nums text-cyan-600">{Number(row?.net_sales || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
-                      </>
+                        <>
+                          <td className="p-3">{row?.transaction_date}</td>
+                          <td className={`p-3 uppercase font-medium ${darkMode ? "text-slate-100" : "text-slate-700"}`}>{row?.customer_name}</td>
+                          <td className="p-3">{row?.id_no}</td>
+                          <td className="p-3">{row?.trans_no}</td>
+                          <td className="p-3 text-blue-500">{row?.or_no}</td>
+                          <td className="p-3 text-right tabular-nums">{Number(row?.sales_inc_vat || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                          <td className="p-3 text-right tabular-nums">{Number(row?.vat_amount || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                          <td className="p-3 text-right tabular-nums">{Number(row?.vat_exempt_sales || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                          <td className="p-3 text-right tabular-nums text-rose-500">{Number(row?.discount_20 || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                          <td className="p-3 text-right tabular-nums text-cyan-600">{Number(row?.net_sales || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</td>
+                        </>
                     )}
                   </tr>
                 )) : (
