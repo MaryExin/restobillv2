@@ -98,7 +98,10 @@ const CustomCalendar = ({
         {[...Array(firstDayOfMonth)].map((_, i) => <div key={i}></div>)}
         {[...Array(daysInMonth(currentView.getFullYear(), currentView.getMonth()))].map((_, i) => {
           const day = i + 1;
-          const dateString = new Date(currentView.getFullYear(), currentView.getMonth(), day + 1).toISOString().split("T")[0];
+          // Inayos na logic para sa tamang date formatting (YYYY-MM-DD)
+          const d = new Date(currentView.getFullYear(), currentView.getMonth(), day);
+          const dateString = d.toLocaleDateString('en-CA'); 
+
           return (
             <button
               key={day}
@@ -122,7 +125,7 @@ const CustomCalendar = ({
   );
 };
 
-// --- 2. VIEW DETAILS MODAL (MULTIPLE PAYMENTS LOGIC) ---
+// --- 2. VIEW DETAILS MODAL ---
 const DetailsModal = ({ transaction, isOpen, onClose, isDark }) => {
   const [items, setItems] = useState([]);
   const [payments, setPayments] = useState([]);
@@ -131,13 +134,11 @@ const DetailsModal = ({ transaction, isOpen, onClose, isDark }) => {
   useEffect(() => {
     if (isOpen && transaction) {
       setLoading(true);
-      // Kinukuha nito ang lahat ng items at payments na naka-link sa transaction_id
       fetch(`http://localhost/api/get_transaction_items.php?id=${transaction.transaction_id}`)
         .then((res) => res.json())
         .then((res) => {
           if (res.success) {
             setItems(res.data || []);
-            // Dito kinukuha ang records mula sa tbl_pos_transactions_payments
             setPayments(res.payments || []); 
           } else {
             setItems([]);
@@ -159,7 +160,6 @@ const DetailsModal = ({ transaction, isOpen, onClose, isDark }) => {
     <div className={`fixed inset-0 z-[200000] flex items-center justify-center p-4 animate-in fade-in duration-200 ${isDark ? "bg-black/80 backdrop-blur-sm" : "bg-slate-900/40 backdrop-blur-sm"}`}>
       <div className={`w-full max-w-lg border rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col max-h-[90vh] transition-all ${isDark ? "bg-[#0a0f1e] border-white/10" : "bg-white border-slate-200"}`}>
         
-        {/* MODAL HEADER */}
         <div className={`p-8 border-b flex justify-between items-center ${isDark ? "bg-white/[0.02] border-white/5" : "bg-slate-50 border-slate-100"}`}>
           <div className="flex items-center gap-4">
             <div className={`flex items-center justify-center w-10 h-10 rounded-xl ${isDark ? "bg-blue-500/10 text-blue-500" : "bg-blue-100 text-blue-600"}`}>
@@ -175,7 +175,6 @@ const DetailsModal = ({ transaction, isOpen, onClose, isDark }) => {
           </button>
         </div>
 
-        {/* ITEM LIST */}
         <div className="flex-1 p-8 overflow-y-auto custom-scrollbar">
           {loading ? (
             <div className="py-20 text-xs font-black tracking-widest text-center uppercase text-slate-400 animate-pulse">Loading list...</div>
@@ -199,14 +198,10 @@ const DetailsModal = ({ transaction, isOpen, onClose, isDark }) => {
           )}
         </div>
 
-        {/* PAYMENT DETAILS SECTION (DITO ANG PAGBABAGO) */}
         <div className={`p-8 space-y-4 border-t transition-all ${isDark ? "bg-black/40 border-white/5" : "bg-slate-50 border-slate-100 shadow-inner"}`}>
-          
           <div className="space-y-3">
             <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest border-b pb-2 border-slate-200/10">Payment breakdown</p>
-            
             {payments.length > 0 ? (
-              // Kung may nakuha sa tbl_pos_transactions_payments, i-display lahat
               payments.map((p, idx) => (
                 <div key={idx} className="flex items-center justify-between">
                   <span className={`text-[11px] font-black uppercase ${p.payment_method?.toLowerCase() === 'gcash' ? 'text-blue-500' : 'text-emerald-500'}`}>
@@ -218,7 +213,6 @@ const DetailsModal = ({ transaction, isOpen, onClose, isDark }) => {
                 </div>
               ))
             ) : (
-              // Fallback sa main transaction object kung walang nakuha sa sub-table
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-black uppercase text-blue-500">
                   {transaction.payment_method || "N/A"}
@@ -260,9 +254,12 @@ const TransactionsModal = ({ isOpen, onClose }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [showFilter, setShowFilter] = useState(false);
   const [statusFilter, setStatusFilter] = useState("All");
-  const today = new Date().toISOString().split("T")[0];
+  
+  // Naka-ISO format para sa API: YYYY-MM-DD
+  const today = new Date().toLocaleDateString('en-CA'); 
   const [dateFrom, setDateFrom] = useState(today);
   const [dateTo, setDateTo] = useState(today);
+  
   const [openStartCal, setOpenStartCal] = useState(false);
   const [openEndCal, setOpenEndCal] = useState(false);
   const [viewingTransaction, setViewingTransaction] = useState(null);
@@ -273,11 +270,12 @@ const TransactionsModal = ({ isOpen, onClose }) => {
       const response = await fetch(`http://localhost/api/read_transaction_records.php?dateFrom=${dateFrom}&dateTo=${dateTo}&search=${searchTerm}&recordStatus=${statusFilter}`);
       const result = await response.json();
       if (result.success) {
-        // Siguraduhin na walang redundant rows sa main table view
         const uniqueData = result.data.filter((value, index, self) =>
           index === self.findIndex((t) => t.transaction_id === value.transaction_id)
         );
         setData(uniqueData);
+      } else {
+        setData([]);
       }
     } catch (error) {
       console.error("Fetch error:", error);
@@ -307,7 +305,7 @@ const TransactionsModal = ({ isOpen, onClose }) => {
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Transactions");
-    XLSX.writeFile(wb, `CNC_Records_${dateFrom}.xlsx`);
+    XLSX.writeFile(wb, `CNC_Records_${dateFrom}_to_${dateTo}.xlsx`);
   };
 
   if (!isOpen) return null;
@@ -337,7 +335,7 @@ const TransactionsModal = ({ isOpen, onClose }) => {
           </div>
         </div>
 
-        {/* SEARCH & FILTERS */}
+        {/* SEARCH & FILTERS BAR */}
         <div className={`px-10 py-3 flex gap-4 items-center shrink-0 border-b transition-all ${isDark ? "bg-[#050a18]/40 border-white/5" : "bg-slate-100 border-slate-200"}`}>
           <div className={`relative flex-1 group h-11 flex items-center rounded-xl px-5 border transition-all ${isDark ? "bg-transparent border-transparent" : "bg-white border-slate-200 shadow-inner"}`}>
             <FaSearch className={`mr-4 transition-colors ${isDark ? "text-slate-700 group-focus-within:text-blue-500" : "text-slate-400 group-focus-within:text-blue-600"}`} size={14} />
@@ -462,18 +460,18 @@ const TransactionsModal = ({ isOpen, onClose }) => {
               </div>
 
               <div className="space-y-6">
-                <div>
+                <div className="relative">
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 block ml-1">From Date</label>
                   <button onClick={() => { setOpenStartCal(!openStartCal); setOpenEndCal(false); }} className={`w-full h-16 rounded-2xl border px-6 text-left flex items-center justify-between group transition-all ${isDark ? "bg-white/[0.03] border-white/10" : "bg-slate-50 border-slate-200"}`}>
-                    <span className="text-lg font-black">{dateFrom}</span>
+                    <span className={`text-lg font-black ${isDark ? "text-white" : "text-[#2e4a7d]"}`}>{dateFrom}</span>
                     <FaChevronDown className="text-slate-500" size={10} />
                   </button>
                   <CustomCalendar selectedDate={dateFrom} onChange={setDateFrom} isOpen={openStartCal} onClose={() => setOpenStartCal(false)} isDark={isDark} />
                 </div>
-                <div>
+                <div className="relative">
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 block ml-1">To Date</label>
                   <button onClick={() => { setOpenEndCal(!openEndCal); setOpenStartCal(false); }} className={`w-full h-16 rounded-2xl border px-6 text-left flex items-center justify-between group transition-all ${isDark ? "bg-white/[0.03] border-white/10" : "bg-slate-50 border-slate-200"}`}>
-                    <span className="text-lg font-black">{dateTo}</span>
+                    <span className={`text-lg font-black ${isDark ? "text-white" : "text-[#2e4a7d]"}`}>{dateTo}</span>
                     <FaChevronDown className="text-slate-500" size={10} />
                   </button>
                   <CustomCalendar selectedDate={dateTo} onChange={setDateTo} isOpen={openEndCal} onClose={() => setOpenEndCal(false)} isDark={isDark} />
@@ -481,11 +479,18 @@ const TransactionsModal = ({ isOpen, onClose }) => {
               </div>
             </div>
 
-            <button onClick={() => { fetchData(); setShowFilter(false); }} className={`w-full py-6 font-black rounded-2xl shadow-xl hover:brightness-110 active:scale-95 transition-all uppercase tracking-widest text-[11px] mt-8 ${isDark ? "bg-[#3b82f6] text-white" : "bg-blue-600 text-white"}`}>Apply Filters</button>
+            <button 
+              onClick={() => { 
+                fetchData(); 
+                setShowFilter(false); 
+              }} 
+              className={`w-full py-6 font-black rounded-2xl shadow-xl hover:brightness-110 active:scale-95 transition-all uppercase tracking-widest text-[11px] mt-8 ${isDark ? "bg-[#3b82f6] text-white" : "bg-blue-600 text-white"}`}
+            >
+              Apply Filters
+            </button>
           </div>
         )}
 
-        {/* DETAILS MODAL IS CALLED HERE */}
         <DetailsModal
           transaction={viewingTransaction}
           isOpen={!!viewingTransaction}
