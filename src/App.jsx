@@ -64,32 +64,28 @@ const App = () => {
 
         <Route
           path="/employeeinfo"
-          element={<PrivateRoute routename={"/pricesyncing"} />}
+          element={<PrivateRoute routename={"/employeeinfo"} />}
         >
           <Route path="/employeeinfo" element={<CmpEmployeeInfo />} />
         </Route>
 
         <Route
           path="/userroles"
-          element={<PrivateRoute routename={"/pricesyncing"} />}
+          element={<PrivateRoute routename={"/userroles"} />}
         >
           <Route path="/userroles" element={<UserRoles />} />
         </Route>
 
         <Route
           path="/usersqueu"
-          element={<PrivateRoute routename={"/pricesyncing"} />}
+          element={<PrivateRoute routename={"/usersqueu"} />}
         >
           <Route path="/usersqueu" element={<MemberQueings />} />
         </Route>
 
-          <Route
-            path="/"
-            element={<PrivateRoute routename={"/pricesyncing"} />}
-          >
-            <Route path="/memberprofile/:id" element={<MemberProfile />} />
-          </Route>
-
+        <Route path="/" element={<PrivateRoute routename={"/pricesyncing"} />}>
+          <Route path="/memberprofile/:id" element={<MemberProfile />} />
+        </Route>
       </Routes>
 
       <GlobalThemeToggle />

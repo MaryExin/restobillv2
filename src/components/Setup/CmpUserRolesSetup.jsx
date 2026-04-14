@@ -10,6 +10,8 @@ import {
   FiRefreshCw,
   FiCheckCircle,
   FiArrowRight,
+  FiServer,
+  FiGlobe,
 } from "react-icons/fi";
 import { supabase } from "../../context/supaBaseClient";
 
@@ -66,6 +68,28 @@ const CheckPill = ({ checked, onChange, title, sub, disabled = false }) => (
   </label>
 );
 
+const EndpointCard = ({ icon, title, badge, url }) => (
+  <div className="rounded-2xl border border-slate-200/80 bg-white/70 p-4">
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="grid h-9 w-9 place-items-center rounded-2xl border border-slate-200 bg-white text-slate-700">
+          {icon}
+        </span>
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-slate-900">{title}</div>
+          <div className="text-[11px] text-slate-500">{badge}</div>
+        </div>
+      </div>
+    </div>
+
+    <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+      <div className="break-all text-[11px] font-medium text-slate-700">
+        {url || "Not set"}
+      </div>
+    </div>
+  </div>
+);
+
 const toList = (data) => {
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.json)) return data.json;
@@ -98,6 +122,11 @@ const findSelectedUser = (usersData, userId) => {
   return list.find((u) => String(u.empid) === String(userId)) || null;
 };
 
+const cleanBase = (value, fallback = "") =>
+  String(value || fallback || "")
+    .trim()
+    .replace(/\/$/, "");
+
 const CmpUserRolesSetup = ({ mode = "assign", onOpenRead }) => {
   const queryClient = useQueryClient();
 
@@ -120,15 +149,18 @@ const CmpUserRolesSetup = ({ mode = "assign", onOpenRead }) => {
 
   const [supabasePostMsg, setSupabasePostMsg] = useState("");
 
-  // ✅ same endpoint approach as MemberQueings
+  // local/current app base for this setup screen
   const apiHost = useMemo(() => {
     const stored = localStorage.getItem("apiendpoint");
-
     if (!stored || stored === "null" || stored === "undefined") {
       return "http://localhost";
     }
+    return cleanBase(stored, "http://localhost");
+  }, []);
 
-    return stored;
+  // separate web base, only for endpoints that must come from web
+  const webApiHost = useMemo(() => {
+    return cleanBase(import.meta.env.VITE_WEBAPIENDPOINT, "");
   }, []);
 
   const companycode = useMemo(
@@ -162,7 +194,8 @@ const CmpUserRolesSetup = ({ mode = "assign", onOpenRead }) => {
   );
 
   const functionToRolesMapUrl = useMemo(
-    () => `${apiHost}${import.meta.env.VITE_FUNCTION_TO_ROLES_MAP_READ_ENDPOINT}`,
+    () =>
+      `${apiHost}${import.meta.env.VITE_FUNCTION_TO_ROLES_MAP_READ_ENDPOINT}`,
     [apiHost],
   );
 
@@ -170,6 +203,12 @@ const CmpUserRolesSetup = ({ mode = "assign", onOpenRead }) => {
     () => `${apiHost}${import.meta.env.VITE_PARAMTEAMS_DATA_READ_ENDPOINT}`,
     [apiHost],
   );
+
+  // separate display only: this is the one that should come from WEB
+  const infiniteUserRolesWebUrl = useMemo(() => {
+    if (!webApiHost) return "";
+    return `${webApiHost}${import.meta.env.VITE_INFINITE_USER_ROLE_ENDPOINT}`;
+  }, [webApiHost]);
 
   const roleMutationKey = useMemo(
     () => `user-roles:${companycode}`,
@@ -270,6 +309,7 @@ const CmpUserRolesSetup = ({ mode = "assign", onOpenRead }) => {
     setQRoutes("");
     setQBU("");
     setQTeam("");
+    setSupabasePostMsg("");
   };
 
   const togglePlain = (setter, id, checked) => {
@@ -409,7 +449,12 @@ const CmpUserRolesSetup = ({ mode = "assign", onOpenRead }) => {
   const buList = useMemo(() => {
     const list = toList(businessunitsData);
     const q = safeLower(qBU);
-    return list.filter((x) => safeLower(x.name).includes(q));
+    return list.filter(
+      (x) =>
+        safeLower(x.name).includes(q) ||
+        safeLower(x.Unit_Name).includes(q) ||
+        safeLower(x.Unit_Code).includes(q),
+    );
   }, [businessunitsData, qBU]);
 
   const teamList = useMemo(() => {
@@ -456,16 +501,28 @@ const CmpUserRolesSetup = ({ mode = "assign", onOpenRead }) => {
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-2">
-          <Chip active={activeTab === "function"} onClick={() => setActiveTab("function")}>
+          <Chip
+            active={activeTab === "function"}
+            onClick={() => setActiveTab("function")}
+          >
             Function{totals.funcs > 0 ? ` • ${totals.funcs}` : ""}
           </Chip>
-          <Chip active={activeTab === "routes"} onClick={() => setActiveTab("routes")}>
+          <Chip
+            active={activeTab === "routes"}
+            onClick={() => setActiveTab("routes")}
+          >
             Routes{totals.routes > 0 ? ` • ${totals.routes}` : ""}
           </Chip>
-          <Chip active={activeTab === "busunit"} onClick={() => setActiveTab("busunit")}>
+          <Chip
+            active={activeTab === "busunit"}
+            onClick={() => setActiveTab("busunit")}
+          >
             Business Units{totals.busunit > 0 ? ` • ${totals.busunit}` : ""}
           </Chip>
-          <Chip active={activeTab === "teams"} onClick={() => setActiveTab("teams")}>
+          <Chip
+            active={activeTab === "teams"}
+            onClick={() => setActiveTab("teams")}
+          >
             Teams{totals.teams > 0 ? ` • ${totals.teams}` : ""}
           </Chip>
         </div>
@@ -485,43 +542,100 @@ const CmpUserRolesSetup = ({ mode = "assign", onOpenRead }) => {
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className={PANEL}>
-          <div className="p-4 sm:p-5">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="text-sm font-semibold text-slate-900">
-                  Step 1 • Select Employee
+      <div className="mt-4 grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <div className="xl:col-span-2 grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className={PANEL}>
+            <div className="p-4 sm:p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="text-sm font-semibold text-slate-900">
+                    Step 1 • Select Employee
+                  </div>
+                  <div className="mt-1 text-xs text-slate-600">
+                    Choose who will receive access.
+                  </div>
                 </div>
-                <div className="mt-1 text-xs text-slate-600">
-                  Choose who will receive access.
-                </div>
+
+                {usersIsLoading && (
+                  <span className="text-[11px] font-semibold text-slate-500">
+                    Loading…
+                  </span>
+                )}
               </div>
 
-              {usersIsLoading && (
-                <span className="text-[11px] font-semibold text-slate-500">
-                  Loading…
-                </span>
-              )}
-            </div>
-
-            <div className="mt-3">
-              <label className={LABEL}>Employee name</label>
-              <select
-                value={userId}
-                onChange={(e) => setUserId(e.target.value)}
-                className={INPUT}
-                disabled={usersIsLoading || !employeesUrl}
-              >
-                <option value="" disabled>
-                  {usersIsLoading ? "Loading employees..." : "Select employee…"}
-                </option>
-                {toList(usersData).map((u, idx) => (
-                  <option key={idx} value={u.empid}>
-                    {`${u.fullname} - ${u.department}`}
+              <div className="mt-3">
+                <label className={LABEL}>Employee name</label>
+                <select
+                  value={userId}
+                  onChange={(e) => setUserId(e.target.value)}
+                  className={INPUT}
+                  disabled={usersIsLoading || !employeesUrl}
+                >
+                  <option value="" disabled>
+                    {usersIsLoading
+                      ? "Loading employees..."
+                      : "Select employee…"}
                   </option>
+                  {toList(usersData).map((u, idx) => (
+                    <option key={idx} value={u.empid}>
+                      {`${u.fullname} - ${u.department}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {supabasePostMsg ? (
+                <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                  {supabasePostMsg}
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          <div className={PANEL}>
+            <div className="p-4 sm:p-5">
+              <div className="text-sm font-semibold text-slate-900">
+                Step 2 • Summary
+              </div>
+              <div className="mt-1 text-xs text-slate-600">
+                Review selections before submitting.
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                {[
+                  { label: "Functions", val: totals.funcs },
+                  { label: "Routes", val: totals.routes },
+                  { label: "Business Units", val: totals.busunit },
+                  { label: "Teams", val: totals.teams },
+                ].map((x) => (
+                  <div
+                    key={x.label}
+                    className="rounded-2xl border border-slate-200/80 bg-white/70 p-4"
+                  >
+                    <div className="text-xs font-semibold text-slate-700">
+                      {x.label}
+                    </div>
+                    <div className="mt-1 text-2xl font-[Poppins-Black] text-slate-900">
+                      {x.val}
+                    </div>
+                  </div>
                 ))}
-              </select>
+              </div>
+
+              <div className="mt-4 flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-end">
+                <button
+                  type="button"
+                  disabled={!canSubmit}
+                  onClick={() => setYesNoModalOpen(true)}
+                  className={[
+                    BTN_PRIMARY,
+                    !canSubmit ? "opacity-50 cursor-not-allowed" : "",
+                  ].join(" ")}
+                >
+                  <FiCheckCircle />
+                  Submit Roles
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -529,46 +643,27 @@ const CmpUserRolesSetup = ({ mode = "assign", onOpenRead }) => {
         <div className={PANEL}>
           <div className="p-4 sm:p-5">
             <div className="text-sm font-semibold text-slate-900">
-              Step 2 • Summary
+              Endpoint Routing Display
             </div>
             <div className="mt-1 text-xs text-slate-600">
-              Review selections before submitting.
+              This setup screen uses the current app API. The infinite read
+              roles endpoint is shown separately and should come from WEB only.
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              {[
-                { label: "Functions", val: totals.funcs },
-                { label: "Routes", val: totals.routes },
-                { label: "Business Units", val: totals.busunit },
-                { label: "Teams", val: totals.teams },
-              ].map((x) => (
-                <div
-                  key={x.label}
-                  className="rounded-2xl border border-slate-200/80 bg-white/70 p-4"
-                >
-                  <div className="text-xs font-semibold text-slate-700">
-                    {x.label}
-                  </div>
-                  <div className="mt-1 text-2xl font-[Poppins-Black] text-slate-900">
-                    {x.val}
-                  </div>
-                </div>
-              ))}
-            </div>
+            <div className="mt-4 space-y-3">
+              <EndpointCard
+                icon={<FiServer size={16} />}
+                title="Setup Screen Base"
+                badge="Current / Local / Selected API"
+                url={apiHost}
+              />
 
-            <div className="mt-4 flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-end">
-              <button
-                type="button"
-                disabled={!canSubmit}
-                onClick={() => setYesNoModalOpen(true)}
-                className={[
-                  BTN_PRIMARY,
-                  !canSubmit ? "opacity-50 cursor-not-allowed" : "",
-                ].join(" ")}
-              >
-                <FiCheckCircle />
-                Submit Roles
-              </button>
+              <EndpointCard
+                icon={<FiGlobe size={16} />}
+                title="Infinite User Roles Base"
+                badge="WEB only"
+                url={infiniteUserRolesWebUrl}
+              />
             </div>
           </div>
         </div>
@@ -587,12 +682,16 @@ const CmpUserRolesSetup = ({ mode = "assign", onOpenRead }) => {
               <div className="p-4 sm:p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <div className="text-sm font-semibold text-slate-900">Functions</div>
+                    <div className="text-sm font-semibold text-slate-900">
+                      Functions
+                    </div>
                     <div className="mt-1 text-xs text-slate-600">
                       Pick a function to auto-add its routes (recommended).
                     </div>
                   </div>
-                  <div className="text-[11px] text-slate-500">{funcList.length} item(s)</div>
+                  <div className="text-[11px] text-slate-500">
+                    {funcList.length} item(s)
+                  </div>
                 </div>
 
                 <div className="mt-3 relative">
@@ -611,15 +710,25 @@ const CmpUserRolesSetup = ({ mode = "assign", onOpenRead }) => {
                   ) : (
                     funcList.map((d, idx) => {
                       const name = d.roleclassfunc_name;
-                      const isLocked = forcedFunctionResolvedSet.has(norm(name));
+                      const isLocked = forcedFunctionResolvedSet.has(
+                        norm(name),
+                      );
                       return (
                         <CheckPill
                           key={idx}
-                          checked={checkedFunctionRole.some((x) => norm(x) === norm(name))}
+                          checked={checkedFunctionRole.some(
+                            (x) => norm(x) === norm(name),
+                          )}
                           disabled={isLocked}
-                          onChange={(e) => toggleFunction(name, e.target.checked)}
+                          onChange={(e) =>
+                            toggleFunction(name, e.target.checked)
+                          }
                           title={name}
-                          sub={isLocked ? "Required (auto-selected)" : "Auto-add mapped routes"}
+                          sub={
+                            isLocked
+                              ? "Required (auto-selected)"
+                              : "Auto-add mapped routes"
+                          }
                         />
                       );
                     })
@@ -628,7 +737,9 @@ const CmpUserRolesSetup = ({ mode = "assign", onOpenRead }) => {
 
                 {functionRoutes?.length > 0 && (
                   <div className="mt-4 rounded-2xl border border-[#D75529]/20 bg-colorBrand/5 p-4">
-                    <div className="text-xs font-semibold text-slate-800">Mapped routes preview</div>
+                    <div className="text-xs font-semibold text-slate-800">
+                      Mapped routes preview
+                    </div>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {functionRoutes.slice(0, 10).map((r) => (
                         <span
@@ -655,12 +766,16 @@ const CmpUserRolesSetup = ({ mode = "assign", onOpenRead }) => {
               <div className="p-4 sm:p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <div className="text-sm font-semibold text-slate-900">Routes</div>
+                    <div className="text-sm font-semibold text-slate-900">
+                      Routes
+                    </div>
                     <div className="mt-1 text-xs text-slate-600">
                       Fine-tune access by selecting specific routes.
                     </div>
                   </div>
-                  <div className="text-[11px] text-slate-500">{routesList.length} item(s)</div>
+                  <div className="text-[11px] text-slate-500">
+                    {routesList.length} item(s)
+                  </div>
                 </div>
 
                 <div className="mt-3 relative">
@@ -682,7 +797,11 @@ const CmpUserRolesSetup = ({ mode = "assign", onOpenRead }) => {
                         key={idx}
                         checked={checkedItems.includes(d.react_route)}
                         onChange={(e) =>
-                          togglePlain(setCheckedItems, d.react_route, e.target.checked)
+                          togglePlain(
+                            setCheckedItems,
+                            d.react_route,
+                            e.target.checked,
+                          )
                         }
                         title={d.route_name}
                         sub={d.react_route}
@@ -699,12 +818,16 @@ const CmpUserRolesSetup = ({ mode = "assign", onOpenRead }) => {
               <div className="p-4 sm:p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <div className="text-sm font-semibold text-slate-900">Business Units</div>
+                    <div className="text-sm font-semibold text-slate-900">
+                      Business Units
+                    </div>
                     <div className="mt-1 text-xs text-slate-600">
                       Restrict access to certain business units if needed.
                     </div>
                   </div>
-                  <div className="text-[11px] text-slate-500">{buList.length} item(s)</div>
+                  <div className="text-[11px] text-slate-500">
+                    {buList.length} item(s)
+                  </div>
                 </div>
 
                 <div className="mt-3 relative">
@@ -726,9 +849,13 @@ const CmpUserRolesSetup = ({ mode = "assign", onOpenRead }) => {
                         key={idx}
                         checked={checkedBusunitRole.includes(d.Unit_Code)}
                         onChange={(e) =>
-                          togglePlain(setCheckedBusunitRole, d.Unit_Code, e.target.checked)
+                          togglePlain(
+                            setCheckedBusunitRole,
+                            d.Unit_Code,
+                            e.target.checked,
+                          )
                         }
-                        title={d.Unit_Name}
+                        title={d.Unit_Name || d.name}
                         sub={d.Unit_Code}
                       />
                     ))
@@ -743,12 +870,16 @@ const CmpUserRolesSetup = ({ mode = "assign", onOpenRead }) => {
               <div className="p-4 sm:p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <div className="text-sm font-semibold text-slate-900">Teams</div>
+                    <div className="text-sm font-semibold text-slate-900">
+                      Teams
+                    </div>
                     <div className="mt-1 text-xs text-slate-600">
                       Restrict access to specific teams if required.
                     </div>
                   </div>
-                  <div className="text-[11px] text-slate-500">{teamList.length} item(s)</div>
+                  <div className="text-[11px] text-slate-500">
+                    {teamList.length} item(s)
+                  </div>
                 </div>
 
                 <div className="mt-3 relative">
@@ -770,7 +901,11 @@ const CmpUserRolesSetup = ({ mode = "assign", onOpenRead }) => {
                         key={idx}
                         checked={checkedTeamRole.includes(d.teamid)}
                         onChange={(e) =>
-                          togglePlain(setCheckedTeamRole, d.teamid, e.target.checked)
+                          togglePlain(
+                            setCheckedTeamRole,
+                            d.teamid,
+                            e.target.checked,
+                          )
                         }
                         title={d.teamname}
                         sub={d.teamid}

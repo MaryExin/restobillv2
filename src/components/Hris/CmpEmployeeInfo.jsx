@@ -149,7 +149,6 @@ function TopNav({ activeNavView, setActiveNavView, onBack }) {
             Back to Dashboard
           </span>
         </button>
-
       </div>
     </div>
   );
@@ -508,7 +507,9 @@ function ReadEmployeesModal({
                                     <td className="px-4 py-3">
                                       <div className="flex items-center gap-3 min-w-0">
                                         <Avatar
-                                          src={handleFilterImageURL(row.image_filename)}
+                                          src={handleFilterImageURL(
+                                            row.image_filename,
+                                          )}
                                           style={{ height: 42, width: 42 }}
                                           imgProps={{
                                             onError: (e) => {
@@ -650,7 +651,10 @@ const CmpEmployeeInfo = () => {
   }, [apiBaseUrl]);
 
   const businessUnitUrl = useMemo(() => {
-    return joinUrl(apiBaseUrl, import.meta.env.VITE_BUSINESS_UNITS_READ_ENDPOINT);
+    return joinUrl(
+      apiBaseUrl,
+      import.meta.env.VITE_BUSINESS_UNITS_READ_ENDPOINT,
+    );
   }, [apiBaseUrl]);
 
   const employeesDataMutationUrl = useMemo(() => {
@@ -766,10 +770,9 @@ const CmpEmployeeInfo = () => {
   /** -------------------------------------------
    * Queries
    * ------------------------------------------ */
-  const { data: qryEmppositonData = [] } = useCustomQuery(
-    employeePositionUrl,
-    ["employee-position"],
-  );
+  const { data: qryEmppositonData = [] } = useCustomQuery(employeePositionUrl, [
+    "employee-position",
+  ]);
 
   const { data: qrydepartmentData = [] } = useCustomQuery(departmentUrl, [
     "department",
@@ -1313,9 +1316,9 @@ const CmpEmployeeInfo = () => {
         activeNavView={activeNavView}
         setActiveNavView={setActiveNavView}
         onBack={() =>
-        navigate("/poscorehomescreen", {
-          state: { openSettings: true },
-        })
+          navigate("/poscorehomescreen", {
+            state: { openSettings: true },
+          })
         }
       />
 
@@ -1810,7 +1813,9 @@ const CmpEmployeeInfo = () => {
                       disabled={formSubmitIsLoading}
                     >
                       <span className="inline-flex items-center justify-center gap-2">
-                        {formSubmitIsLoading ? <ModernLoader size={18} /> : null}
+                        {formSubmitIsLoading ? (
+                          <ModernLoader size={18} />
+                        ) : null}
                         <span>
                           {formSubmitIsLoading ? "Resetting…" : "Form Reset"}
                         </span>
@@ -1864,7 +1869,9 @@ const CmpEmployeeInfo = () => {
                           disabled={formSubmitIsLoading}
                         >
                           <span className="inline-flex items-center justify-center gap-2">
-                            {formSubmitIsLoading ? <ModernLoader size={18} /> : null}
+                            {formSubmitIsLoading ? (
+                              <ModernLoader size={18} />
+                            ) : null}
                             <span>
                               {formSubmitIsLoading ? "Processing…" : "Submit"}
                             </span>
