@@ -2,29 +2,26 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { FiEye, FiX } from "react-icons/fi";
+import { FiEye, FiX, FiGlobe, FiUploadCloud } from "react-icons/fi";
 import { FaUserShield, FaArrowLeft } from "react-icons/fa6";
-import {
-  HiOutlineMoon,
-  HiOutlineViewColumns,
-  HiOutlineSquares2X2,
-} from "react-icons/hi2";
 import { useNavigate } from "react-router-dom";
 
 import InfiniteScrollComponent from "../../../components/InfiniteScrolling/InfiniteScrollComponent";
 import CmpUserRolesSetup from "../../../components/Setup/CmpUserRolesSetup";
 import ModalYesNoReusable from "../../Modals/ModalYesNoReusable";
+import ModalSuccessNavToSelf from "../../Modals/ModalSuccessNavToSelf";
 
 import { useQueryClient } from "@tanstack/react-query";
 import useCustomInfiniteQuery from "../../../hooks/useCustomInfiniteQuery";
 import { useSecuredMutation } from "../../../hooks/useSecuredMutation";
+import { supabase } from "../../../context/supaBaseClient";
 
 /* -------------------------------------------------------------------------- */
 /* UI Helpers                                                                  */
 /* -------------------------------------------------------------------------- */
 const ModernLoader = ({ size = 18, className = "" }) => {
   const s = Number(size) || 18;
-
+  const { roles } = useZustandLoginCred();
   return (
     <span className={["inline-grid place-items-center", className].join(" ")}>
       <style>{`
@@ -98,6 +95,44 @@ const FloatingReadButton = ({ onOpen, disabled = false }) => {
   );
 };
 
+const FloatingReadWebButton = ({ onOpen, disabled = false }) => {
+  return (
+    <motion.button
+      type="button"
+      onClick={onOpen}
+      disabled={disabled}
+      whileHover={disabled ? {} : { y: -2, scale: 1.02 }}
+      whileTap={disabled ? {} : { scale: 0.98 }}
+      className={[
+        "fixed z-[9998] bottom-[max(5.75rem,env(safe-area-inset-bottom))] right-5",
+        "group flex items-center gap-3 rounded-3xl border border-slate-200/80 bg-white/80 backdrop-blur-xl",
+        "px-4 py-3 shadow-[0_18px_50px_rgba(15,23,42,0.16)] transition",
+        disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-white",
+      ].join(" ")}
+    >
+      <span className="relative">
+        <span className="pointer-events-none absolute -inset-3 rounded-2xl bg-gradient-to-br from-sky-500/20 via-cyan-400/15 to-blue-500/10 blur-xl opacity-80" />
+        <span className="relative grid h-11 w-11 place-items-center rounded-2xl border border-slate-200/70 bg-white/75">
+          <FiGlobe className="text-sky-600" size={20} />
+        </span>
+      </span>
+
+      <span className="text-left leading-tight">
+        <span className="block text-sm font-semibold text-slate-900">
+          Read Roles WEB
+        </span>
+        <span className="block text-[11px] text-slate-600">
+          View / search from 210
+        </span>
+      </span>
+
+      <span className="ml-1 text-[11px] font-semibold text-slate-500">
+        Open →
+      </span>
+    </motion.button>
+  );
+};
+
 const TopNav = ({ activeNavView, setActiveNavView }) => {
   const navigate = useNavigate();
 
@@ -107,9 +142,9 @@ const TopNav = ({ activeNavView, setActiveNavView }) => {
         <button
           type="button"
           onClick={() =>
-          navigate("/poscorehomescreen", {
-            state: { openSettings: true },
-          })
+            navigate("/poscorehomescreen", {
+              state: { openSettings: true },
+            })
           }
           className="group inline-flex items-center gap-3 rounded-full border border-slate-300/90 bg-white px-7 py-5 text-slate-600 shadow-[0_8px_30px_rgba(15,23,42,0.05)] transition-all duration-200 hover:-translate-y-[1px] hover:text-slate-900"
         >
@@ -131,6 +166,7 @@ const TopNav = ({ activeNavView, setActiveNavView }) => {
 /* -------------------------------------------------------------------------- */
 const UserRoles = () => {
   const [isReadModalOpen, setIsReadModalOpen] = useState(false);
+  const [isReadWebModalOpen, setIsReadWebModalOpen] = useState(false);
   const [activeNavView, setActiveNavView] = useState("grid");
 
   return (
@@ -168,8 +204,9 @@ const UserRoles = () => {
                   </h1>
 
                   <p className="text-sm text-slate-600">
-                    Assign access faster: choose the user, pick a <b>Function</b>
-                    , then fine-tune routes, business units, and teams.
+                    Assign access faster: choose the user, pick a{" "}
+                    <b>Function</b>, then fine-tune routes, business units, and
+                    teams.
                   </p>
                 </div>
 
@@ -195,14 +232,25 @@ const UserRoles = () => {
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setIsReadModalOpen(true)}
-                    className="hidden sm:inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
-                  >
-                    <FiEye />
-                    Read Roles
-                  </button>
+                  <div className="hidden sm:flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsReadModalOpen(true)}
+                      className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                    >
+                      <FiEye />
+                      Read Roles
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsReadWebModalOpen(true)}
+                      className="inline-flex items-center gap-2 rounded-2xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-700 hover:bg-sky-100 transition"
+                    >
+                      <FiGlobe />
+                      Read Roles WEB
+                    </button>
+                  </div>
                 </div>
 
                 <div className="mt-4">
@@ -258,6 +306,16 @@ const UserRoles = () => {
                         and delete.
                       </div>
                     </div>
+
+                    <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4">
+                      <div className="text-xs font-semibold text-slate-800">
+                        Separate WEB display + sync
+                      </div>
+                      <div className="mt-1 text-xs">
+                        Use <b>Read Roles WEB</b> to display data from 210 and
+                        insert missing roles into localhost.
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -269,8 +327,8 @@ const UserRoles = () => {
                   </div>
                   <div className="mt-2 text-xs text-slate-600">
                     If you want a user to access a module, ensure they have its{" "}
-                    <b>route role</b> plus any business unit or team restrictions
-                    your system requires.
+                    <b>route role</b> plus any business unit or team
+                    restrictions your system requires.
                   </div>
                 </div>
               </div>
@@ -279,10 +337,16 @@ const UserRoles = () => {
         </div>
 
         <FloatingReadButton onOpen={() => setIsReadModalOpen(true)} />
+        <FloatingReadWebButton onOpen={() => setIsReadWebModalOpen(true)} />
 
         <ReadUserRolesModal
           isOpen={isReadModalOpen}
           onClose={() => setIsReadModalOpen(false)}
+        />
+
+        <ReadUserRolesWebModal
+          isOpen={isReadWebModalOpen}
+          onClose={() => setIsReadWebModalOpen(false)}
         />
       </div>
     </>
@@ -307,9 +371,8 @@ const ReadUserRolesModal = ({ isOpen, onClose }) => {
     return stored;
   }, []);
 
-  const infiniteUserRoleUrl = useMemo(() => {
-    return `${apiHost}${import.meta.env.VITE_INFINITE_USER_ROLE_ENDPOINT}`;
-  }, [apiHost]);
+  const infiniteUserRoleUrl =
+    apiHost + import.meta.env.VITE_INFINITE_USER_ROLE_ENDPOINT;
 
   const mutateUserRolesUrl = useMemo(() => {
     return `${apiHost}${import.meta.env.VITE_MUTATE_USER_ROLES_ENDPOINT}`;
@@ -673,5 +736,429 @@ const ReadUserRolesModal = ({ isOpen, onClose }) => {
         </>
       )}
     </AnimatePresence>
+  );
+};
+
+/* -------------------------------------------------------------------------- */
+/* Read WEB Modal                                                              */
+/* -------------------------------------------------------------------------- */
+const ReadUserRolesWebModal = ({ isOpen, onClose }) => {
+  const apiHost = useMemo(() => {
+    const stored = localStorage.getItem("apiendpoint");
+
+    if (!stored || stored === "null" || stored === "undefined") {
+      return "http://localhost";
+    }
+
+    return String(stored).trim().replace(/\/$/, "");
+  }, []);
+
+  const webApiHost = useMemo(() => {
+    return String(import.meta.env.VITE_WEBAPIENDPOINT || "")
+      .trim()
+      .replace(/\/$/, "");
+  }, []);
+
+  const infiniteUserRoleWebUrl = useMemo(() => {
+    return `${webApiHost}${import.meta.env.VITE_INFINITE_USER_ROLE_ENDPOINT}`;
+  }, [webApiHost]);
+
+  const syncMissingRolesUrl = useMemo(() => {
+    return `${apiHost}${import.meta.env.VITE_SYNC_WEB_USER_ROLES_TO_LOCAL_ENDPOINT}`;
+  }, [apiHost]);
+
+  const [localSearch, setLocalSearch] = useState("");
+  const [searchRole, setSearchRole] = useState("");
+  const [pageItems, setPageItems] = useState("25");
+  const [roleClassFilter, setRoleClassFilter] = useState("");
+  const [syncMessage, setSyncMessage] = useState("");
+  const [isSyncYesNoOpen, setIsSyncYesNoOpen] = useState(false);
+  const [isSyncSuccessOpen, setIsSyncSuccessOpen] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSearchRole(localSearch.trim());
+    }, 250);
+
+    return () => clearTimeout(t);
+  }, [localSearch]);
+
+  const queryKey = useMemo(
+    () => ["readuserroledataweb", searchRole, pageItems, webApiHost],
+    [searchRole, pageItems, webApiHost],
+  );
+
+  const {
+    data: readUserRoleData,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    refetch,
+    isFetching,
+  } = useCustomInfiniteQuery(
+    infiniteUserRoleWebUrl,
+    queryKey,
+    searchRole,
+    pageItems,
+  );
+
+  const { isLoading: syncIsLoading, mutate: syncMissingRoles } =
+    useSecuredMutation(syncMissingRolesUrl, "POST");
+
+  const classOptions = useMemo(() => {
+    const values = new Set();
+
+    (readUserRoleData?.pages || []).forEach((page) => {
+      (page?.items || []).forEach((item) => {
+        const roleClass = String(item?.roleclass || "").trim();
+        if (roleClass) values.add(roleClass);
+      });
+    });
+
+    return Array.from(values).sort((a, b) => a.localeCompare(b));
+  }, [readUserRoleData]);
+
+  const allWebRows = useMemo(() => {
+    const rows = [];
+
+    (readUserRoleData?.pages || []).forEach((page) => {
+      (page?.items || []).forEach((item) => {
+        rows.push({
+          uuid: item?.uuid || "",
+          userid: item?.userid || "",
+          username: item?.username || "",
+          email: item?.email || "",
+          roleclass: item?.roleclass || "",
+          rolename: item?.rolename || "",
+          role_description: item?.role_description || "",
+          createtime: item?.createtime || "",
+          deletestatus: item?.deletestatus || "",
+        });
+      });
+    });
+
+    return rows;
+  }, [readUserRoleData]);
+
+  const filteredRows = useMemo(() => {
+    return allWebRows.filter((item) => {
+      if (!roleClassFilter) return true;
+      return String(item?.roleclass || "") === String(roleClassFilter);
+    });
+  }, [allWebRows, roleClassFilter]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    refetch();
+  }, [isOpen, refetch]);
+
+  const handleReset = () => {
+    setLocalSearch("");
+    setSearchRole("");
+    setPageItems("25");
+    setRoleClassFilter("");
+    setSyncMessage("");
+    refetch();
+  };
+
+  const handleSyncMissing = () => {
+    if (!filteredRows.length) {
+      setSyncMessage("No WEB role rows available to sync.");
+      return;
+    }
+
+    const preparedRows = filteredRows.map((row) => ({
+      uuid: row.uuid || "",
+      userid: row.userid || "",
+      roleclass: row.roleclass || "",
+      rolename: row.rolename || "",
+      role_description: row.role_description || "",
+    }));
+
+    syncMissingRoles(
+      {
+        usertracker: localStorage.getItem("username") || "WEB ROLE SYNC",
+        rows: preparedRows,
+      },
+      {
+        onSuccess: (result) => {
+          const responseData = result?.data?.status
+            ? result.data
+            : result?.response?.data?.status
+              ? result.response.data
+              : result;
+
+          if (String(responseData?.status || "").toLowerCase() !== "success") {
+            return;
+          }
+
+          const insertedCount =
+            responseData?.data?.inserted_count ??
+            responseData?.inserted_count ??
+            0;
+
+          const skippedCount =
+            responseData?.data?.skipped_count ??
+            responseData?.skipped_count ??
+            0;
+
+          const msg =
+            responseData?.message ||
+            `WEB roles sync completed successfully. Inserted: ${insertedCount}, Skipped: ${skippedCount}.`;
+
+          setSyncMessage(msg);
+          setIsSyncYesNoOpen(false);
+          onClose();
+
+          setTimeout(() => {
+            setIsSyncSuccessOpen(true);
+          }, 200);
+
+          refetch();
+        },
+        onError: (error) => {
+          const errMsg =
+            error?.response?.data?.message ||
+            error?.message ||
+            "Failed to sync WEB roles to localhost.";
+          setSyncMessage(errMsg);
+        },
+      },
+    );
+  };
+
+  return (
+    <>
+      {isSyncSuccessOpen && (
+        <ModalSuccessNavToSelf
+          header="Success"
+          message={syncMessage || "WEB roles synced successfully."}
+          button="Confirm"
+          setIsModalOpen={setIsSyncSuccessOpen}
+          resetForm={() => {}}
+        />
+      )}
+
+      <AnimatePresence>
+        {isOpen && (
+          <>
+            {isSyncYesNoOpen && (
+              <ModalYesNoReusable
+                header="Confirmation"
+                message={`Insert non-existing localhost roles from WEB?\n\nRows to check: ${filteredRows.length}`}
+                setYesNoModalOpen={setIsSyncYesNoOpen}
+                triggerYesNoEvent={handleSyncMissing}
+                isLoading={syncIsLoading}
+              />
+            )}
+
+            <motion.button
+              type="button"
+              onClick={onClose}
+              className="fixed inset-0 z-[9999] bg-black/55 backdrop-blur-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              aria-label="Close"
+            />
+
+            <motion.div
+              className="fixed inset-0 z-[10000] grid place-items-center px-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <motion.div
+                initial={{ opacity: 0, y: 18, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 18, scale: 0.98 }}
+                transition={{ duration: 0.22, ease: "easeOut" }}
+                className="relative w-full max-w-6xl h-[85svh] sm:h-[90vh] overflow-hidden rounded-[2rem] border border-slate-200 bg-white/90 backdrop-blur-xl shadow-[0_28px_90px_rgba(0,0,0,0.30)]"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-sky-500 via-cyan-500 to-blue-500" />
+
+                <div className="flex h-full flex-col">
+                  <div className="mt-3 ms-3">
+                    <motion.div
+                      initial={false}
+                      animate={{
+                        opacity: isFetching || isFetchingNextPage ? 1 : 0,
+                        y: isFetching || isFetchingNextPage ? 0 : -4,
+                      }}
+                      transition={{ duration: 0.18 }}
+                      className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[11px] font-semibold text-sky-700"
+                      style={{ pointerEvents: "none" }}
+                    >
+                      <ModernLoader size={18} />
+                      Loading WEB list…
+                    </motion.div>
+                  </div>
+
+                  <div className="shrink-0 p-5 sm:p-6">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                          <FiGlobe className="text-sky-600" />
+                          User Roles (WEB Display)
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setIsSyncYesNoOpen(true)}
+                          disabled={syncIsLoading || !filteredRows.length}
+                          className={[
+                            "inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-semibold transition",
+                            syncIsLoading || !filteredRows.length
+                              ? "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed"
+                              : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100",
+                          ].join(" ")}
+                        >
+                          <FiUploadCloud />
+                          {syncIsLoading ? "Syncing…" : "Sync to Local"}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={onClose}
+                          className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                        >
+                          <FiX />
+                          Close
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+                      <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2">
+                        <div className="text-[11px] font-semibold text-slate-500">
+                          Search user / role
+                        </div>
+                        <input
+                          value={localSearch}
+                          onChange={(e) => setLocalSearch(e.target.value)}
+                          placeholder="Type to filter…"
+                          className="mt-1 w-full bg-transparent text-sm text-slate-800 placeholder-slate-400 outline-none"
+                        />
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2">
+                        <div className="text-[11px] font-semibold text-slate-500">
+                          Class
+                        </div>
+                        <select
+                          value={roleClassFilter}
+                          onChange={(e) => setRoleClassFilter(e.target.value)}
+                          className="mt-1 w-full bg-transparent text-sm text-slate-800 outline-none"
+                        >
+                          <option value="">All</option>
+                          {classOptions.map((roleClass) => (
+                            <option key={roleClass} value={roleClass}>
+                              {roleClass}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2">
+                        <div className="text-[11px] font-semibold text-slate-500">
+                          Page size
+                        </div>
+                        <select
+                          value={pageItems}
+                          onChange={(e) => setPageItems(e.target.value)}
+                          className="mt-1 w-full bg-transparent text-sm text-slate-800 outline-none"
+                        >
+                          <option value="10">10</option>
+                          <option value="25">25</option>
+                          <option value="50">50</option>
+                          <option value="100">100</option>
+                          <option value="500">500</option>
+                          <option value="1000">1000</option>
+                        </select>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleReset}
+                        className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 hover:bg-slate-50 transition"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="px-5 sm:px-6 pb-5 flex-1 min-h-0">
+                    <div className="h-full overflow-auto border border-slate-200 bg-white">
+                      <table className="min-w-full divide-y divide-slate-200">
+                        <thead className="sticky top-0 bg-sky-50 backdrop-blur">
+                          <tr>
+                            <th className="px-5 py-3 text-left text-xs font-semibold text-slate-700">
+                              User
+                            </th>
+                            <th className="px-5 py-3 text-left text-xs font-semibold text-slate-700">
+                              Class
+                            </th>
+                            <th className="px-5 py-3 text-left text-xs font-semibold text-slate-700">
+                              Role
+                            </th>
+                            <th className="px-5 py-3 text-left text-xs font-semibold text-slate-700">
+                              Description
+                            </th>
+                          </tr>
+                        </thead>
+
+                        <tbody className="divide-y divide-slate-200 bg-white">
+                          {readUserRoleData?.pages?.map((page) =>
+                            (page?.items || [])
+                              .filter((item) => {
+                                if (!roleClassFilter) return true;
+                                return (
+                                  String(item?.roleclass || "") ===
+                                  String(roleClassFilter)
+                                );
+                              })
+                              .map((item, index) => (
+                                <tr
+                                  key={`web-${item.uuid || item.id || index}-${index}`}
+                                  className="hover:bg-slate-50 transition"
+                                >
+                                  <td className="px-5 py-3 text-sm text-slate-900">
+                                    {item.username}
+                                  </td>
+                                  <td className="px-5 py-3 text-sm text-slate-700">
+                                    {item.roleclass}
+                                  </td>
+                                  <td className="px-5 py-3 text-sm text-slate-700">
+                                    {item.rolename}
+                                  </td>
+                                  <td className="px-5 py-3 text-sm text-slate-700">
+                                    {item.role_description}
+                                  </td>
+                                </tr>
+                              )),
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div className="mt-4">
+                      <InfiniteScrollComponent
+                        fetchNextPage={fetchNextPage}
+                        hasNextPage={hasNextPage}
+                        isFetchingNextPage={isFetchingNextPage}
+                        data={readUserRoleData}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </>
   );
 };

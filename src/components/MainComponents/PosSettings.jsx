@@ -18,7 +18,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "../../context/ThemeContext";
 import { useNavigate } from "react-router-dom";
-
+import useZustandLoginCred from "../../context/useZustandLoginCred";
 // Import Components
 import PosMyAccount from "./PosSettingsModal/PosMyAccount";
 import PosAppearance from "./PosSettingsModal/PosAppearance";
@@ -33,7 +33,7 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
   const isDark = theme === "dark";
-
+  const { roles } = useZustandLoginCred();
   const [activeTab, setActiveTab] = useState("My Account");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 

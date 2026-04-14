@@ -834,32 +834,36 @@ const Orderlist = ({
       return acc;
     }, {});
 
+    const originalQtyByLineId = originalLoadedItems.reduce((acc, item) => {
+      acc[item.lineId] = Number(item.quantity || 0);
+      return acc;
+    }, {});
+
     return loadedCartItems.map((item) => {
       const key = buildCartMergeKey(item);
       const additionalQty = Number(additionalQtyMap[key] || 0);
+      const originalQuantity = Number(
+        originalQtyByLineId[item.lineId] ?? item.quantity ?? 0,
+      );
 
       return {
         ...item,
+        sourceLineId: item.lineId,
         lineId: `recent-${key}`,
         mergedKey: key,
-        quantity: Number(item.quantity || 0) + additionalQty,
-        baseQuantity: Number(item.quantity || 0),
+        quantity: Number(item.quantity || 0),
+        currentQuantity: Number(item.quantity || 0),
+        originalQuantity,
         additionalQuantity: additionalQty,
+        hasAdditionalEntry: additionalQty > 0,
       };
     });
-  }, [loadedCartItems, additionalCartItems]);
+  }, [loadedCartItems, additionalCartItems, originalLoadedItems]);
 
-  const visibleAdditionalCartItems = useMemo(() => {
-    if (additionalCartItems.length === 0) return [];
-
-    const loadedKeys = new Set(
-      loadedCartItems.map((item) => buildCartMergeKey(item)),
-    );
-
-    return additionalCartItems.filter(
-      (item) => !loadedKeys.has(buildCartMergeKey(item)),
-    );
-  }, [additionalCartItems, loadedCartItems]);
+  const visibleAdditionalCartItems = useMemo(
+    () => additionalCartItems,
+    [additionalCartItems],
+  );
 
   const mergedCartItemsForSave = useMemo(() => {
     const mergedMap = new Map();
@@ -977,13 +981,90 @@ const Orderlist = ({
     });
   };
 
+  const restoreLoadedQuantityByCode = (
+    items,
+    productCode,
+    qtyToRestore = 1,
+  ) => {
+    let remaining = Math.max(0, Number(qtyToRestore || 0));
+    if (remaining <= 0) {
+      return { items, restored: 0 };
+    }
+
+    const originalByLineId = originalLoadedItems.reduce((acc, item) => {
+      acc[item.lineId] = Number(item.quantity || 0);
+      return acc;
+    }, {});
+
+    const nextItems = items.map((entry) => ({ ...entry }));
+
+    for (let i = 0; i < nextItems.length && remaining > 0; i += 1) {
+      const entry = nextItems[i];
+      if (entry.isLoadedFromDB !== true) continue;
+      if (String(entry.code) !== String(productCode)) continue;
+
+      const originalQty = Number(originalByLineId[entry.lineId] || 0);
+      const currentQty = Number(entry.quantity || 0);
+      const deficit = Math.max(0, originalQty - currentQty);
+      if (deficit <= 0) continue;
+
+      const restore = Math.min(deficit, remaining);
+      entry.quantity = currentQty + restore;
+      remaining -= restore;
+    }
+
+    return {
+      items: nextItems,
+      restored: Math.max(0, Number(qtyToRestore || 0) - remaining),
+    };
+  };
+
   const updateRecentDisplayQuantity = (lineId, delta, proxyItem) => {
     if (isCartFromDB || !proxyItem) return;
 
     const mergedKey = proxyItem?.mergedKey || buildCartMergeKey(proxyItem);
 
     if (delta > 0) {
-      addOrUpdateRecentProxyItem(proxyItem, delta);
+      syncCartState((items) => {
+        const restoredResult = restoreLoadedQuantityByCode(
+          items,
+          proxyItem.code,
+          delta,
+        );
+
+        const remaining = Math.max(
+          0,
+          Number(delta || 0) - restoredResult.restored,
+        );
+        if (remaining <= 0) {
+          return restoredResult.items;
+        }
+
+        const nextItems = [...restoredResult.items];
+        const additionalIndex = nextItems.findIndex(
+          (entry) =>
+            entry.isLoadedFromDB !== true &&
+            buildCartMergeKey(entry) === mergedKey,
+        );
+
+        if (additionalIndex >= 0) {
+          nextItems[additionalIndex] = {
+            ...nextItems[additionalIndex],
+            quantity:
+              Number(nextItems[additionalIndex].quantity || 0) + remaining,
+          };
+          return nextItems;
+        }
+
+        nextItems.push({
+          ...proxyItem,
+          lineId: makeLineId("new"),
+          quantity: remaining,
+          isLoadedFromDB: false,
+        });
+
+        return nextItems;
+      });
       return;
     }
 
@@ -1021,21 +1102,36 @@ const Orderlist = ({
   const removeRecentDisplayItem = (lineId, proxyItem) => {
     if (isCartFromDB || !proxyItem) return;
 
+    const sourceLineId = String(proxyItem?.sourceLineId || "").trim();
     const mergedKey = proxyItem?.mergedKey || buildCartMergeKey(proxyItem);
 
     syncCartState((items) =>
-      items.filter((entry) => buildCartMergeKey(entry) !== mergedKey),
+      items.filter((entry) => {
+        if (entry.isLoadedFromDB !== true) return true;
+
+        if (sourceLineId) {
+          return String(entry.lineId || "") !== sourceLineId;
+        }
+
+        return buildCartMergeKey(entry) !== mergedKey;
+      }),
     );
   };
 
   const requestRemoveItem = (lineId, item = null) => {
-    setItemToDelete(lineId);
+    setItemToDelete({ lineId, item });
     setShowDeleteItemModal(true);
   };
 
   const confirmRemoveItem = () => {
-    if (!itemToDelete) return;
-    removeItem(itemToDelete);
+    if (!itemToDelete?.lineId) return;
+
+    if (String(itemToDelete.lineId).startsWith("recent-")) {
+      removeRecentDisplayItem(itemToDelete.lineId, itemToDelete.item);
+    } else {
+      removeItem(itemToDelete.lineId);
+    }
+
     setItemToDelete(null);
     setShowDeleteItemModal(false);
   };
@@ -1046,73 +1142,45 @@ const Orderlist = ({
   };
 
   const addToCart = (product) => {
-    setproductcart((prev) => {
-      const existing = prev.items.find(
+    syncCartState((items) => {
+      const restoredResult = restoreLoadedQuantityByCode(
+        items,
+        product.product_id,
+        1,
+      );
+
+      if (restoredResult.restored >= 1) {
+        return restoredResult.items;
+      }
+
+      const nextItems = [...restoredResult.items];
+      const existing = nextItems.find(
         (i) => i.code === product.product_id && i.isLoadedFromDB !== true,
       );
 
       if (existing) {
-        return {
-          ...prev,
-          items: prev.items.map((i) =>
-            i.code === product.product_id && i.isLoadedFromDB !== true
-              ? { ...i, quantity: Number(i.quantity || 0) + 1 }
-              : i,
-          ),
-        };
+        return nextItems.map((i) =>
+          i.code === product.product_id && i.isLoadedFromDB !== true
+            ? { ...i, quantity: Number(i.quantity || 0) + 1 }
+            : i,
+        );
       }
 
-      return {
-        ...prev,
-        items: [
-          ...prev.items,
-          {
-            lineId: makeLineId("new"),
-            code: product.product_id,
-            name: product.item_name,
-            price: Number(product.selling_price) || 0,
-            unit_cost: Number(product.unit_cost) || 0,
-            quantity: 1,
-            isDiscountable: product.isDiscountable,
-            itemInstruction: "",
-            vatable: product.vatable,
-            item_category: product.item_category || "",
-            isLoadedFromDB: false,
-          },
-        ],
-      };
-    });
+      nextItems.push({
+        lineId: makeLineId("new"),
+        code: product.product_id,
+        name: product.item_name,
+        price: Number(product.selling_price) || 0,
+        unit_cost: Number(product.unit_cost) || 0,
+        quantity: 1,
+        isDiscountable: product.isDiscountable,
+        itemInstruction: "",
+        vatable: product.vatable,
+        item_category: product.item_category || "",
+        isLoadedFromDB: false,
+      });
 
-    setcartforqr((prev) => {
-      const existing = prev.items.find(
-        (i) => i.code === product.product_id && i.isLoadedFromDB !== true,
-      );
-
-      if (existing) {
-        return {
-          ...prev,
-          items: prev.items.map((i) =>
-            i.code === product.product_id && i.isLoadedFromDB !== true
-              ? { ...i, quantity: Number(i.quantity || 0) + 1 }
-              : i,
-          ),
-        };
-      }
-
-      return {
-        ...prev,
-        items: [
-          ...prev.items,
-          {
-            lineId: makeLineId("new"),
-            code: product.product_id,
-            quantity: 1,
-            itemInstruction: "",
-            item_category: product.item_category || "",
-            isLoadedFromDB: false,
-          },
-        ],
-      };
+      return nextItems;
     });
   };
 
@@ -1315,9 +1383,7 @@ const Orderlist = ({
       transaction_id: transaction.transaction_id,
       printTitle: "BILLING", // change to "RECEIPT" if needed
       transStatus: "Pending for Payment", // or "Settled" if receipt/payment final
-      category_code:
-        transaction.Category_Code ||
-        transaction.category_code ,
+      category_code: transaction.Category_Code || transaction.category_code,
       unit_code: transaction.Unit_Code || transaction.unit_code || "",
 
       TotalSales: Number(transaction.TotalSales || 0),
@@ -4980,13 +5046,17 @@ const CartList = ({
             </div>
 
             <div className="flex justify-between items-center">
-              {readOnly ? (
+              {readOnly || item.hasAdditionalEntry ? (
                 <div
                   className={`text-xs font-bold ${
                     isDark ? "text-slate-300" : "text-slate-700"
                   }`}
                 >
                   Qty: {item.quantity}
+                  {item.originalQuantity > 0 &&
+                  item.originalQuantity !== item.quantity
+                    ? ` / Original: ${item.originalQuantity}`
+                    : ""}
                 </div>
               ) : isSpecialPaluto ? (
                 <div className="flex items-center gap-2">
