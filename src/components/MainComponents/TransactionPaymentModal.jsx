@@ -1663,10 +1663,10 @@ export default function TransactionPaymentModal({
   const [printers, setPrinters] = useState([]);
   const [shiftDetails, setShiftDetails] = useState(null);
 
-  let escposWarmedUp = false;
+  // let escposWarmedUp = false;
 
   useEffect(() => {
-    if (escposWarmedUp) return;
+    // if (escposWarmedUp) return;
 
     const warmupPrinter = async () => {
       try {
@@ -1675,9 +1675,9 @@ export default function TransactionPaymentModal({
         const result = await window.electronAPI.warmupEscPos();
         console.log("ESC/POS warm-up result:", result);
 
-        if (result?.success) {
-          escposWarmedUp = true;
-        }
+        // if (result?.success) {
+        //   escposWarmedUp = true;
+        // }
       } catch (error) {
         console.error("ESC/POS warm-up failed:", error);
       }
@@ -1852,6 +1852,27 @@ export default function TransactionPaymentModal({
         printerName: printerName || defaultPrinterName || "",
       });
 
+      const safeComputed = snapshot.computed || computed || {};
+      const totalQualified = Number(
+        safeComputed?.totalQualifiedCount ??
+          safeComputed?.totalQualifiedAll ??
+          0,
+      );
+
+      if (result?.success && totalQualified > 0) {
+        await window.electronAPI.pospaymentreceipt({
+          transaction: snapshot.transaction || transaction,
+          items: snapshot.items || items,
+          computed: snapshot.computed || computed,
+          payments: snapshot.payments || payments,
+          otherCharges: snapshot.otherCharges || otherCharges,
+          customerCards: snapshot.customerCards || customerCards,
+          isDuplicateCopy: snapshot.isDuplicateCopy || false,
+          terminalConfig,
+          businessInfo,
+          printerName: printerName || defaultPrinterName || "",
+        });
+      }
       // const html = BuildPosPaymentReceiptHtml({
       //   transaction: snapshot.transaction || transaction,
       //   items: snapshot.items || items,
@@ -1876,9 +1897,11 @@ export default function TransactionPaymentModal({
       if (!result?.success) {
         throw new Error(result?.message || "Failed to print receipt.");
       }
+      setIsPrinting(false);
     } catch (error) {
       console.error(error);
       setErrorMessage(error.message || "Failed to print receipt.");
+      setIsPrinting(false);
     }
   };
 

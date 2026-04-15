@@ -428,10 +428,10 @@ const ModalDiscountTransaction = ({
   const [initialLoadedSignature, setInitialLoadedSignature] = useState("");
   const [showOverrideWarning, setShowOverrideWarning] = useState(false);
 
-  let escposWarmedUp = false;
+  // let escposWarmedUp = false;
 
   useEffect(() => {
-    if (escposWarmedUp) return;
+    // if (escposWarmedUp) return;
 
     const warmupPrinter = async () => {
       try {
@@ -440,9 +440,9 @@ const ModalDiscountTransaction = ({
         const result = await window.electronAPI.warmupEscPos();
         console.log("ESC/POS warm-up result:", result);
 
-        if (result?.success) {
-          escposWarmedUp = true;
-        }
+        // if (result?.success) {
+        //   escposWarmedUp = true;
+        // }
       } catch (error) {
         console.error("ESC/POS warm-up failed:", error);
       }
@@ -1029,6 +1029,30 @@ const ModalDiscountTransaction = ({
         printerName,
       });
 
+      // const html = BuildPrintableDiscountReceiptHtml({
+      //   transaction: {
+      //     ...transaction,
+      //     cashier:
+      //       localStorage.getItem("username") ||
+      //       transaction?.cashier ||
+      //       "System",
+      //     billing_no: finalBillingNo,
+      //     invoice_no: finalInvoiceNo,
+      //   },
+      //   dateFrom,
+      //   computed,
+      //   items,
+      //   scale: 1,
+      //   businessInfo,
+      // });
+
+      // const result = await window.electronAPI.printReceipt({
+      //   html,
+      //   printerName,
+      //   silent: true,
+      //   copies: 1,
+      // });
+
       // const handleDiscountPrintElectron = async ({
       //   transaction,
       //   finalBillingNo,
@@ -1064,30 +1088,6 @@ const ModalDiscountTransaction = ({
 
       //   return result;
       // };
-
-      // const html = BuildPrintableDiscountReceiptHtml({
-      //   transaction: {
-      //     ...transaction,
-      //     cashier:
-      //       localStorage.getItem("username") ||
-      //       transaction?.cashier ||
-      //       "System",
-      //     billing_no: finalBillingNo,
-      //     invoice_no: finalInvoiceNo,
-      //   },
-      //   dateFrom,
-      //   computed,
-      //   items,
-      //   scale: 1,
-      //   businessInfo,
-      // });
-
-      // const result = await window.electronAPI.printReceipt({
-      //   html,
-      //   printerName,
-      //   silent: true,
-      //   copies: 1,
-      // });
 
       console.log("Print result:", result);
 

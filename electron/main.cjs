@@ -834,10 +834,12 @@ app.whenReady().then(() => {
                   );
                 }
 
-                if (item?.code) {
-                  chunks.push(txt(String(item.code)));
-                  chunks.push(nl());
-                }
+                // if (item?.code) {
+                //   chunks.push(Buffer.from([0x1b, 0x4d, 0x01]));
+                //   chunks.push(txt(String(item.code)));
+                //   chunks.push(nl());
+                //   chunks.push(Buffer.from([0x1b, 0x4d, 0x00])); // back to normal font
+                // }
               });
             }
 
@@ -949,8 +951,6 @@ app.whenReady().then(() => {
     const port = 9100;
     const LINE_WIDTH = 42;
 
-    // const { host, port } = escposResolvePrinterTarget(data?.printerName);
-
     try {
       return await new Promise((resolve) => {
         const client = new net.Socket();
@@ -979,12 +979,12 @@ app.whenReady().then(() => {
               computed = {},
               dateFrom,
             } = data || {};
+
             const business = escposPickBusinessInfo(data);
 
             const initPrinter = Buffer.from([0x1b, 0x40]);
             const alignLeft = Buffer.from([0x1b, 0x61, 0x00]);
             const alignCenter = Buffer.from([0x1b, 0x61, 0x01]);
-            const alignRight = Buffer.from([0x1b, 0x61, 0x02]);
             const boldOn = Buffer.from([0x1b, 0x45, 0x01]);
             const boldOff = Buffer.from([0x1b, 0x45, 0x00]);
             const doubleSizeOn = Buffer.from([0x1d, 0x21, 0x11]);
@@ -994,61 +994,90 @@ app.whenReady().then(() => {
             const txt = (value) => Buffer.from(String(value || ""), "ascii");
 
             const safeItems = Array.isArray(items) ? items : [];
+            const safeComputed = computed || {};
 
-            const computedTotalSales = safeItems.reduce((total, item) => {
-              const price = escposSafeNumber(
-                item?.selling_price ?? item?.price ?? item?.unit_price,
+            const peso = (value) =>
+              Number(value || 0).toLocaleString("en-PH", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              });
+
+            const signedNegativePeso = (value) => `- ${peso(value)}`;
+
+            const line = () => {
+              chunks.push(txt(escposRepeat("-", LINE_WIDTH)));
+              chunks.push(nl());
+            };
+
+            const pushWrapped = (value, width = LINE_WIDTH) => {
+              escposWrapText(String(value || ""), width).forEach((wrapped) => {
+                chunks.push(txt(wrapped));
+                chunks.push(nl());
+              });
+            };
+
+            const pushLR = (label, value, width = LINE_WIDTH) => {
+              chunks.push(
+                txt(
+                  escposFormatLeftRight(
+                    String(label || ""),
+                    String(value || ""),
+                    width,
+                  ),
+                ),
               );
-              const quantity = escposSafeNumber(
-                item?.sales_quantity ?? item?.quantity ?? item?.qty,
-              );
-              return total + price * quantity;
-            }, 0);
+              chunks.push(nl());
+            };
 
-            const discount =
-              escposSafeNumber(
-                computed?.discountAmount ??
-                  computed?.discount ??
-                  transaction?.Discount ??
-                  transaction?.discount,
-              ) || 0;
+            const activeBreakdown = Array.isArray(
+              safeComputed?.discountBreakdown,
+            )
+              ? safeComputed.discountBreakdown.filter(
+                  (entry) =>
+                    Number(entry?.qualifiedCount || 0) > 0 ||
+                    Number(entry?.discountAmount || 0) > 0,
+                )
+              : [];
 
-            const amountDue =
-              escposSafeNumber(
-                computed?.amountDue ??
-                  computed?.netAmount ??
-                  computed?.totalAfterDiscount,
-              ) || computedTotalSales - discount;
+            const totalQualifiedAll = Number(
+              safeComputed?.totalQualifiedAll ||
+                safeComputed?.totalQualifiedCount ||
+                0,
+            );
 
-            const customerName =
-              transaction?.customer_name || transaction?.customerName || "";
-            const customerId =
-              transaction?.customer_id || transaction?.customerId || "";
-            const customerTin =
-              transaction?.customer_tin || transaction?.customerTin || "";
-            const customerAddress =
-              transaction?.customer_address ||
-              transaction?.customerAddress ||
-              "";
+            const statutoryQualifiedCount = Number(
+              safeComputed?.statutoryQualifiedCount || 0,
+            );
+
+            const grossTotal = Number(safeComputed?.grossTotal || 0);
+            const netAfterDiscount = Number(
+              safeComputed?.netAfterDiscount || 0,
+            );
+            const totalVatExemption = Number(
+              safeComputed?.totalVatExemption || 0,
+            );
 
             const billingRows = [
-              ["Trans No", transaction?.transaction_id || "N/A"],
-              ["Billing No", transaction?.billing_no || "N/A"],
-              ["Invoice No", transaction?.invoice_no || "N/A"],
+              ["Trans. No.", transaction?.transaction_id || "-"],
               [
-                "Trans Date",
-                transaction?.transaction_date || dateFrom || "N/A",
+                "Billing No.",
+                transaction?.billing_no || transaction?.billingNo || "-",
               ],
-              ["Trans Time", transaction?.transaction_time || "N/A"],
-              ["Terminal No", transaction?.terminal_number || "N/A"],
-              ["Order Type", transaction?.order_type || "N/A"],
-              ["Ref Tag", transaction?.table_number || "N/A"],
-              ["Cashier", transaction?.cashier || "N/A"],
+              [
+                "Invoice No.",
+                transaction?.invoice_no || transaction?.invoiceNo || "-",
+              ],
+              ["Trans. Date", transaction?.transaction_date || dateFrom || "-"],
+              ["Trans. Time", transaction?.transaction_time || "-"],
+              ["Terminal No.", transaction?.terminal_number || "-"],
+              ["Order Type", transaction?.order_type || "-"],
+              ["Ref./Tag #", transaction?.table_number || "-"],
+              ["Cashier", transaction?.cashier || "-"],
             ];
 
             const formatItemRow = (name, qty, amt) => {
-              const nameWidth = 21;
-              const qtyWidth = 7;
+              const nameWidth = 20;
+              const qtyWidth = 8;
               const amtWidth = 14;
 
               return (
@@ -1063,6 +1092,7 @@ app.whenReady().then(() => {
             // HEADER
             chunks.push(alignCenter);
             chunks.push(boldOn);
+            // chunks.push(doubleSizeOn);
             chunks.push(
               txt(
                 escposSafeText(
@@ -1072,81 +1102,69 @@ app.whenReady().then(() => {
               ),
             );
             chunks.push(nl());
-            chunks.push(
-              txt(
-                escposSafeText(
-                  business.storeName,
-                  "AND SHAKING CRABS - GUIGUINTO",
-                ),
-              ),
-            );
+            chunks.push(normalSize);
+            chunks.push(txt(escposSafeText(business.storeName, "STORE")));
             chunks.push(nl());
-            chunks.push(boldOff);
 
             if (business.corpName) {
-              chunks.push(txt(business.corpName));
+              chunks.push(txt(escposSafeText(business.corpName, "")));
               chunks.push(nl());
             }
 
-            escposWrapText(business.address, LINE_WIDTH).forEach((line) => {
-              chunks.push(txt(line));
+            chunks.push(boldOff);
+
+            if (business.address) {
+              pushWrapped(business.address);
+            }
+
+            if (business.tin) {
+              chunks.push(
+                txt(`VAT REG TIN: ${escposSafeText(business.tin, "N/A")}`),
+              );
               chunks.push(nl());
-            });
+            }
 
-            chunks.push(
-              txt(`VAT REG TIN: ${escposSafeText(business.tin, "N/A")}`),
-            );
-            chunks.push(nl());
-            chunks.push(
-              txt(`MIN: ${escposSafeText(business.machineNumber, "N/A")}`),
-            );
-            chunks.push(nl());
-            chunks.push(
-              txt(`S/N: ${escposSafeText(business.serialNumber, "N/A")}`),
-            );
-            chunks.push(nl());
+            if (business.machineNumber) {
+              chunks.push(
+                txt(`MIN: ${escposSafeText(business.machineNumber, "N/A")}`),
+              );
+              chunks.push(nl());
+            }
 
-            chunks.push(txt(escposRepeat("-", LINE_WIDTH)));
-            chunks.push(nl());
+            if (business.serialNumber) {
+              chunks.push(
+                txt(`S/N: ${escposSafeText(business.serialNumber, "N/A")}`),
+              );
+              chunks.push(nl());
+            }
 
+            line();
+
+            // TITLE
             chunks.push(alignCenter);
             chunks.push(boldOn);
             chunks.push(doubleSizeOn);
-            chunks.push(txt("DISCOUNT"));
+            chunks.push(txt("BILLING"));
             chunks.push(nl());
             chunks.push(normalSize);
             chunks.push(boldOff);
 
+            line();
+
             // BILLING INFO
             chunks.push(alignLeft);
             billingRows.forEach(([label, value]) => {
-              const printedValue = escposSafeText(value, "N/A");
-              const line = `${label}:`;
-              if (line.length + printedValue.length <= LINE_WIDTH) {
-                chunks.push(
-                  txt(escposFormatLeftRight(line, printedValue, LINE_WIDTH)),
-                );
-                chunks.push(nl());
-              } else {
-                chunks.push(txt(line));
-                chunks.push(nl());
-                escposWrapText(printedValue, LINE_WIDTH).forEach((wrapped) => {
-                  chunks.push(txt(wrapped));
-                  chunks.push(nl());
-                });
-              }
+              pushLR(`${label}:`, value);
             });
 
-            chunks.push(txt(escposRepeat("-", LINE_WIDTH)));
-            chunks.push(nl());
+            line();
 
-            // ITEMS HEADER
+            // ITEMS
             chunks.push(boldOn);
             chunks.push(txt(formatItemRow("Item", "Qty", "Amt")));
             chunks.push(nl());
             chunks.push(boldOff);
-            chunks.push(txt(escposRepeat("-", LINE_WIDTH)));
-            chunks.push(nl());
+            line();
 
             if (!safeItems.length) {
               chunks.push(alignCenter);
@@ -1154,118 +1172,122 @@ app.whenReady().then(() => {
               chunks.push(nl());
               chunks.push(alignLeft);
             } else {
-              chunks.push(alignLeft);
-
               safeItems.forEach((item) => {
-                const itemName =
-                  item?.item_name ||
-                  item?.product_name ||
-                  item?.name ||
-                  "Unnamed Item";
+                const qty = Number(item?.sales_quantity || 0);
+                const price = Number(item?.selling_price || 0);
+                const lineTotal = qty * price;
 
-                const qtyValue =
-                  item?.sales_quantity ?? item?.quantity ?? item?.qty ?? 0;
+                const isDiscountable =
+                  String(item?.isDiscountable || "")
+                    .trim()
+                    .toLowerCase() === "yes";
 
-                const unitOfMeasure = item?.unit_of_measure || item?.uom || "";
+                const itemLabel = String(
+                  item?.item_name || item?.product_id || item?.name || "-",
+                ).toUpperCase();
 
-                const qtyText =
-                  `${qtyValue}${unitOfMeasure ? ` ${unitOfMeasure}` : ""}`.trim();
+                const itemText = `${itemLabel}${isDiscountable ? " (D)" : ""}`;
+                const qtyText = `${qty} ${item?.unit_of_measure || ""}`.trim();
+                const amtText = peso(lineTotal);
 
-                const lineTotal = escposSafeNumber(
-                  item?.line_total ??
-                    item?.total ??
-                    escposSafeNumber(
-                      item?.selling_price ?? item?.price ?? item?.unit_price,
-                    ) * escposSafeNumber(qtyValue),
-                );
+                const nameLines = escposWrapText(itemText, 20);
 
-                const amtText = escposPeso(lineTotal);
-
-                const nameLines = escposWrapText(String(itemName), 15);
-
-                nameLines.forEach((line, index) => {
+                nameLines.forEach((entry, index) => {
                   if (index === 0) {
-                    chunks.push(txt(formatItemRow(line, qtyText, amtText)));
+                    chunks.push(
+                      txt(formatItemRow(`* ${entry}`, qtyText, amtText)),
+                    );
                   } else {
-                    chunks.push(txt(line));
+                    chunks.push(txt(entry));
                   }
                   chunks.push(nl());
                 });
               });
             }
 
-            chunks.push(txt(escposRepeat("-", LINE_WIDTH)));
-            chunks.push(nl());
+            line();
 
-            // TOTALS
-            chunks.push(
-              txt(
-                escposFormatLeftRight(
-                  "Total Sales:",
-                  escposPeso(computedTotalSales),
-                  LINE_WIDTH,
-                ),
-              ),
-            );
-            chunks.push(nl());
+            // SALES / DISCOUNT SECTION
+            pushLR("TOTAL SALES:", peso(grossTotal));
 
-            chunks.push(
-              txt(
-                escposFormatLeftRight(
-                  "Discount:",
-                  escposPeso(discount),
-                  LINE_WIDTH,
-                ),
-              ),
-            );
-            chunks.push(nl());
+            activeBreakdown.forEach((entry) => {
+              if (Number(entry?.discountAmount || 0) > 0) {
+                pushLR(
+                  `${String(entry?.label || "DISCOUNT").toUpperCase()}:`,
+                  signedNegativePeso(entry.discountAmount),
+                );
+              }
+            });
 
+            if (totalVatExemption > 0) {
+              pushLR("VAT EXEMPTION:", signedNegativePeso(totalVatExemption));
+            }
+
+            line();
+
+            // AMOUNT DUE
             chunks.push(boldOn);
             chunks.push(doubleSizeOn);
-            chunks.push(
-              txt(
-                escposFormatLeftRight(
-                  "Amount Due:",
-                  escposPeso(amountDue),
-                  LINE_WIDTH,
-                ),
-              ),
-            );
-            chunks.push(nl());
+            pushLR("AMOUNT DUE:", peso(netAfterDiscount));
             chunks.push(normalSize);
             chunks.push(boldOff);
 
-            chunks.push(txt(escposRepeat("-", LINE_WIDTH)));
-            chunks.push(nl());
+            line();
 
-            // CUSTOMER SECTION
-            chunks.push(alignLeft);
-            chunks.push(txt(`Customer Name: ${customerName}`));
-            chunks.push(nl());
-            chunks.push(txt(`Customer ID: ${customerId}`));
-            chunks.push(nl());
-            chunks.push(txt(`TIN: ${customerTin}`));
-            chunks.push(nl());
+            // VAT SECTION
+            pushLR("VATABLE SALES:", peso(safeComputed?.vatableSales));
+            pushLR("VAT AMOUNT:", peso(safeComputed?.vatableSalesVat));
+            pushLR("VAT EXEMPT SALES:", peso(safeComputed?.vatExemptSales));
+            pushLR("VAT EXEMPTION:", peso(safeComputed?.totalVatExemption));
+            pushLR("ZERO RATED SALES:", peso(safeComputed?.vatZeroRatedSales));
 
-            if (customerAddress) {
-              const addressLines = escposWrapText(
-                `Address: ${customerAddress}`,
-                LINE_WIDTH,
+            line();
+
+            // QUALIFIED / BREAKDOWN SECTION
+            pushLR(
+              "Total Customers:",
+              String(safeComputed?.safeCustomerCount ?? 0),
+            );
+            pushLR("Total Qualified:", String(totalQualifiedAll));
+            pushLR("Statutory Qualified:", String(statutoryQualifiedCount));
+
+            activeBreakdown.forEach((entry) => {
+              pushLR(
+                `${entry.label} Count:`,
+                String(entry?.qualifiedCount || 0),
               );
-              addressLines.forEach((line) => {
-                chunks.push(txt(line));
-                chunks.push(nl());
-              });
-            } else {
-              chunks.push(txt("Address:"));
-              chunks.push(nl());
-            }
+              pushLR(
+                `${entry.label} Amount:`,
+                peso(entry?.discountAmount || 0),
+              );
+            });
 
+            pushLR(
+              "Discountable Gross:",
+              peso(safeComputed?.discountableGross),
+            );
+            pushLR("Discountable Base:", peso(safeComputed?.discountableBase));
+
+            line();
+
+            // SIGNATURE
             chunks.push(txt("Customer Signature:"));
             chunks.push(nl());
-            chunks.push(txt("_______________________________"));
-            chunks.push(nl(3));
+            chunks.push(txt("________________________________"));
+            chunks.push(nl(2));
 
+            line();
+
+            // FOOTER
+            chunks.push(alignCenter);
+            chunks.push(boldOn);
+            chunks.push(txt("Thank you"));
+            chunks.push(nl());
+            chunks.push(txt("Please come again."));
+            chunks.push(nl());
+            chunks.push(boldOff);
+
+            chunks.push(nl(3));
             chunks.push(cutPaper);
 
             const payload = Buffer.concat(chunks);
@@ -1620,7 +1642,7 @@ app.whenReady().then(() => {
                 item?.item_name || item?.product_id || "-",
               ).toUpperCase();
 
-              const nameWithFlags = `• ${itemLabel}${isDiscountable ? " (D)" : ""}`;
+              const nameWithFlags = `* ${itemLabel}${isDiscountable ? " (D)" : ""}`;
               const nameLines = escposWrapText(nameWithFlags, 15);
               const qtyText = `${qty}${item?.unit_of_measure ? ` ${item.unit_of_measure}` : ""}`;
               const amtText = `${escposPeso(lineTotal)}${item?.vatable === "Yes" ? "V" : ""}`;

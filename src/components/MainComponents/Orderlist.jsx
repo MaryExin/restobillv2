@@ -151,10 +151,10 @@ const Orderlist = ({
 
   const [isPricingLoading, setIsPricingLoading] = useState(false);
 
-  let escposWarmedUp = false;
+  // let escposWarmedUp = false;
 
   useEffect(() => {
-    if (escposWarmedUp) return;
+    // if (escposWarmedUp) return;
 
     const warmupPrinter = async () => {
       try {
@@ -163,9 +163,9 @@ const Orderlist = ({
         const result = await window.electronAPI.warmupEscPos();
         console.log("ESC/POS warm-up result:", result);
 
-        if (result?.success) {
-          escposWarmedUp = true;
-        }
+        // if (result?.success) {
+        //   escposWarmedUp = true;
+        // }
       } catch (error) {
         console.error("ESC/POS warm-up failed:", error);
       }
