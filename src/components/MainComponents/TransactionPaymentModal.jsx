@@ -1662,6 +1662,30 @@ export default function TransactionPaymentModal({
   const [printerName, setPrinterName] = useState("");
   const [printers, setPrinters] = useState([]);
   const [shiftDetails, setShiftDetails] = useState(null);
+
+  let escposWarmedUp = false;
+
+  useEffect(() => {
+    if (escposWarmedUp) return;
+
+    const warmupPrinter = async () => {
+      try {
+        if (!window?.electronAPI?.warmupEscPos) return;
+
+        const result = await window.electronAPI.warmupEscPos();
+        console.log("ESC/POS warm-up result:", result);
+
+        if (result?.success) {
+          escposWarmedUp = true;
+        }
+      } catch (error) {
+        console.error("ESC/POS warm-up failed:", error);
+      }
+    };
+
+    warmupPrinter();
+  }, []);
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -1815,7 +1839,7 @@ export default function TransactionPaymentModal({
         throw new Error("Electron print API is not available.");
       }
 
-      const html = BuildPosPaymentReceiptHtml({
+      const result = await window.electronAPI.pospaymentreceipt({
         transaction: snapshot.transaction || transaction,
         items: snapshot.items || items,
         computed: snapshot.computed || computed,
@@ -1825,14 +1849,27 @@ export default function TransactionPaymentModal({
         isDuplicateCopy: snapshot.isDuplicateCopy || false,
         terminalConfig,
         businessInfo,
+        printerName: printerName || defaultPrinterName || "",
       });
 
-      const result = await window.electronAPI.printReceipt({
-        html,
-        printerName: printerName || defaultPrinterName || "",
-        silent: true,
-        copies: 1,
-      });
+      // const html = BuildPosPaymentReceiptHtml({
+      //   transaction: snapshot.transaction || transaction,
+      //   items: snapshot.items || items,
+      //   computed: snapshot.computed || computed,
+      //   payments: snapshot.payments || payments,
+      //   otherCharges: snapshot.otherCharges || otherCharges,
+      //   customerCards: snapshot.customerCards || customerCards,
+      //   isDuplicateCopy: snapshot.isDuplicateCopy || false,
+      //   terminalConfig,
+      //   businessInfo,
+      // });
+
+      // const result = await window.electronAPI.printReceipt({
+      //   html,
+      //   printerName: printerName || defaultPrinterName || "",
+      //   silent: true,
+      //   copies: 1,
+      // });
 
       console.log("Payment print result:", result);
 

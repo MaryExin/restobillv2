@@ -131,29 +131,29 @@ const PrintBilling = () => {
   const currentItems = tablelist.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(tablelist.length / itemsPerPage);
 
-const table_trasaction = (table_number) => {
-  if (!apiHost || !dateFrom) return;
+  const table_trasaction = (table_number) => {
+    if (!apiHost || !dateFrom) return;
 
-  const params = new URLSearchParams({
-    date: dateFrom,
-    table_number: table_number,
-  });
-
-  fetch(`${apiHost}/api/transactio_per_table.php?${params.toString()}`)
-    .then((res) => {
-      if (!res.ok) throw new Error("Failed to fetch transaction per table");
-      return res.json();
-    })
-    .then((data) => {
-      settranspertable(Array.isArray(data) ? data : data.data || []);
-      settableselected(table_number);
-      setshowtranslistpertable(true);
-    })
-    .catch((error) => {
-      console.error("table_trasaction fetch error:", error);
-      settranspertable([]);
+    const params = new URLSearchParams({
+      date: dateFrom,
+      table_number: table_number,
     });
-};
+
+    fetch(`${apiHost}/api/transactio_per_table.php?${params.toString()}`)
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch transaction per table");
+        return res.json();
+      })
+      .then((data) => {
+        settranspertable(Array.isArray(data) ? data : data.data || []);
+        settableselected(table_number);
+        setshowtranslistpertable(true);
+      })
+      .catch((error) => {
+        console.error("table_trasaction fetch error:", error);
+        settranspertable([]);
+      });
+  };
   const FilterChip = ({ label, value, icon: Icon }) => (
     <button
       onClick={() => setStatusFilter(value)}
