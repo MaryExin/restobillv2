@@ -428,6 +428,29 @@ const ModalDiscountTransaction = ({
   const [initialLoadedSignature, setInitialLoadedSignature] = useState("");
   const [showOverrideWarning, setShowOverrideWarning] = useState(false);
 
+  // let escposWarmedUp = false;
+
+  useEffect(() => {
+    // if (escposWarmedUp) return;
+
+    const warmupPrinter = async () => {
+      try {
+        if (!window?.electronAPI?.warmupEscPos) return;
+
+        const result = await window.electronAPI.warmupEscPos();
+        console.log("ESC/POS warm-up result:", result);
+
+        // if (result?.success) {
+        //   escposWarmedUp = true;
+        // }
+      } catch (error) {
+        console.error("ESC/POS warm-up failed:", error);
+      }
+    };
+
+    warmupPrinter();
+  }, []);
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -989,7 +1012,7 @@ const ModalDiscountTransaction = ({
         transaction?.invoice_no ||
         "";
 
-      const html = BuildPrintableDiscountReceiptHtml({
+      const result = await window.electronAPI.printEscposDiscount({
         transaction: {
           ...transaction,
           cashier:
@@ -1002,16 +1025,69 @@ const ModalDiscountTransaction = ({
         dateFrom,
         computed,
         items,
-        scale: 1,
         businessInfo,
+        printerName,
       });
 
-      const result = await window.electronAPI.printReceipt({
-        html,
-        printerName,
-        silent: true,
-        copies: 1,
-      });
+      // const html = BuildPrintableDiscountReceiptHtml({
+      //   transaction: {
+      //     ...transaction,
+      //     cashier:
+      //       localStorage.getItem("username") ||
+      //       transaction?.cashier ||
+      //       "System",
+      //     billing_no: finalBillingNo,
+      //     invoice_no: finalInvoiceNo,
+      //   },
+      //   dateFrom,
+      //   computed,
+      //   items,
+      //   scale: 1,
+      //   businessInfo,
+      // });
+
+      // const result = await window.electronAPI.printReceipt({
+      //   html,
+      //   printerName,
+      //   silent: true,
+      //   copies: 1,
+      // });
+
+      // const handleDiscountPrintElectron = async ({
+      //   transaction,
+      //   finalBillingNo,
+      //   finalInvoiceNo,
+      //   dateFrom,
+      //   computed,
+      //   items,
+      //   businessInfo,
+      //   printerName,
+      // }) => {
+      //   const result = await window.electronAPI.printableDiscountReceipt({
+      //     transaction: {
+      //       ...transaction,
+      //       cashier:
+      //         localStorage.getItem("username") ||
+      //         transaction?.cashier ||
+      //         "System",
+      //       billing_no: finalBillingNo,
+      //       invoice_no: finalInvoiceNo,
+      //     },
+      //     dateFrom,
+      //     computed,
+      //     items,
+      //     businessInfo,
+      //     printerName,
+      //     silent: true,
+      //     copies: 1,
+      //   });
+
+      //   if (!result?.success) {
+      //     throw new Error(result?.message || "ESC/POS printing failed.");
+      //   }
+
+      //   return result;
+      // };
 
       console.log("Print result:", result);
 

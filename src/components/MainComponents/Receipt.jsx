@@ -68,9 +68,7 @@ const Receipt = forwardRef(({ transaction, detailedproduct }, ref) => {
     >
       <div className="leading-tight text-center">
         <h2 className="font-bold text-[14px]">CRABS N CRACK SEAFOOD HOUSE</h2>
-        <h3 className="font-bold text-[14px]">
-          AND SHAKING CRABS - GUIGUINTO
-        </h3>
+        <h3 className="font-bold text-[14px]">AND SHAKING CRABS - GUIGUINTO</h3>
         <p className="font-semibold">ARU FOOD CORP.</p>
         <p>PLARIDEL BYPASS ROAD TIAONG GUIGUINTO</p>
         <p>BULACAN</p>

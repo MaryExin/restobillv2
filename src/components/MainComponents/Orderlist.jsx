@@ -151,6 +151,29 @@ const Orderlist = ({
 
   const [isPricingLoading, setIsPricingLoading] = useState(false);
 
+  // let escposWarmedUp = false;
+
+  useEffect(() => {
+    // if (escposWarmedUp) return;
+
+    const warmupPrinter = async () => {
+      try {
+        if (!window?.electronAPI?.warmupEscPos) return;
+
+        const result = await window.electronAPI.warmupEscPos();
+        console.log("ESC/POS warm-up result:", result);
+
+        // if (result?.success) {
+        //   escposWarmedUp = true;
+        // }
+      } catch (error) {
+        console.error("ESC/POS warm-up failed:", error);
+      }
+    };
+
+    warmupPrinter();
+  }, []);
+
   const makeLineId = (prefix = "LINE") =>
     `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
@@ -314,84 +337,148 @@ const Orderlist = ({
     }
   };
 
-  const handlePrintAdditionalOrderElectron = async () => {
-    const html = BuildOrderReceiptHtml({
-      productcart: {
-        customer: tableselected,
-        items: additionalCartItems,
-      },
-      totalPrice: additionalTotalPrice,
-      tableselected,
-      instructions,
-      transactionId,
-      printMode: transactionId ? "additional" : "new",
-    });
+  // const handlePrintAdditionalOrderElectron = async () => {
+  // const html = BuildOrderReceiptHtml({
+  // productcart: {
+  //   customer: tableselected,
+  //   items: additionalCartItems,
+  // },
+  // totalPrice: additionalTotalPrice,
+  // tableselected,
+  // instructions,
+  // transactionId,
+  // printMode: transactionId ? "additional" : "new",
+  //   });
 
-    return printViaElectron({
-      html,
-      fallbackDocumentName: transactionId
-        ? `additional-order-${transactionId}`
-        : `new-order-${tableselected}`,
-      afterSuccess: () => {
-        setIsReprint(false);
-        setShowqrModal(false);
-        setShowCartMobile(false);
-        setShowDesktopCartActions(false);
-        setshoworderlist(false);
-      },
-    });
+  //   return printViaElectron({
+  //     html,
+  //     fallbackDocumentName: transactionId
+  //       ? `additional-order-${transactionId}`
+  //       : `new-order-${tableselected}`,
+  //     afterSuccess: () => {
+  //       setIsReprint(false);
+  //       setShowqrModal(false);
+  //       setShowCartMobile(false);
+  //       setShowDesktopCartActions(false);
+  //       setshoworderlist(false);
+  //     },
+  //   });
+  // };
+
+  // const handlePrintAllElectron = async (printMode = "auto") => {
+  //   const html = BuildOrderReceiptHtml({
+  //     productcart: {
+  //       customer: tableselected,
+  //       items: cartSummaryItems,
+  //     },
+  //     totalPrice,
+  //     tableselected,
+  //     instructions,
+  //     transactionId,
+  //     printMode,
+  //   });
+
+  //   return printViaElectron({
+  //     html,
+  //     fallbackDocumentName: transactionId
+  //       ? `full-order-${transactionId}`
+  //       : `full-order-${tableselected}`,
+  //     afterSuccess: () => {
+  //       setIsReprint(false);
+  //       setShowqrModal(false);
+  //       setShowCartMobile(false);
+  //       setShowDesktopCartActions(false);
+  //     },
+  //   });
+  // };
+
+  const handlePrintAdditionalOrderElectron = async () => {
+    try {
+      const printResult = await window.electronAPI.printEscPos({
+        table: tableselected,
+        items: additionalCartItems,
+        total: additionalTotalPrice,
+        instructions,
+        transactionId,
+        printMode: transactionId ? "additional" : "new",
+      });
+
+      console.log("ESC/POS additional print result:", printResult);
+
+      if (!printResult?.success) {
+        alert(printResult?.message || "Printing failed");
+        return;
+      }
+
+      setIsReprint(false);
+      setShowqrModal(false);
+      setShowCartMobile(false);
+      setShowDesktopCartActions(false);
+      setshoworderlist(false);
+    } catch (error) {
+      console.error("handlePrintAdditionalOrderElectron error:", error);
+      alert(error?.message || "Unexpected printing error");
+    }
   };
 
   const handlePrintAllElectron = async (printMode = "auto") => {
-    const html = BuildOrderReceiptHtml({
-      productcart: {
-        customer: tableselected,
+    try {
+      const printResult = await window.electronAPI.printEscPos({
+        table: tableselected,
         items: cartSummaryItems,
-      },
-      totalPrice,
-      tableselected,
-      instructions,
-      transactionId,
-      printMode,
-    });
+        total: totalPrice,
+        instructions,
+        transactionId,
+        printMode:
+          printMode === "auto"
+            ? transactionId
+              ? "additional"
+              : "new"
+            : printMode,
+      });
 
-    return printViaElectron({
-      html,
-      fallbackDocumentName: transactionId
-        ? `full-order-${transactionId}`
-        : `full-order-${tableselected}`,
-      afterSuccess: () => {
-        setIsReprint(false);
-        setShowqrModal(false);
-        setShowCartMobile(false);
-        setShowDesktopCartActions(false);
-      },
-    });
+      console.log("ESC/POS full print result:", printResult);
+
+      if (!printResult?.success) {
+        alert(printResult?.message || "Printing failed");
+        return;
+      }
+
+      setIsReprint(false);
+      setShowqrModal(false);
+      setShowCartMobile(false);
+      setShowDesktopCartActions(false);
+    } catch (error) {
+      console.error("handlePrintAllElectron error:", error);
+      alert(error?.message || "Unexpected printing error");
+    }
   };
 
   const handleBillingPrintElectron = async (transaction, detailedItems) => {
-    const html = BuildBillingReceiptHtml({
-      transaction,
-      detailedproduct: detailedItems,
-      title: transaction?.billing_no
-        ? `billing-${transaction.billing_no}`
-        : transaction?.transaction_id
-          ? `billing-${transaction.transaction_id}`
-          : `billing-${tableselected}`,
-    });
+    try {
+      const printResult = await window.electronAPI.printEscPosBilling({
+        transaction,
+        detailedproduct: detailedItems,
+        title: transaction?.billing_no
+          ? `billing-${transaction.billing_no}`
+          : transaction?.transaction_id
+            ? `billing-${transaction.transaction_id}`
+            : `billing-${tableselected}`,
+      });
 
-    return printViaElectron({
-      html,
-      fallbackDocumentName: transaction?.billing_no
-        ? `billing-${transaction.billing_no}`
-        : transaction?.transaction_id
-          ? `billing-${transaction.transaction_id}`
-          : `billing-${tableselected}`,
-      afterSuccess: () => {
-        setBillingSelectedTransaction(null);
-        setBillingDetailedProduct([]);
-      },
-    });
+      console.log("ESC/POS billing print result:", printResult);
+
+      if (!printResult?.success) {
+        alert(printResult?.message || "Billing printing failed");
+        return;
+      }
+
+      setBillingSelectedTransaction(null);
+      setBillingDetailedProduct([]);
+    } catch (error) {
+      console.error("handleBillingPrintElectron error:", error);
+      alert(error?.message || "Unexpected billing printing error");
+    }
   };
 
   const getCategoryIcon = (name) => {
