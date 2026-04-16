@@ -549,6 +549,427 @@ function escposGetDiscountAmountLabel(entry) {
   if (entry?.key === "manual") return "Manual Discount Amount:";
   return `${entry?.label || "Discount"} Amount:`;
 }
+function peso(value) {
+  return Number(value || 0).toFixed(2);
+}
+
+function escposSafe(value) {
+  if (value === null || value === undefined) return "";
+  return String(value)
+    .replace(/[^\x20-\x7E\n]/g, "")
+    .trim();
+}
+
+function wrapText(text, width = 32) {
+  const input = escposSafe(text);
+  if (!input) return [""];
+
+  const words = input.split(/\s+/);
+  const lines = [];
+  let current = "";
+
+  for (const word of words) {
+    if (!current) {
+      if (word.length <= width) {
+        current = word;
+      } else {
+        for (let i = 0; i < word.length; i += width) {
+          lines.push(word.slice(i, i + width));
+        }
+      }
+      continue;
+    }
+
+    if ((current + " " + word).length <= width) {
+      current += " " + word;
+    } else {
+      lines.push(current);
+      if (word.length <= width) {
+        current = word;
+      } else {
+        for (let i = 0; i < word.length; i += width) {
+          const chunk = word.slice(i, i + width);
+          if (chunk.length === width || i + width < word.length) {
+            lines.push(chunk);
+          } else {
+            current = chunk;
+          }
+        }
+      }
+    }
+  }
+
+  if (current) lines.push(current);
+  return lines.length ? lines : [""];
+}
+
+function centerText(text, width = 32) {
+  const str = escposSafe(text);
+  if (str.length >= width) return str.slice(0, width);
+  const pad = Math.floor((width - str.length) / 2);
+  return " ".repeat(pad) + str;
+}
+
+function formatLeftRight(left, right, width = 32) {
+  const l = escposSafe(left);
+  const r = escposSafe(right);
+
+  if (l.length + r.length + 1 <= width) {
+    return l + " ".repeat(width - l.length - r.length) + r;
+  }
+
+  const leftWidth = Math.max(0, width - r.length - 1);
+  return l.slice(0, leftWidth) + " " + r;
+}
+
+function line(width = 32) {
+  return "-".repeat(width);
+}
+
+function txt(value) {
+  return Buffer.from(String(value), "ascii");
+}
+
+function nl(count = 1) {
+  return Buffer.from("\n".repeat(count), "ascii");
+}
+
+function pushRow(chunks, label, value, width = 32) {
+  chunks.push(txt(formatLeftRight(label, value, width)));
+  chunks.push(nl());
+}
+
+function pushWrappedRow(chunks, label, value, width = 32) {
+  const right = escposSafe(value);
+  const leftLines = wrapText(label, Math.max(8, width - right.length - 1));
+
+  if (!leftLines.length) {
+    pushRow(chunks, "", right, width);
+    return;
+  }
+
+  pushRow(chunks, leftLines[0], right, width);
+
+  for (let i = 1; i < leftLines.length; i++) {
+    chunks.push(txt(leftLines[i]));
+    chunks.push(nl());
+  }
+}
+
+function pushCentered(chunks, value, width = 32, bold = false) {
+  const lines = wrapText(value, width);
+  if (bold) chunks.push(Buffer.from([0x1b, 0x45, 0x01]));
+  lines.forEach((lineText) => {
+    chunks.push(txt(centerText(lineText, width)));
+    chunks.push(nl());
+  });
+  if (bold) chunks.push(Buffer.from([0x1b, 0x45, 0x00]));
+}
+
+function buildHeaderChunks(data, title, width = 32) {
+  const chunks = [];
+
+  pushCentered(chunks, data.companyName || "", width, true);
+  pushCentered(chunks, data.storeName || "", width, false);
+  pushCentered(chunks, data.corpName || "", width, false);
+  pushCentered(chunks, data.address || "", width, false);
+  pushCentered(chunks, `TIN: ${data.tin || ""}`, width, false);
+  pushCentered(chunks, `MIN: ${data.machineNumber || ""}`, width, false);
+  pushCentered(chunks, `S/N: ${data.serialNumber || ""}`, width, false);
+  chunks.push(nl());
+  pushCentered(chunks, title, width, true);
+  chunks.push(txt(line(width)));
+  chunks.push(nl());
+
+  return chunks;
+}
+
+function buildXReadingEscposBuffer(data = {}) {
+  const width = 32;
+  const chunks = [];
+  const otherPaymentsBreakdown = Array.isArray(data?.otherPaymentsBreakdown)
+    ? data.otherPaymentsBreakdown
+    : Array.isArray(data?.paymentBreakdown)
+      ? data.paymentBreakdown
+      : [];
+
+  chunks.push(Buffer.from([0x1b, 0x40]));
+  chunks.push(...buildHeaderChunks(data, "X-READING", width));
+
+  pushRow(chunks, "Report Date", data.reportDate || "", width);
+  pushRow(chunks, "Report Time", data.reportTime || "", width);
+  pushWrappedRow(chunks, "Start Date/Time", data.startDateTime || "", width);
+  pushWrappedRow(chunks, "End Date/Time", data.endDateTime || "", width);
+  pushWrappedRow(chunks, "Cashier", data.cashier || "", width);
+  pushRow(chunks, "Beg. INV.", data.begOR || "", width);
+  pushRow(chunks, "End INV.", data.endOR || "", width);
+
+  chunks.push(txt(line(width)));
+  chunks.push(nl());
+
+  chunks.push(Buffer.from([0x1b, 0x45, 0x01]));
+  chunks.push(txt("PAYMENTS"));
+  chunks.push(nl());
+  chunks.push(Buffer.from([0x1b, 0x45, 0x00]));
+
+  pushRow(chunks, "Opening Fund", peso(data.openingFund), width);
+  pushRow(chunks, "Cash", peso(data.cash), width);
+  pushRow(chunks, "Cheque", peso(data.cheque), width);
+  pushRow(chunks, "Credit Card", peso(data.creditCard), width);
+  pushRow(
+    chunks,
+    "Other Payments",
+    peso(data.otherPaymentsTotal ?? data.otherPayments),
+    width,
+  );
+
+  if (otherPaymentsBreakdown.length > 0) {
+    otherPaymentsBreakdown.forEach((item) => {
+      pushWrappedRow(
+        chunks,
+        `- ${item?.payment_method || "Other"}`,
+        peso(item?.payment_amount || 0),
+        width,
+      );
+    });
+  } else {
+    pushRow(chunks, "- None", peso(0), width);
+  }
+
+  chunks.push(Buffer.from([0x1b, 0x45, 0x01]));
+  pushRow(chunks, "Total Payments", peso(data.totalPayments), width);
+  chunks.push(Buffer.from([0x1b, 0x45, 0x00]));
+
+  pushRow(chunks, "Void", peso(data.void), width);
+  pushRow(chunks, "Refund", peso(data.refund), width);
+  pushRow(chunks, "Withdrawal", peso(data.withdrawal), width);
+
+  chunks.push(txt(line(width)));
+  chunks.push(nl());
+
+  chunks.push(Buffer.from([0x1b, 0x45, 0x01]));
+  chunks.push(txt("SUMMARY"));
+  chunks.push(nl());
+  chunks.push(Buffer.from([0x1b, 0x45, 0x00]));
+
+  pushRow(chunks, "Cash In Drawer", peso(data.summaryCashInDrawer), width);
+  pushRow(chunks, "Cheque", peso(data.summaryCheque), width);
+  pushRow(chunks, "Credit Card", peso(data.summaryCreditCard), width);
+  pushRow(chunks, "Other Payments", peso(data.summaryOtherPayments), width);
+  pushRow(chunks, "Opening Fund", peso(data.summaryOpeningFund), width);
+  pushRow(chunks, "Withdrawal", peso(data.summaryWithdrawal), width);
+  pushRow(
+    chunks,
+    "Payments Received",
+    peso(data.summaryPaymentsReceived),
+    width,
+  );
+
+  chunks.push(Buffer.from([0x1b, 0x45, 0x01]));
+  pushRow(chunks, "Short / Over", peso(data.summaryShortOver), width);
+  chunks.push(Buffer.from([0x1b, 0x45, 0x00]));
+
+  chunks.push(nl(4));
+  chunks.push(Buffer.from([0x1d, 0x56, 0x00]));
+
+  return Buffer.concat(chunks);
+}
+
+function buildZReadingEscposBuffer(data = {}) {
+  const width = 32;
+  const chunks = [];
+  const vatExemptionValue =
+    data.vatExemption ?? data.lessVatExemption ?? data.vatExemptVat ?? 0;
+
+  chunks.push(Buffer.from([0x1b, 0x40]));
+  chunks.push(...buildHeaderChunks(data, "Z-READING", width));
+
+  pushRow(chunks, "Date Issued", data.reportDate || "", width);
+  pushRow(chunks, "Time", data.reportTime || "", width);
+  pushRow(chunks, "Beg SI No.", data.begSI || "", width);
+  pushRow(chunks, "End SI No.", data.endSI || "", width);
+  pushRow(chunks, "Beg Void No.", data.begVoid || "", width);
+  pushRow(chunks, "End Void No.", data.endVoid || "", width);
+  pushRow(chunks, "Beg Return No.", data.begReturn || "", width);
+  pushRow(chunks, "End Return No.", data.endReturn || "", width);
+  pushRow(chunks, "Reset Counter No.", String(data.resetCounterNo || 0), width);
+  pushRow(chunks, "Z Counter No.", String(data.zCounterNo || 0), width);
+
+  chunks.push(txt(line(width)));
+  chunks.push(nl());
+
+  pushRow(
+    chunks,
+    "Present Accum. Sales",
+    peso(data.presentAccumulatedSales),
+    width,
+  );
+  pushRow(
+    chunks,
+    "Previous Accum. Sales",
+    peso(data.previousAccumulatedSales),
+    width,
+  );
+  pushRow(chunks, "Sales for the Day", peso(data.salesForTheDay), width);
+
+  chunks.push(txt(line(width)));
+  chunks.push(nl());
+
+  chunks.push(Buffer.from([0x1b, 0x45, 0x01]));
+  chunks.push(txt("BREAKDOWN OF SALES"));
+  chunks.push(nl());
+  chunks.push(Buffer.from([0x1b, 0x45, 0x00]));
+
+  pushRow(chunks, "VATABLE SALES", peso(data.vatableSales), width);
+  pushRow(chunks, "VAT AMOUNT", peso(data.vatAmount), width);
+  pushRow(chunks, "VAT-EXEMPT SALES", peso(data.vatExemptSales), width);
+  pushRow(chunks, "VAT EXEMPTION", peso(vatExemptionValue), width);
+  pushRow(chunks, "ZERO RATED SALES", peso(data.zeroRatedSales), width);
+  pushRow(chunks, "OTHER CHARGES", peso(data.otherCharges), width);
+
+  chunks.push(txt(line(width)));
+  chunks.push(nl());
+
+  pushRow(chunks, "Gross Amount", peso(data.grossAmount), width);
+  pushRow(chunks, "Discount", peso(data.lessDiscount), width);
+  pushRow(chunks, "VAT Exemption", peso(vatExemptionValue), width);
+  pushRow(chunks, "Refund", peso(data.lessReturn), width);
+  pushRow(chunks, "Void", peso(data.lessVoid), width);
+  pushRow(chunks, "VAT Adjustment", peso(data.lessVatAdjustment), width);
+
+  chunks.push(Buffer.from([0x1b, 0x45, 0x01]));
+  pushRow(chunks, "Net Amount", peso(data.netAmount), width);
+  chunks.push(Buffer.from([0x1b, 0x45, 0x00]));
+
+  chunks.push(txt(line(width)));
+  chunks.push(nl());
+
+  chunks.push(Buffer.from([0x1b, 0x45, 0x01]));
+  chunks.push(txt("DISCOUNT SUMMARY"));
+  chunks.push(nl());
+  chunks.push(Buffer.from([0x1b, 0x45, 0x00]));
+
+  pushRow(chunks, "SC Disc", peso(data.scDisc), width);
+  pushRow(chunks, "PWD Disc", peso(data.pwdDisc), width);
+  pushRow(chunks, "NAAC Disc", peso(data.naacDisc), width);
+  pushRow(chunks, "Solo Parent Disc", peso(data.soloParentDisc), width);
+  pushRow(chunks, "Other Disc", peso(data.otherDisc), width);
+
+  chunks.push(txt(line(width)));
+  chunks.push(nl());
+
+  chunks.push(Buffer.from([0x1b, 0x45, 0x01]));
+  chunks.push(txt("SALES ADJUSTMENT"));
+  chunks.push(nl());
+  chunks.push(Buffer.from([0x1b, 0x45, 0x00]));
+
+  pushRow(chunks, "Void", peso(data.salesAdjustmentVoid), width);
+  pushRow(chunks, "Return", peso(data.salesAdjustmentReturn), width);
+
+  chunks.push(txt(line(width)));
+  chunks.push(nl());
+
+  chunks.push(Buffer.from([0x1b, 0x45, 0x01]));
+  chunks.push(txt("VAT ADJUSTMENT"));
+  chunks.push(nl());
+  chunks.push(Buffer.from([0x1b, 0x45, 0x00]));
+
+  pushRow(chunks, "SC Trans VAT Adj", peso(data.scTransVatAdj), width);
+  pushRow(chunks, "PWD Trans VAT Adj", peso(data.pwdTransVatAdj), width);
+  pushRow(
+    chunks,
+    "Reg Disc Trans VAT Adj",
+    peso(data.regDiscTransVatAdj),
+    width,
+  );
+  pushRow(
+    chunks,
+    "Zero Rated Trans VAT Adj",
+    peso(data.zeroRatedTransVatAdj),
+    width,
+  );
+  pushRow(chunks, "VAT on Return", peso(data.vatOnReturn), width);
+  pushRow(chunks, "Other VAT Adj", peso(data.otherVatAdjustments), width);
+
+  chunks.push(txt(line(width)));
+  chunks.push(nl());
+
+  chunks.push(Buffer.from([0x1b, 0x45, 0x01]));
+  chunks.push(txt("TRANSACTION SUMMARY"));
+  chunks.push(nl());
+  chunks.push(Buffer.from([0x1b, 0x45, 0x00]));
+
+  pushRow(chunks, "Cash In Drawer", peso(data.cashInDrawer), width);
+  pushRow(chunks, "Cheque", peso(data.cheque), width);
+  pushRow(chunks, "Credit Card", peso(data.creditCard), width);
+  pushRow(chunks, "Other Payments", peso(data.otherPayments), width);
+  pushRow(chunks, "Opening Fund", peso(data.openingFund), width);
+  pushRow(chunks, "Less Withdrawal", peso(data.lessWithdrawal), width);
+  pushRow(chunks, "Payments Received", peso(data.paymentsReceived), width);
+
+  chunks.push(Buffer.from([0x1b, 0x45, 0x01]));
+  pushRow(chunks, "Short / Over", peso(data.shortOver), width);
+  chunks.push(Buffer.from([0x1b, 0x45, 0x00]));
+
+  chunks.push(nl(4));
+  chunks.push(Buffer.from([0x1d, 0x56, 0x00]));
+
+  return Buffer.concat(chunks);
+}
+
+function writeBufferToEscposTcp({ host, port = 9100, buffer, timeout = 5000 }) {
+  return new Promise((resolve) => {
+    const client = new net.Socket();
+    let finished = false;
+
+    const done = (result) => {
+      if (finished) return;
+      finished = true;
+      try {
+        client.destroy();
+      } catch {}
+      resolve(result);
+    };
+
+    client.setTimeout(timeout);
+
+    client.on("connect", () => {
+      client.write(buffer, (err) => {
+        if (err) {
+          return done({
+            success: false,
+            message: err.message || "Failed to write ESC/POS buffer.",
+          });
+        }
+
+        client.end();
+      });
+    });
+
+    client.on("timeout", () => {
+      done({
+        success: false,
+        message: `Printer connection timed out (${host}:${port}).`,
+      });
+    });
+
+    client.on("error", (err) => {
+      done({
+        success: false,
+        message: err.message || "Printer connection failed.",
+      });
+    });
+
+    client.on("close", () => {
+      done({
+        success: true,
+        message: "Printed successfully.",
+      });
+    });
+
+    client.connect(port, host);
+  });
+}
 
 app.whenReady().then(() => {
   ipcMain.handle("test-escpos", async () => {
@@ -1909,6 +2330,806 @@ app.whenReady().then(() => {
       return {
         success: false,
         message: error?.message || "ESC/POS POS payment print failed",
+      };
+    }
+  });
+
+  ipcMain.handle("print-escposxzreading", async (_event, data) => {
+    const host = getPrinterHost();
+    const port = 9100;
+    const LINE_WIDTH = 42;
+
+    try {
+      return await new Promise((resolve) => {
+        const client = new net.Socket();
+        let finished = false;
+
+        const done = (result) => {
+          if (finished) return;
+          finished = true;
+          try {
+            client.destroy();
+          } catch {}
+          resolve(result);
+        };
+
+        client.setTimeout(10000);
+
+        client.on("connect", () => {
+          try {
+            console.log(`[ESC/POS XZ] Connected to ${host}:${port}`);
+            console.log("[ESC/POS XZ] Payload:", data);
+
+            const { payload = {}, isZReading = false } = data || {};
+            const safeData = payload || {};
+            const chunks = [];
+
+            const initPrinter = Buffer.from([0x1b, 0x40]);
+            const alignLeft = Buffer.from([0x1b, 0x61, 0x00]);
+            const alignCenter = Buffer.from([0x1b, 0x61, 0x01]);
+            const boldOn = Buffer.from([0x1b, 0x45, 0x01]);
+            const boldOff = Buffer.from([0x1b, 0x45, 0x00]);
+            const doubleSizeOn = Buffer.from([0x1d, 0x21, 0x11]);
+            const doubleWidthOn = Buffer.from([0x1d, 0x21, 0x10]);
+            const normalSize = Buffer.from([0x1d, 0x21, 0x00]);
+            const cutPaper = Buffer.from([0x1d, 0x56, 0x00]);
+            const nl = (count = 1) => Buffer.from("\n".repeat(count), "ascii");
+            const txt = (value) => Buffer.from(String(value || ""), "ascii");
+
+            const escposSafeText = (value, fallback = "") => {
+              const str = String(value ?? fallback ?? "");
+              return str.replace(/[^\x20-\x7E]/g, " ").trim() || fallback;
+            };
+
+            const escposPeso = (value) =>
+              Number(value || 0).toLocaleString("en-PH", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              });
+
+            const escposRepeat = (char, count) =>
+              String(char || "-").repeat(count);
+
+            const escposPadRight = (value, width) => {
+              const str = String(value || "");
+              if (str.length >= width) return str.slice(0, width);
+              return str + " ".repeat(width - str.length);
+            };
+
+            const escposPadLeft = (value, width) => {
+              const str = String(value || "");
+              if (str.length >= width) return str.slice(0, width);
+              return " ".repeat(width - str.length) + str;
+            };
+
+            const escposFormatLeftRight = (left, right, width = LINE_WIDTH) => {
+              const l = String(left || "");
+              const r = String(right || "");
+              if (l.length + r.length >= width) {
+                return `${l} ${r}`;
+              }
+              return l + " ".repeat(width - l.length - r.length) + r;
+            };
+
+            const escposWrapText = (value, width = LINE_WIDTH) => {
+              const text = String(value || "").trim();
+              if (!text) return [""];
+              const words = text.split(/\s+/);
+              const lines = [];
+              let current = "";
+
+              for (const word of words) {
+                if (!current) {
+                  current = word;
+                  continue;
+                }
+
+                if ((current + " " + word).length <= width) {
+                  current += " " + word;
+                } else {
+                  lines.push(current);
+                  current = word;
+                }
+              }
+
+              if (current) lines.push(current);
+
+              return lines.length ? lines : [text];
+            };
+
+            const pushWrapped = (value, width = LINE_WIDTH) => {
+              escposWrapText(String(value || ""), width).forEach((line) => {
+                chunks.push(txt(line));
+                chunks.push(nl());
+              });
+            };
+
+            const pushDivider = () => {
+              chunks.push(txt(escposRepeat("-", LINE_WIDTH)));
+              chunks.push(nl());
+            };
+
+            const pushMetaRow = (label, value) => {
+              const left = `${label}`;
+              const right = escposSafeText(value, "-");
+
+              if (left.length + right.length <= LINE_WIDTH) {
+                chunks.push(
+                  txt(escposFormatLeftRight(left, right, LINE_WIDTH)),
+                );
+                chunks.push(nl());
+              } else {
+                chunks.push(txt(left));
+                chunks.push(nl());
+                escposWrapText(right, LINE_WIDTH).forEach((line) => {
+                  chunks.push(txt(line));
+                  chunks.push(nl());
+                });
+              }
+            };
+
+            const splitAddressLines = (value) =>
+              String(value || "")
+                .split(/\r?\n|\|/)
+                .map((line) => line.trim())
+                .filter(Boolean);
+
+            const companyName = String(
+              safeData.companyName || "COMPANY",
+            ).trim();
+            const storeName = String(safeData.storeName || "STORE").trim();
+            const corpName = String(safeData.corpName || "").trim();
+            const storeAddress = splitAddressLines(
+              safeData.address || "ADDRESS",
+            );
+            const storeTin = String(safeData.tin || "").trim();
+            const machineNumber = String(safeData.machineNumber || "").trim();
+            const serialNumber = String(safeData.serialNumber || "").trim();
+
+            chunks.push(initPrinter);
+
+            // HEADER
+            chunks.push(alignCenter);
+            chunks.push(boldOn);
+            chunks.push(txt(companyName));
+            chunks.push(nl());
+            chunks.push(txt(String(storeName).toUpperCase()));
+            chunks.push(nl());
+
+            if (corpName) {
+              chunks.push(txt(String(corpName).toUpperCase()));
+              chunks.push(nl());
+            }
+
+            chunks.push(boldOff);
+
+            storeAddress.forEach((line) => {
+              chunks.push(txt(line));
+              chunks.push(nl());
+            });
+
+            if (storeTin) {
+              chunks.push(txt(`TIN: ${storeTin}`));
+              chunks.push(nl());
+            }
+
+            chunks.push(txt(`MIN: ${machineNumber || "-"}`));
+            chunks.push(nl());
+            chunks.push(txt(`S/N: ${serialNumber || "-"}`));
+            chunks.push(nl());
+
+            pushDivider();
+
+            // TITLE
+            chunks.push(alignCenter);
+            chunks.push(boldOn);
+            chunks.push(doubleWidthOn);
+            chunks.push(txt(isZReading ? "Z-READING" : "X-READING"));
+            chunks.push(nl());
+            chunks.push(normalSize);
+            chunks.push(boldOff);
+
+            chunks.push(alignLeft);
+
+            if (isZReading) {
+              const vatExemptionValue =
+                safeData.vatExemption ??
+                safeData.lessVatExemption ??
+                safeData.vatExemptVat ??
+                0;
+
+              pushMetaRow("Date Issued:", safeData.reportDate || "-");
+              pushMetaRow("Time:", safeData.reportTime || "-");
+              pushMetaRow("Beg SI No.:", safeData.begSI || "-");
+              pushMetaRow("End SI No.:", safeData.endSI || "-");
+              pushMetaRow("Beg Void No.:", safeData.begVoid || "-");
+              pushMetaRow("End Void No.:", safeData.endVoid || "-");
+              pushMetaRow("Beg Return No.:", safeData.begReturn || "-");
+              pushMetaRow("End Return No.:", safeData.endReturn || "-");
+              pushMetaRow("Reset Counter No.:", safeData.resetCounterNo || 0);
+              pushMetaRow("Z Counter No.:", safeData.zCounterNo || 0);
+
+              pushDivider();
+
+              pushMetaRow(
+                "Present Accum. Sales:",
+                escposPeso(safeData.presentAccumulatedSales),
+              );
+              pushMetaRow(
+                "Previous Accum. Sales:",
+                escposPeso(safeData.previousAccumulatedSales),
+              );
+              pushMetaRow(
+                "Sales for the Day:",
+                escposPeso(safeData.salesForTheDay),
+              );
+
+              pushDivider();
+
+              chunks.push(boldOn);
+              chunks.push(txt("BREAKDOWN OF SALES"));
+              chunks.push(nl());
+              chunks.push(boldOff);
+
+              pushMetaRow("VATABLE SALES:", escposPeso(safeData.vatableSales));
+              pushMetaRow("VAT AMOUNT:", escposPeso(safeData.vatAmount));
+              pushMetaRow(
+                "VAT-EXEMPT SALES:",
+                escposPeso(safeData.vatExemptSales),
+              );
+              pushMetaRow("VAT EXEMPTION:", escposPeso(vatExemptionValue));
+              pushMetaRow(
+                "ZERO RATED SALES:",
+                escposPeso(safeData.zeroRatedSales),
+              );
+              pushMetaRow("OTHER CHARGES:", escposPeso(safeData.otherCharges));
+
+              pushDivider();
+
+              pushMetaRow("Gross Amount:", escposPeso(safeData.grossAmount));
+              pushMetaRow("Discount:", escposPeso(safeData.lessDiscount));
+              pushMetaRow("VAT Exemption:", escposPeso(vatExemptionValue));
+              pushMetaRow("Refund:", escposPeso(safeData.lessReturn));
+              pushMetaRow("Void:", escposPeso(safeData.lessVoid));
+              pushMetaRow(
+                "VAT Adjustment:",
+                escposPeso(safeData.lessVatAdjustment),
+              );
+
+              chunks.push(boldOn);
+              pushMetaRow("Net Amount:", escposPeso(safeData.netAmount));
+              chunks.push(boldOff);
+
+              pushDivider();
+
+              chunks.push(boldOn);
+              chunks.push(txt("DISCOUNT SUMMARY"));
+              chunks.push(nl());
+              chunks.push(boldOff);
+
+              pushMetaRow("SC Disc:", escposPeso(safeData.scDisc));
+              pushMetaRow("PWD Disc:", escposPeso(safeData.pwdDisc));
+              pushMetaRow("NAAC Disc:", escposPeso(safeData.naacDisc));
+              pushMetaRow(
+                "Solo Parent Disc:",
+                escposPeso(safeData.soloParentDisc),
+              );
+              pushMetaRow("Other Disc:", escposPeso(safeData.otherDisc));
+
+              pushDivider();
+
+              chunks.push(boldOn);
+              chunks.push(txt("SALES ADJUSTMENT"));
+              chunks.push(nl());
+              chunks.push(boldOff);
+
+              pushMetaRow("Void:", escposPeso(safeData.salesAdjustmentVoid));
+              pushMetaRow(
+                "Return:",
+                escposPeso(safeData.salesAdjustmentReturn),
+              );
+
+              pushDivider();
+
+              chunks.push(boldOn);
+              chunks.push(txt("VAT ADJUSTMENT"));
+              chunks.push(nl());
+              chunks.push(boldOff);
+
+              pushMetaRow(
+                "SC Trans VAT Adj:",
+                escposPeso(safeData.scTransVatAdj),
+              );
+              pushMetaRow(
+                "PWD Trans VAT Adj:",
+                escposPeso(safeData.pwdTransVatAdj),
+              );
+              pushMetaRow(
+                "Reg Disc Trans VAT Adj:",
+                escposPeso(safeData.regDiscTransVatAdj),
+              );
+              pushMetaRow(
+                "Zero Rated Trans VAT Adj:",
+                escposPeso(safeData.zeroRatedTransVatAdj),
+              );
+              pushMetaRow("VAT on Return:", escposPeso(safeData.vatOnReturn));
+              pushMetaRow(
+                "Other VAT Adjustments:",
+                escposPeso(safeData.otherVatAdjustments),
+              );
+
+              pushDivider();
+
+              chunks.push(boldOn);
+              chunks.push(txt("TRANSACTION SUMMARY"));
+              chunks.push(nl());
+              chunks.push(boldOff);
+
+              pushMetaRow("Cash In Drawer:", escposPeso(safeData.cashInDrawer));
+              pushMetaRow("Cheque:", escposPeso(safeData.cheque));
+              pushMetaRow("Credit Card:", escposPeso(safeData.creditCard));
+              pushMetaRow(
+                "Other Payments:",
+                escposPeso(safeData.otherPayments),
+              );
+              pushMetaRow("Opening Fund:", escposPeso(safeData.openingFund));
+              pushMetaRow(
+                "Less Withdrawal:",
+                escposPeso(safeData.lessWithdrawal),
+              );
+              pushMetaRow(
+                "Payments Received:",
+                escposPeso(safeData.paymentsReceived),
+              );
+
+              chunks.push(boldOn);
+              pushMetaRow("Short / Over:", escposPeso(safeData.shortOver));
+              chunks.push(boldOff);
+            } else {
+              const otherPaymentsBreakdown = Array.isArray(
+                safeData?.otherPaymentsBreakdown,
+              )
+                ? safeData.otherPaymentsBreakdown
+                : Array.isArray(safeData?.paymentBreakdown)
+                  ? safeData.paymentBreakdown
+                  : [];
+
+              pushMetaRow("Report Date:", safeData.reportDate || "-");
+              pushMetaRow("Report Time:", safeData.reportTime || "-");
+              pushMetaRow("Start Date/Time:", safeData.startDateTime || "-");
+              pushMetaRow("End Date/Time:", safeData.endDateTime || "-");
+              pushMetaRow("Cashier:", safeData.cashier || "-");
+              pushMetaRow("Beg. INV.:", safeData.begOR || "-");
+              pushMetaRow("End INV.:", safeData.endOR || "-");
+
+              pushDivider();
+
+              chunks.push(boldOn);
+              chunks.push(txt("PAYMENTS"));
+              chunks.push(nl());
+              chunks.push(boldOff);
+
+              pushMetaRow("Opening Fund:", escposPeso(safeData.openingFund));
+              pushMetaRow("Cash:", escposPeso(safeData.cash));
+              pushMetaRow("Cheque:", escposPeso(safeData.cheque));
+              pushMetaRow("Credit Card:", escposPeso(safeData.creditCard));
+              pushMetaRow(
+                "Other Payments:",
+                escposPeso(
+                  safeData.otherPaymentsTotal ?? safeData.otherPayments ?? 0,
+                ),
+              );
+
+              if (otherPaymentsBreakdown.length > 0) {
+                otherPaymentsBreakdown.forEach((item) => {
+                  pushMetaRow(
+                    `- ${item?.payment_method || "Other"}:`,
+                    escposPeso(item?.payment_amount || 0),
+                  );
+                });
+              } else {
+                pushMetaRow("- None:", escposPeso(0));
+              }
+
+              chunks.push(boldOn);
+              pushMetaRow(
+                "Total Payments:",
+                escposPeso(safeData.totalPayments),
+              );
+              chunks.push(boldOff);
+
+              pushMetaRow("Void:", escposPeso(safeData.void));
+              pushMetaRow("Refund:", escposPeso(safeData.refund));
+              pushMetaRow("Withdrawal:", escposPeso(safeData.withdrawal));
+
+              pushDivider();
+
+              chunks.push(boldOn);
+              chunks.push(txt("SUMMARY"));
+              chunks.push(nl());
+              chunks.push(boldOff);
+
+              pushMetaRow(
+                "Cash In Drawer:",
+                escposPeso(safeData.summaryCashInDrawer),
+              );
+              pushMetaRow("Cheque:", escposPeso(safeData.summaryCheque));
+              pushMetaRow(
+                "Credit Card:",
+                escposPeso(safeData.summaryCreditCard),
+              );
+              pushMetaRow(
+                "Other Payments:",
+                escposPeso(safeData.summaryOtherPayments),
+              );
+              pushMetaRow(
+                "Opening Fund:",
+                escposPeso(safeData.summaryOpeningFund),
+              );
+              pushMetaRow(
+                "Withdrawal:",
+                escposPeso(safeData.summaryWithdrawal),
+              );
+              pushMetaRow(
+                "Payments Received:",
+                escposPeso(safeData.summaryPaymentsReceived),
+              );
+
+              chunks.push(boldOn);
+              pushMetaRow(
+                "Short / Over:",
+                escposPeso(safeData.summaryShortOver),
+              );
+              chunks.push(boldOff);
+            }
+
+            chunks.push(nl(3));
+            chunks.push(cutPaper);
+
+            const finalPayload = Buffer.concat(chunks);
+
+            client.write(finalPayload, (err) => {
+              if (err) {
+                console.error("[ESC/POS XZ] Write error:", err);
+                return done({
+                  success: false,
+                  message:
+                    err?.message || "Failed to write X/Z reading to printer",
+                });
+              }
+
+              client.end();
+            });
+          } catch (error) {
+            console.error("[ESC/POS XZ] Build/print error:", error);
+            done({
+              success: false,
+              message: error?.message || "ESC/POS X/Z reading print failed",
+            });
+          }
+        });
+
+        client.on("timeout", () => {
+          console.error("[ESC/POS XZ] Socket timeout");
+          done({
+            success: false,
+            message: "X/Z reading printer socket timeout",
+          });
+        });
+
+        client.on("error", (err) => {
+          console.error("[ESC/POS XZ] Socket error:", err);
+          done({
+            success: false,
+            message: err?.message || "X/Z reading printer connection error",
+          });
+        });
+
+        client.on("close", () => {
+          console.log("[ESC/POS XZ] Connection closed");
+          done({
+            success: true,
+            message: "X/Z reading printed successfully",
+          });
+        });
+
+        client.connect(port, host);
+      });
+    } catch (error) {
+      console.error("ESC/POS X/Z reading print error:", error);
+      return {
+        success: false,
+        message: error?.message || "ESC/POS X/Z reading print failed",
+      };
+    }
+  });
+
+  ipcMain.handle("print-escpossalesperproduct", async (_event, data) => {
+    const host = getPrinterHost();
+    const port = 9100;
+    const LINE_WIDTH = 42;
+
+    try {
+      return await new Promise((resolve) => {
+        const client = new net.Socket();
+        let finished = false;
+
+        const done = (result) => {
+          if (finished) return;
+          finished = true;
+          try {
+            client.destroy();
+          } catch {}
+          resolve(result);
+        };
+
+        client.setTimeout(10000);
+
+        client.on("connect", () => {
+          try {
+            console.log(
+              `[ESC/POS SALES PER PRODUCT] Connected to ${host}:${port}`,
+            );
+            console.log("[ESC/POS SALES PER PRODUCT] Payload:", data);
+
+            const chunks = [];
+            const {
+              title = "SALES REPORT",
+              dateFrom = "",
+              dateTo = "",
+              printedAt = "",
+              items = [],
+              totals = {},
+            } = data || {};
+
+            const safeItems = Array.isArray(items) ? items : [];
+            const safeTotals = totals || {};
+
+            const initPrinter = Buffer.from([0x1b, 0x40]);
+            const alignLeft = Buffer.from([0x1b, 0x61, 0x00]);
+            const alignCenter = Buffer.from([0x1b, 0x61, 0x01]);
+            const boldOn = Buffer.from([0x1b, 0x45, 0x01]);
+            const boldOff = Buffer.from([0x1b, 0x45, 0x00]);
+            const doubleWidthOn = Buffer.from([0x1d, 0x21, 0x10]);
+            const normalSize = Buffer.from([0x1d, 0x21, 0x00]);
+            const cutPaper = Buffer.from([0x1d, 0x56, 0x00]);
+
+            const nl = (count = 1) => Buffer.from("\n".repeat(count), "ascii");
+            const txt = (value) => Buffer.from(String(value || ""), "ascii");
+
+            const escposSafeText = (value, fallback = "") => {
+              const str = String(value ?? fallback ?? "");
+              return str.replace(/[^\x20-\x7E]/g, " ").trim() || fallback;
+            };
+
+            const escposPeso = (value) =>
+              Number(value || 0).toLocaleString("en-PH", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              });
+
+            const escposRepeat = (char, count) =>
+              String(char || "-").repeat(count);
+
+            const escposPadRight = (value, width) => {
+              const str = String(value || "");
+              if (str.length >= width) return str.slice(0, width);
+              return str + " ".repeat(width - str.length);
+            };
+
+            const escposPadLeft = (value, width) => {
+              const str = String(value || "");
+              if (str.length >= width) return str.slice(0, width);
+              return " ".repeat(width - str.length) + str;
+            };
+
+            const escposWrapText = (value, width = LINE_WIDTH) => {
+              const text = String(value || "").trim();
+              if (!text) return [""];
+
+              const words = text.split(/\s+/);
+              const lines = [];
+              let current = "";
+
+              for (const word of words) {
+                if (!current) {
+                  current = word;
+                  continue;
+                }
+
+                if ((current + " " + word).length <= width) {
+                  current += " " + word;
+                } else {
+                  lines.push(current);
+                  current = word;
+                }
+              }
+
+              if (current) lines.push(current);
+              return lines.length ? lines : [text];
+            };
+
+            const escposFormatLeftRight = (left, right, width = LINE_WIDTH) => {
+              const l = String(left || "");
+              const r = String(right || "");
+
+              if (l.length + r.length >= width) {
+                return `${l} ${r}`;
+              }
+
+              return l + " ".repeat(width - l.length - r.length) + r;
+            };
+
+            const pushDivider = () => {
+              chunks.push(txt(escposRepeat("-", LINE_WIDTH)));
+              chunks.push(nl());
+            };
+
+            const pushWrappedCentered = (value, width = LINE_WIDTH) => {
+              escposWrapText(value, width).forEach((line) => {
+                chunks.push(txt(line));
+                chunks.push(nl());
+              });
+            };
+
+            const pushMetaRow = (label, value) => {
+              const left = String(label || "");
+              const right = escposSafeText(value, "-");
+
+              if (left.length + right.length <= LINE_WIDTH) {
+                chunks.push(
+                  txt(escposFormatLeftRight(left, right, LINE_WIDTH)),
+                );
+                chunks.push(nl());
+              } else {
+                chunks.push(txt(left));
+                chunks.push(nl());
+                escposWrapText(right, LINE_WIDTH).forEach((line) => {
+                  chunks.push(txt(line));
+                  chunks.push(nl());
+                });
+              }
+            };
+
+            const formatItemRow = (name, qty, amt) => {
+              const nameWidth = 22;
+              const qtyWidth = 6;
+              const amtWidth = 14;
+
+              return (
+                escposPadRight(name, nameWidth) +
+                escposPadRight(qty, qtyWidth) +
+                escposPadLeft(amt, amtWidth)
+              );
+            };
+
+            chunks.push(initPrinter);
+
+            chunks.push(alignCenter);
+            chunks.push(boldOn);
+            chunks.push(doubleWidthOn);
+            pushWrappedCentered(String(title || "SALES REPORT").toUpperCase());
+            chunks.push(normalSize);
+            chunks.push(boldOff);
+
+            chunks.push(txt(`${dateFrom || "-"} - ${dateTo || "-"}`));
+            chunks.push(nl());
+
+            pushDivider();
+
+            chunks.push(alignLeft);
+            chunks.push(boldOn);
+            chunks.push(txt(formatItemRow("ITEM", "QTY", "TOTAL")));
+            chunks.push(nl());
+            chunks.push(boldOff);
+
+            safeItems.forEach((item) => {
+              const itemName = String(item?.name || "-").toUpperCase();
+              const qtyText = String(Number(item?.qty || 0));
+              const amtText = escposPeso(item?.amount || 0);
+
+              const nameLines = escposWrapText(itemName, 22);
+
+              nameLines.forEach((line, index) => {
+                if (index === 0) {
+                  chunks.push(txt(formatItemRow(line, qtyText, amtText)));
+                } else {
+                  chunks.push(txt(line));
+                }
+                chunks.push(nl());
+              });
+
+              if (nameLines.length > 1) {
+                chunks.push(nl());
+              }
+
+              // if (item?.code) {
+              //   const codeLines = escposWrapText(
+              //     `CODE: ${String(item.code).toUpperCase()}`,
+              //     LINE_WIDTH,
+              //   );
+              //   codeLines.forEach((line) => {
+              //     chunks.push(txt(line));
+              //     chunks.push(nl());
+              //   });
+              // }
+            });
+
+            pushDivider();
+
+            pushMetaRow("TOTAL QTY:", Number(safeTotals.qty || 0));
+            pushMetaRow(
+              "GRAND TOTAL:",
+              `P${escposPeso(safeTotals.amount || 0)}`,
+            );
+
+            pushDivider();
+
+            chunks.push(alignCenter);
+            chunks.push(txt(`DATE: ${printedAt || "-"}`));
+            chunks.push(nl(3));
+            chunks.push(cutPaper);
+
+            const payload = Buffer.concat(chunks);
+
+            client.write(payload, (err) => {
+              if (err) {
+                console.error("[ESC/POS SALES PER PRODUCT] Write error:", err);
+                return done({
+                  success: false,
+                  message:
+                    err?.message ||
+                    "Failed to write sales per product report to printer",
+                });
+              }
+
+              client.end();
+            });
+          } catch (error) {
+            console.error(
+              "[ESC/POS SALES PER PRODUCT] Build/print error:",
+              error,
+            );
+            done({
+              success: false,
+              message:
+                error?.message || "ESC/POS sales per product print failed",
+            });
+          }
+        });
+
+        client.on("timeout", () => {
+          console.error("[ESC/POS SALES PER PRODUCT] Socket timeout");
+          done({
+            success: false,
+            message: "Sales per product printer socket timeout",
+          });
+        });
+
+        client.on("error", (err) => {
+          console.error("[ESC/POS SALES PER PRODUCT] Socket error:", err);
+          done({
+            success: false,
+            message:
+              err?.message || "Sales per product printer connection error",
+          });
+        });
+
+        client.on("close", () => {
+          console.log("[ESC/POS SALES PER PRODUCT] Connection closed");
+          done({
+            success: true,
+            message: "Sales per product report printed successfully",
+          });
+        });
+
+        client.connect(port, host);
+      });
+    } catch (error) {
+      console.error("ESC/POS sales per product print error:", error);
+      return {
+        success: false,
+        message: error?.message || "ESC/POS sales per product print failed",
       };
     }
   });
