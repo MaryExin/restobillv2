@@ -1,9 +1,4 @@
-import React, {
-  useState,
-  useEffect,
-  useCallback,
-  useMemo,
-} from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   FaSearch,
   FaSyncAlt,
@@ -19,25 +14,22 @@ const SalesPerProductModal = ({ isOpen, onClose }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [salesData, setSalesData] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   const [dateFrom, setDateFrom] = useState(today);
   const [dateTo, setDateTo] = useState(today);
 
-  // ================= FETCH DATA =================
   const fetchSales = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(
-        "http://localhost/api/reports_dashboard.php",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            datefrom: dateFrom,
-            dateto: dateTo,
-          }),
-        }
-      );
+      const res = await fetch("http://localhost/api/reports_dashboard.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          datefrom: dateFrom,
+          dateto: dateTo,
+        }),
+      });
 
       const data = await res.json();
       setSalesData(data?.salesPerProduct || []);
@@ -53,18 +45,21 @@ const SalesPerProductModal = ({ isOpen, onClose }) => {
     if (isOpen) fetchSales();
   }, [isOpen, fetchSales]);
 
-  // ================= FILTER LOGIC =================
   const filteredData = useMemo(() => {
     const kw = searchTerm.toLowerCase().trim();
     if (!kw) return salesData;
+
     return salesData.filter(
       (item) =>
-        item["Product Name"]?.toLowerCase().includes(kw) ||
-        item["Code"]?.toLowerCase().includes(kw)
+        String(item["Product Name"] || "")
+          .toLowerCase()
+          .includes(kw) ||
+        String(item["Code"] || "")
+          .toLowerCase()
+          .includes(kw),
     );
   }, [salesData, searchTerm]);
 
-  // ================= CALC TOTALS =================
   const totals = useMemo(() => {
     return filteredData.reduce(
       (acc, curr) => {
@@ -72,20 +67,64 @@ const SalesPerProductModal = ({ isOpen, onClose }) => {
         acc.amt += Number(curr["Gross Sales"] || 0);
         return acc;
       },
-      { qty: 0, amt: 0 }
+      { qty: 0, amt: 0 },
     );
   }, [filteredData]);
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (filteredData.length === 0) {
       alert("No data to print.");
       return;
     }
-    window.print();
+
+    if (!window.electronAPI?.printEscposSalesPerProduct) {
+      alert("ESC/POS print API is not available.");
+      return;
+    }
+
+    try {
+      setIsPrinting(true);
+
+      const result = await window.electronAPI.printEscposSalesPerProduct({
+        title: "SALES REPORT",
+        dateFrom,
+        dateTo,
+        printedAt: new Date().toLocaleString(),
+        items: filteredData.map((item) => ({
+          code: item["Code"] || "",
+          name: item["Product Name"] || "",
+          qty: Number(item["Total Qty Sold"] || 0),
+          amount: Number(item["Gross Sales"] || 0),
+        })),
+        totals: {
+          qty: Number(totals.qty || 0),
+          amount: Number(totals.amt || 0),
+        },
+      });
+
+      console.log("sales per product print result:", result);
+
+      if (!result?.success) {
+        throw new Error(
+          result?.message || "Failed to print sales per product report.",
+        );
+      }
+    } catch (error) {
+      console.error("ESC/POS print error:", error);
+      alert(
+        error?.message || "Something went wrong while printing the report.",
+      );
+    } finally {
+      setIsPrinting(false);
+    }
   };
 
   const exportToExcel = () => {
-    if (filteredData.length === 0) return alert("No data to export");
+    if (filteredData.length === 0) {
+      alert("No data to export");
+      return;
+    }
+
     const ws = XLSX.utils.json_to_sheet(filteredData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Sales");
@@ -95,152 +134,110 @@ const SalesPerProductModal = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
-    <>
-      <style>
-        {`
-          @media screen {
-            #thermal-receipt { display: none; }
-          }
+    <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/40 backdrop-blur-sm font-bold">
+      <div className="flex h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white text-slate-800 shadow-2xl">
+        <div className="flex items-center justify-between border-b bg-slate-50 px-6 py-4">
+          <h2 className="text-xl font-bold uppercase tracking-tight">
+            Sales Per Product
+          </h2>
 
-          /* Ito ang magtatago sa lahat ng screen elements habang nagpi-print */
-          @media print {
-            body > *:not(#thermal-receipt) {
-              display: none !important;
-            }
-            .no-print { display: none !important; }
-          }
-        `}
-        
-        {/* DYNAMIC PRINT CSS: Gagawa lang ng Page Size kung may data */}
-        {filteredData.length > 0 ? (
-          `@media print {
-            @page {
-              size: 70mm auto;
-              margin: 0;
-            }
-            #thermal-receipt {
-              display: block !important;
-              width: 70mm;
-              padding: 0;
-              margin: 0;
-              visibility: visible !important;
-            }
-          }`
-        ) : (
-          `@media print {
-            @page { size: 0; margin: 0; }
-            #thermal-receipt { display: none !important; }
-          }`
-        )}
-      </style>
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="rounded border px-2 py-1 text-sm outline-none"
+            />
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="rounded border px-2 py-1 text-sm outline-none"
+            />
 
-      {/* SCREEN UI (Non-printable) */}
-      <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/40 backdrop-blur-sm no-print font-bold">
-        <div className="w-full max-w-6xl h-[90vh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-800">
-          
-          <div className="flex items-center justify-between px-6 py-4 border-b bg-slate-50">
-            <h2 className="text-xl font-bold tracking-tight uppercase">Sales Per Product</h2>
-            <div className="flex items-center gap-2">
-              <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="px-2 py-1 text-sm border rounded outline-none" />
-              <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="px-2 py-1 text-sm border rounded outline-none" />
-              <button onClick={fetchSales} className="p-2 rounded-lg bg-slate-200"><FaSyncAlt className={loading ? "animate-spin" : ""} /></button>
-              <button onClick={exportToExcel} className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white rounded-lg bg-emerald-600"><FaFileExcel /> Excel</button>
-              <button 
-                onClick={handlePrint} 
-                disabled={filteredData.length === 0}
-                className={`flex items-center gap-2 px-4 py-2 text-sm font-bold text-white rounded-lg ${filteredData.length === 0 ? 'bg-gray-400' : 'bg-blue-600'}`}
-              >
-                <FaPrint /> Print
-              </button>
-              <button onClick={onClose} className="p-2 text-white rounded-lg bg-rose-500"><FaTimes /></button>
-            </div>
-          </div>
+            <button
+              onClick={fetchSales}
+              disabled={loading || isPrinting}
+              className="rounded-lg bg-slate-200 p-2 disabled:opacity-60"
+            >
+              <FaSyncAlt className={loading ? "animate-spin" : ""} />
+            </button>
 
-          <div className="p-4 border-b">
-            <div className="flex items-center px-3 py-2 bg-slate-100 rounded-xl">
-              <FaSearch className="mr-2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search product..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full text-sm font-bold bg-transparent outline-none"
-              />
-            </div>
-          </div>
+            <button
+              onClick={exportToExcel}
+              disabled={loading || isPrinting}
+              className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+            >
+              <FaFileExcel /> Excel
+            </button>
 
-          <div className="flex-1 p-4 overflow-auto">
-            <table className="w-full text-sm text-left">
-              <thead>
-                <tr className="border-b text-slate-500 uppercase text-[10px]">
-                  <th className="py-3">Item</th>
-                  <th className="py-3 text-center">Qty</th>
-                  <th className="py-3 text-right">Gross Sales</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredData.map((item, i) => (
-                  <tr key={i} className="border-b">
-                    <td className="py-3">{item["Product Name"]}</td>
-                    <td className="py-3 text-center">{item["Total Qty Sold"]}</td>
-                    <td className="py-3 text-right">₱{Number(item["Gross Sales"]).toLocaleString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+            <button
+              onClick={handlePrint}
+              disabled={filteredData.length === 0 || loading || isPrinting}
+              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold text-white disabled:opacity-60 ${
+                filteredData.length === 0 || loading || isPrinting
+                  ? "bg-gray-400"
+                  : "bg-blue-600"
+              }`}
+            >
+              <FaPrint />
+              {isPrinting ? "Printing..." : "Print"}
+            </button>
 
-          <div className="flex justify-between px-6 py-4 font-bold uppercase border-t bg-slate-50">
-            <span>Total Qty: {totals.qty}</span>
-            <span className="text-blue-600">₱{totals.amt.toLocaleString()}</span>
+            <button
+              onClick={onClose}
+              disabled={isPrinting}
+              className="rounded-lg bg-rose-500 p-2 text-white disabled:opacity-60"
+            >
+              <FaTimes />
+            </button>
           </div>
         </div>
-      </div>
 
-      {/* ================= THERMAL RECEIPT ================= */}
-      {/* Ginagamit ang condition para hindi mag-render ang DOM element kapag empty */}
-      {filteredData.length > 0 && (
-        <div id="thermal-receipt" style={{ color: 'black', textTransform: 'uppercase', fontFamily: 'monospace' }}>
-          <div style={{ textAlign: 'center' }}>
-            <h2 style={{ margin: '0', fontSize: '15px', fontWeight: '900' }}>SALES REPORT</h2>
-            <p style={{ margin: '2px 0', fontSize: '10px' }}>{dateFrom} - {dateTo}</p>
+        <div className="border-b p-4">
+          <div className="flex items-center rounded-xl bg-slate-100 px-3 py-2">
+            <FaSearch className="mr-2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search product..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-transparent text-sm font-bold outline-none"
+            />
           </div>
+        </div>
 
-          <div style={{ borderTop: '2pt solid black', margin: '4px 0' }} />
-
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', fontWeight: '900' }}>
+        <div className="flex-1 overflow-auto p-4">
+          <table className="w-full text-left text-sm">
             <thead>
-              <tr style={{ fontSize: '11px' }}>
-                <th style={{ textAlign: 'left', width: '55%' }}>ITEM</th>
-                <th style={{ textAlign: 'left', width: '15%' }}>QTY</th>
-                <th style={{ textAlign: 'left', width: '30%' }}>TOTAL</th>
+              <tr className="border-b text-[10px] uppercase text-slate-500">
+                <th className="py-3">Item</th>
+                <th className="py-3 text-center">Qty</th>
+                <th className="py-3 text-right">Gross Sales</th>
               </tr>
             </thead>
             <tbody>
               {filteredData.map((item, i) => (
-                <tr key={i}>
-                  <td style={{ padding: '2px 0', wordBreak: 'break-all' }}>{item["Product Name"]}</td>
-                  <td>{item["Total Qty Sold"]}</td>
-                  <td>{Number(item["Gross Sales"]).toLocaleString()}</td>
+                <tr key={i} className="border-b">
+                  <td className="py-3">{item["Product Name"]}</td>
+                  <td className="py-3 text-center">{item["Total Qty Sold"]}</td>
+                  <td className="py-3 text-right">
+                    ₱{Number(item["Gross Sales"] || 0).toLocaleString()}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
-
-          <div style={{ borderTop: '2pt solid black', margin: '4px 0' }} />
-
-          <div style={{ fontSize: '12px', fontWeight: '900' }}>
-            <div>TOTAL QTY: {totals.qty}</div>
-            <div>GRAND TOTAL: ₱{totals.amt.toLocaleString()}</div>
-          </div>
-
-          <div style={{ borderTop: '1pt solid black', margin: '4px 0' }} />
-          <div style={{ textAlign: 'center', fontSize: '9px' }}>
-            <p style={{ margin: 0 }}>DATE: {new Date().toLocaleString()}</p>
-          </div>
         </div>
-      )}
-    </>
+
+        <div className="flex justify-between border-t bg-slate-50 px-6 py-4 font-bold uppercase">
+          <span>Total Qty: {totals.qty}</span>
+          <span className="text-blue-600">
+            ₱{Number(totals.amt || 0).toLocaleString()}
+          </span>
+        </div>
+      </div>
+    </div>
   );
 };
 

@@ -407,7 +407,7 @@ const Orderlist = ({
 
       if (!printResult?.success) {
         alert(printResult?.message || "Printing failed");
-        return;
+        // return;
       }
 
       setIsReprint(false);
@@ -1575,6 +1575,27 @@ const Orderlist = ({
       const formData = new FormData();
       const txId = transactionId || Date.now();
 
+      // read terminal config from public folder
+      let terminalNumber = "1";
+
+      try {
+        const terminalRes = await fetch(
+          `${import.meta.env.BASE_URL}businessInfo.json`,
+        );
+
+        if (!terminalRes.ok) {
+          throw new Error(`HTTP ${terminalRes.status}`);
+        }
+
+        const terminalData = await terminalRes.json();
+        terminalNumber = terminalData?.terminalId || "1";
+      } catch (err) {
+        console.warn(
+          "Failed to load terminal config, using default terminal 1",
+          err,
+        );
+      }
+
       // get logged in user info
       const loggedUserId =
         localStorage.getItem("userId") ||
@@ -1594,7 +1615,7 @@ const Orderlist = ({
           hour12: true,
         }),
       );
-      formData.append("terminal_number", "1");
+      formData.append("terminal_number", terminalNumber);
       formData.append("order_slip_no", txId);
       formData.append("table_number", tableselected);
       formData.append("order_type", orderTypeName);

@@ -622,14 +622,14 @@ export default function PosReadingModal({
         }),
       });
 
-      const result = await response.json();
+      const results = await response.json();
 
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || "Failed to load reading data.");
+      if (!response.ok || !results.success) {
+        throw new Error(results.message || "Failed to load reading data.");
       }
 
       const payload = {
-        ...result.data,
+        ...results.data,
         companyName: businessInfo.companyName || "",
         storeName: businessInfo.storeName || "",
         corpName: businessInfo.corpName || "",
@@ -649,17 +649,21 @@ export default function PosReadingModal({
         summaryCashInDrawer: Number(values.cashDrawerAmount || 0),
         cashInDrawer: Number(values.cashDrawerAmount || 0),
         vatExemption:
-          result.data?.vatExemption ??
-          result.data?.lessVatExemption ??
-          result.data?.vatExemptVat ??
+          results.data?.vatExemption ??
+          results.data?.lessVatExemption ??
+          results.data?.vatExemptVat ??
           0,
       };
 
-      const printHtml = isZReading
-        ? buildZPrintHtml(payload)
-        : buildXPrintHtml(payload);
+      const result = await window.electronAPI.printEscposXzReading({
+        payload,
+        isZReading,
+        printerName: printerName || defaultPrinterName || "",
+      });
 
-      await printViaElectron(printHtml, isZReading ? "z-reading" : "x-reading");
+      if (!result?.success) {
+        throw new Error(result?.message || "Failed to print X/Z reading.");
+      }
 
       if (isZReading) {
         setActiveType(null);

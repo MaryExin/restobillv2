@@ -12,6 +12,10 @@ contextBridge.exposeInMainWorld("appConfig", {
 
 contextBridge.exposeInMainWorld("electronAPI", {
   printReceipt: (payload) => ipcRenderer.invoke("print-receipt", payload),
+  printEscposXzReading: (payload) =>
+    ipcRenderer.invoke("print-escposxzreading", payload),
+  printEscposSalesPerProduct: (payload) =>
+    ipcRenderer.invoke("print-escpossalesperproduct", payload),
   warmupEscPos: () => ipcRenderer.invoke("warmup-escpos"),
   printEscPos: (data) => ipcRenderer.invoke("print-escpos", data),
   printEscPosBilling: (data) => ipcRenderer.invoke("print-escposbilling", data), // NEW
