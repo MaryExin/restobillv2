@@ -17,6 +17,7 @@ import {
   FaCode,
 } from "react-icons/fa";
 import { useTheme } from "../../context/ThemeContext";
+import useApiHost from "../../hooks/useApiHost";
 
 // Modals
 import DashboardModal from "../MainComponents/ReportsModal/DashboardModal";
@@ -97,27 +98,57 @@ const PosReports = ({ open, onClose, terminalNumber, categoryCode, unitCode }) =
   const isDark = theme === "dark";
   const [activeModal, setActiveModal] = useState(null);
   const [zReadingData, setZReadingData] = useState(null);
+  const [isLoadingZReading, setIsLoadingZReading] = useState(false);
+  const apiHost = useApiHost();
 
   if (!open) return null;
 
   const handleZReadingClick = () => {
     setActiveModal("zreadingview");
-    setZReadingData({
-      parReportDate: new Date().toLocaleDateString(),
-      parReportTime: new Date().toLocaleTimeString(),
-      parZCounterNo: "000001",
-      parBegOR: "000001",
-      parEndOR: "000050",
-      parGrossAmount: 1500.00,
-      parDiscount: 150.00,
-      parReturn: 0.00,
-      parNetAmount: 1350.00,
-      parVATableSales: 1205.36,
-      parVATAmount: 144.64,
-      parVATExemptSales: 0.00,
-      parPreviousAccumSales: 10000.00,
-      parPresentAccumSales: 11350.00
-    });
+    setZReadingData(null);
+  };
+
+  const handleFilterZReading = async (selectedDate) => {
+    try {
+      if (!selectedDate) {
+        alert("Please select a date first.");
+        return;
+      }
+
+      setIsLoadingZReading(true);
+      setZReadingData(null);
+
+      
+
+      const res = await fetch(`${apiHost}/api/reprint_z_reading.php`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          selectedDate,
+          categoryCode: localStorage.getItem("posBusinessCategoryCode") || "",
+          unitCode: localStorage.getItem("posBusinessUnitCode") || "",
+          terminalNumber: terminalNumber || "1",
+        }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok || !json.success) {
+        throw new Error(
+          json.message || "Failed to load Z-Reading reprint data."
+        );
+      }
+
+      setZReadingData(json.data);
+    } catch (error) {
+      console.error("Z-Reading reprint error:", error);
+      alert(error.message || "Failed to load Z-Reading reprint.");
+      setZReadingData(null);
+    } finally {
+      setIsLoadingZReading(false);
+    }
   };
 
   const reportItems = [
@@ -204,14 +235,17 @@ const PosReports = ({ open, onClose, terminalNumber, categoryCode, unitCode }) =
       <SalesPerProductModal isOpen={activeModal === "perProduct"} onClose={() => setActiveModal(null)} />
       <TransactionsModal isOpen={activeModal === "transactions"} onClose={() => setActiveModal(null)} />
       <BirESalesModal isOpen={activeModal === "birESales"} onClose={() => setActiveModal(null)} />
-      
-      <ZReadingView 
-        isOpen={activeModal === "zreadingview"} 
+
+      <ZReadingView
+        isOpen={activeModal === "zreadingview"}
         onClose={() => {
           setActiveModal(null);
           setZReadingData(null);
-        }} 
-        reportData={zReadingData} 
+          setIsLoadingZReading(false);
+        }}
+        reportData={zReadingData}
+        isLoading={isLoadingZReading}
+        onFilter={handleFilterZReading}
       />
 
       <RefundsModal isOpen={activeModal === "refunds"} onClose={() => setActiveModal(null)} />
