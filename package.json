@@ -49,6 +49,7 @@
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",
     "lodash": "^4.17.21",
+    "lucide-react": "^1.8.0",
     "npm": "^10.5.0",
     "papaparse": "^5.5.3",
     "qrcode.react": "^3.1.0",

@@ -15,6 +15,7 @@ import {
   FaSyncAlt,
   FaTimes,
   FaCode,
+  FaTag, // New icon for Price Change
 } from "react-icons/fa";
 import { useTheme } from "../../context/ThemeContext";
 import useApiHost from "../../hooks/useApiHost";
@@ -32,6 +33,7 @@ import CustomersModal from "../MainComponents/ReportsModal/CustomersModal";
 import LogsModal from "../MainComponents/ReportsModal/LogsModal";
 import ModalXml from "../Modals/ModalXml";
 import ZReadingView from "../MainComponents/ReportsModal/ZReadingView";
+import PricingDashboard from "../MainComponents/ReportsModal/PricingDashboard";
 
 const MenuCard = ({
   icon: Icon,
@@ -101,6 +103,9 @@ const PosReports = ({ open, onClose, terminalNumber, categoryCode, unitCode }) =
   const [isLoadingZReading, setIsLoadingZReading] = useState(false);
   const apiHost = useApiHost();
 
+  // Authentication check for Price Change button
+  const currentUserName = localStorage.getItem("username");
+
   if (!open) return null;
 
   const handleZReadingClick = () => {
@@ -117,8 +122,6 @@ const PosReports = ({ open, onClose, terminalNumber, categoryCode, unitCode }) =
 
       setIsLoadingZReading(true);
       setZReadingData(null);
-
-      
 
       const res = await fetch(`${apiHost}/api/reprint_z_reading.php`, {
         method: "POST",
@@ -151,6 +154,7 @@ const PosReports = ({ open, onClose, terminalNumber, categoryCode, unitCode }) =
     }
   };
 
+  // Standard report items
   const reportItems = [
     { label: "Dashboard", icon: FaChartLine, color: "#3b82f6", action: () => setActiveModal("dashboard") },
     { label: "Daily Sales", icon: FaCalendarDay, color: "#8b5cf6", action: () => setActiveModal("daily") },
@@ -167,6 +171,16 @@ const PosReports = ({ open, onClose, terminalNumber, categoryCode, unitCode }) =
     { label: "XML", icon: FaCode, color: "#10b981", action: () => setActiveModal("xml") },
   ];
 
+  // Logic: Append Price Change button if current user is 'LightemAdmin'
+  if (currentUserName === "LightemAdmin") {
+    reportItems.push({ 
+      label: "Price Change", 
+      icon: FaTag, 
+      color: "#ec4899", 
+      action: () => setActiveModal("priceChange") 
+    });
+  }
+
   return createPortal(
     <>
       <div
@@ -180,6 +194,7 @@ const PosReports = ({ open, onClose, terminalNumber, categoryCode, unitCode }) =
             isDark ? "bg-[#0f172a] border-blue-500/20" : "bg-[#f8fafc] border-blue-100"
           }`}
         >
+          {/* Header Section */}
           <div
             className={`border-b-2 px-6 py-6 sm:px-8 ${
               isDark ? "border-white/10 bg-white/[0.03]" : "border-slate-200 bg-white"
@@ -187,15 +202,10 @@ const PosReports = ({ open, onClose, terminalNumber, categoryCode, unitCode }) =
           >
             <div className="flex items-start justify-between gap-4">
               <div>
-                <div className="text-sm font-semibold text-blue-500">
-                  Reports
-                </div>
-
-                <h2
-                  className={`mt-1 text-3xl font-bold tracking-tight sm:text-4xl ${
+                <div className="text-sm font-semibold text-blue-500">Reports</div>
+                <h2 className={`mt-1 text-3xl font-bold tracking-tight sm:text-4xl ${
                     isDark ? "text-white" : "text-slate-900"
-                  }`}
-                >
+                  }`}>
                   Reports & Analytics
                 </h2>
               </div>
@@ -213,7 +223,8 @@ const PosReports = ({ open, onClose, terminalNumber, categoryCode, unitCode }) =
             </div>
           </div>
 
-          <div className="px-6 py-6 sm:px-8 sm:py-8">
+          {/* Grid Layout for Menu Cards */}
+          <div className="px-6 py-6 sm:px-8 sm:py-8 overflow-y-auto max-h-[70vh]">
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
               {reportItems.map((item, index) => (
                 <MenuCard
@@ -229,6 +240,7 @@ const PosReports = ({ open, onClose, terminalNumber, categoryCode, unitCode }) =
         </div>
       </div>
 
+      {/* Report Modals */}
       <DashboardModal isOpen={activeModal === "dashboard"} onClose={() => setActiveModal(null)} />
       <DailySalesModal isOpen={activeModal === "daily"} onClose={() => setActiveModal(null)} />
       <HourlySalesModal isOpen={activeModal === "hourly"} onClose={() => setActiveModal(null)} />
@@ -253,6 +265,23 @@ const PosReports = ({ open, onClose, terminalNumber, categoryCode, unitCode }) =
       <CustomersModal isOpen={activeModal === "customers"} onClose={() => setActiveModal(null)} />
       <LogsModal isOpen={activeModal === "logs"} onClose={() => setActiveModal(null)} />
       <ModalXml isOpen={activeModal === "xml"} onClose={() => setActiveModal(null)} />
+      <PricingDashboard isOpen={activeModal === "priceChange"} onClose={() => setActiveModal(null)} />
+
+      {/* Price Change Modal Placeholder
+      {activeModal === "priceChange" && (
+         <div className="fixed inset-0 z-[100001] bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
+             <div className="w-full max-w-md p-8 bg-white shadow-2xl rounded-3xl">
+                 <h2 className="mb-4 text-2xl font-bold">Price Change Module</h2>
+                 <p className="mb-6 text-slate-600">Enter the logic here for updating item prices.</p>
+                 <button 
+                    onClick={() => setActiveModal(null)}
+                    className="w-full py-3 font-bold text-white bg-blue-600 rounded-xl"
+                 >
+                    CLOSE
+                 </button>
+             </div>
+         </div>
+      )} */}
     </>,
     document.body
   );
