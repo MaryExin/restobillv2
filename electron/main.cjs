@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, protocol } = require("electron");
+const { app, BrowserWindow, ipcMain, protocol, session } = require("electron");
 
 const net = require("net");
 
@@ -2590,6 +2590,12 @@ app.whenReady().then(() => {
             chunks.push(nl());
             chunks.push(normalSize);
             chunks.push(boldOff);
+
+            if (safeData.reprintDateTime) {
+              chunks.push(alignCenter);
+              chunks.push(txt(`Reprint Date: ${safeData.reprintDateTime}`));
+              chunks.push(nl());
+            }
 
             chunks.push(alignLeft);
 
