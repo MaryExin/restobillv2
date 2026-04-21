@@ -2591,6 +2591,12 @@ app.whenReady().then(() => {
             chunks.push(normalSize);
             chunks.push(boldOff);
 
+            if (safeData.reprintDateTime) {
+              chunks.push(alignCenter);
+              chunks.push(txt(`Reprint Date: ${safeData.reprintDateTime}`));
+              chunks.push(nl());
+            }
+
             chunks.push(alignLeft);
 
             if (isZReading) {
