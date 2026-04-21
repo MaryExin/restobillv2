@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { FaTimes, FaPrint, FaFilePdf, FaCalendarDay, FaSearch } from 'react-icons/fa';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
   const [selectedDate, setSelectedDate] = useState('');
+  const receiptRef = useRef(null); // Reference to the receipt for PDF export
 
   if (!isOpen) return null;
 
@@ -12,9 +15,8 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
       maximumFractionDigits: 2,
     }).format(n || 0);
 
-  const line = "========================================";
+  const line = "========================================================";
 
-  // Dummy Data for visual representation if reportData is empty
   const displayData = {
     reportDate: reportData?.reportDate || "03/17/26",
     reportTime: reportData?.reportTime || "03:11 PM",
@@ -35,10 +37,41 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
     if (onFilter) onFilter(selectedDate);
   };
 
+  // PDF EXPORT LOGIC
+  const handleExportPDF = async () => {
+    const element = receiptRef.current;
+    if (!element) return;
+
+    try {
+      const canvas = await html2canvas(element, {
+        scale: 3, // High resolution
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      
+      // Standard 80mm thermal paper width (approx 80mm x 297mm)
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: [80, 297]
+      });
+
+      const imgProps = pdf.getImageProperties(imgData);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`Z-REPORT-${displayData.reportDate.replace(/\//g, '-')}.pdf`);
+    } catch (error) {
+      console.error("PDF Export failed:", error);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 transition-all duration-300">
       
-      {/* Main Container */}
       <div className="relative w-full max-w-[850px] flex flex-col md:flex-row gap-6 h-[95vh] animate-in fade-in zoom-in duration-300">
         
         {/* LEFT SIDE: SIDEBAR FILTER */}
@@ -57,29 +90,22 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
                 type="date" 
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="w-full p-3 text-sm transition-all border-2 shadow-inner outline-none cursor-pointer border-blue-50 bg-slate-50 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full p-3 text-sm border-2 shadow-inner outline-none border-blue-50 bg-slate-50 rounded-xl focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
             <button 
               onClick={handleFilter}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2.5 text-xs shadow-lg shadow-blue-500/30 active:scale-95"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2.5 text-xs shadow-lg active:scale-95"
             >
               <FaSearch size={13} /> SEARCH RECORDS
             </button>
-          </div>
-
-          <div className="p-4 mt-8 border-2 border-blue-50 bg-blue-50/50 rounded-xl">
-            <p className="text-[10px] text-blue-700 leading-relaxed italic font-bold">
-              * Select a specific date to retrieve historical Z-Reading data from the server.
-            </p>
           </div>
         </div>
 
         {/* RIGHT SIDE: RECEIPT PREVIEW */}
         <div className="flex flex-col flex-1 h-full min-w-0">
           
-          {/* Header Controls */}
           <div className="flex items-center justify-between mb-3 text-[11px] font-bold tracking-[0.2em] text-white uppercase px-1">
             <span>Reprint Z-Reading</span>
             <button onClick={onClose} className="flex items-center gap-1.5 hover:text-rose-400 transition-colors">
@@ -87,9 +113,8 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
             </button>
           </div>
 
-          {/* Receipt Content - All text set to font-bold */}
-          <div className="bg-[#fefefe] text-slate-900 shadow-[0_0_50px_rgba(0,0,0,0.3)] overflow-y-auto rounded-sm flex-1 p-8 font-mono text-[11px] leading-tight border-2 border-blue-100 font-bold
-                          scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent">
+          {/* Receipt Content - ADDED REF HERE */}
+          <div className="bg-[#fefefe] text-slate-900 shadow-[0_0_50px_rgba(0,0,0,0.3)] overflow-y-auto rounded-sm flex-1 p-8 font-mono text-[11px] leading-tight border-2 border-blue-100 font-bold scrollbar-thin">
             
             {isLoading ? (
               <div className="flex flex-col items-center justify-center h-full gap-4 italic animate-pulse text-slate-400">
@@ -97,17 +122,17 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
                 Retrieving Data...
               </div>
             ) : (
-              <div className="max-w-[340px] mx-auto">
+              <div ref={receiptRef} className="max-w-[340px] mx-auto bg-white p-4">
                 
                 {/* HEADER SECTION */}
                 <div className="text-center">
-                  <div className="text-slate-300">{line}</div>
+                  <div className="text-slate-400">{line}</div>
                   <div className="my-1 text-sm">Z-Reading Report</div>
                   <div className="text-[10px] font-bold text-slate-500">(Reprint: {displayData.reprintDateTime || '03/17/26 03:11 PM'})</div>
-                  <div className="mt-2 text-slate-300">{line}</div>
+                  <div className="mt-2 text-slate-400">{line}</div>
                 </div>
 
-                {/* BASIC INFO WITH DUMMY DATA */}
+                {/* BASIC INFO */}
                 <div className="mt-4 space-y-0.5">
                   <div className="flex justify-between"><span>Report Date:</span><span>{displayData.reportDate}</span></div>
                   <div className="flex justify-between"><span>Report Time:</span><span>{displayData.reportTime}</span></div>
@@ -124,7 +149,7 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
                   <div className="flex justify-between"><span>Z Counter No.:</span><span>{displayData.zCounter}</span></div>
                 </div>
 
-                <div className="my-2 text-slate-300">{line}</div>
+                <div className="my-2 text-slate-400">{line}</div>
 
                 {/* SALES SUMMARY SECTION */}
                 <div className="space-y-0.5">
@@ -133,7 +158,7 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
                   <div className="flex justify-between"><span>Sales for the Day:</span><span>{f(displayData.dailySales)}</span></div>
                 </div>
 
-                <div className="my-2 text-slate-300">{line}</div>
+                <div className="my-2 text-slate-400">{line}</div>
                 <div className="mb-2 text-center">BREAKDOWN OF SALES</div>
                 <div className="space-y-0.5">
                   <div className="flex justify-between"><span>VATABLE SALES:</span><span>{f(displayData.vatableSales)}</span></div>
@@ -144,7 +169,7 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
                   <div className="flex justify-between"><span>OTHER CHARGES:</span><span>{f(displayData.otherCharges)}</span></div>
                 </div>
 
-                <div className="my-2 text-slate-300">{line}</div>
+                <div className="my-2 text-slate-400">{line}</div>
                 <div className="space-y-0.5">
                   <div className="flex justify-between"><span>Gross Amount:</span><span>{f(displayData.gross)}</span></div>
                   <div className="flex justify-between"><span>Discount:</span><span>{f(displayData.discount)}</span></div>
@@ -155,7 +180,7 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
                   <div className="flex justify-between"><span>Net Amount:</span><span>{f(displayData.net)}</span></div>
                 </div>
 
-                <div className="my-2 text-slate-300">{line}</div>
+                <div className="my-2 text-slate-400">{line}</div>
                 <div className="mb-2 text-center">DISCOUNT SUMMARY</div>
                 <div className="space-y-0.5">
                   <div className="flex justify-between"><span>SC. DISC. :</span><span>{f(displayData.scDisc)}</span></div>
@@ -165,14 +190,14 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
                   <div className="flex justify-between"><span>OTHER DISC. :</span><span>{f(displayData.otherDisc)}</span></div>
                 </div>
 
-                <div className="my-2 text-slate-300">{line}</div>
+                <div className="my-2 text-slate-400">{line}</div>
                 <div className="mb-2 text-center">SALES ADJUSTMENT</div>
                 <div className="space-y-0.5">
                   <div className="flex justify-between"><span>VOID:</span><span>{f(displayData.void)}</span></div>
                   <div className="flex justify-between"><span>REFUND:</span><span>{f(displayData.refund)}</span></div>
                 </div>
 
-                <div className="my-2 text-slate-300">{line}</div>
+                <div className="my-2 text-slate-400">{line}</div>
                 <div className="mb-2 text-center">VAT ADJUSTMENT</div>
                 <div className="space-y-0.5">
                   <div className="flex justify-between"><span>SC TRANS. :</span><span>{f(displayData.scTrans)}</span></div>
@@ -183,7 +208,7 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
                   <div className="flex justify-between"><span>OTHER VAT ADJ. :</span><span>{f(displayData.otherVatAdj)}</span></div>
                 </div>
 
-                <div className="my-2 text-slate-300">{line}</div>
+                <div className="my-2 text-slate-400">{line}</div>
                 <div className="mb-2 text-center">TRANSACTION SUMMARY</div>
                 <div className="space-y-0.5">
                   <div className="flex justify-between"><span>Cash in Drawer:</span><span>{f(displayData.cash)}</span></div>
@@ -195,22 +220,26 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
                   <div className="flex justify-between"><span>Payments Received:</span><span>{f(displayData.paymentsReceived)}</span></div>
                 </div>
 
-                <div className="my-2 text-slate-300">{line}</div>
+                <div className="my-2 text-slate-400">{line}</div>
                 <div className="flex justify-between">
                   <span>SHORT / OVER:</span>
                   <span>{f(displayData.shortOver)}</span>
                 </div>
-                <div className="mt-2 text-slate-300">{line}</div>
+                <div className="mt-2 text-slate-400">{line}</div>
               </div>
             )}
           </div>
 
           {/* Action Buttons */}
           <div className="flex w-full gap-3 mt-4">
-            <button className="flex items-center justify-center flex-1 gap-2.5 py-4 font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all shadow-xl shadow-blue-900/20 active:scale-[0.98]">
+            <button className="flex items-center justify-center flex-1 gap-2.5 py-4 font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all shadow-xl active:scale-[0.98]">
               <FaPrint size={16} /> PRINT Z-REPORT
             </button>
-            <button className="p-4 text-blue-600 border-2 border-blue-100 rounded-xl bg-white hover:bg-blue-50 transition-all active:scale-[0.98]">
+            {/* UPDATED PDF BUTTON */}
+            <button 
+              onClick={handleExportPDF}
+              className="p-4 text-blue-600 border-2 border-blue-100 rounded-xl bg-white hover:bg-blue-50 transition-all active:scale-[0.98]"
+            >
               <FaFilePdf size={22} />
             </button>
           </div>
