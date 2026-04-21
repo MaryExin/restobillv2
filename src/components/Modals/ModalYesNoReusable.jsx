@@ -1,6 +1,5 @@
 import React from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useTheme } from "../../context/ThemeContext";
 
 const ModalYesNoReusable = ({
   header = "Are you sure?",
@@ -10,12 +9,13 @@ const ModalYesNoReusable = ({
   triggerYesNoEvent,
   dataTour,
   dataTourBtn,
+  yesLabel = "Yes",
+  noLabel = "No",
 }) => {
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
-
   const handleYes = () => {
-    triggerYesNoEvent(id);
+    if (typeof triggerYesNoEvent === "function") {
+      triggerYesNoEvent(id);
+    }
     setYesNoModalOpen(false);
   };
 
@@ -29,9 +29,11 @@ const ModalYesNoReusable = ({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className={`fixed inset-0 z-[100000] flex items-center justify-center p-4 ${
-          isDark ? "bg-black/70" : "bg-slate-900/40"
-        }`}
+        className="fixed inset-0 z-[100000] flex items-center justify-center p-4"
+        style={{
+          backgroundColor: "rgba(0,0,0,0.6)",
+          backdropFilter: "blur(4px)",
+        }}
       >
         <motion.div
           data-tour={dataTour}
@@ -39,24 +41,26 @@ const ModalYesNoReusable = ({
           animate={{ scale: 1, y: 0 }}
           exit={{ scale: 0.95, y: 10 }}
           transition={{ type: "spring", stiffness: 260, damping: 22 }}
-          className={`w-full max-w-sm rounded-3xl p-8 text-center shadow-2xl transition-colors ${
-            isDark
-              ? "border border-white/10 bg-slate-900"
-              : "border border-slate-200 bg-white"
-          }`}
+          className="w-full max-w-sm rounded-3xl border p-8 text-center shadow-2xl"
+          style={{
+            background: "var(--app-surface)",
+            color: "var(--app-text)",
+            borderColor: "var(--app-border)",
+          }}
         >
-          <h3
-            className={`mb-2 text-xl font-black ${
-              isDark ? "text-white" : "text-slate-900"
-            }`}
-          >
-            {header}
-          </h3>
+          <div
+            className="mx-auto mb-5 h-1.5 w-20 rounded-full"
+            style={{
+              background:
+                "linear-gradient(90deg, var(--app-accent), var(--app-accent-secondary))",
+            }}
+          />
+
+          <h3 className="mb-2 text-xl font-black">{header}</h3>
 
           <p
-            className={`mb-6 text-sm ${
-              isDark ? "text-slate-400" : "text-slate-500"
-            }`}
+            className="mb-6 text-sm"
+            style={{ color: "var(--app-muted-text)" }}
           >
             {message}
           </p>
@@ -67,22 +71,28 @@ const ModalYesNoReusable = ({
               data-tour={dataTourBtn}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="flex-1 rounded-2xl bg-blue-600 py-3 font-bold text-white transition hover:bg-blue-500"
+              className="flex-1 rounded-2xl py-3 font-bold text-white"
+              style={{
+                background:
+                  "linear-gradient(180deg, var(--app-accent), var(--app-accent-secondary))",
+                boxShadow: "0 10px 24px var(--app-accent-glow)",
+              }}
             >
-              Yes
+              {yesLabel}
             </motion.button>
 
             <motion.button
               onClick={handleNo}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className={`flex-1 rounded-2xl py-3 font-bold transition-colors ${
-                isDark
-                  ? "bg-white/10 text-white hover:bg-white/20"
-                  : "bg-slate-200 text-slate-800 hover:bg-slate-300"
-              }`}
+              className="flex-1 rounded-2xl py-3 font-bold"
+              style={{
+                backgroundColor: "var(--app-surface-soft)",
+                color: "var(--app-text)",
+                border: "1px solid var(--app-border)",
+              }}
             >
-              No
+              {noLabel}
             </motion.button>
           </div>
         </motion.div>

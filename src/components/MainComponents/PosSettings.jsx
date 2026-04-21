@@ -13,12 +13,11 @@ import {
   FiMenu,
   FiDatabase,
   FiChevronRight,
-  FiInfo,
 } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "../../context/ThemeContext";
 import { useNavigate } from "react-router-dom";
-import useZustandLoginCred from "../../context/useZustandLoginCred";
+
 // Import Components
 import PosMyAccount from "./PosSettingsModal/PosMyAccount";
 import PosAppearance from "./PosSettingsModal/PosAppearance";
@@ -27,22 +26,11 @@ import PosSystemLogs from "./PosSettingsModal/PosSystemLogs";
 import PosExpenses from "./PosSettingsModal/PosExpenses";
 import PosReportingModal from "./PosSettingsModal/PosReportingModal";
 import PosBackupModal from "./PosSettingsModal/PosBackupModal";
-import PosBusinessInfoManager from "./PosSettingsModal/PosBusinessInfoManager";
 
 const PosSettings = ({ isOpen, onClose, branchInfo }) => {
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
   const isDark = theme === "dark";
-  const { roles } = useZustandLoginCred();
-  const [activeTab, setActiveTab] = useState("My Account");
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-  useEffect(() => {
-    if (isOpen) {
-      setActiveTab("My Account");
-      setIsMobileMenuOpen(false);
-    }
-  }, [isOpen]);
 
   const adaptivePalette = [
     { name: "Crimson", light: "#ef4444", dark: "#fca5a5" },
@@ -53,8 +41,20 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
   ];
 
   const [selectedColorObj, setSelectedColorObj] = useState(adaptivePalette[1]);
+  const [activeTab, setActiveTab] = useState("My Account");
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const accentColor = isDark ? selectedColorObj.dark : selectedColorObj.light;
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab("My Account");
+      setIsMobileMenuOpen(false);
+    }
+  }, [isOpen]);
+
+  const accentColor = "var(--branch-primary)";
+  const accentSecondary = "var(--branch-secondary)";
+  const accentTertiary = "var(--branch-tertiary)";
+
   const getContrastText = () => (isDark ? "#0f172a" : "#ffffff");
 
   if (!isOpen) return null;
@@ -67,7 +67,6 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
     { id: "Registry Sales", icon: FiTrendingUp },
     { id: "Expenses & Petty", icon: FiCreditCard },
     { id: "Email Reports", icon: FiMail },
-    { id: "Business Info", icon: FiInfo },
     { id: "Data & Security", icon: FiDatabase },
     { id: "Appearance", icon: FiLayers },
   ];
@@ -123,10 +122,6 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
       return <PosReportingModal isDark={isDark} accent={accentColor} />;
     }
 
-    if (activeTab === "Business Info") {
-      return <PosBusinessInfoManager isDark={isDark} accent={accentColor} />;
-    }
-
     if (activeTab === "Data & Security") {
       return <PosBackupModal isDark={isDark} accent={accentColor} />;
     }
@@ -159,10 +154,10 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
           mobile ? "w-full px-4 py-4" : "px-4 py-3 whitespace-nowrap"
         } ${
           isActive
-            ? "text-white shadow-[0_0_20px_rgba(37,99,235,0.22)]"
+            ? "text-white shadow-[0_0_20px_rgba(0,0,0,0.12)]"
             : isDark
-              ? "bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-600 hover:text-white"
-              : "bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-900 shadow-sm"
+              ? "bg-slate-900/50 border-slate-800 text-slate-400 hover:text-white"
+              : "bg-white border-slate-200 text-slate-600 hover:text-slate-900 shadow-sm"
         }`}
         style={
           isActive
@@ -171,7 +166,9 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
                 borderColor: accentColor,
                 color: getContrastText(),
               }
-            : {}
+            : {
+                borderColor: isDark ? undefined : undefined,
+              }
         }
       >
         <Icon size={16} />
@@ -209,28 +206,34 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
               : "bg-slate-50 border-slate-200 text-slate-900"
           } shadow-2xl`}
         >
-          {/* Ambient background */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             <div
-              className={`absolute top-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full blur-[120px] ${
-                isDark ? "bg-blue-600/10" : "bg-blue-600/15"
-              }`}
+              className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full blur-[120px]"
+              style={{
+                backgroundColor: accentColor,
+                opacity: isDark ? 0.12 : 0.16,
+              }}
             />
             <div
-              className={`absolute bottom-[-10%] left-[-10%] w-[35%] h-[35%] rounded-full blur-[120px] ${
-                isDark ? "bg-cyan-500/10" : "bg-cyan-500/10"
-              }`}
+              className="absolute bottom-[-10%] left-[-10%] w-[35%] h-[35%] rounded-full blur-[120px]"
+              style={{
+                backgroundColor: accentSecondary,
+                opacity: isDark ? 0.1 : 0.12,
+              }}
             />
           </div>
 
           <div className="relative z-10 flex flex-col h-full">
-            {/* Top bar */}
             <div className="flex items-center justify-between px-5 py-5 border-b sm:px-8 sm:py-6 border-white/5">
               <div>
-                <div className="flex items-center gap-2 text-[10px] font-black tracking-[0.22em] uppercase text-blue-400">
+                <div
+                  className="flex items-center gap-2 text-[10px] font-black tracking-[0.22em] uppercase"
+                  style={{ color: accentColor }}
+                >
                   <FiLayers size={14} />
                   Settings Center
                 </div>
+
                 <h1
                   className={`mt-2 text-3xl sm:text-4xl font-black tracking-tight ${
                     isDark ? "text-white" : "text-slate-900"
@@ -238,13 +241,31 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
                 >
                   {activeTab}
                 </h1>
-                <p
-                  className={`mt-1 text-sm ${
-                    isDark ? "text-slate-400" : "text-slate-500"
-                  }`}
-                >
-                  Manage account, users, reports, backups, and appearance.
-                </p>
+
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <p
+                    className={`text-sm ${
+                      isDark ? "text-slate-400" : "text-slate-500"
+                    }`}
+                  >
+                    Manage account, users, reports, backups, and appearance.
+                  </p>
+
+                  <span
+                    className="inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em]"
+                    style={{
+                      color: accentColor,
+                      borderColor: isDark
+                        ? "color-mix(in srgb, var(--branch-primary) 28%, transparent)"
+                        : "color-mix(in srgb, var(--branch-primary) 18%, #e2e8f0)",
+                      backgroundColor: isDark
+                        ? "color-mix(in srgb, var(--branch-primary) 12%, transparent)"
+                        : "color-mix(in srgb, var(--branch-primary) 8%, white)",
+                    }}
+                  >
+                    Global Theme
+                  </span>
+                </div>
               </div>
 
               <div className="flex items-center gap-3">
@@ -273,7 +294,6 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
             </div>
 
             <div className="flex flex-1 min-h-0">
-              {/* Desktop sidebar */}
               <aside
                 className={`hidden lg:flex lg:w-[310px] flex-col border-r ${
                   isDark
@@ -296,6 +316,7 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
                     >
                       Navigation
                     </p>
+
                     <h2
                       className={`mt-2 text-xl font-black ${
                         isDark ? "text-white" : "text-slate-900"
@@ -303,6 +324,7 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
                     >
                       POS Settings
                     </h2>
+
                     <div
                       className="w-14 h-1 mt-3 rounded-full"
                       style={{ backgroundColor: accentColor }}
@@ -319,7 +341,6 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
                 </div>
               </aside>
 
-              {/* Main content */}
               <main className="flex flex-col flex-1 min-h-0">
                 <div className="flex-1 min-h-0 px-5 pb-5 pt-4 sm:px-8 sm:pb-8">
                   <div
@@ -343,6 +364,7 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
                       >
                         Active Module
                       </p>
+
                       <h2
                         className={`mt-1 text-2xl font-black ${
                           isDark ? "text-white" : "text-slate-900"
@@ -373,7 +395,6 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
             </div>
           </div>
 
-          {/* Mobile menu */}
           <AnimatePresence>
             {isMobileMenuOpen && (
               <>
@@ -398,9 +419,13 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
                 >
                   <div className="flex items-center justify-between p-5 border-b border-white/5">
                     <div>
-                      <p className="text-[10px] font-black tracking-[0.24em] uppercase text-blue-400">
+                      <p
+                        className="text-[10px] font-black tracking-[0.24em] uppercase"
+                        style={{ color: accentColor }}
+                      >
                         Settings Menu
                       </p>
+
                       <h2
                         className={`mt-1 text-2xl font-black ${
                           isDark ? "text-white" : "text-slate-900"

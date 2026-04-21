@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -27,22 +25,98 @@ import PosSettings from "../MainComponents/PosSettings";
 
 import Billing from "../../assets/Billing.jpg";
 
-import { useTheme } from "../../context/ThemeContext";
 import PosQuickActionTile from "../MainComponents/Common/PosQuickActionTile";
 
 import useZustandLoginCred from "../../context/useZustandLoginCred";
 import useApiHost from "../../hooks/useApiHost";
+import { useTheme } from "../../context/ThemeContext";
 
 const POS_HOME_BG = "./pos-home-bg.png";
 const HEADER_HEIGHT = 96;
 const FOOTER_HEIGHT = 118;
 
+const hexToRgba = (hex, alpha = 1) => {
+  if (!hex) return `rgba(59,130,246,${alpha})`;
+
+  let clean = String(hex).replace("#", "").trim();
+
+  if (clean.length === 3) {
+    clean = clean
+      .split("")
+      .map((char) => char + char)
+      .join("");
+  }
+
+  if (clean.length !== 6) {
+    return `rgba(59,130,246,${alpha})`;
+  }
+
+  const r = parseInt(clean.slice(0, 2), 16);
+  const g = parseInt(clean.slice(2, 4), 16);
+  const b = parseInt(clean.slice(4, 6), 16);
+
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+const resolveThemeImageUrl = (value, apiHost) => {
+  const cleanValue = typeof value === "string" ? value.trim() : "";
+  if (!cleanValue) return "";
+
+  if (
+    cleanValue.startsWith("http://") ||
+    cleanValue.startsWith("https://") ||
+    cleanValue.startsWith("data:")
+  ) {
+    return cleanValue;
+  }
+
+  const base = typeof apiHost === "string" ? apiHost.replace(/\/$/, "") : "";
+  if (!base) return cleanValue;
+
+  if (cleanValue.startsWith("/uploads/")) {
+    return `${base}${cleanValue}`;
+  }
+
+  if (cleanValue.startsWith("uploads/")) {
+    return `${base}/${cleanValue}`;
+  }
+
+  return cleanValue;
+};
+
 const LayoutPos = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const apiHost = useApiHost();
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
+  const { theme, isDark, themeSettings } = useTheme();
+
+  const brandPrimary = isDark
+    ? themeSettings?.Dark_Primary || "#2563eb"
+    : themeSettings?.Light_Primary || "#38bdf8";
+
+  const brandSecondary = isDark
+    ? themeSettings?.Dark_Secondary || "#1d4ed8"
+    : themeSettings?.Light_Secondary || "#0ea5e9";
+
+  const appBackground = isDark
+    ? themeSettings?.Dark_Background || "#0f172a"
+    : themeSettings?.Light_Background || "#f8fafc";
+
+  const appSurface = isDark
+    ? themeSettings?.Dark_Surface || "#111827"
+    : themeSettings?.Light_Surface || "#ffffff";
+
+  const appText = isDark
+    ? themeSettings?.Dark_Text || "#ffffff"
+    : themeSettings?.Light_Text || "#0f172a";
+
+  const dashboardBackgroundImage = useMemo(() => {
+    const resolved = resolveThemeImageUrl(
+      themeSettings?.Dashboard_Background_Url || "",
+      apiHost,
+    );
+    return resolved || POS_HOME_BG;
+  }, [themeSettings?.Dashboard_Background_Url, apiHost]);
 
   const { userId } = useZustandLoginCred();
 
@@ -126,7 +200,6 @@ const LayoutPos = ({ children }) => {
   }, [dateselection]);
 
   const isClosed = branchInfo.shiftStatus?.toLowerCase() !== "open";
-  const COLORS = { brandSecondary: "var(--color-brandSecondary, #169b43)" };
 
   const handleClose = () => {
     setIsLogoutConfirmOpen(true);
@@ -307,9 +380,11 @@ const LayoutPos = ({ children }) => {
 
   return (
     <div
-      className={`relative h-screen w-full overflow-hidden transition-colors duration-300 ${
-        isDark ? "bg-[#0f172a]" : "bg-transparent"
-      }`}
+      className="relative h-screen w-full overflow-hidden transition-colors duration-300"
+      style={{
+        backgroundColor: isDark ? appBackground : "transparent",
+        color: appText,
+      }}
     >
       {isLogoutConfirmOpen && (
         <ModalYesNoReusable
@@ -351,7 +426,7 @@ const LayoutPos = ({ children }) => {
       <div
         className="absolute inset-0"
         style={{
-          backgroundImage: `url(${POS_HOME_BG})`,
+          backgroundImage: `url(${dashboardBackgroundImage})`,
           backgroundPosition: "center",
           backgroundSize: "cover",
           backgroundRepeat: "no-repeat",
@@ -361,7 +436,7 @@ const LayoutPos = ({ children }) => {
       <motion.div
         className="pointer-events-none absolute inset-0"
         animate={{
-          opacity: [0.55, 0.8, 0.55],
+          opacity: [0.45, 0.72, 0.45],
           scale: [1, 1.06, 1],
         }}
         transition={{
@@ -370,8 +445,13 @@ const LayoutPos = ({ children }) => {
           ease: "easeInOut",
         }}
         style={{
-          background:
-            "radial-gradient(circle at center, rgba(160,190,255,0.38) 0%, rgba(110,150,255,0.24) 12%, rgba(55,110,230,0.12) 24%, rgba(8,24,64,0.02) 42%, rgba(0,0,0,0) 58%)",
+          background: `radial-gradient(circle at center, ${hexToRgba(
+            brandPrimary,
+            0.38,
+          )} 0%, ${hexToRgba(brandSecondary, 0.24)} 12%, ${hexToRgba(
+            brandPrimary,
+            0.12,
+          )} 24%, rgba(8,24,64,0.02) 42%, rgba(0,0,0,0) 58%)`,
           filter: "blur(16px)",
           transformOrigin: "center center",
         }}
@@ -380,7 +460,7 @@ const LayoutPos = ({ children }) => {
       <motion.div
         className="pointer-events-none absolute inset-0"
         animate={{
-          opacity: [0.2, 0.35, 0.2],
+          opacity: [0.16, 0.3, 0.16],
           scale: [1, 1.1, 1],
         }}
         transition={{
@@ -389,8 +469,13 @@ const LayoutPos = ({ children }) => {
           ease: "easeInOut",
         }}
         style={{
-          background:
-            "radial-gradient(circle at center, rgba(138,170,255,0.30) 0%, rgba(83,124,255,0.16) 18%, rgba(44,83,190,0.08) 34%, rgba(0,0,0,0) 60%)",
+          background: `radial-gradient(circle at center, ${hexToRgba(
+            brandSecondary,
+            0.28,
+          )} 0%, ${hexToRgba(brandPrimary, 0.16)} 18%, ${hexToRgba(
+            brandSecondary,
+            0.08,
+          )} 34%, rgba(0,0,0,0) 60%)`,
           filter: "blur(36px)",
           transformOrigin: "center center",
         }}
@@ -400,7 +485,7 @@ const LayoutPos = ({ children }) => {
         className="pointer-events-none absolute inset-0"
         animate={{
           rotate: [0, 360],
-          opacity: [0.1, 0.18, 0.1],
+          opacity: [0.08, 0.16, 0.08],
         }}
         transition={{
           rotate: {
@@ -419,20 +504,20 @@ const LayoutPos = ({ children }) => {
             conic-gradient(
               from 0deg at center,
               rgba(255,255,255,0) 0deg,
-              rgba(135,170,255,0.00) 18deg,
-              rgba(135,170,255,0.16) 34deg,
+              ${hexToRgba(brandSecondary, 0.0)} 18deg,
+              ${hexToRgba(brandSecondary, 0.16)} 34deg,
               rgba(255,255,255,0.00) 54deg,
               rgba(255,255,255,0.00) 78deg,
-              rgba(135,170,255,0.10) 96deg,
+              ${hexToRgba(brandPrimary, 0.1)} 96deg,
               rgba(255,255,255,0.00) 118deg,
               rgba(255,255,255,0.00) 156deg,
-              rgba(135,170,255,0.14) 174deg,
+              ${hexToRgba(brandSecondary, 0.14)} 174deg,
               rgba(255,255,255,0.00) 198deg,
               rgba(255,255,255,0.00) 236deg,
-              rgba(135,170,255,0.12) 258deg,
+              ${hexToRgba(brandPrimary, 0.12)} 258deg,
               rgba(255,255,255,0.00) 278deg,
               rgba(255,255,255,0.00) 316deg,
-              rgba(135,170,255,0.10) 336deg,
+              ${hexToRgba(brandSecondary, 0.1)} 336deg,
               rgba(255,255,255,0.00) 360deg
             )
           `,
@@ -446,7 +531,7 @@ const LayoutPos = ({ children }) => {
         className="pointer-events-none absolute inset-0"
         animate={{
           rotate: [360, 0],
-          opacity: [0.06, 0.12, 0.06],
+          opacity: [0.05, 0.11, 0.05],
           scale: [1, 1.03, 1],
         }}
         transition={{
@@ -471,17 +556,17 @@ const LayoutPos = ({ children }) => {
             conic-gradient(
               from 90deg at center,
               rgba(255,255,255,0) 0deg,
-              rgba(255,210,120,0.00) 35deg,
-              rgba(255,210,120,0.08) 52deg,
+              ${hexToRgba(brandPrimary, 0.0)} 35deg,
+              ${hexToRgba(brandPrimary, 0.08)} 52deg,
               rgba(255,255,255,0.00) 70deg,
               rgba(255,255,255,0.00) 120deg,
-              rgba(255,210,120,0.07) 145deg,
+              ${hexToRgba(brandSecondary, 0.07)} 145deg,
               rgba(255,255,255,0.00) 168deg,
               rgba(255,255,255,0.00) 220deg,
-              rgba(255,210,120,0.06) 242deg,
+              ${hexToRgba(brandPrimary, 0.06)} 242deg,
               rgba(255,255,255,0.00) 268deg,
               rgba(255,255,255,0.00) 315deg,
-              rgba(255,210,120,0.07) 335deg,
+              ${hexToRgba(brandSecondary, 0.07)} 335deg,
               rgba(255,255,255,0.00) 360deg
             )
           `,
@@ -563,9 +648,12 @@ const LayoutPos = ({ children }) => {
                   placeholder="Enter password"
                   className={`w-full rounded-2xl border px-5 py-4 outline-none transition-all ${
                     isDark
-                      ? "border-slate-800 bg-slate-900/60 text-white focus:border-cyan-400/40 focus:ring-4 focus:ring-cyan-500/10"
-                      : "border-slate-300 bg-slate-50 text-slate-900 focus:border-cyan-400 focus:ring-4 focus:ring-cyan-500/10"
+                      ? "border-slate-800 bg-slate-900/60 text-white"
+                      : "border-slate-300 bg-slate-50 text-slate-900"
                   }`}
+                  style={{
+                    boxShadow: `0 0 0 0 ${hexToRgba(brandPrimary, 0)}`,
+                  }}
                 />
 
                 {passwordError && (
@@ -586,7 +674,10 @@ const LayoutPos = ({ children }) => {
 
                   <button
                     onClick={handlePasswordSubmit}
-                    className="flex-1 rounded-2xl bg-gradient-to-b from-cyan-500 to-sky-600 px-5 py-4 font-bold text-white transition-all hover:brightness-110"
+                    className="flex-1 rounded-2xl px-5 py-4 font-bold text-white transition-all hover:brightness-110"
+                    style={{
+                      background: `linear-gradient(180deg, ${brandPrimary} 0%, ${brandSecondary} 100%)`,
+                    }}
                   >
                     Enter
                   </button>
@@ -620,7 +711,7 @@ const LayoutPos = ({ children }) => {
               <div className="mt-2 flex items-center gap-2">
                 <HiOutlineStatusOnline
                   className="text-[17px]"
-                  style={{ color: COLORS.brandSecondary }}
+                  style={{ color: brandSecondary }}
                 />
                 <div className="text-[16px] font-black tracking-tight sm:text-[18px]">
                   {isLoading ? "Loading..." : branchInfo.branch}
@@ -645,7 +736,10 @@ const LayoutPos = ({ children }) => {
                     : "border-white/75 bg-white/20"
                 }`}
               >
-                <FaUserCircle className="text-[30px] text-blue-500 sm:text-[34px]" />
+                <FaUserCircle
+                  className="text-[30px] sm:text-[34px]"
+                  style={{ color: brandPrimary }}
+                />
               </div>
 
               <button
@@ -653,8 +747,7 @@ const LayoutPos = ({ children }) => {
                 onClick={handleClose}
                 className="grid h-11 w-11 place-items-center rounded-2xl text-white shadow-[0_10px_24px_rgba(0,0,0,0.16)] sm:h-12 sm:w-12"
                 style={{
-                  background:
-                    "linear-gradient(180deg, #ff6825 0%, #ef4b17 100%)",
+                  background: `linear-gradient(180deg, ${brandPrimary} 0%, ${brandSecondary} 100%)`,
                 }}
               >
                 <FaPowerOff className="text-[22px]" />
@@ -710,7 +803,7 @@ const LayoutPos = ({ children }) => {
           >
             <FaCog
               className="text-[24px] sm:text-[26px]"
-              style={{ color: COLORS.brandSecondary }}
+              style={{ color: brandSecondary }}
             />
           </button>
         </div>

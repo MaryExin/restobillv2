@@ -972,6 +972,68 @@ function writeBufferToEscposTcp({ host, port = 9100, buffer, timeout = 5000 }) {
 }
 
 app.whenReady().then(() => {
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    const existingHeaders = details.responseHeaders || {};
+    const existingCspHeader =
+      existingHeaders["Content-Security-Policy"] ||
+      existingHeaders["content-security-policy"];
+
+    const cspValue =
+      Array.isArray(existingCspHeader) && existingCspHeader.length > 0
+        ? existingCspHeader[0]
+        : "";
+
+    const hasImgSrc = /(^|;)\s*img-src\s/i.test(cspValue);
+    const hasConnectSrc = /(^|;)\s*connect-src\s/i.test(cspValue);
+
+    let nextCsp = cspValue || "default-src 'self'";
+
+    if (hasImgSrc) {
+      nextCsp = nextCsp.replace(
+        /(^|;)\s*img-src\s+([^;]*)/i,
+        (match, prefix, sources) => {
+          let nextSources = sources;
+          if (!/\bhttp:\/\/localhost\b/i.test(nextSources)) {
+            nextSources += " http://localhost";
+          }
+          if (!/\bhttp:\/\/127\.0\.0\.1\b/i.test(nextSources)) {
+            nextSources += " http://127.0.0.1";
+          }
+          return `${prefix} img-src ${nextSources.trim()}`;
+        },
+      );
+    } else {
+      nextCsp +=
+        "; img-src 'self' data: asset: https: http://localhost http://127.0.0.1";
+    }
+
+    if (hasConnectSrc) {
+      nextCsp = nextCsp.replace(
+        /(^|;)\s*connect-src\s+([^;]*)/i,
+        (match, prefix, sources) => {
+          let nextSources = sources;
+          if (!/\bhttp:\/\/localhost\b/i.test(nextSources)) {
+            nextSources += " http://localhost";
+          }
+          if (!/\bhttp:\/\/127\.0\.0\.1\b/i.test(nextSources)) {
+            nextSources += " http://127.0.0.1";
+          }
+          return `${prefix} connect-src ${nextSources.trim()}`;
+        },
+      );
+    } else {
+      nextCsp +=
+        "; connect-src 'self' https: http://localhost http://127.0.0.1 ws: wss:";
+    }
+
+    callback({
+      responseHeaders: {
+        ...existingHeaders,
+        "Content-Security-Policy": [nextCsp],
+      },
+    });
+  });
+
   ipcMain.handle("test-escpos", async () => {
     const host = getPrinterHost();
     const port = 9100;

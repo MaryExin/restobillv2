@@ -12,13 +12,64 @@ import ModalAttemp from "../Modals/ModalAttemp";
 
 import useZustandLoginCred from "../../context/useZustandLoginCred";
 import useLoginAttempts from "../../context/useLoginAttempts ";
+import { useTheme } from "../../context/ThemeContext";
 
-const RIGHT_IMAGE = ".//login-visual.png";
+const FALLBACK_RIGHT_IMAGE = ".//login-visual.png";
+
+const hexToRgb = (hex) => {
+  if (!hex || typeof hex !== "string") return null;
+
+  let normalized = hex.replace("#", "").trim();
+
+  if (normalized.length === 3) {
+    normalized = normalized
+      .split("")
+      .map((char) => char + char)
+      .join("");
+  }
+
+  if (normalized.length !== 6) return null;
+
+  const num = parseInt(normalized, 16);
+  if (Number.isNaN(num)) return null;
+
+  return {
+    r: (num >> 16) & 255,
+    g: (num >> 8) & 255,
+    b: num & 255,
+  };
+};
+
+const toRgba = (hex, alpha = 1) => {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return `rgba(0,0,0,${alpha})`;
+  return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
+};
+
+const getContrastText = (hex, fallback = "#ffffff") => {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return fallback;
+
+  const brightness = (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
+  return brightness > 155 ? "#0f172a" : "#ffffff";
+};
+
+const readCssVar = (name, fallback = "") => {
+  if (typeof window === "undefined") return fallback;
+
+  const value = getComputedStyle(document.documentElement)
+    .getPropertyValue(name)
+    .trim();
+
+  return value || fallback;
+};
 
 const PosLoginComponent = () => {
   const navigate = useNavigate();
   const userInputRef = useRef(null);
   const apiHost = useApiHost();
+
+  const { isThemeLoading, themeSettings } = useTheme();
 
   const {
     toggleAuthToTrue,
@@ -48,6 +99,34 @@ const PosLoginComponent = () => {
       userInputRef.current.focus();
     }
   }, []);
+
+  const accent = readCssVar("--app-accent", "#2563eb");
+  const accentSecondary = readCssVar("--app-accent-secondary", "#1d4ed8");
+  const bg = readCssVar("--app-bg", "#f8fafc");
+  const surface = readCssVar("--app-surface", "#ffffff");
+  const surfaceSoft = readCssVar("--app-surface-soft", "rgba(255,255,255,0.9)");
+  const text = readCssVar("--app-text", "#0f172a");
+  const mutedText = readCssVar("--app-muted-text", "rgba(15,23,42,0.68)");
+  const accentGlow = readCssVar("--app-accent-glow", "rgba(37,99,235,0.35)");
+
+  const loginBgValue = themeSettings?.Login_Background_Url || "";
+  const loginBackgroundImage = !loginBgValue
+    ? FALLBACK_RIGHT_IMAGE
+    : loginBgValue.startsWith("/")
+      ? `${apiHost}${loginBgValue}`
+      : `${apiHost}/${loginBgValue}`;
+
+  const logoValue = themeSettings?.Logo_Url || "";
+  const logoUrl = !logoValue
+    ? ""
+    : logoValue.startsWith("/")
+      ? `${apiHost}${logoValue}`
+      : `${apiHost}/${logoValue}`;
+
+  const buttonTextColor = useMemo(
+    () => getContrastText(accent, "#ffffff"),
+    [accent],
+  );
 
   const isDisabled = useMemo(() => {
     return (
@@ -167,23 +246,95 @@ const PosLoginComponent = () => {
 
   return (
     <>
-      <div className="h-screen overflow-hidden bg-gradient-to-r from-blue-50 to-blue-200  lg:py-10">
+      <div
+        className="h-screen overflow-hidden lg:py-10"
+        style={{
+          background: `linear-gradient(135deg, ${bg} 0%, ${toRgba(
+            accentSecondary,
+            0.16,
+          )} 100%)`,
+        }}
+      >
         <div className="mx-auto h-full w-full max-w-[1600px]">
           <div className="grid h-full grid-cols-1 md:grid-cols-[420px_minmax(0,1fr)] lg:grid-cols-[460px_minmax(0,1fr)]">
-            <section className="relative flex h-full items-center justify-center overflow-hidden bg-white/80 px-5 py-6 sm:px-6 md:px-8">
-              <div className="absolute inset-0 bg-white/70 backdrop-blur-[2px]" />
+            <section
+              className="relative flex h-full items-center justify-center overflow-hidden px-5 py-6 sm:px-6 md:px-8"
+              style={{
+                backgroundColor: surfaceSoft,
+              }}
+            >
+              <div
+                className="absolute inset-0"
+                style={{
+                  background: `linear-gradient(180deg, ${toRgba(
+                    surface,
+                    0.72,
+                  )} 0%, ${toRgba(bg, 0.12)} 100%)`,
+                  backdropFilter: "blur(4px)",
+                }}
+              />
+
+              <div
+                className="pointer-events-none absolute -left-12 top-10 h-40 w-40 rounded-full blur-3xl"
+                style={{
+                  backgroundColor: toRgba(accent, 0.18),
+                }}
+              />
+              <div
+                className="pointer-events-none absolute -bottom-12 right-0 h-48 w-48 rounded-full blur-3xl"
+                style={{
+                  backgroundColor: toRgba(accentSecondary, 0.18),
+                }}
+              />
 
               <div className="relative z-10 w-full max-w-[340px]">
                 <div className="mb-12">
-                  <h1 className="text-center font-[Poppins-Black] text-[34px] font-extrabold tracking-tight bg-gradient-to-r from-blue-700 via-sky-500 to-fuchsia-400 bg-clip-text text-transparent sm:text-[38px]">
+                  {logoUrl ? (
+                    <div className="mb-6 flex justify-center">
+                      <img
+                        src={logoUrl}
+                        alt="Brand logo"
+                        className="max-h-[78px] w-auto object-contain"
+                        onError={() => console.error("Logo failed:", logoUrl)}
+                      />
+                    </div>
+                  ) : null}
+
+                  <h1
+                    className="text-center text-[34px] font-extrabold tracking-tight sm:text-[38px]"
+                    style={{
+                      color: accent,
+                    }}
+                  >
                     Point of Sales
                   </h1>
+
+                  <p
+                    className="mt-3 text-center text-sm font-medium"
+                    style={{ color: mutedText }}
+                  >
+                    {isThemeLoading
+                      ? "Loading theme..."
+                      : "Sign in to continue"}
+                  </p>
                 </div>
 
                 <form onSubmit={handleOpenConfirm} className="space-y-5">
                   <div className="relative">
-                    <div className="flex h-14 items-center rounded-full border border-blue-400/70 bg-white px-4 shadow-[0_6px_18px_rgba(0,0,0,0.04)]">
-                      <div className="mr-3 grid h-8 w-8 place-items-center rounded-full bg-slate-100 text-slate-500">
+                    <div
+                      className="flex h-14 items-center rounded-full border px-4 shadow-[0_6px_18px_rgba(0,0,0,0.04)]"
+                      style={{
+                        borderColor: toRgba(accent, 0.32),
+                        backgroundColor: toRgba(surface, 1),
+                      }}
+                    >
+                      <div
+                        className="mr-3 grid h-8 w-8 place-items-center rounded-full"
+                        style={{
+                          backgroundColor: toRgba(accent, 0.12),
+                          color: accent,
+                        }}
+                      >
                         <FiUser className="h-4 w-4" />
                       </div>
 
@@ -193,15 +344,30 @@ const PosLoginComponent = () => {
                         value={formData.username}
                         onChange={handleChange("username")}
                         placeholder="Username"
-                        className="h-full w-full border-none bg-transparent text-center text-[17px] font-medium text-slate-600 outline-none placeholder:text-slate-400"
+                        className="h-full w-full border-none bg-transparent text-center text-[17px] font-medium outline-none"
+                        style={{
+                          color: text,
+                        }}
                         autoComplete="username"
                       />
                     </div>
                   </div>
 
                   <div className="relative">
-                    <div className="flex h-14 items-center rounded-full border border-blue-300/80 bg-white px-4 shadow-[0_6px_18px_rgba(0,0,0,0.04)]">
-                      <div className="mr-3 grid h-8 w-8 place-items-center rounded-full bg-slate-100 text-slate-500">
+                    <div
+                      className="flex h-14 items-center rounded-full border px-4 shadow-[0_6px_18px_rgba(0,0,0,0.04)]"
+                      style={{
+                        borderColor: toRgba(accent, 0.24),
+                        backgroundColor: toRgba(surface, 1),
+                      }}
+                    >
+                      <div
+                        className="mr-3 grid h-8 w-8 place-items-center rounded-full"
+                        style={{
+                          backgroundColor: toRgba(accent, 0.12),
+                          color: accent,
+                        }}
+                      >
                         <FiLock className="h-4 w-4" />
                       </div>
 
@@ -216,14 +382,20 @@ const PosLoginComponent = () => {
                           }
                         }}
                         placeholder="••••••"
-                        className="h-full w-full border-none bg-transparent text-center text-[17px] font-medium tracking-[0.2em] text-slate-600 outline-none placeholder:text-slate-400"
+                        className="h-full w-full border-none bg-transparent text-center text-[17px] font-medium tracking-[0.2em] outline-none"
+                        style={{
+                          color: text,
+                        }}
                         autoComplete="current-password"
                       />
 
                       <button
                         type="button"
                         onClick={() => setShowPassword((prev) => !prev)}
-                        className="ml-3 grid h-8 w-8 place-items-center rounded-full text-slate-500 transition hover:bg-slate-100"
+                        className="ml-3 grid h-8 w-8 place-items-center rounded-full transition"
+                        style={{
+                          color: toRgba(text, 0.7),
+                        }}
                       >
                         {showPassword ? (
                           <FiEyeOff className="h-4 w-4" />
@@ -239,13 +411,23 @@ const PosLoginComponent = () => {
                       type="button"
                       onClick={handleOpenConfirm}
                       disabled={isDisabled || isSubmitting}
-                      className="mx-auto flex h-[52px] w-[190px] items-center justify-center rounded-full bg-blue-600 px-6 text-[18px] font-semibold text-gray-100 shadow-[0_14px_28px_rgba(37,99,235,0.32)] transition hover:bg-blue-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+                      className="mx-auto flex h-[52px] w-[190px] items-center justify-center rounded-full px-6 text-[18px] font-semibold shadow-[0_14px_28px_rgba(0,0,0,0.18)] transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+                      style={{
+                        backgroundColor: accent,
+                        color: buttonTextColor,
+                        boxShadow: `0 14px 28px ${accentGlow}`,
+                      }}
                     >
                       {!apiHost ? (
                         "Resolving..."
                       ) : isSubmitting ? (
                         <div className="flex items-center gap-2">
-                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          <div
+                            className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent"
+                            style={{
+                              borderColor: `${buttonTextColor} ${buttonTextColor} transparent ${buttonTextColor}`,
+                            }}
+                          />
                           <span>Logging in...</span>
                         </div>
                       ) : (
@@ -255,19 +437,36 @@ const PosLoginComponent = () => {
                   </div>
                 </form>
 
-                <div className="mt-12 text-center text-[15px] font-semibold text-slate-500 sm:mt-16">
+                <div
+                  className="mt-12 text-center text-[15px] font-semibold sm:mt-16"
+                  style={{ color: toRgba(text, 0.62) }}
+                >
                   Restaurant (Version: 1.0.1-1)
                 </div>
               </div>
             </section>
 
-            <section className="relative hidden h-full  overflow-hidden md:block">
+            <section className="relative hidden h-full overflow-hidden md:block">
               <img
-                src={RIGHT_IMAGE}
+                src={loginBackgroundImage}
                 alt="Login visual"
                 className="h-full w-full object-cover"
+                onError={() =>
+                  console.error(
+                    "Login background failed:",
+                    loginBackgroundImage,
+                  )
+                }
               />
-              <div className="absolute inset-0 bg-gradient-to-l from-transparent via-transparent to-white/8" />
+              <div
+                className="absolute inset-0"
+                style={{
+                  background: `linear-gradient(to left, transparent 0%, ${toRgba(
+                    bg,
+                    0.04,
+                  )} 55%, ${toRgba(surface, 0.02)} 100%)`,
+                }}
+              />
             </section>
           </div>
         </div>

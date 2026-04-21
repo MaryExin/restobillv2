@@ -10,16 +10,47 @@ import {
   AiOutlineDashboard,
   AiOutlineDatabase,
 } from "react-icons/ai";
-import { FaEdit, FaTimes, FaPlus } from "react-icons/fa";
 import { FiSearch, FiX } from "react-icons/fi";
 
-import useCustomQuery from "../../hooks/useCustomQuery";
 import useApiHost from "../../hooks/useApiHost";
-import { colorSchemes } from "../../constants/ColorSchemes";
+import { useTheme } from "../../context/ThemeContext";
 
 import ModalYesNoReusable from "../Modals/ModalYesNoReusable";
 import ModalSuccessNavToSelf from "../Modals/ModalSuccessNavToSelf";
 import ModalFailure from "../Modals/ModalFailure";
+
+/* -----------------------------
+   helpers
+------------------------------ */
+const hexToRgb = (hex) => {
+  if (!hex || typeof hex !== "string") return null;
+
+  let normalized = hex.replace("#", "").trim();
+
+  if (normalized.length === 3) {
+    normalized = normalized
+      .split("")
+      .map((char) => char + char)
+      .join("");
+  }
+
+  if (normalized.length !== 6) return null;
+
+  const num = parseInt(normalized, 16);
+  if (Number.isNaN(num)) return null;
+
+  return {
+    r: (num >> 16) & 255,
+    g: (num >> 8) & 255,
+    b: num & 255,
+  };
+};
+
+const toRgba = (hex, alpha = 1) => {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return hex || `rgba(0,0,0,${alpha})`;
+  return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
+};
 
 /* -----------------------------
    Stable local CRUD read/manage modal
@@ -33,24 +64,13 @@ function ReadBusunitManageModal({
   setManageSearch,
   categories,
   businessUnits,
-  selectedCategory,
   categoryName,
-  setCategoryName,
   unitForm,
-  setUnitForm,
   addedit,
   setaddedit,
-  setYesNoModalOpen,
-  setErrormessage,
   handleCrudFormReset,
   filteredCategories,
   filteredBusinessUnits,
-  openCreateCategory,
-  openEditCategory,
-  openDeleteCategory,
-  openCreateUnit,
-  openEditUnit,
-  openDeleteUnit,
   COLORS,
 }) {
   const close = () => onClose?.();
@@ -84,10 +104,6 @@ function ReadBusunitManageModal({
   const LABEL = "text-[11px] font-semibold tracking-wide theme-muted";
   const INPUT =
     "theme-input h-11 w-full rounded-2xl px-4 text-sm outline-none transition";
-  const GHOST_BTN =
-    "h-11 px-4 rounded-2xl font-semibold transition active:scale-[0.99] theme-surface hover:opacity-90";
-  const PRIMARY_BTN =
-    "h-11 px-4 rounded-2xl font-semibold text-white transition active:scale-[0.99]";
 
   return (
     <AnimatePresence>
@@ -269,93 +285,39 @@ function ReadBusunitManageModal({
                         </div>
 
                         <div className="mt-5 space-y-4">
-                          <div>
-                            <div className={LABEL}>Category</div>
-                            <input
-                              type="text"
-                              value={unitForm.category}
-                              readOnly
-                              className={[INPUT, "mt-1 opacity-80"].join(" ")}
-                              style={{ borderColor: COLORS.brandLight }}
-                            />
-                          </div>
-
-                          <div>
-                            <div className={LABEL}>Business Unit Name</div>
-                            <input
-                              type="text"
-                              value={unitForm.label}
-                              readOnly
-                              className={[INPUT, "mt-1 opacity-80"].join(" ")}
-                              style={{ borderColor: COLORS.brandLight }}
-                            />
-                          </div>
-
-                          <div>
-                            <div className={LABEL}>Category Code</div>
-                            <input
-                              type="text"
-                              value={unitForm.categoryCode}
-                              readOnly
-                              className={[INPUT, "mt-1 opacity-80"].join(" ")}
-                              style={{ borderColor: COLORS.brandLight }}
-                            />
-                          </div>
-
-                          <div>
-                            <div className={LABEL}>Unit Code</div>
-                            <input
-                              type="text"
-                              value={unitForm.unitCode}
-                              readOnly
-                              className={[INPUT, "mt-1 opacity-80"].join(" ")}
-                              style={{ borderColor: COLORS.brandLight }}
-                            />
-                          </div>
-
-                          <div>
-                            <div className={LABEL}>Business Type</div>
-                            <input
-                              type="text"
-                              value={unitForm.businessType}
-                              readOnly
-                              className={[INPUT, "mt-1 opacity-80"].join(" ")}
-                              style={{ borderColor: COLORS.brandLight }}
-                            />
-                          </div>
-
-                          <div>
-                            <div className={LABEL}>TIN Number</div>
-                            <input
-                              type="text"
-                              value={unitForm.Unit_TIN}
-                              readOnly
-                              className={[INPUT, "mt-1 opacity-80"].join(" ")}
-                              style={{ borderColor: COLORS.brandLight }}
-                            />
-                          </div>
-
-                          <div>
-                            <div className={LABEL}>Address</div>
-                            <input
-                              type="text"
-                              value={unitForm.Unit_Address}
-                              readOnly
-                              className={[INPUT, "mt-1 opacity-80"].join(" ")}
-                              style={{ borderColor: COLORS.brandLight }}
-                            />
-                          </div>
-
-                          <div>
-                            <div className={LABEL}>Corporation</div>
-                            <input
-                              type="text"
-                              value={unitForm.Category_Code}
-                              readOnly
-                              className={[INPUT, "mt-1 opacity-80"].join(" ")}
-                              style={{ borderColor: COLORS.brandLight }}
-                            />
-                          </div>
+                          {[
+                            { label: "Category", value: unitForm.category },
+                            {
+                              label: "Business Unit Name",
+                              value: unitForm.label,
+                            },
+                            {
+                              label: "Category Code",
+                              value: unitForm.categoryCode,
+                            },
+                            { label: "Unit Code", value: unitForm.unitCode },
+                            {
+                              label: "Business Type",
+                              value: unitForm.businessType,
+                            },
+                            { label: "TIN Number", value: unitForm.tinNumber },
+                            { label: "Address", value: unitForm.address },
+                            {
+                              label: "Corporation",
+                              value: unitForm.corporation,
+                            },
+                          ].map((field) => (
+                            <div key={field.label}>
+                              <div className={LABEL}>{field.label}</div>
+                              <input
+                                type="text"
+                                value={field.value}
+                                readOnly
+                                className={[INPUT, "mt-1 opacity-80"].join(" ")}
+                                style={{ borderColor: COLORS.brandLight }}
+                              />
+                            </div>
+                          ))}
                         </div>
                       </>
                     )}
@@ -378,11 +340,9 @@ function ReadBusunitManageModal({
                             }}
                           >
                             {activeCrudTab === "category" ? (
-                              <>
-                                <th className="px-4 py-3 text-left text-xs font-semibold theme-text">
-                                  Category
-                                </th>
-                              </>
+                              <th className="px-4 py-3 text-left text-xs font-semibold theme-text">
+                                Category
+                              </th>
                             ) : (
                               <>
                                 <th className="px-4 py-3 text-left text-xs font-semibold theme-text">
@@ -460,53 +420,44 @@ function ReadBusunitManageModal({
 const PosSelectBusunitComponent = () => {
   const navigate = useNavigate();
   const apiHost = useApiHost();
-  const { roles, userId, firstName } = useZustandLoginCred();
+  const { userId, firstName } = useZustandLoginCred();
   const { width } = useWindowSize();
+  const { isDark, themeSettings } = useTheme();
 
   const reduceMotion = useReducedMotion();
   const isMobile = width < 768;
   const reduceMobileMotion = reduceMotion || isMobile;
 
-  const { data: userSelectedTheme } = useCustomQuery(
-    localStorage.getItem("apiendpoint") +
-      import.meta.env.VITE_READ_SELECTED_THEME_ENDPOINT,
-    "userthemes",
-  );
-
-  const applyPalette = (palette) => {
-    if (!palette?.colors) return;
-    const root = document.documentElement;
-    Object.entries(palette.colors).forEach(([key, value]) => {
-      root.style.setProperty(`--color-${key}`, value);
-    });
-  };
-
-  useEffect(() => {
-    if (userSelectedTheme && userSelectedTheme.length > 0) {
-      const themeSelected = userSelectedTheme.filter(
-        (items) => items.userid === userId,
-      );
-
-      if (themeSelected.length > 0) {
-        const palette = colorSchemes.filter(
-          (colors) => colors.name === themeSelected[0].theme,
-        );
-        applyPalette(palette[0]);
-      } else {
-        applyPalette(colorSchemes[0]);
-      }
-    } else {
-      applyPalette(colorSchemes[0]);
+  const activePalette = useMemo(() => {
+    if (isDark) {
+      return {
+        primary: themeSettings?.Dark_Primary || "#2563eb",
+        secondary: themeSettings?.Dark_Secondary || "#1d4ed8",
+        background: themeSettings?.Dark_Background || "#0f172a",
+        surface: themeSettings?.Dark_Surface || "#111827",
+        text: themeSettings?.Dark_Text || "#ffffff",
+      };
     }
-  }, [userSelectedTheme, userId]);
 
-  const COLORS = {
-    brand: "var(--color-brandPrimary, #0f8a3a)",
-    brandSecondary: "var(--color-brandSecondary, #169b43)",
-    brandTertiary: "var(--color-brandTertiary, #8edb9c)",
-    brandLight: "var(--color-light, #c4e5cb)",
-    brandLighter: "var(--color-lighter, #dcf0e0)",
-  };
+    return {
+      primary: themeSettings?.Light_Primary || "#38bdf8",
+      secondary: themeSettings?.Light_Secondary || "#0ea5e9",
+      background: themeSettings?.Light_Background || "#f8fafc",
+      surface: themeSettings?.Light_Surface || "#ffffff",
+      text: themeSettings?.Light_Text || "#0f172a",
+    };
+  }, [isDark, themeSettings]);
+
+  const COLORS = useMemo(
+    () => ({
+      brand: activePalette.primary,
+      brandSecondary: activePalette.secondary,
+      brandTertiary: activePalette.secondary,
+      brandLight: toRgba(activePalette.primary, 0.18),
+      brandLighter: toRgba(activePalette.primary, 0.1),
+    }),
+    [activePalette],
+  );
 
   const emptyUnitForm = {
     id: "",
@@ -543,13 +494,8 @@ const PosSelectBusunitComponent = () => {
   const [activeCrudTab, setActiveCrudTab] = useState("category");
   const [manageSearch, setManageSearch] = useState("");
 
-  const [selectedCategoryId, setSelectedCategoryId] = useState("");
-  const [selectedUnitId, setSelectedUnitId] = useState("");
-
   const [categoryName, setCategoryName] = useState("");
   const [unitForm, setUnitForm] = useState(emptyUnitForm);
-
-  const [errormessage, setErrormessage] = useState("");
 
   const [shiftDetails, setShiftDetails] = useState(null);
   const [isShiftLoading, setIsShiftLoading] = useState(false);
@@ -622,9 +568,9 @@ const PosSelectBusunitComponent = () => {
                 categoryCode: shiftDetails?.Category_Code || "-",
                 unitCode: shiftDetails?.Unit_Code || "-",
                 businessType: shiftDetails?.Business_Type || "-",
-                tinNumber: shiftDetails?.Unit_TIN || "-",
-                address: shiftDetails?.Unit_Address || "-",
-                corporation: shiftDetails?.Category_Code || "-",
+                tinNumber: shiftDetails?.TIN_No || "-",
+                address: shiftDetails?.Address || "-",
+                corporation: shiftDetails?.Corp_Name || "-",
               },
             },
           ]
@@ -742,9 +688,6 @@ const PosSelectBusunitComponent = () => {
       address: shiftDetails?.Address || "",
       corporation: shiftDetails?.Corp_Name || "",
     });
-    setSelectedCategoryId("");
-    setSelectedUnitId("");
-    setErrormessage("");
     setaddedit(activeCrudTab === "category" ? "ViewCategory" : "ViewUnit");
   };
 
@@ -753,13 +696,6 @@ const PosSelectBusunitComponent = () => {
       setaddedit(activeCrudTab === "category" ? "ViewCategory" : "ViewUnit");
     }
   }, [activeCrudTab, addedit]);
-
-  const openCreateCategory = () => {};
-  const openEditCategory = () => {};
-  const openDeleteCategory = () => {};
-  const openCreateUnit = () => {};
-  const openEditUnit = () => {};
-  const openDeleteUnit = () => {};
 
   const handleSelect = async () => {
     if (!selectedCategory || !selectedBusinessUnit) {
@@ -823,7 +759,12 @@ const PosSelectBusunitComponent = () => {
       };
 
   return (
-    <div className="theme-page relative min-h-screen w-full overflow-x-hidden overflow-y-auto">
+    <div
+      className="theme-page relative min-h-screen w-full overflow-x-hidden overflow-y-auto"
+      style={{
+        background: `linear-gradient(135deg, ${toRgba(activePalette.background, 1)} 0%, ${toRgba(activePalette.secondary, isDark ? 0.18 : 0.1)} 100%)`,
+      }}
+    >
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div
           className="absolute -left-20 -top-20 h-72 w-72 rounded-full blur-3xl opacity-30"
@@ -881,24 +822,13 @@ const PosSelectBusunitComponent = () => {
         setManageSearch={setManageSearch}
         categories={categories}
         businessUnits={businessUnits}
-        selectedCategory={selectedCategory}
         categoryName={categoryName}
-        setCategoryName={setCategoryName}
         unitForm={unitForm}
-        setUnitForm={setUnitForm}
         addedit={addedit}
         setaddedit={setaddedit}
-        setYesNoModalOpen={setYesNoModalOpen}
-        setErrormessage={setErrormessage}
         handleCrudFormReset={handleCrudFormReset}
         filteredCategories={filteredCategories}
         filteredBusinessUnits={filteredBusinessUnits}
-        openCreateCategory={openCreateCategory}
-        openEditCategory={openEditCategory}
-        openDeleteCategory={openDeleteCategory}
-        openCreateUnit={openCreateUnit}
-        openEditUnit={openEditUnit}
-        openDeleteUnit={openDeleteUnit}
         COLORS={COLORS}
       />
 
@@ -921,17 +851,6 @@ const PosSelectBusunitComponent = () => {
                   Select Business Unit
                 </h1>
               </div>
-
-              {/* <button
-                type="button"
-                onClick={() => {
-                  setActiveCrudTab("category");
-                  setIsReadOpen(true);
-                }}
-                className="rounded-2xl bg-white/10 px-4 py-2 text-sm font-bold text-gray-100 backdrop-blur-md transition hover:bg-white/15"
-              >
-                Manage Data
-              </button> */}
             </div>
           </div>
 
@@ -1015,7 +934,7 @@ const PosSelectBusunitComponent = () => {
                       className="h-12 rounded-full px-4 text-sm font-bold text-gray-100 transition hover:scale-[0.99] active:scale-[0.98] sm:text-base"
                       style={{
                         background: `linear-gradient(180deg, ${COLORS.brand} 0%, ${COLORS.brandSecondary} 100%)`,
-                        boxShadow: `0 14px 28px color-mix(in srgb, ${COLORS.brand} 34%, transparent)`,
+                        boxShadow: `0 14px 28px ${toRgba(COLORS.brand, 0.28)}`,
                       }}
                     >
                       Select
@@ -1028,7 +947,7 @@ const PosSelectBusunitComponent = () => {
                 <div
                   className="theme-border border-b px-5 py-4"
                   style={{
-                    background: `linear-gradient(180deg, ${COLORS.brandLighter}35 0%, transparent 100%)`,
+                    background: `linear-gradient(180deg, ${COLORS.brandLighter} 0%, transparent 100%)`,
                   }}
                 >
                   <div
