@@ -86,9 +86,9 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
         // posProviderAccreDateIssued: businessInfo.posProviderAccreDateIssued || "",
 
         vatExemption:
-          businessInfo.vatExemption ??
-          businessInfo.lessVatExemption ??
-          businessInfo.vatExemptVat ??
+          source.vatExemption ??
+          source.lessVatExemption ??
+          source.vatExemptVat ??
           0,
       };
 
