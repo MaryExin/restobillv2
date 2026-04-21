@@ -7,9 +7,12 @@ import {
   FaSearch,
 } from "react-icons/fa";
 import useBusinessInfo from "../../../hooks/useBusinessInfo";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
   const [selectedDate, setSelectedDate] = useState("");
+  const receiptRef = useRef(null); // Reference to the receipt for PDF export
 
   const {
     businessInfo,
@@ -25,9 +28,8 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
       maximumFractionDigits: 2,
     }).format(n || 0);
 
-  const line = "========================================";
+  const line = "========================================================";
 
-  // Dummy Data for visual representation if reportData is empty
   const displayData = {
     reportDate: reportData?.reportDate || "03/17/26",
     reportTime: reportData?.reportTime || "03:11 PM",
@@ -104,6 +106,37 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
       alert(error?.message || "Failed to print Z-Reading");
     }
   };
+  // PDF EXPORT LOGIC
+  const handleExportPDF = async () => {
+    const element = receiptRef.current;
+    if (!element) return;
+
+    try {
+      const canvas = await html2canvas(element, {
+        scale: 3, // High resolution
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+
+      // Standard 80mm thermal paper width (approx 80mm x 297mm)
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: [80, 297],
+      });
+
+      const imgProps = pdf.getImageProperties(imgData);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`Z-REPORT-${displayData.reportDate.replace(/\//g, "-")}.pdf`);
+    } catch (error) {
+      console.error("PDF Export failed:", error);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 transition-all duration-300">
@@ -125,13 +158,13 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="w-full p-3 text-sm transition-all border-2 shadow-inner outline-none cursor-pointer border-blue-50 bg-slate-50 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full p-3 text-sm border-2 shadow-inner outline-none border-blue-50 bg-slate-50 rounded-xl focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
             <button
               onClick={handleFilter}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2.5 text-xs shadow-lg shadow-blue-500/30 active:scale-95"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2.5 text-xs shadow-lg active:scale-95"
             >
               <FaSearch size={13} /> SEARCH RECORDS
             </button>
@@ -158,30 +191,30 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
             </button>
           </div>
 
-          {/* Receipt Content - All text set to font-bold */}
-          <div
-            className="bg-[#fefefe] text-slate-900 shadow-[0_0_50px_rgba(0,0,0,0.3)] overflow-y-auto rounded-sm flex-1 p-8 font-mono text-[11px] leading-tight border-2 border-blue-100 font-bold
-                          scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent"
-          >
+          {/* Receipt Content - ADDED REF HERE */}
+          <div className="bg-[#fefefe] text-slate-900 shadow-[0_0_50px_rgba(0,0,0,0.3)] overflow-y-auto rounded-sm flex-1 p-8 font-mono text-[11px] leading-tight border-2 border-blue-100 font-bold scrollbar-thin">
             {isLoading ? (
               <div className="flex flex-col items-center justify-center h-full gap-4 italic animate-pulse text-slate-400">
                 <div className="w-8 h-8 border-4 rounded-full border-slate-200 border-t-blue-500 animate-spin"></div>
                 Retrieving Data...
               </div>
             ) : (
-              <div className="max-w-[340px] mx-auto">
+              <div
+                ref={receiptRef}
+                className="max-w-[340px] mx-auto bg-white p-4"
+              >
                 {/* HEADER SECTION */}
                 <div className="text-center">
-                  <div className="text-slate-300">{line}</div>
+                  <div className="text-slate-400">{line}</div>
                   <div className="my-1 text-sm">Z-Reading Report</div>
                   <div className="text-[10px] font-bold text-slate-500">
                     (Reprint:{" "}
                     {displayData.reprintDateTime || "03/17/26 03:11 PM"})
                   </div>
-                  <div className="mt-2 text-slate-300">{line}</div>
+                  <div className="mt-2 text-slate-400">{line}</div>
                 </div>
 
-                {/* BASIC INFO WITH DUMMY DATA */}
+                {/* BASIC INFO */}
                 <div className="mt-4 space-y-0.5">
                   <div className="flex justify-between">
                     <span>Report Date:</span>
@@ -234,7 +267,7 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
                   </div>
                 </div>
 
-                <div className="my-2 text-slate-300">{line}</div>
+                <div className="my-2 text-slate-400">{line}</div>
 
                 {/* SALES SUMMARY SECTION */}
                 <div className="space-y-0.5">
@@ -252,7 +285,7 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
                   </div>
                 </div>
 
-                <div className="my-2 text-slate-300">{line}</div>
+                <div className="my-2 text-slate-400">{line}</div>
                 <div className="mb-2 text-center">BREAKDOWN OF SALES</div>
                 <div className="space-y-0.5">
                   <div className="flex justify-between">
@@ -281,7 +314,7 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
                   </div>
                 </div>
 
-                <div className="my-2 text-slate-300">{line}</div>
+                <div className="my-2 text-slate-400">{line}</div>
                 <div className="space-y-0.5">
                   <div className="flex justify-between">
                     <span>Gross Amount:</span>
@@ -313,7 +346,7 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
                   </div>
                 </div>
 
-                <div className="my-2 text-slate-300">{line}</div>
+                <div className="my-2 text-slate-400">{line}</div>
                 <div className="mb-2 text-center">DISCOUNT SUMMARY</div>
                 <div className="space-y-0.5">
                   <div className="flex justify-between">
@@ -338,7 +371,7 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
                   </div>
                 </div>
 
-                <div className="my-2 text-slate-300">{line}</div>
+                <div className="my-2 text-slate-400">{line}</div>
                 <div className="mb-2 text-center">SALES ADJUSTMENT</div>
                 <div className="space-y-0.5">
                   <div className="flex justify-between">
@@ -351,7 +384,7 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
                   </div>
                 </div>
 
-                <div className="my-2 text-slate-300">{line}</div>
+                <div className="my-2 text-slate-400">{line}</div>
                 <div className="mb-2 text-center">VAT ADJUSTMENT</div>
                 <div className="space-y-0.5">
                   <div className="flex justify-between">
@@ -380,7 +413,7 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
                   </div>
                 </div>
 
-                <div className="my-2 text-slate-300">{line}</div>
+                <div className="my-2 text-slate-400">{line}</div>
                 <div className="mb-2 text-center">TRANSACTION SUMMARY</div>
                 <div className="space-y-0.5">
                   <div className="flex justify-between">
@@ -413,12 +446,12 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
                   </div>
                 </div>
 
-                <div className="my-2 text-slate-300">{line}</div>
+                <div className="my-2 text-slate-400">{line}</div>
                 <div className="flex justify-between">
                   <span>SHORT / OVER:</span>
                   <span>{f(displayData.shortOver)}</span>
                 </div>
-                <div className="mt-2 text-slate-300">{line}</div>
+                <div className="mt-2 text-slate-400">{line}</div>
               </div>
             )}
           </div>
@@ -431,7 +464,11 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
             >
               <FaPrint size={16} /> PRINT Z-REPORT
             </button>
-            <button className="p-4 text-blue-600 border-2 border-blue-100 rounded-xl bg-white hover:bg-blue-50 transition-all active:scale-[0.98]">
+            {/* UPDATED PDF BUTTON */}
+            <button
+              onClick={handleExportPDF}
+              className="p-4 text-blue-600 border-2 border-blue-100 rounded-xl bg-white hover:bg-blue-50 transition-all active:scale-[0.98]"
+            >
               <FaFilePdf size={22} />
             </button>
           </div>
