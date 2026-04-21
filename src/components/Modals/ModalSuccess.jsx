@@ -11,46 +11,95 @@ const ModalSuccess = ({ header, message, button, route }) => {
   const { endpoint, setEndPoint } = useZustandAPIEndpoint();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black lg:scale-125 bg-opacity-60 backdrop-blur-sm">
-      {/* Gradient border wrapper */}
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm lg:scale-125"
+      style={{
+        backgroundColor: "rgba(0, 0, 0, 0.55)",
+      }}
+    >
       <motion.div
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.8 }}
         transition={{ type: "spring", stiffness: 300, damping: 25 }}
-        className="bg-gradient-to-br from-green-400 to-green-600 p-1 rounded-2xl shadow-2xl"
+        className="overflow-hidden rounded-2xl p-[1px] shadow-2xl"
+        style={{
+          background:
+            "linear-gradient(135deg, var(--app-accent), var(--app-accent-secondary))",
+        }}
       >
-        <div className="bg-white rounded-2xl overflow-hidden relative">
-          {/* Header with geometric shapes */}
-          <div className="relative bg-gradient-to-br from-green-600 to-green-500 h-32 ">
-            {/* Decorative circles */}
-            <div className="absolute -top-8 -left-8 w-24 h-24 bg-green-300 rounded-full opacity-50 mix-blend-multiply animate-pulse" />
-            <div className="absolute -bottom-8 -right-8 w-28 h-28 bg-green-700 rounded-full opacity-40 mix-blend-multiply" />
-            {/* Center icon */}
+        <div
+          className="relative overflow-hidden rounded-2xl"
+          style={{
+            backgroundColor: "var(--app-surface)",
+            color: "var(--app-text)",
+            border: "1px solid var(--app-border)",
+          }}
+        >
+          <div
+            className="relative h-32"
+            style={{
+              background:
+                "linear-gradient(135deg, var(--app-accent), var(--app-accent-secondary))",
+            }}
+          >
+            <div
+              className="absolute -top-8 -left-8 h-24 w-24 animate-pulse rounded-full"
+              style={{
+                backgroundColor: "var(--app-surface-soft)",
+                opacity: 0.35,
+              }}
+            />
+            <div
+              className="absolute -right-8 -bottom-8 h-28 w-28 rounded-full"
+              style={{
+                backgroundColor: "var(--app-bg)",
+                opacity: 0.22,
+              }}
+            />
+
             <div className="absolute inset-0 flex items-center justify-center">
               <motion.div
                 initial={{ rotate: -180, scale: 0, opacity: 0 }}
                 animate={{ rotate: 0, scale: 1, opacity: 1 }}
                 transition={{ duration: 0.7, ease: "easeOut" }}
-                className="bg-white rounded-full p-4 shadow-lg"
+                className="rounded-full p-4 shadow-lg"
+                style={{
+                  backgroundColor: "var(--app-surface)",
+                  border: "1px solid var(--app-border)",
+                }}
               >
-                <FaCheckCircle className="w-16 h-16 text-green-600" />
+                <FaCheckCircle
+                  className="h-16 w-16"
+                  style={{ color: "var(--app-accent)" }}
+                />
               </motion.div>
             </div>
           </div>
 
-          {/* Body */}
-          <div className="pt-20 pb-8 px-6 text-center space-y-4">
-            <h2 className="text-3xl font-bold text-gray-800">{header}</h2>
-            <p className="text-gray-600">{message}</p>
+          <div className="space-y-4 px-6 pt-20 pb-8 text-center">
+            <h2
+              className="text-3xl font-bold"
+              style={{ color: "var(--app-text)" }}
+            >
+              {header}
+            </h2>
+
+            <p style={{ color: "var(--app-muted-text)" }}>{message}</p>
+
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => navigate(route)}
-              className="inline-flex items-center space-x-2 mt-4 px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-full shadow-lg transition"
+              className="mt-4 inline-flex items-center space-x-2 rounded-full px-6 py-3 font-medium text-white shadow-lg transition"
+              style={{
+                background:
+                  "linear-gradient(180deg, var(--app-accent) 0%, var(--app-accent-secondary) 100%)",
+                boxShadow: "0 12px 28px var(--app-accent-glow)",
+              }}
             >
               <span>{button}</span>
-              <FaArrowRight className="w-5 h-5" />
+              <FaArrowRight className="h-5 w-5" />
             </motion.button>
           </div>
         </div>
