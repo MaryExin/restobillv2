@@ -2402,7 +2402,12 @@ const Orderlist = ({
                       isDark ? "text-white" : "text-slate-900"
                     }`}
                   >
-                    <span className="text-blue-500">
+                    <span
+                      className="text-blue-500"
+                      style={{
+                        color: "var(--app-accent)",
+                      }}
+                    >
                       {tableselected || "Select Table"}
                     </span>
                   </h2>
@@ -2453,7 +2458,11 @@ const Orderlist = ({
               {transactionId && (
                 <button
                   onClick={openBillingModal}
-                  className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500"
+                  className="flex items-center gap-2 rounded-xl  px-4 py-2 text-sm font-semibold text-gray-100 "
+                  style={{
+                    backgroundColor: "var(--app-accent)",
+                    boxShadow: "0 12px 28px var(--app-accent-glow)",
+                  }}
                 >
                   <FaReceipt /> View Billing
                 </button>
@@ -2563,13 +2572,21 @@ const Orderlist = ({
                         setselectcategory(cat.item_category);
                         setShowMobileCats(false);
                       }}
-                      className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-semibold transition-all ${
-                        selectcategory === cat.item_category
-                          ? "bg-blue-600 text-white shadow-lg"
-                          : isDark
-                            ? "text-slate-400 hover:bg-white/5"
-                            : "text-slate-700 hover:bg-slate-100"
-                      }`}
+                      className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-semibold transition-all `}
+                      style={{
+                        backgroundColor:
+                          selectcategory === cat.item_category
+                            ? "var(--app-accent)"
+                            : "transparent",
+                        color:
+                          selectcategory === cat.item_category
+                            ? "#ffffff"
+                            : "var(--app-text)",
+                        boxShadow:
+                          selectcategory === cat.item_category
+                            ? "0 12px 28px var(--app-accent-glow)"
+                            : "none",
+                      }}
                     >
                       <span>{getCategoryIcon(cat.item_category)}</span>
                       {cat.item_category}
@@ -2613,36 +2630,43 @@ const Orderlist = ({
                       whileHover={{ y: -6, scale: 1.01 }}
                       whileTap={{ scale: 0.98 }}
                       onClick={() => addToCart(p)}
-                      className={`group relative overflow-hidden rounded-[28px] border text-left transition-all duration-300 ${
-                        isDark
-                          ? "border-white/10 bg-slate-900/85 hover:border-blue-400/40"
-                          : "border-slate-200 bg-white hover:border-blue-400/50 hover:shadow-[0_18px_50px_rgba(15,23,42,0.10)]"
-                      }`}
+                      className="group relative overflow-hidden rounded-[28px] border text-left transition-all duration-300"
+                      style={{
+                        borderColor: "var(--app-border)",
+                        backgroundColor: "var(--app-surface)",
+                      }}
                     >
                       <div
-                        className={`absolute inset-x-0 top-0 h-1 ${
-                          isDark
-                            ? "bg-gradient-to-r from-cyan-500/0 via-blue-400/70 to-blue-500/0"
-                            : "bg-gradient-to-r from-blue-500/0 via-blue-500/70 to-blue-500/0"
-                        }`}
+                        className="absolute inset-x-0 top-0 h-1"
+                        style={{
+                          background:
+                            "linear-gradient(to right, transparent, var(--app-accent), transparent)",
+                        }}
                       />
 
                       <div className="relative flex min-h-[145px] flex-col justify-between p-5">
                         <div className="flex items-start justify-between gap-3">
                           <h4
-                            className={`max-w-[calc(100%-56px)] break-words text-[15px] font-black leading-snug ${
-                              isDark ? "text-white" : "text-slate-900"
-                            }`}
+                            className="max-w-[calc(100%-56px)] break-words text-[15px] font-black leading-snug"
+                            style={{ color: "var(--app-text)" }}
                           >
                             {p.item_name}
                           </h4>
 
                           <div
-                            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition-all ${
-                              isDark
-                                ? "bg-slate-800 text-blue-400 group-hover:bg-blue-500 group-hover:text-white"
-                                : "bg-slate-100 text-blue-600 group-hover:bg-blue-500 group-hover:text-white"
-                            }`}
+                            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition-all group-hover:text-white"
+                            style={{
+                              backgroundColor: "var(--app-surface-soft)",
+                              color: "var(--app-accent)",
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor =
+                                "var(--app-accent)";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor =
+                                "var(--app-surface-soft)";
+                            }}
                           >
                             <FaPlus size={13} />
                           </div>
@@ -2651,13 +2675,15 @@ const Orderlist = ({
                         <div className="flex justify-end">
                           <div className="text-right">
                             <div
-                              className={`mb-1 text-[10px] font-bold uppercase tracking-[0.2em] ${
-                                isDark ? "text-slate-500" : "text-slate-400"
-                              }`}
+                              className="mb-1 text-[10px] font-bold uppercase tracking-[0.2em]"
+                              style={{ color: "var(--app-muted-text)" }}
                             >
                               Price
                             </div>
-                            <div className="text-[22px] font-black text-blue-500">
+                            <div
+                              className="text-[22px] font-black"
+                              style={{ color: "var(--app-accent)" }}
+                            >
                               ₱{Number(p.selling_price || 0).toLocaleString()}
                             </div>
                           </div>
@@ -2670,20 +2696,21 @@ const Orderlist = ({
             </main>
 
             <aside
-              className={`relative hidden min-h-0 w-80 flex-col overflow-hidden transition-colors lg:flex ${
-                isDark
-                  ? "border-l border-white/5 bg-slate-950/40"
-                  : "border-l border-slate-200 bg-slate-50"
-              }`}
+              className="relative hidden min-h-0 w-80 flex-col overflow-hidden transition-colors lg:flex"
+              style={{
+                borderLeft: "1px solid var(--app-border)",
+                backgroundColor: "var(--app-surface-soft)",
+              }}
             >
               <div
-                className={`flex items-center gap-2 p-6 font-bold transition-colors ${
-                  isDark
-                    ? "border-b border-white/5 text-white"
-                    : "border-b border-slate-200 text-slate-900"
-                }`}
+                className="flex items-center gap-2 border-b p-6 font-bold transition-colors"
+                style={{
+                  borderColor: "var(--app-border)",
+                  color: "var(--app-text)",
+                }}
               >
-                <FaShoppingCart className="text-blue-500" /> Cart Summary
+                <FaShoppingCart style={{ color: "var(--app-accent)" }} /> Cart
+                Summary
                 {isCartFromDB && (
                   <span className="ml-auto rounded-full border border-green-500/20 bg-green-500/10 px-2 py-1 text-[10px] text-green-400">
                     Loaded Order
@@ -2693,7 +2720,12 @@ const Orderlist = ({
 
               <button
                 onClick={() => setSummaryCart(true)}
-                className="mx-4 mt-4 flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-lg hover:bg-blue-500"
+                className="mx-4 mt-4 flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold text-gray-100"
+                style={{
+                  background:
+                    "linear-gradient(180deg, var(--app-accent) 0%, var(--app-accent-secondary) 100%)",
+                  boxShadow: "0 12px 28px var(--app-accent-glow)",
+                }}
               >
                 <FaReceipt /> View Full Summary
               </button>
@@ -2701,7 +2733,12 @@ const Orderlist = ({
               <div className="absolute right-4 top-[10px] z-20 flex flex-row items-center gap-2">
                 <button
                   onClick={() => setShowDesktopCartActions((prev) => !prev)}
-                  className="inline-flex h-10 items-center justify-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-500"
+                  className="inline-flex h-10 items-center justify-center rounded-xl px-4 text-sm font-semibold text-gray-100 transition"
+                  style={{
+                    background:
+                      "linear-gradient(180deg, var(--app-accent) 0%, var(--app-accent-secondary) 100%)",
+                    boxShadow: "0 12px 28px var(--app-accent-glow)",
+                  }}
                 >
                   Save
                 </button>
@@ -2715,19 +2752,16 @@ const Orderlist = ({
                     isLoading={isPrintingOnly}
                     disabled={isPrintingOnly}
                     loadingText=""
-                    className="mt-3 h-10 min-w-[44px] px-4 text-sm rounded-xl mb-0"
+                    className="mt-3 mb-0 h-10 min-w-[44px] rounded-xl px-4 text-sm"
                   ></ButtonComponent>
                 )}
               </div>
 
-              <div className="flex-1 min-h-0 overflow-y-auto pr-2">
+              <div className="min-h-0 flex-1 overflow-y-auto pr-2">
                 {visibleAdditionalCartItems.length > 0 && (
                   <div
-                    className={`p-4 pt-2 ${
-                      isDark
-                        ? "border-t border-white/10"
-                        : "border-t border-slate-200"
-                    }`}
+                    className="border-t p-4 pt-2"
+                    style={{ borderColor: "var(--app-border)" }}
                   >
                     <h4 className="mb-3 text-xs font-bold uppercase tracking-widest text-emerald-500">
                       New Items
@@ -2739,7 +2773,6 @@ const Orderlist = ({
                       removeItem={requestRemoveItem}
                       readOnly={false}
                       openItemInstructionModal={openItemInstructionModal}
-                      isDark={isDark}
                     />
                   </div>
                 )}
@@ -2747,9 +2780,8 @@ const Orderlist = ({
                 {loadedCartItems.length > 0 && (
                   <div className="p-4 pb-2">
                     <h4
-                      className={`mb-3 text-xs font-bold uppercase tracking-widest ${
-                        isDark ? "text-slate-400" : "text-slate-500"
-                      }`}
+                      className="mb-3 text-xs font-bold uppercase tracking-widest"
+                      style={{ color: "var(--app-muted-text)" }}
                     >
                       Recent Orders
                     </h4>
@@ -2760,7 +2792,6 @@ const Orderlist = ({
                       removeItem={requestRemoveItem}
                       readOnly={false}
                       openItemInstructionModal={openItemInstructionModal}
-                      isDark={isDark}
                       showInstructionButton={false}
                     />
                   </div>
@@ -2775,7 +2806,6 @@ const Orderlist = ({
                       removeItem={removeItem}
                       readOnly={false}
                       openItemInstructionModal={openItemInstructionModal}
-                      isDark={isDark}
                     />
                   )}
               </div>
@@ -2786,32 +2816,25 @@ const Orderlist = ({
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className={`fixed inset-0 z-[370] flex items-center justify-center p-4 ${
-                      isDark ? "bg-black/70" : "bg-slate-900/40"
-                    }`}
+                    className="fixed inset-0 z-[370] flex items-center justify-center p-4"
+                    style={{ backgroundColor: "rgba(0,0,0,0.55)" }}
                   >
                     <motion.div
                       initial={{ scale: 0.95, y: 10 }}
                       animate={{ scale: 1, y: 0 }}
                       exit={{ scale: 0.95, y: 10 }}
-                      className={`w-full max-w-sm rounded-3xl p-8 text-center shadow-2xl transition-colors ${
-                        isDark
-                          ? "border border-white/10 bg-slate-900"
-                          : "border border-slate-200 bg-white"
-                      }`}
+                      className="w-full max-w-sm rounded-3xl border p-8 text-center shadow-2xl transition-colors"
+                      style={{
+                        borderColor: "var(--app-border)",
+                        backgroundColor: "var(--app-surface)",
+                        color: "var(--app-text)",
+                      }}
                     >
-                      <h3
-                        className={`mb-2 text-xl font-black ${
-                          isDark ? "text-white" : "text-slate-900"
-                        }`}
-                      >
-                        Remove Item?
-                      </h3>
+                      <h3 className="mb-2 text-xl font-black">Remove Item?</h3>
 
                       <p
-                        className={`mb-6 text-sm ${
-                          isDark ? "text-slate-400" : "text-slate-500"
-                        }`}
+                        className="mb-6 text-sm"
+                        style={{ color: "var(--app-muted-text)" }}
                       >
                         Are you sure you want to delete this item from the cart?
                       </p>
@@ -2826,11 +2849,12 @@ const Orderlist = ({
 
                         <button
                           onClick={cancelRemoveItem}
-                          className={`flex-1 rounded-2xl py-3 font-bold transition-colors ${
-                            isDark
-                              ? "bg-white/10 text-white hover:bg-white/20"
-                              : "bg-slate-200 text-slate-800 hover:bg-slate-300"
-                          }`}
+                          className="flex-1 rounded-2xl py-3 font-bold transition-colors"
+                          style={{
+                            backgroundColor: "var(--app-surface-soft)",
+                            color: "var(--app-text)",
+                            border: "1px solid var(--app-border)",
+                          }}
                         >
                           No
                         </button>
@@ -2847,28 +2871,28 @@ const Orderlist = ({
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 30 }}
                     transition={{ duration: 0.2 }}
-                    className={`absolute inset-y-0 right-0 z-20 flex w-[88%] max-w-[320px] flex-col p-5 shadow-2xl backdrop-blur-xl transition-colors ${
-                      isDark
-                        ? "border-l border-white/10 bg-slate-950/95"
-                        : "border-l border-slate-200 bg-white/95"
-                    }`}
+                    className="absolute inset-y-0 right-0 z-20 flex w-[88%] max-w-[320px] flex-col border-l p-5 shadow-2xl backdrop-blur-xl transition-colors"
+                    style={{
+                      borderColor: "var(--app-border)",
+                      backgroundColor: "var(--app-surface)",
+                    }}
                   >
                     <div className="mb-4 flex items-center justify-between">
                       <h3
-                        className={`text-lg font-black ${
-                          isDark ? "text-white" : "text-slate-900"
-                        }`}
+                        className="text-lg font-black"
+                        style={{ color: "var(--app-text)" }}
                       >
                         Cart Actions
                       </h3>
 
                       <button
                         onClick={() => setShowDesktopCartActions(false)}
-                        className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
-                          isDark
-                            ? "bg-white/10 text-slate-300 hover:bg-white/20"
-                            : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                        }`}
+                        className="flex h-9 w-9 items-center justify-center rounded-full transition-colors"
+                        style={{
+                          backgroundColor: "var(--app-surface-soft)",
+                          color: "var(--app-text)",
+                          border: "1px solid var(--app-border)",
+                        }}
                       >
                         <FiX size={16} />
                       </button>
@@ -2876,37 +2900,39 @@ const Orderlist = ({
 
                     <div className="custom-scrollbar flex-1 space-y-4 overflow-y-auto pr-1">
                       <div
-                        className={`rounded-2xl p-4 transition-colors ${
-                          isDark
-                            ? "border border-white/10 bg-white/5"
-                            : "border border-slate-200 bg-slate-50"
-                        }`}
+                        className="rounded-2xl border p-4 transition-colors"
+                        style={{
+                          borderColor: "var(--app-border)",
+                          backgroundColor: "var(--app-surface-soft)",
+                        }}
                       >
                         <div
-                          className={`flex items-center justify-between text-xl font-black ${
-                            isDark ? "text-white" : "text-slate-900"
-                          }`}
+                          className="flex items-center justify-between text-xl font-black"
+                          style={{ color: "var(--app-text)" }}
                         >
                           <span>Total</span>
-                          <span className="text-blue-500">
+                          <span style={{ color: "var(--app-accent)" }}>
                             ₱{totalPrice.toLocaleString()}
                           </span>
                         </div>
-                        <p className="mt-1 text-xs text-slate-500">
+                        <p
+                          className="mt-1 text-xs"
+                          style={{ color: "var(--app-muted-text)" }}
+                        >
                           {totalItems} item{totalItems !== 1 ? "s" : ""}
                         </p>
                       </div>
+
                       <div
-                        className={`rounded-2xl p-3 transition-colors ${
-                          isDark
-                            ? "border border-white/10 bg-white/5"
-                            : "border border-slate-200 bg-slate-50"
-                        }`}
+                        className="rounded-2xl border p-3 transition-colors"
+                        style={{
+                          borderColor: "var(--app-border)",
+                          backgroundColor: "var(--app-surface-soft)",
+                        }}
                       >
                         <label
-                          className={`mb-2 block text-[10px] font-bold uppercase tracking-[0.18em] ${
-                            isDark ? "text-slate-500" : "text-slate-500"
-                          }`}
+                          className="mb-2 block text-[10px] font-bold uppercase tracking-[0.18em]"
+                          style={{ color: "var(--app-muted-text)" }}
                         >
                           Printer
                         </label>
@@ -2914,11 +2940,12 @@ const Orderlist = ({
                         <select
                           value={printerName}
                           onChange={(e) => setPrinterName(e.target.value)}
-                          className={`w-full rounded-xl px-3 py-3 text-sm outline-none ${
-                            isDark
-                              ? "border border-slate-700 bg-slate-900 text-white"
-                              : "border border-slate-300 bg-white text-slate-900"
-                          }`}
+                          className="w-full rounded-xl px-3 py-3 text-sm outline-none"
+                          style={{
+                            border: "1px solid var(--app-border)",
+                            backgroundColor: "var(--app-surface)",
+                            color: "var(--app-text)",
+                          }}
                         >
                           <option value="">Default Printer</option>
                           {printers.map((printer) => (
@@ -2931,15 +2958,17 @@ const Orderlist = ({
                     </div>
 
                     <div
-                      className={`space-y-3 pt-4 ${
-                        isDark
-                          ? "border-t border-white/10"
-                          : "border-t border-slate-200"
-                      }`}
+                      className="space-y-3 border-t pt-4"
+                      style={{ borderColor: "var(--app-border)" }}
                     >
                       <button
                         onClick={handleGenerateQR}
-                        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 py-4 font-bold text-white shadow-xl shadow-blue-600/20 hover:bg-blue-500"
+                        className="flex w-full items-center justify-center gap-2 rounded-2xl py-4 font-bold text-white shadow-xl"
+                        style={{
+                          background:
+                            "linear-gradient(180deg, var(--app-accent) 0%, var(--app-accent-secondary) 100%)",
+                          boxShadow: "0 12px 28px var(--app-accent-glow)",
+                        }}
                       >
                         <IoQrCode size={20} /> Confirm Order
                       </button>
@@ -2947,15 +2976,17 @@ const Orderlist = ({
                       <button
                         onClick={requestClearCart}
                         disabled={isCartFromDB}
-                        className={`flex w-full items-center justify-center gap-2 rounded-2xl py-3 font-bold transition-colors ${
-                          isCartFromDB
-                            ? isDark
-                              ? "cursor-not-allowed border border-white/10 bg-white/5 text-slate-500"
-                              : "cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400"
-                            : isDark
-                              ? "border border-white/10 bg-white/10 text-white hover:bg-white/20"
-                              : "border border-slate-200 bg-slate-100 text-slate-900 hover:bg-slate-200"
-                        }`}
+                        className="flex w-full items-center justify-center gap-2 rounded-2xl py-3 font-bold transition-colors"
+                        style={{
+                          backgroundColor: isCartFromDB
+                            ? "var(--app-surface-soft)"
+                            : "var(--app-surface)",
+                          color: isCartFromDB
+                            ? "var(--app-muted-text)"
+                            : "var(--app-text)",
+                          border: "1px solid var(--app-border)",
+                          opacity: isCartFromDB ? 0.6 : 1,
+                        }}
                       >
                         <FaTrash size={16} /> Clear Cart
                       </button>
@@ -2967,9 +2998,8 @@ const Orderlist = ({
               <AnimatePresence>
                 {showTransferModal && (
                   <motion.div
-                    className={`fixed inset-0 z-[500] flex items-center justify-center backdrop-blur-sm px-3 sm:px-4 py-3 ${
-                      isDark ? "bg-black/60" : "bg-slate-900/30"
-                    }`}
+                    className="fixed inset-0 z-[500] flex items-center justify-center px-3 py-3 backdrop-blur-sm sm:px-4"
+                    style={{ backgroundColor: "rgba(0,0,0,0.55)" }}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
@@ -2978,25 +3008,21 @@ const Orderlist = ({
                       initial={{ opacity: 0, scale: 0.97, y: 8 }}
                       animate={{ opacity: 1, scale: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.97, y: 8 }}
-                      className={`w-full max-w-[820px] rounded-[1.5rem] p-4 sm:p-5 shadow-2xl ${
-                        isDark
-                          ? "bg-slate-950 border border-white/10"
-                          : "bg-white border border-slate-200"
-                      }`}
+                      className="w-full max-w-[820px] rounded-[1.5rem] border p-4 shadow-2xl sm:p-5"
+                      style={{
+                        backgroundColor: "var(--app-surface)",
+                        borderColor: "var(--app-border)",
+                        color: "var(--app-text)",
+                      }}
                     >
-                      <div className="flex items-start justify-between gap-3 mb-4">
+                      <div className="mb-4 flex items-start justify-between gap-3">
                         <div>
-                          <h2
-                            className={`text-lg sm:text-xl font-black ${
-                              isDark ? "text-white" : "text-slate-900"
-                            }`}
-                          >
+                          <h2 className="text-lg font-black sm:text-xl">
                             Transfer Table
                           </h2>
                           <p
-                            className={`text-xs sm:text-sm ${
-                              isDark ? "text-slate-400" : "text-slate-500"
-                            }`}
+                            className="text-xs sm:text-sm"
+                            style={{ color: "var(--app-muted-text)" }}
                           >
                             Choose fixed table, merge tables, or type a special
                             table name.
@@ -3005,32 +3031,37 @@ const Orderlist = ({
 
                         <button
                           onClick={resetTransferState}
-                          className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
-                            isDark
-                              ? "text-slate-400 hover:text-white hover:bg-slate-800"
-                              : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
-                          }`}
+                          className="flex h-9 w-9 items-center justify-center rounded-full transition-all"
+                          style={{
+                            backgroundColor: "var(--app-surface-soft)",
+                            color: "var(--app-text)",
+                            border: "1px solid var(--app-border)",
+                          }}
                         >
                           <FiX size={16} />
                         </button>
                       </div>
 
                       <div
-                        className={`grid grid-cols-3 gap-2 mb-4 p-1 rounded-2xl ${
-                          isDark
-                            ? "bg-slate-900/40 border border-white/5"
-                            : "bg-slate-100 border border-slate-200"
-                        }`}
+                        className="mb-4 grid grid-cols-3 gap-2 rounded-2xl border p-1"
+                        style={{
+                          backgroundColor: "var(--app-surface-soft)",
+                          borderColor: "var(--app-border)",
+                        }}
                       >
                         <button
                           onClick={() => setTransferMode("fixed")}
-                          className={`rounded-xl px-3 py-2.5 text-sm font-bold transition-all ${
-                            transferMode === "fixed"
-                              ? "bg-blue-600 text-white"
-                              : isDark
-                                ? "text-slate-400 hover:text-white"
-                                : "text-slate-600 hover:text-slate-900"
-                          }`}
+                          className="rounded-xl px-3 py-2.5 text-sm font-bold transition-all"
+                          style={{
+                            backgroundColor:
+                              transferMode === "fixed"
+                                ? "var(--app-accent)"
+                                : "transparent",
+                            color:
+                              transferMode === "fixed"
+                                ? "#ffffff"
+                                : "var(--app-muted-text)",
+                          }}
                         >
                           Fixed Table
                         </button>
@@ -3040,13 +3071,17 @@ const Orderlist = ({
                             setTransferMode("merge");
                             seedCurrentMergeTables();
                           }}
-                          className={`rounded-xl px-3 py-2.5 text-sm font-bold transition-all ${
-                            transferMode === "merge"
-                              ? "bg-blue-600 text-white"
-                              : isDark
-                                ? "text-slate-400 hover:text-white"
-                                : "text-slate-600 hover:text-slate-900"
-                          }`}
+                          className="rounded-xl px-3 py-2.5 text-sm font-bold transition-all"
+                          style={{
+                            backgroundColor:
+                              transferMode === "merge"
+                                ? "var(--app-accent)"
+                                : "transparent",
+                            color:
+                              transferMode === "merge"
+                                ? "#ffffff"
+                                : "var(--app-muted-text)",
+                          }}
                         >
                           Merge Table
                         </button>
@@ -3057,13 +3092,17 @@ const Orderlist = ({
                             setSelectedTransferTable("");
                             setTransferSearch("");
                           }}
-                          className={`rounded-xl px-3 py-2.5 text-sm font-bold transition-all ${
-                            transferMode === "transferItem"
-                              ? "bg-blue-600 text-white"
-                              : isDark
-                                ? "text-slate-400 hover:text-white"
-                                : "text-slate-600 hover:text-slate-900"
-                          }`}
+                          className="rounded-xl px-3 py-2.5 text-sm font-bold transition-all"
+                          style={{
+                            backgroundColor:
+                              transferMode === "transferItem"
+                                ? "var(--app-accent)"
+                                : "transparent",
+                            color:
+                              transferMode === "transferItem"
+                                ? "#ffffff"
+                                : "var(--app-muted-text)",
+                          }}
                         >
                           Transfer Product
                         </button>
@@ -3073,9 +3112,8 @@ const Orderlist = ({
                         <div className="space-y-4">
                           <div className="relative">
                             <FaSearch
-                              className={`absolute left-4 top-1/2 -translate-y-1/2 ${
-                                isDark ? "text-slate-600" : "text-slate-400"
-                              }`}
+                              className="absolute left-4 top-1/2 -translate-y-1/2"
+                              style={{ color: "var(--app-muted-text)" }}
                             />
                             <input
                               type="text"
@@ -3084,36 +3122,36 @@ const Orderlist = ({
                               onChange={(e) =>
                                 setTransferSearch(e.target.value)
                               }
-                              className={`w-full rounded-xl py-3 pl-11 pr-4 text-sm focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${
-                                isDark
-                                  ? "bg-slate-900/50 border border-slate-800 text-white focus:border-blue-500/40"
-                                  : "bg-slate-50 border border-slate-300 text-slate-900 focus:border-blue-400"
-                              }`}
+                              className="w-full rounded-xl py-3 pl-11 pr-4 text-sm transition-all focus:outline-none"
+                              style={{
+                                backgroundColor: "var(--app-surface-soft)",
+                                border: "1px solid var(--app-border)",
+                                color: "var(--app-text)",
+                              }}
                             />
                           </div>
 
                           <div>
                             <label
-                              className={`block text-[10px] font-black uppercase tracking-[0.25em] mb-2 ${
-                                isDark ? "text-slate-500" : "text-slate-500"
-                              }`}
+                              className="mb-2 block text-[10px] font-black uppercase tracking-[0.25em]"
+                              style={{ color: "var(--app-muted-text)" }}
                             >
                               Select Fixed Table
                             </label>
 
                             <div
-                              className={`max-h-[200px] overflow-y-auto rounded-2xl p-2 ${
-                                isDark
-                                  ? "border border-white/5 bg-slate-900/30"
-                                  : "border border-slate-200 bg-slate-50"
-                              }`}
+                              className="max-h-[200px] overflow-y-auto rounded-2xl border p-2"
+                              style={{
+                                borderColor: "var(--app-border)",
+                                backgroundColor: "var(--app-surface-soft)",
+                              }}
                             >
                               {transferTableList.filter((table) =>
                                 String(table.table_name || "")
                                   .toLowerCase()
                                   .includes(transferSearch.toLowerCase()),
                               ).length > 0 ? (
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
                                   {transferTableList
                                     .filter((table) =>
                                       String(table.table_name || "")
@@ -3133,46 +3171,44 @@ const Orderlist = ({
                                           onClick={() =>
                                             setSelectedTransferTable(tableName)
                                           }
-                                          className={`group relative rounded-xl px-3 py-3 text-left transition-all duration-200 border shadow-sm hover:scale-[1.01] active:scale-[0.98] ${
-                                            isSelected
-                                              ? isDark
-                                                ? "bg-blue-500/15 border-blue-400/40 text-white shadow-blue-500/10"
-                                                : "bg-blue-50 border-blue-300 text-blue-700 shadow-blue-100"
-                                              : isDark
-                                                ? "bg-slate-800/70 border-white/5 text-slate-200 hover:bg-slate-800"
-                                                : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"
-                                          }`}
+                                          className="group relative rounded-xl border px-3 py-3 text-left shadow-sm transition-all duration-200 hover:scale-[1.01] active:scale-[0.98]"
+                                          style={{
+                                            backgroundColor: isSelected
+                                              ? "color-mix(in srgb, var(--app-accent) 12%, transparent)"
+                                              : "var(--app-surface)",
+                                            borderColor: isSelected
+                                              ? "var(--app-accent)"
+                                              : "var(--app-border)",
+                                            color: "var(--app-text)",
+                                          }}
                                         >
                                           <div className="flex items-start justify-between gap-2">
                                             <div>
                                               <p
-                                                className={`text-[9px] font-black uppercase tracking-[0.2em] mb-1 ${
-                                                  isSelected
-                                                    ? isDark
-                                                      ? "text-blue-300"
-                                                      : "text-blue-500"
-                                                    : isDark
-                                                      ? "text-slate-500"
-                                                      : "text-slate-400"
-                                                }`}
+                                                className="mb-1 text-[9px] font-black uppercase tracking-[0.2em]"
+                                                style={{
+                                                  color: isSelected
+                                                    ? "var(--app-accent)"
+                                                    : "var(--app-muted-text)",
+                                                }}
                                               >
                                                 Table
                                               </p>
-                                              <p className="text-sm font-extrabold leading-tight break-words">
+                                              <p className="break-words text-sm font-extrabold leading-tight">
                                                 {tableName}
                                               </p>
                                             </div>
 
                                             <div
-                                              className={`shrink-0 mt-0.5 h-5 w-5 rounded-full flex items-center justify-center transition-all ${
-                                                isSelected
-                                                  ? isDark
-                                                    ? "bg-blue-500 text-white"
-                                                    : "bg-blue-600 text-white"
-                                                  : isDark
-                                                    ? "bg-slate-700 text-slate-400"
-                                                    : "bg-slate-100 text-slate-400"
-                                              }`}
+                                              className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-all"
+                                              style={{
+                                                backgroundColor: isSelected
+                                                  ? "var(--app-accent)"
+                                                  : "var(--app-surface-soft)",
+                                                color: isSelected
+                                                  ? "#ffffff"
+                                                  : "var(--app-muted-text)",
+                                              }}
                                             >
                                               {isSelected ? (
                                                 <FaCheck size={9} />
@@ -3189,11 +3225,12 @@ const Orderlist = ({
                                 </div>
                               ) : (
                                 <div
-                                  className={`rounded-xl px-4 py-5 text-center text-sm ${
-                                    isDark
-                                      ? "bg-slate-800/50 text-slate-500"
-                                      : "bg-white text-slate-500 border border-dashed border-slate-200"
-                                  }`}
+                                  className="rounded-xl px-4 py-5 text-center text-sm"
+                                  style={{
+                                    backgroundColor: "var(--app-surface)",
+                                    color: "var(--app-muted-text)",
+                                    border: "1px dashed var(--app-border)",
+                                  }}
                                 >
                                   No fixed table found.
                                 </div>
@@ -3203,9 +3240,8 @@ const Orderlist = ({
 
                           <div>
                             <label
-                              className={`block text-[10px] font-black uppercase tracking-[0.25em] mb-2 ${
-                                isDark ? "text-slate-500" : "text-slate-500"
-                              }`}
+                              className="mb-2 block text-[10px] font-black uppercase tracking-[0.25em]"
+                              style={{ color: "var(--app-muted-text)" }}
                             >
                               Or Type Custom / Special Table
                             </label>
@@ -3217,41 +3253,37 @@ const Orderlist = ({
                               onChange={(e) =>
                                 setCustomTransferTableName(e.target.value)
                               }
-                              className={`w-full rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${
-                                isDark
-                                  ? "bg-slate-900/50 border border-slate-800 text-white placeholder:text-slate-500 focus:border-blue-500/40"
-                                  : "bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-blue-400"
-                              }`}
+                              className="w-full rounded-xl px-4 py-3 text-sm transition-all focus:outline-none"
+                              style={{
+                                backgroundColor: "var(--app-surface-soft)",
+                                border: "1px solid var(--app-border)",
+                                color: "var(--app-text)",
+                              }}
                             />
                           </div>
 
                           <div
-                            className={`rounded-2xl px-4 py-4 ${
-                              isDark
-                                ? "bg-slate-900/40 border border-white/5"
-                                : "bg-slate-50 border border-slate-200"
-                            }`}
+                            className="rounded-2xl border px-4 py-4"
+                            style={{
+                              backgroundColor: "var(--app-surface-soft)",
+                              borderColor: "var(--app-border)",
+                            }}
                           >
                             <p
-                              className={`text-[10px] font-black uppercase tracking-[0.25em] mb-2 ${
-                                isDark ? "text-slate-500" : "text-slate-500"
-                              }`}
+                              className="mb-2 text-[10px] font-black uppercase tracking-[0.25em]"
+                              style={{ color: "var(--app-muted-text)" }}
                             >
                               Selected
                             </p>
 
                             <div
-                              className={`rounded-xl px-4 py-3 ${
-                                isDark
-                                  ? "bg-slate-950/70 border border-white/5"
-                                  : "bg-white border border-slate-200"
-                              }`}
+                              className="rounded-xl border px-4 py-3"
+                              style={{
+                                backgroundColor: "var(--app-surface)",
+                                borderColor: "var(--app-border)",
+                              }}
                             >
-                              <p
-                                className={`text-sm sm:text-base font-bold leading-relaxed ${
-                                  isDark ? "text-white" : "text-slate-900"
-                                }`}
-                              >
+                              <p className="text-sm font-bold leading-relaxed sm:text-base">
                                 {customTransferTableName.trim() ||
                                   selectedTransferTable ||
                                   "None"}
@@ -3263,9 +3295,8 @@ const Orderlist = ({
                         <div className="space-y-4">
                           <div className="relative">
                             <FaSearch
-                              className={`absolute left-4 top-1/2 -translate-y-1/2 ${
-                                isDark ? "text-slate-600" : "text-slate-400"
-                              }`}
+                              className="absolute left-4 top-1/2 -translate-y-1/2"
+                              style={{ color: "var(--app-muted-text)" }}
                             />
                             <input
                               type="text"
@@ -3274,32 +3305,32 @@ const Orderlist = ({
                               onChange={(e) =>
                                 setTransferSearch(e.target.value)
                               }
-                              className={`w-full rounded-xl py-3 pl-11 pr-4 text-sm focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${
-                                isDark
-                                  ? "bg-slate-900/50 border border-slate-800 text-white focus:border-blue-500/40"
-                                  : "bg-slate-50 border border-slate-300 text-slate-900 focus:border-blue-400"
-                              }`}
+                              className="w-full rounded-xl py-3 pl-11 pr-4 text-sm transition-all focus:outline-none"
+                              style={{
+                                backgroundColor: "var(--app-surface-soft)",
+                                border: "1px solid var(--app-border)",
+                                color: "var(--app-text)",
+                              }}
                             />
                           </div>
 
                           <div>
                             <label
-                              className={`block text-[10px] font-black uppercase tracking-[0.25em] mb-2 ${
-                                isDark ? "text-slate-500" : "text-slate-500"
-                              }`}
+                              className="mb-2 block text-[10px] font-black uppercase tracking-[0.25em]"
+                              style={{ color: "var(--app-muted-text)" }}
                             >
                               Select Tables To Merge
                             </label>
 
                             <div
-                              className={`max-h-[200px] overflow-y-auto rounded-2xl p-2 ${
-                                isDark
-                                  ? "border border-white/5 bg-slate-900/30"
-                                  : "border border-slate-200 bg-slate-50"
-                              }`}
+                              className="max-h-[200px] overflow-y-auto rounded-2xl border p-2"
+                              style={{
+                                borderColor: "var(--app-border)",
+                                backgroundColor: "var(--app-surface-soft)",
+                              }}
                             >
                               {mergeSelectableTables.length > 0 ? (
-                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
                                   {mergeSelectableTables.map((table) => {
                                     const tableName = table.table_name;
                                     const isSelected = selectedMergeTables.some(
@@ -3321,48 +3352,46 @@ const Orderlist = ({
                                         onClick={() =>
                                           toggleMergeTableSelection(tableName)
                                         }
-                                        className={`group relative rounded-xl px-3 py-3 text-left transition-all duration-200 border shadow-sm hover:scale-[1.01] active:scale-[0.98] ${
-                                          isSelected
-                                            ? isDark
-                                              ? "bg-blue-500/15 border-blue-400/40 text-white shadow-blue-500/10"
-                                              : "bg-blue-50 border-blue-300 text-blue-700 shadow-blue-100"
-                                            : isDark
-                                              ? "bg-slate-800/70 border-white/5 text-slate-200 hover:bg-slate-800"
-                                              : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"
-                                        }`}
+                                        className="group relative rounded-xl border px-3 py-3 text-left shadow-sm transition-all duration-200 hover:scale-[1.01] active:scale-[0.98]"
+                                        style={{
+                                          backgroundColor: isSelected
+                                            ? "color-mix(in srgb, var(--app-accent) 12%, transparent)"
+                                            : "var(--app-surface)",
+                                          borderColor: isSelected
+                                            ? "var(--app-accent)"
+                                            : "var(--app-border)",
+                                          color: "var(--app-text)",
+                                        }}
                                       >
                                         <div className="flex items-start justify-between gap-2">
                                           <div>
                                             <p
-                                              className={`text-[9px] font-black uppercase tracking-[0.2em] mb-1 ${
-                                                isSelected
-                                                  ? isDark
-                                                    ? "text-blue-300"
-                                                    : "text-blue-500"
-                                                  : isDark
-                                                    ? "text-slate-500"
-                                                    : "text-slate-400"
-                                              }`}
+                                              className="mb-1 text-[9px] font-black uppercase tracking-[0.2em]"
+                                              style={{
+                                                color: isSelected
+                                                  ? "var(--app-accent)"
+                                                  : "var(--app-muted-text)",
+                                              }}
                                             >
                                               {isCurrentTable
                                                 ? "Current"
                                                 : "Table"}
                                             </p>
-                                            <p className="text-sm font-extrabold leading-tight break-words">
+                                            <p className="break-words text-sm font-extrabold leading-tight">
                                               {tableName}
                                             </p>
                                           </div>
 
                                           <div
-                                            className={`shrink-0 mt-0.5 h-5 w-5 rounded-full flex items-center justify-center transition-all ${
-                                              isSelected
-                                                ? isDark
-                                                  ? "bg-blue-500 text-white"
-                                                  : "bg-blue-600 text-white"
-                                                : isDark
-                                                  ? "bg-slate-700 text-slate-400"
-                                                  : "bg-slate-100 text-slate-400"
-                                            }`}
+                                            className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-all"
+                                            style={{
+                                              backgroundColor: isSelected
+                                                ? "var(--app-accent)"
+                                                : "var(--app-surface-soft)",
+                                              color: isSelected
+                                                ? "#ffffff"
+                                                : "var(--app-muted-text)",
+                                            }}
                                           >
                                             {isSelected ? (
                                               <FaCheck size={9} />
@@ -3379,11 +3408,12 @@ const Orderlist = ({
                                 </div>
                               ) : (
                                 <div
-                                  className={`rounded-xl px-4 py-5 text-center text-sm ${
-                                    isDark
-                                      ? "bg-slate-800/50 text-slate-500"
-                                      : "bg-white text-slate-500 border border-dashed border-slate-200"
-                                  }`}
+                                  className="rounded-xl px-4 py-5 text-center text-sm"
+                                  style={{
+                                    backgroundColor: "var(--app-surface)",
+                                    color: "var(--app-muted-text)",
+                                    border: "1px dashed var(--app-border)",
+                                  }}
                                 >
                                   No tables found.
                                 </div>
@@ -3393,9 +3423,8 @@ const Orderlist = ({
 
                           <div>
                             <label
-                              className={`block text-[10px] font-black uppercase tracking-[0.25em] mb-2 ${
-                                isDark ? "text-slate-500" : "text-slate-500"
-                              }`}
+                              className="mb-2 block text-[10px] font-black uppercase tracking-[0.25em]"
+                              style={{ color: "var(--app-muted-text)" }}
                             >
                               Add Custom / Special Table To Merge
                             </label>
@@ -3407,41 +3436,37 @@ const Orderlist = ({
                               onChange={(e) =>
                                 setCustomMergeTableName(e.target.value)
                               }
-                              className={`w-full rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${
-                                isDark
-                                  ? "bg-slate-900/50 border border-slate-800 text-white placeholder:text-slate-500 focus:border-blue-500/40"
-                                  : "bg-slate-50 border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-blue-400"
-                              }`}
+                              className="w-full rounded-xl px-4 py-3 text-sm transition-all focus:outline-none"
+                              style={{
+                                backgroundColor: "var(--app-surface-soft)",
+                                border: "1px solid var(--app-border)",
+                                color: "var(--app-text)",
+                              }}
                             />
                           </div>
 
                           <div
-                            className={`rounded-2xl px-4 py-4 ${
-                              isDark
-                                ? "bg-slate-900/40 border border-white/5"
-                                : "bg-slate-50 border border-slate-200"
-                            }`}
+                            className="rounded-2xl border px-4 py-4"
+                            style={{
+                              backgroundColor: "var(--app-surface-soft)",
+                              borderColor: "var(--app-border)",
+                            }}
                           >
                             <p
-                              className={`text-[10px] font-black uppercase tracking-[0.25em] mb-2 ${
-                                isDark ? "text-slate-500" : "text-slate-500"
-                              }`}
+                              className="mb-2 text-[10px] font-black uppercase tracking-[0.25em]"
+                              style={{ color: "var(--app-muted-text)" }}
                             >
                               Preview
                             </p>
 
                             <div
-                              className={`rounded-xl px-4 py-3 ${
-                                isDark
-                                  ? "bg-slate-950/70 border border-white/5"
-                                  : "bg-white border border-slate-200"
-                              }`}
+                              className="rounded-xl border px-4 py-3"
+                              style={{
+                                backgroundColor: "var(--app-surface)",
+                                borderColor: "var(--app-border)",
+                              }}
                             >
-                              <p
-                                className={`text-sm sm:text-base font-bold leading-relaxed ${
-                                  isDark ? "text-white" : "text-slate-900"
-                                }`}
-                              >
+                              <p className="text-sm font-bold leading-relaxed sm:text-base">
                                 {mergeTablePreview}
                               </p>
                             </div>
@@ -3451,49 +3476,51 @@ const Orderlist = ({
                         <div className="grid gap-4 lg:grid-cols-[1.2fr,0.95fr]">
                           <div className="space-y-4">
                             <div
-                              className={`rounded-2xl px-4 py-4 ${
-                                isDark
-                                  ? "bg-slate-900/40 border border-white/5"
-                                  : "bg-slate-50 border border-slate-200"
-                              }`}
+                              className="rounded-2xl border px-4 py-4"
+                              style={{
+                                backgroundColor: "var(--app-surface-soft)",
+                                borderColor: "var(--app-border)",
+                              }}
                             >
                               <div className="mb-3 flex items-center justify-between gap-3">
                                 <div>
                                   <p
-                                    className={`text-[10px] font-black uppercase tracking-[0.25em] ${
-                                      isDark
-                                        ? "text-slate-500"
-                                        : "text-slate-500"
-                                    }`}
+                                    className="text-[10px] font-black uppercase tracking-[0.25em]"
+                                    style={{ color: "var(--app-muted-text)" }}
                                   >
                                     Current Order
                                   </p>
-                                  <p
-                                    className={`mt-1 text-sm font-bold ${
-                                      isDark ? "text-white" : "text-slate-900"
-                                    }`}
-                                  >
+                                  <p className="mt-1 text-sm font-bold">
                                     Select Product to move from {tableselected}
                                   </p>
                                 </div>
 
                                 <div
-                                  className={`rounded-xl px-3 py-2 text-right ${
-                                    isDark
-                                      ? "bg-slate-950/70 border border-white/5"
-                                      : "bg-white border border-slate-200"
-                                  }`}
+                                  className="rounded-xl border px-3 py-2 text-right"
+                                  style={{
+                                    backgroundColor: "var(--app-surface)",
+                                    borderColor: "var(--app-border)",
+                                  }}
                                 >
-                                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+                                  <p
+                                    className="text-[10px] font-black uppercase tracking-[0.2em]"
+                                    style={{ color: "var(--app-muted-text)" }}
+                                  >
                                     Selected
                                   </p>
-                                  <p className="text-base font-black text-blue-500">
+                                  <p
+                                    className="text-base font-black"
+                                    style={{ color: "var(--app-accent)" }}
+                                  >
                                     {selectedTransferProductTotalQty} item
                                     {selectedTransferProductTotalQty !== 1
                                       ? "s"
                                       : ""}
                                   </p>
-                                  <p className="text-xs text-slate-500">
+                                  <p
+                                    className="text-xs"
+                                    style={{ color: "var(--app-muted-text)" }}
+                                  >
                                     ₱
                                     {selectedTransferProductSubtotal.toLocaleString()}
                                   </p>
@@ -3519,38 +3546,50 @@ const Orderlist = ({
                                     return (
                                       <div
                                         key={item.transferKey}
-                                        className={`rounded-2xl p-3 ${
-                                          isDark
-                                            ? "bg-slate-950/60 border border-white/5"
-                                            : "bg-white border border-slate-200"
-                                        }`}
+                                        className="rounded-2xl border p-3"
+                                        style={{
+                                          backgroundColor: "var(--app-surface)",
+                                          borderColor: "var(--app-border)",
+                                        }}
                                       >
                                         <div className="flex items-start justify-between gap-3">
                                           <div className="min-w-0 flex-1">
-                                            <p
-                                              className={`text-sm font-extrabold ${
-                                                isDark
-                                                  ? "text-white"
-                                                  : "text-slate-900"
-                                              }`}
-                                            >
+                                            <p className="text-sm font-extrabold">
                                               {item.name}
                                             </p>
                                             <div className="mt-1 flex flex-wrap gap-2 text-[11px]">
                                               <span
-                                                className={`rounded-full px-2 py-1 ${isDark ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-600"}`}
+                                                className="rounded-full px-2 py-1"
+                                                style={{
+                                                  backgroundColor:
+                                                    "var(--app-surface-soft)",
+                                                  color:
+                                                    "var(--app-muted-text)",
+                                                }}
                                               >
                                                 Qty:{" "}
                                                 {Number(item.quantity || 0)}
                                               </span>
                                               <span
-                                                className={`rounded-full px-2 py-1 ${isDark ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-600"}`}
+                                                className="rounded-full px-2 py-1"
+                                                style={{
+                                                  backgroundColor:
+                                                    "var(--app-surface-soft)",
+                                                  color:
+                                                    "var(--app-muted-text)",
+                                                }}
                                               >
                                                 Remaining: {remainingQty}
                                               </span>
                                               {item.item_category ? (
                                                 <span
-                                                  className={`rounded-full px-2 py-1 ${isDark ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-600"}`}
+                                                  className="rounded-full px-2 py-1"
+                                                  style={{
+                                                    backgroundColor:
+                                                      "var(--app-surface-soft)",
+                                                    color:
+                                                      "var(--app-muted-text)",
+                                                  }}
                                                 >
                                                   {item.item_category}
                                                 </span>
@@ -3558,7 +3597,11 @@ const Orderlist = ({
                                             </div>
                                             {item.itemInstruction ? (
                                               <p
-                                                className={`mt-2 text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}
+                                                className="mt-2 text-xs"
+                                                style={{
+                                                  color:
+                                                    "var(--app-muted-text)",
+                                                }}
                                               >
                                                 Note: {item.itemInstruction}
                                               </p>
@@ -3567,21 +3610,22 @@ const Orderlist = ({
 
                                           <div className="w-[190px] shrink-0">
                                             <label
-                                              className={`mb-2 block text-[10px] font-black uppercase tracking-[0.2em] ${
-                                                isDark
-                                                  ? "text-slate-500"
-                                                  : "text-slate-500"
-                                              }`}
+                                              className="mb-2 block text-[10px] font-black uppercase tracking-[0.2em]"
+                                              style={{
+                                                color: "var(--app-muted-text)",
+                                              }}
                                             >
                                               Transfer Qty
                                             </label>
 
                                             <div
-                                              className={`rounded-2xl p-2 ${
-                                                isDark
-                                                  ? "border border-slate-800 bg-slate-900/90"
-                                                  : "border border-slate-300 bg-slate-50"
-                                              }`}
+                                              className="rounded-2xl border p-2"
+                                              style={{
+                                                borderColor:
+                                                  "var(--app-border)",
+                                                backgroundColor:
+                                                  "var(--app-surface-soft)",
+                                              }}
                                             >
                                               <div className="grid grid-cols-[50px_1fr_50px] gap-2">
                                                 <button
@@ -3600,21 +3644,27 @@ const Orderlist = ({
                                                       ),
                                                     );
                                                   }}
-                                                  className={`flex h-14 items-center justify-center rounded-2xl text-3xl font-black transition active:scale-95 ${
-                                                    isDark
-                                                      ? "bg-slate-800 text-white hover:bg-slate-700"
-                                                      : "bg-white text-slate-900 hover:bg-slate-100 border border-slate-200"
-                                                  }`}
+                                                  className="flex h-14 items-center justify-center rounded-2xl text-3xl font-black transition active:scale-95"
+                                                  style={{
+                                                    backgroundColor:
+                                                      "var(--app-surface)",
+                                                    color: "var(--app-text)",
+                                                    border:
+                                                      "1px solid var(--app-border)",
+                                                  }}
                                                 >
                                                   −
                                                 </button>
 
                                                 <div
-                                                  className={`flex h-15 flex-col items-center justify-center rounded-2xl ${
-                                                    isDark
-                                                      ? "bg-slate-950 text-white border border-white/5"
-                                                      : "bg-white text-slate-900 border border-slate-200"
-                                                  }`}
+                                                  className="flex h-15 flex-col items-center justify-center rounded-2xl border"
+                                                  style={{
+                                                    backgroundColor:
+                                                      "var(--app-surface)",
+                                                    color: "var(--app-text)",
+                                                    borderColor:
+                                                      "var(--app-border)",
+                                                  }}
                                                 >
                                                   <input
                                                     type="number"
@@ -3634,18 +3684,17 @@ const Orderlist = ({
                                                         e.target.value,
                                                       )
                                                     }
-                                                    className={`w-full bg-transparent text-center text-2xl font-black outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
-                                                      isDark
-                                                        ? "text-white"
-                                                        : "text-slate-900"
-                                                    }`}
+                                                    className="w-full bg-transparent text-center text-2xl font-black outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                                    style={{
+                                                      color: "var(--app-text)",
+                                                    }}
                                                   />
                                                   <span
-                                                    className={`text-[10px] font-bold uppercase tracking-[0.18em] ${
-                                                      isDark
-                                                        ? "text-slate-500"
-                                                        : "text-slate-400"
-                                                    }`}
+                                                    className="text-[10px] font-bold uppercase tracking-[0.18em]"
+                                                    style={{
+                                                      color:
+                                                        "var(--app-muted-text)",
+                                                    }}
                                                   >
                                                     selected
                                                   </span>
@@ -3670,11 +3719,11 @@ const Orderlist = ({
                                                       ),
                                                     );
                                                   }}
-                                                  className={`flex h-14 items-center justify-center rounded-2xl text-3xl font-black transition active:scale-95 ${
-                                                    isDark
-                                                      ? "bg-blue-600 text-white hover:bg-blue-500"
-                                                      : "bg-blue-600 text-white hover:bg-blue-500"
-                                                  }`}
+                                                  className="flex h-14 items-center justify-center rounded-2xl text-3xl font-black text-white transition active:scale-95"
+                                                  style={{
+                                                    background:
+                                                      "linear-gradient(180deg, var(--app-accent) 0%, var(--app-accent-secondary) 100%)",
+                                                  }}
                                                 >
                                                   +
                                                 </button>
@@ -3689,11 +3738,14 @@ const Orderlist = ({
                                                       0,
                                                     )
                                                   }
-                                                  className={`h-12 rounded-xl text-sm font-black transition active:scale-95 ${
-                                                    isDark
-                                                      ? "bg-slate-800 text-slate-200 hover:bg-slate-700"
-                                                      : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-200"
-                                                  }`}
+                                                  className="h-12 rounded-xl text-sm font-black transition active:scale-95"
+                                                  style={{
+                                                    backgroundColor:
+                                                      "var(--app-surface)",
+                                                    color: "var(--app-text)",
+                                                    border:
+                                                      "1px solid var(--app-border)",
+                                                  }}
                                                 >
                                                   Clear
                                                 </button>
@@ -3708,11 +3760,7 @@ const Orderlist = ({
                                                       ),
                                                     )
                                                   }
-                                                  className={`h-12 rounded-xl text-sm font-black transition active:scale-95 ${
-                                                    isDark
-                                                      ? "bg-emerald-600 text-white hover:bg-emerald-500"
-                                                      : "bg-emerald-600 text-white hover:bg-emerald-500"
-                                                  }`}
+                                                  className="h-12 rounded-xl bg-emerald-600 text-sm font-black text-white transition active:scale-95 hover:bg-emerald-500"
                                                 >
                                                   All
                                                 </button>
@@ -3725,11 +3773,12 @@ const Orderlist = ({
                                   })
                                 ) : (
                                   <div
-                                    className={`rounded-xl px-4 py-5 text-center text-sm ${
-                                      isDark
-                                        ? "bg-slate-800/50 text-slate-500"
-                                        : "bg-white text-slate-500 border border-dashed border-slate-200"
-                                    }`}
+                                    className="rounded-xl px-4 py-5 text-center text-sm"
+                                    style={{
+                                      backgroundColor: "var(--app-surface)",
+                                      color: "var(--app-muted-text)",
+                                      border: "1px dashed var(--app-border)",
+                                    }}
                                   >
                                     No order items available for transfer.
                                   </div>
@@ -3741,9 +3790,8 @@ const Orderlist = ({
                           <div className="space-y-4">
                             <div className="relative">
                               <FaSearch
-                                className={`absolute left-4 top-1/2 -translate-y-1/2 ${
-                                  isDark ? "text-slate-600" : "text-slate-400"
-                                }`}
+                                className="absolute left-4 top-1/2 -translate-y-1/2"
+                                style={{ color: "var(--app-muted-text)" }}
                               />
                               <input
                                 type="text"
@@ -3752,31 +3800,38 @@ const Orderlist = ({
                                 onChange={(e) =>
                                   setTransferSearch(e.target.value)
                                 }
-                                className={`w-full rounded-xl py-3 pl-11 pr-4 text-sm focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${
-                                  isDark
-                                    ? "bg-slate-900/50 border border-slate-800 text-white focus:border-blue-500/40"
-                                    : "bg-slate-50 border border-slate-300 text-slate-900 focus:border-blue-400"
-                                }`}
+                                className="w-full rounded-xl py-3 pl-11 pr-4 text-sm transition-all focus:outline-none"
+                                style={{
+                                  backgroundColor: "var(--app-surface-soft)",
+                                  border: "1px solid var(--app-border)",
+                                  color: "var(--app-text)",
+                                }}
                               />
                             </div>
 
                             <div
-                              className={`rounded-2xl p-3 ${
-                                isDark
-                                  ? "border border-white/5 bg-slate-900/30"
-                                  : "border border-slate-200 bg-slate-50"
-                              }`}
+                              className="rounded-2xl border p-3"
+                              style={{
+                                borderColor: "var(--app-border)",
+                                backgroundColor: "var(--app-surface-soft)",
+                              }}
                             >
                               <div className="mb-3 flex items-center justify-between gap-2">
                                 <div>
                                   <p
-                                    className={`text-[10px] font-black uppercase tracking-[0.25em] ${isDark ? "text-slate-500" : "text-slate-500"}`}
+                                    className="text-[10px] font-black uppercase tracking-[0.25em]"
+                                    style={{ color: "var(--app-muted-text)" }}
                                   >
                                     Pending Tables
                                   </p>
                                 </div>
                                 <span
-                                  className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${isDark ? "bg-slate-950 text-slate-300" : "bg-white text-slate-600 border border-slate-200"}`}
+                                  className="rounded-full px-2.5 py-1 text-[11px] font-bold"
+                                  style={{
+                                    backgroundColor: "var(--app-surface)",
+                                    color: "var(--app-muted-text)",
+                                    border: "1px solid var(--app-border)",
+                                  }}
                                 >
                                   {filteredTransferTables.length}
                                 </span>
@@ -3800,20 +3855,26 @@ const Orderlist = ({
                                           onClick={() =>
                                             setSelectedTransferTable(tableName)
                                           }
-                                          className={`w-full rounded-xl border px-3 py-3 text-left transition-all ${
-                                            isSelected
-                                              ? isDark
-                                                ? "border-blue-400/40 bg-blue-500/15 text-white"
-                                                : "border-blue-300 bg-blue-50 text-blue-700"
-                                              : isDark
-                                                ? "border-white/5 bg-slate-800/70 text-slate-200 hover:bg-slate-800"
-                                                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
-                                          }`}
+                                          className="w-full rounded-xl border px-3 py-3 text-left transition-all"
+                                          style={{
+                                            backgroundColor: isSelected
+                                              ? "color-mix(in srgb, var(--app-accent) 12%, transparent)"
+                                              : "var(--app-surface)",
+                                            borderColor: isSelected
+                                              ? "var(--app-accent)"
+                                              : "var(--app-border)",
+                                            color: "var(--app-text)",
+                                          }}
                                         >
                                           <div className="flex items-start justify-between gap-3">
                                             <div>
                                               <p
-                                                className={`text-[10px] font-black uppercase tracking-[0.2em] ${isSelected ? (isDark ? "text-blue-300" : "text-blue-500") : isDark ? "text-slate-500" : "text-slate-400"}`}
+                                                className="text-[10px] font-black uppercase tracking-[0.2em]"
+                                                style={{
+                                                  color: isSelected
+                                                    ? "var(--app-accent)"
+                                                    : "var(--app-muted-text)",
+                                                }}
                                               >
                                                 Pending Table
                                               </p>
@@ -3822,7 +3883,15 @@ const Orderlist = ({
                                               </p>
                                             </div>
                                             <div
-                                              className={`mt-1 flex h-5 w-5 items-center justify-center rounded-full ${isSelected ? (isDark ? "bg-blue-500 text-white" : "bg-blue-600 text-white") : isDark ? "bg-slate-700 text-slate-400" : "bg-slate-100 text-slate-400"}`}
+                                              className="mt-1 flex h-5 w-5 items-center justify-center rounded-full"
+                                              style={{
+                                                backgroundColor: isSelected
+                                                  ? "var(--app-accent)"
+                                                  : "var(--app-surface-soft)",
+                                                color: isSelected
+                                                  ? "#ffffff"
+                                                  : "var(--app-muted-text)",
+                                              }}
                                             >
                                               {isSelected ? (
                                                 <FaCheck size={9} />
@@ -3839,11 +3908,12 @@ const Orderlist = ({
                                   </div>
                                 ) : (
                                   <div
-                                    className={`rounded-xl px-4 py-5 text-center text-sm ${
-                                      isDark
-                                        ? "bg-slate-800/50 text-slate-500"
-                                        : "bg-white text-slate-500 border border-dashed border-slate-200"
-                                    }`}
+                                    className="rounded-xl px-4 py-5 text-center text-sm"
+                                    style={{
+                                      backgroundColor: "var(--app-surface)",
+                                      color: "var(--app-muted-text)",
+                                      border: "1px dashed var(--app-border)",
+                                    }}
                                   >
                                     No pending tables found.
                                   </div>
@@ -3852,32 +3922,36 @@ const Orderlist = ({
                             </div>
 
                             <div
-                              className={`rounded-2xl p-4 ${
-                                isDark
-                                  ? "bg-slate-900/40 border border-white/5"
-                                  : "bg-slate-50 border border-slate-200"
-                              }`}
+                              className="rounded-2xl border p-4"
+                              style={{
+                                backgroundColor: "var(--app-surface-soft)",
+                                borderColor: "var(--app-border)",
+                              }}
                             >
                               <p
-                                className={`text-[10px] font-black uppercase tracking-[0.25em] ${isDark ? "text-slate-500" : "text-slate-500"}`}
+                                className="text-[10px] font-black uppercase tracking-[0.25em]"
+                                style={{ color: "var(--app-muted-text)" }}
                               >
                                 Destination Preview
                               </p>
                               <p
-                                className={`mt-1 text-lg font-bold ${isDark ? "text-white" : "text-slate-900"}`}
+                                className="mt-1 text-lg font-bold"
+                                style={{ color: "var(--app-text)" }}
                               >
                                 {selectedTransferTable ||
                                   "No pending table selected"}
                               </p>
                               {destinationTransferLoading ? (
                                 <p
-                                  className={`mt-3 text-sm ${isDark ? "text-slate-400" : "text-slate-500"}`}
+                                  className="mt-3 text-sm"
+                                  style={{ color: "var(--app-muted-text)" }}
                                 >
                                   Loading destination order...
                                 </p>
                               ) : (
                                 <p
-                                  className={`mt-3 text-sm ${isDark ? "text-slate-400" : "text-slate-500"}`}
+                                  className="mt-3 text-sm"
+                                  style={{ color: "var(--app-muted-text)" }}
                                 ></p>
                               )}
                             </div>
@@ -3888,18 +3962,24 @@ const Orderlist = ({
                       <div className="flex gap-2 pt-4">
                         <button
                           onClick={resetTransferState}
-                          className={`flex-1 rounded-xl px-4 py-3 text-sm transition-all ${
-                            isDark
-                              ? "bg-slate-800 text-slate-300 hover:text-white"
-                              : "bg-slate-200 text-slate-700 hover:text-slate-900"
-                          }`}
+                          className="flex-1 rounded-xl px-4 py-3 text-sm transition-all"
+                          style={{
+                            backgroundColor: "var(--app-surface-soft)",
+                            color: "var(--app-text)",
+                            border: "1px solid var(--app-border)",
+                          }}
                         >
                           Cancel
                         </button>
 
                         <button
                           onClick={requestTransferConfirm}
-                          className="flex-1 px-4 py-3 text-sm font-bold text-white transition-all bg-blue-600 rounded-xl hover:bg-blue-500"
+                          className="flex-1 rounded-xl px-4 py-3 text-sm font-bold text-white transition-all"
+                          style={{
+                            background:
+                              "linear-gradient(180deg, var(--app-accent) 0%, var(--app-accent-secondary) 100%)",
+                            boxShadow: "0 12px 28px var(--app-accent-glow)",
+                          }}
                         >
                           Confirm Transfer
                         </button>
@@ -5079,18 +5159,18 @@ const CartList = ({
   readOnly = false,
   extraClassName = "",
   openItemInstructionModal,
-  isDark,
   showInstructionButton = true,
 }) => (
-  <div className={`flex-1 overflow-y-auto p-4 space-y-3 ${extraClassName}`}>
+  <div className={`flex-1 space-y-3 overflow-y-auto p-4 ${extraClassName}`}>
     {items.length === 0 ? (
-      <div className="text-center py-20">
+      <div className="py-20 text-center">
         <FaShoppingCart
-          className={`mx-auto text-5xl mb-4 ${
-            isDark ? "text-slate-700" : "text-slate-300"
-          }`}
+          className="mx-auto mb-4 text-5xl"
+          style={{ color: "var(--app-muted-text)" }}
         />
-        <p className="text-slate-500 font-medium">Your cart is feeling empty</p>
+        <p className="font-medium" style={{ color: "var(--app-muted-text)" }}>
+          Your cart is feeling empty
+        </p>
       </div>
     ) : (
       items.map((item, index) => {
@@ -5100,39 +5180,36 @@ const CartList = ({
         return (
           <div
             key={item.lineId || `${item.code}-${index}`}
-            className={`rounded-xl p-3 border transition-colors ${
-              isDark
-                ? "bg-white/5 border-white/5"
-                : "bg-white border-slate-200 shadow-sm"
-            }`}
+            className="rounded-xl border p-3 transition-colors"
+            style={{
+              backgroundColor: "var(--app-surface)",
+              borderColor: "var(--app-border)",
+              color: "var(--app-text)",
+            }}
           >
-            <div className="flex justify-between items-start mb-2 gap-2">
-              <div className="flex-1 min-w-0">
+            <div className="mb-2 flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
                 <span
-                  className={`text-xs font-medium leading-tight block ${
-                    isDark ? "text-white" : "text-slate-900"
-                  }`}
+                  className="block text-xs font-medium leading-tight"
+                  style={{ color: "var(--app-text)" }}
                 >
                   {item.name}
                 </span>
 
                 {item.itemInstruction && (
-                  <p className="text-[10px] text-amber-500 mt-1 break-words">
+                  <p className="mt-1 break-words text-[10px] text-amber-500">
                     Note: {item.itemInstruction}
                   </p>
                 )}
               </div>
 
               {!readOnly && (
-                <div className="flex items-center gap-3 shrink-0">
+                <div className="flex shrink-0 items-center gap-3">
                   {showInstructionButton && (
                     <button
                       onClick={() => openItemInstructionModal?.(item)}
-                      className={`p-2 transition-colors ${
-                        isDark
-                          ? "text-slate-400 hover:text-amber-300"
-                          : "text-slate-500 hover:text-amber-600"
-                      }`}
+                      className="p-2 transition-colors"
+                      style={{ color: "var(--app-muted-text)" }}
                       title="Add instruction"
                     >
                       <FaEdit size={18} />
@@ -5141,11 +5218,8 @@ const CartList = ({
 
                   <button
                     onClick={() => removeItem?.(item.lineId, item)}
-                    className={`p-2 transition-colors ${
-                      isDark
-                        ? "text-slate-500 hover:text-red-400"
-                        : "text-slate-500 hover:text-red-600"
-                    }`}
+                    className="p-2 transition-colors"
+                    style={{ color: "var(--app-muted-text)" }}
                   >
                     <FaTrash size={18} />
                   </button>
@@ -5153,12 +5227,11 @@ const CartList = ({
               )}
             </div>
 
-            <div className="flex justify-between items-center">
+            <div className="flex items-center justify-between">
               {readOnly || item.hasAdditionalEntry ? (
                 <div
-                  className={`text-xs font-bold ${
-                    isDark ? "text-slate-300" : "text-slate-700"
-                  }`}
+                  className="text-xs font-bold"
+                  style={{ color: "var(--app-muted-text)" }}
                 >
                   Qty: {item.quantity}
                   {item.originalQuantity > 0 &&
@@ -5169,9 +5242,8 @@ const CartList = ({
               ) : isSpecialPaluto ? (
                 <div className="flex items-center gap-2">
                   <span
-                    className={`text-xs ${
-                      isDark ? "text-slate-400" : "text-slate-600"
-                    }`}
+                    className="text-xs"
+                    style={{ color: "var(--app-muted-text)" }}
                   >
                     Qty
                   </span>
@@ -5193,54 +5265,59 @@ const CartList = ({
                         updateQuantityByInput?.(item.lineId, "1");
                       }
                     }}
-                    className={`w-20 rounded-lg px-3 py-2 text-sm outline-none transition-colors ${
-                      isDark
-                        ? "bg-slate-900 border border-white/10 text-white focus:border-blue-500/50"
-                        : "bg-white border border-slate-300 text-slate-900 focus:border-blue-400"
-                    }`}
+                    className="w-20 rounded-lg px-3 py-2 text-sm outline-none transition-colors"
+                    style={{
+                      backgroundColor: "var(--app-surface-soft)",
+                      border: "1px solid var(--app-border)",
+                      color: "var(--app-text)",
+                    }}
                   />
                 </div>
               ) : (
                 <div
-                  className={`flex items-center gap-2 rounded-lg p-1 border transition-colors ${
-                    isDark
-                      ? "bg-slate-900 border-white/5"
-                      : "bg-slate-100 border-slate-200"
-                  }`}
+                  className="flex items-center gap-2 rounded-lg border p-1 transition-colors"
+                  style={{
+                    backgroundColor: "var(--app-surface-soft)",
+                    borderColor: "var(--app-border)",
+                  }}
                 >
                   <button
                     onClick={() => updateQuantity?.(item.lineId, -1, item)}
-                    className={`w-7 h-7 flex items-center justify-center rounded-md transition-colors ${
-                      isDark
-                        ? "text-slate-300 bg-slate-800 hover:bg-slate-700"
-                        : "text-slate-700 bg-white hover:bg-slate-200 border border-slate-200"
-                    }`}
+                    className="flex h-7 w-7 items-center justify-center rounded-md transition-colors"
+                    style={{
+                      color: "var(--app-text)",
+                      backgroundColor: "var(--app-surface)",
+                      border: "1px solid var(--app-border)",
+                    }}
                   >
                     <FaMinus size={8} />
                   </button>
 
                   <span
-                    className={`text-xs font-bold px-1 min-w-[18px] text-center ${
-                      isDark ? "text-white" : "text-slate-900"
-                    }`}
+                    className="min-w-[18px] px-1 text-center text-xs font-bold"
+                    style={{ color: "var(--app-text)" }}
                   >
                     {item.quantity}
                   </span>
 
                   <button
                     onClick={() => updateQuantity?.(item.lineId, 1, item)}
-                    className={`w-7 h-7 flex items-center justify-center rounded-md transition-colors ${
-                      isDark
-                        ? "text-slate-300 bg-slate-800 hover:bg-slate-700"
-                        : "text-slate-700 bg-white hover:bg-slate-200 border border-slate-200"
-                    }`}
+                    className="flex h-7 w-7 items-center justify-center rounded-md transition-colors"
+                    style={{
+                      color: "var(--app-text)",
+                      backgroundColor: "var(--app-surface)",
+                      border: "1px solid var(--app-border)",
+                    }}
                   >
                     <FaPlus size={8} />
                   </button>
                 </div>
               )}
 
-              <span className="text-blue-500 font-bold text-sm">
+              <span
+                className="text-sm font-bold"
+                style={{ color: "var(--app-accent)" }}
+              >
                 ₱{(Number(item.price) * Number(item.quantity)).toLocaleString()}
               </span>
             </div>

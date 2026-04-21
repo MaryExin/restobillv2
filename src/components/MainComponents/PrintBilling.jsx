@@ -19,8 +19,7 @@ import useApiHost from "../../hooks/useApiHost";
 import { useTheme } from "../../context/ThemeContext";
 
 const PrintBilling = () => {
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
+  const { themeSettings } = useTheme();
   const navigate = useNavigate();
   const dateInputRef = useRef(null);
 
@@ -29,8 +28,6 @@ const PrintBilling = () => {
   const [tablelist, setTablelist] = useState([]);
   const [searchtable, setsearchtable] = useState("");
   const [statusFilter, setStatusFilter] = useState("pending");
-
-  // --- NEW VIEW MODE STATE ---
   const [viewMode, setViewMode] = useState("grid");
 
   const [tableselected, settableselected] = useState("");
@@ -39,7 +36,6 @@ const PrintBilling = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isDateLoading, setIsDateLoading] = useState(true);
 
-  // --- PAGINATION STATE ---
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = viewMode === "grid" ? 12 : 10;
 
@@ -154,19 +150,23 @@ const PrintBilling = () => {
         settranspertable([]);
       });
   };
+
   const FilterChip = ({ label, value, icon: Icon }) => (
     <button
       onClick={() => setStatusFilter(value)}
-      className={`flex items-center gap-2 px-6 py-2 rounded-full border transition-all duration-300 ${
-        statusFilter === value
-          ? "bg-blue-600 border-blue-400 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]"
-          : isDark
-            ? "bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-600"
-            : "bg-white border-slate-200 text-slate-600 hover:border-slate-300 shadow-sm"
-      }`}
+      className="flex items-center gap-2 rounded-full border px-6 py-2 transition-all duration-300"
+      style={{
+        backgroundColor:
+          statusFilter === value ? "var(--app-accent)" : "var(--app-surface)",
+        borderColor:
+          statusFilter === value ? "var(--app-accent)" : "var(--app-border)",
+        color: statusFilter === value ? "#ffffff" : "var(--app-muted-text)",
+        boxShadow:
+          statusFilter === value ? "0 0 15px var(--app-accent-glow)" : "none",
+      }}
     >
       <Icon size={12} />
-      <span className="text-xs font-bold tracking-widest uppercase">
+      <span className="text-xs font-bold uppercase tracking-widest">
         {label}
       </span>
     </button>
@@ -174,17 +174,31 @@ const PrintBilling = () => {
 
   return (
     <div
-      className={
-        isDark
-          ? "min-h-screen bg-[#020617] text-slate-200 p-4 sm:p-8"
-          : "min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-8"
-      }
+      className="min-h-screen p-4 text-[var(--app-text)] sm:p-8"
+      style={{
+        backgroundColor: "var(--app-bg)",
+      }}
     >
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+      <div
+        className="pointer-events-none fixed inset-0 overflow-hidden"
+        style={{
+          backgroundImage: `url(${
+            themeSettings?.Dashboard_Background_Url
+              ? themeSettings.Dashboard_Background_Url.startsWith("/")
+                ? `${apiHost}${themeSettings.Dashboard_Background_Url}`
+                : `${apiHost}/${themeSettings.Dashboard_Background_Url}`
+              : "./pos-home-bg.png"
+          })`,
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+          backgroundSize: "cover",
+          opacity: 0.08,
+        }}
+      />
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div
-          className={`absolute top-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full blur-[120px] ${
-            isDark ? "bg-blue-600/10" : "bg-blue-600/15"
-          }`}
+          className="absolute top-[-10%] right-[-10%] h-[40%] w-[40%] rounded-full blur-[120px]"
+          style={{ backgroundColor: "var(--app-accent-glow)" }}
         />
       </div>
 
@@ -199,54 +213,77 @@ const PrintBilling = () => {
         )}
       </AnimatePresence>
 
-      <div className="relative z-10 max-w-7xl mx-auto flex flex-col min-h-[90vh]">
-        <nav className="flex items-center justify-between mb-8">
+      <div className="relative z-10 mx-auto flex min-h-[90vh] max-w-7xl flex-col">
+        <nav className="mb-8 flex items-center justify-between">
           <button
             onClick={() => navigate("/poscorehomescreen")}
-            className={`flex items-center gap-3 mt-2 px-10 py-6 rounded-full transition-all ${
-              isDark
-                ? "bg-slate-900/50 border border-white/5 text-slate-400 hover:text-white"
-                : "bg-white border border-slate-200 text-slate-600 hover:text-slate-900 shadow-sm"
-            }`}
+            className="mt-2 flex items-center gap-3 rounded-full border px-10 py-6 transition-all"
+            style={{
+              backgroundColor: "var(--app-surface)",
+              borderColor: "var(--app-border)",
+              color: "var(--app-muted-text)",
+            }}
           >
             <FaArrowLeft size={14} />
             <span className="text-sm font-bold uppercase">
               BACK TO DASHBOARD
             </span>
           </button>
-          <div className="flex items-center gap-2 text-xs font-bold tracking-widest text-blue-400 uppercase">
+          <div
+            className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest"
+            style={{ color: "var(--app-accent)" }}
+          >
             <FaPrint /> Billing Center
           </div>
         </nav>
 
-        <header className="flex flex-col justify-between gap-6 mb-10 md:flex-row md:items-end">
+        <header className="mb-10 flex flex-col justify-between gap-6 md:flex-row md:items-end">
           <div>
-            <h1
-              className={`text-4xl sm:text-5xl font-black mb-2 ${
-                isDark ? "text-white" : "text-slate-900"
-              }`}
-            >
+            <h1 className="mb-2 text-4xl font-black sm:text-5xl">
               Print Billing
             </h1>
-            <p className="text-slate-400">
+            <p style={{ color: "var(--app-muted-text)" }}>
               Showing {tablelist.length} tables found for this date.
             </p>
           </div>
 
-          {/* VIEW SWITCHER BUTTONS */}
           <div
-            className={`flex p-1.5 rounded-2xl border ${isDark ? "bg-slate-900/50 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}
+            className="flex rounded-2xl border p-1.5"
+            style={{
+              backgroundColor: "var(--app-surface)",
+              borderColor: "var(--app-border)",
+            }}
           >
             <button
               onClick={() => setViewMode("grid")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${viewMode === "grid" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-500 hover:text-blue-500"}`}
+              className="flex items-center gap-2 rounded-xl px-4 py-2 transition-all"
+              style={{
+                backgroundColor:
+                  viewMode === "grid" ? "var(--app-accent)" : "transparent",
+                color:
+                  viewMode === "grid" ? "#ffffff" : "var(--app-muted-text)",
+                boxShadow:
+                  viewMode === "grid"
+                    ? "0 12px 28px var(--app-accent-glow)"
+                    : "none",
+              }}
             >
               <FaThLarge size={14} />
               <span className="text-[10px] font-bold uppercase"></span>
             </button>
             <button
               onClick={() => setViewMode("list")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${viewMode === "list" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20" : "text-slate-500 hover:text-blue-500"}`}
+              className="flex items-center gap-2 rounded-xl px-4 py-2 transition-all"
+              style={{
+                backgroundColor:
+                  viewMode === "list" ? "var(--app-accent)" : "transparent",
+                color:
+                  viewMode === "list" ? "#ffffff" : "var(--app-muted-text)",
+                boxShadow:
+                  viewMode === "list"
+                    ? "0 12px 28px var(--app-accent-glow)"
+                    : "none",
+              }}
             >
               <FaList size={14} />
               <span className="text-[10px] font-bold uppercase"></span>
@@ -254,39 +291,47 @@ const PrintBilling = () => {
           </div>
         </header>
 
-        <div className="grid grid-cols-1 gap-4 mb-6 md:grid-cols-2">
-          <div className="relative group" onClick={handleCalendarClick}>
-            <FaCalendarAlt className="absolute z-20 -translate-y-1/2 pointer-events-none left-4 top-1/2 text-slate-500" />
+        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="group relative" onClick={handleCalendarClick}>
+            <FaCalendarAlt
+              className="pointer-events-none absolute left-4 top-1/2 z-20 -translate-y-1/2"
+              style={{ color: "var(--app-muted-text)" }}
+            />
             <input
               ref={dateInputRef}
               type="text"
               value={isDateLoading ? "Loading..." : dateFrom || "No open shift"}
               readOnly
-              className={`w-full rounded-2xl py-4 pl-12 pr-4 ${
-                isDark
-                  ? "bg-slate-900/50 border border-slate-800 text-white"
-                  : "bg-white border border-slate-200 text-slate-900 shadow-sm"
-              }`}
+              className="w-full rounded-2xl border py-4 pl-12 pr-4"
+              style={{
+                backgroundColor: "var(--app-surface)",
+                borderColor: "var(--app-border)",
+                color: "var(--app-text)",
+              }}
             />
           </div>
 
-          <div className="relative group">
-            <FaSearch className="absolute -translate-y-1/2 left-4 top-1/2 text-slate-500 group-focus-within:text-blue-500" />
+          <div className="group relative">
+            <FaSearch
+              className="absolute left-4 top-1/2 -translate-y-1/2"
+              style={{ color: "var(--app-muted-text)" }}
+            />
             <input
               type="text"
               placeholder="Search table number..."
               value={searchtable}
               onChange={(e) => setsearchtable(e.target.value)}
-              className={`w-full rounded-2xl py-4 pl-12 pr-4 ${
-                isDark
-                  ? "bg-slate-900/50 border border-slate-800 text-white"
-                  : "bg-white border border-slate-200 text-slate-900 shadow-sm"
-              }`}
+              className="w-full rounded-2xl border py-4 pl-12 pr-4"
+              style={{
+                backgroundColor: "var(--app-surface)",
+                borderColor: "var(--app-border)",
+                color: "var(--app-text)",
+              }}
             />
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-3 mb-10">
+        <div className="mb-10 flex flex-wrap gap-3">
           <FilterChip label="All" value="all" icon={FaLayerGroup} />
           <FilterChip label="Pending" value="pending" icon={FaClock} />
           <FilterChip label="Paid" value="paid" icon={FaCheckCircle} />
@@ -298,16 +343,15 @@ const PrintBilling = () => {
               {[...Array(6)].map((_, i) => (
                 <div
                   key={i}
-                  className={`aspect-square rounded-[2rem] animate-pulse ${
-                    isDark
-                      ? "bg-slate-900"
-                      : "bg-white border border-slate-200 shadow-sm"
-                  }`}
+                  className="aspect-square animate-pulse rounded-[2rem] border"
+                  style={{
+                    backgroundColor: "var(--app-surface)",
+                    borderColor: "var(--app-border)",
+                  }}
                 />
               ))}
             </div>
           ) : viewMode === "grid" ? (
-            /* --- GRID VIEW --- */
             <motion.div
               layout
               className="grid grid-cols-3 gap-4 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6"
@@ -320,30 +364,25 @@ const PrintBilling = () => {
                     whileHover={{ scale: 1.05 }}
                     key={index}
                     onClick={() => table_trasaction(table.table_number)}
-                    className={`aspect-square rounded-[2rem] border flex flex-col items-center justify-center relative overflow-hidden transition-all shadow-xl ${
-                      isDark
-                        ? "bg-slate-900/40 border-white/5 hover:border-blue-500/50"
-                        : "bg-white border-slate-200 hover:border-blue-400/50"
-                    }`}
+                    className="relative flex aspect-square flex-col items-center justify-center overflow-hidden rounded-[2rem] border shadow-xl transition-all"
+                    style={{
+                      backgroundColor: "var(--app-surface)",
+                      borderColor: "var(--app-border)",
+                    }}
                   >
                     <span
-                      className={`text-[10px] font-black uppercase ${
-                        isDark ? "text-slate-500" : "text-slate-400"
-                      }`}
+                      className="text-[10px] font-black uppercase"
+                      style={{ color: "var(--app-muted-text)" }}
                     >
                       Table
                     </span>
-                    <span
-                      className={`text-4xl font-black ${
-                        isDark ? "text-white" : "text-slate-900"
-                      }`}
-                    >
+                    <span className="text-4xl font-black">
                       {String(table.table_number || "")}
                     </span>
                     <div
-                      className={`absolute top-4 right-4 w-3 h-3 rounded-full ${
+                      className={`absolute top-4 right-4 h-3 w-3 rounded-full ${
                         isPending
-                          ? "bg-amber-500 animate-pulse"
+                          ? "animate-pulse bg-amber-500"
                           : "bg-emerald-500"
                       }`}
                     />
@@ -359,7 +398,6 @@ const PrintBilling = () => {
               })}
             </motion.div>
           ) : (
-            /* --- LIST VIEW --- */
             <motion.div layout className="flex flex-col gap-3">
               {currentItems.map((table, index) => {
                 const isPending =
@@ -369,42 +407,47 @@ const PrintBilling = () => {
                     layout
                     key={index}
                     onClick={() => table_trasaction(table.table_number)}
-                    className={`flex items-center justify-between p-4 rounded-3xl border transition-all ${
-                      isDark
-                        ? "bg-slate-900/40 border-white/5 hover:bg-slate-800"
-                        : "bg-white border-slate-200 hover:bg-slate-50 shadow-sm"
-                    }`}
+                    className="flex items-center justify-between rounded-3xl border p-4 transition-all"
+                    style={{
+                      backgroundColor: "var(--app-surface)",
+                      borderColor: "var(--app-border)",
+                    }}
                   >
                     <div className="flex items-center gap-5">
                       <div
-                        className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black text-2xl ${
-                          isDark
-                            ? "bg-slate-800 text-white"
-                            : "bg-slate-100 text-slate-900"
-                        }`}
+                        className="flex h-14 w-14 items-center justify-center rounded-2xl text-2xl font-black"
+                        style={{
+                          backgroundColor: "var(--app-surface-soft)",
+                          color: "var(--app-text)",
+                        }}
                       >
                         {String(table.table_number || "").replace(/^\D+/g, "")}
                       </div>
                       <div className="text-left">
-                        <p
-                          className={`font-black uppercase text-sm ${isDark ? "text-white" : "text-slate-900"}`}
-                        >
+                        <p className="text-sm font-black uppercase">
                           Table {table.table_number}
                         </p>
-                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                        <p
+                          className="text-[10px] font-bold uppercase tracking-wider"
+                          style={{ color: "var(--app-muted-text)" }}
+                        >
                           Ready for billing
                         </p>
                       </div>
                     </div>
                     <div
-                      className={`px-5 py-2 rounded-full border flex items-center gap-3 ${
+                      className={`flex items-center gap-3 rounded-full border px-5 py-2 ${
                         isPending
                           ? "border-amber-500/20 bg-amber-500/5 text-amber-500"
                           : "border-emerald-500/20 bg-emerald-500/5 text-emerald-500"
                       }`}
                     >
                       <div
-                        className={`w-2 h-2 rounded-full ${isPending ? "bg-amber-500 animate-pulse" : "bg-emerald-500"}`}
+                        className={`h-2 w-2 rounded-full ${
+                          isPending
+                            ? "animate-pulse bg-amber-500"
+                            : "bg-emerald-500"
+                        }`}
                       />
                       <span className="text-[10px] font-black uppercase tracking-widest">
                         {table.status_label}
@@ -416,33 +459,35 @@ const PrintBilling = () => {
             </motion.div>
           )}
 
-          {/* NO RESULTS STATE */}
           {!isLoading && !isDateLoading && currentItems.length === 0 && (
             <div
-              className={`text-center py-20 border-2 border-dashed rounded-3xl ${
-                isDark
-                  ? "bg-slate-900/20 border-slate-800"
-                  : "bg-white border-slate-200"
-              }`}
+              className="rounded-3xl border-2 border-dashed py-20 text-center"
+              style={{
+                backgroundColor: "var(--app-surface)",
+                borderColor: "var(--app-border)",
+              }}
             >
-              <p className="font-bold tracking-widest uppercase text-slate-500">
+              <p
+                className="font-bold uppercase tracking-widest"
+                style={{ color: "var(--app-muted-text)" }}
+              >
                 No Tables Found
               </p>
             </div>
           )}
         </main>
 
-        {/* --- PAGINATION CONTROLS --- */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-6 mt-12 mb-6">
+          <div className="mt-12 mb-6 flex items-center justify-center gap-6">
             <button
               disabled={currentPage === 1}
               onClick={() => setCurrentPage((prev) => prev - 1)}
-              className={`p-4 rounded-full border disabled:opacity-20 disabled:cursor-not-allowed transition-all ${
-                isDark
-                  ? "bg-slate-900/50 border-slate-800 text-slate-400 hover:text-white"
-                  : "bg-white border-slate-200 text-slate-500 hover:text-slate-900 shadow-sm"
-              }`}
+              className="rounded-full border p-4 transition-all disabled:cursor-not-allowed disabled:opacity-20"
+              style={{
+                backgroundColor: "var(--app-surface)",
+                borderColor: "var(--app-border)",
+                color: "var(--app-muted-text)",
+              }}
             >
               <FaChevronLeft />
             </button>
@@ -452,13 +497,25 @@ const PrintBilling = () => {
                 <button
                   key={i}
                   onClick={() => setCurrentPage(i + 1)}
-                  className={`w-10 h-10 rounded-xl font-bold text-xs transition-all ${
-                    currentPage === i + 1
-                      ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
-                      : isDark
-                        ? "bg-slate-900/50 text-slate-500 hover:bg-slate-800"
-                        : "bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 shadow-sm"
-                  }`}
+                  className="h-10 w-10 rounded-xl text-xs font-bold transition-all"
+                  style={{
+                    backgroundColor:
+                      currentPage === i + 1
+                        ? "var(--app-accent)"
+                        : "var(--app-surface)",
+                    color:
+                      currentPage === i + 1
+                        ? "#ffffff"
+                        : "var(--app-muted-text)",
+                    border:
+                      currentPage === i + 1
+                        ? "none"
+                        : "1px solid var(--app-border)",
+                    boxShadow:
+                      currentPage === i + 1
+                        ? "0 12px 28px var(--app-accent-glow)"
+                        : "none",
+                  }}
                 >
                   {i + 1}
                 </button>
@@ -468,11 +525,12 @@ const PrintBilling = () => {
             <button
               disabled={currentPage === totalPages}
               onClick={() => setCurrentPage((prev) => prev + 1)}
-              className={`p-4 rounded-full border disabled:opacity-20 disabled:cursor-not-allowed transition-all ${
-                isDark
-                  ? "bg-slate-900/50 border-slate-800 text-slate-400 hover:text-white"
-                  : "bg-white border-slate-200 text-slate-500 hover:text-slate-900 shadow-sm"
-              }`}
+              className="rounded-full border p-4 transition-all disabled:cursor-not-allowed disabled:opacity-20"
+              style={{
+                backgroundColor: "var(--app-surface)",
+                borderColor: "var(--app-border)",
+                color: "var(--app-muted-text)",
+              }}
             >
               <FaChevronRight />
             </button>
