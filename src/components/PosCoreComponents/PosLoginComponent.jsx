@@ -100,15 +100,6 @@ const PosLoginComponent = () => {
     }
   }, []);
 
-  const accent = readCssVar("--app-accent", "#2563eb");
-  const accentSecondary = readCssVar("--app-accent-secondary", "#1d4ed8");
-  const bg = readCssVar("--app-bg", "#f8fafc");
-  const surface = readCssVar("--app-surface", "#ffffff");
-  const surfaceSoft = readCssVar("--app-surface-soft", "rgba(255,255,255,0.9)");
-  const text = readCssVar("--app-text", "#0f172a");
-  const mutedText = readCssVar("--app-muted-text", "rgba(15,23,42,0.68)");
-  const accentGlow = readCssVar("--app-accent-glow", "rgba(37,99,235,0.35)");
-
   const loginBgValue = themeSettings?.Login_Background_Url || "";
   const loginBackgroundImage = !loginBgValue
     ? FALLBACK_RIGHT_IMAGE
@@ -123,10 +114,9 @@ const PosLoginComponent = () => {
       ? `${apiHost}${logoValue}`
       : `${apiHost}/${logoValue}`;
 
-  const buttonTextColor = useMemo(
-    () => getContrastText(accent, "#ffffff"),
-    [accent],
-  );
+  const buttonTextColor = useMemo(() => {
+    return getContrastText(readCssVar("--app-accent", "#2563eb"), "#ffffff");
+  }, []);
 
   const isDisabled = useMemo(() => {
     return (
@@ -249,10 +239,8 @@ const PosLoginComponent = () => {
       <div
         className="h-screen overflow-hidden lg:py-10"
         style={{
-          background: `linear-gradient(135deg, ${bg} 0%, ${toRgba(
-            accentSecondary,
-            0.16,
-          )} 100%)`,
+          background:
+            "linear-gradient(135deg, var(--app-bg) 0%, color-mix(in srgb, var(--app-accent-secondary) 16%, var(--app-bg)) 100%)",
         }}
       >
         <div className="mx-auto h-full w-full max-w-[1600px]">
@@ -260,16 +248,14 @@ const PosLoginComponent = () => {
             <section
               className="relative flex h-full items-center justify-center overflow-hidden px-5 py-6 sm:px-6 md:px-8"
               style={{
-                backgroundColor: surfaceSoft,
+                backgroundColor: "var(--app-surface-soft)",
               }}
             >
               <div
                 className="absolute inset-0"
                 style={{
-                  background: `linear-gradient(180deg, ${toRgba(
-                    surface,
-                    0.72,
-                  )} 0%, ${toRgba(bg, 0.12)} 100%)`,
+                  background:
+                    "linear-gradient(180deg, color-mix(in srgb, var(--app-surface) 72%, transparent) 0%, color-mix(in srgb, var(--app-bg) 12%, transparent) 100%)",
                   backdropFilter: "blur(4px)",
                 }}
               />
@@ -277,13 +263,19 @@ const PosLoginComponent = () => {
               <div
                 className="pointer-events-none absolute -left-12 top-10 h-40 w-40 rounded-full blur-3xl"
                 style={{
-                  backgroundColor: toRgba(accent, 0.18),
+                  backgroundColor: toRgba(
+                    readCssVar("--app-accent", "#2563eb"),
+                    0.18,
+                  ),
                 }}
               />
               <div
                 className="pointer-events-none absolute -bottom-12 right-0 h-48 w-48 rounded-full blur-3xl"
                 style={{
-                  backgroundColor: toRgba(accentSecondary, 0.18),
+                  backgroundColor: toRgba(
+                    readCssVar("--app-accent-secondary", "#1d4ed8"),
+                    0.18,
+                  ),
                 }}
               />
 
@@ -303,7 +295,7 @@ const PosLoginComponent = () => {
                   <h1
                     className="text-center text-[34px] font-extrabold tracking-tight sm:text-[38px]"
                     style={{
-                      color: accent,
+                      color: "var(--app-accent)",
                     }}
                   >
                     Point of Sales
@@ -311,7 +303,7 @@ const PosLoginComponent = () => {
 
                   <p
                     className="mt-3 text-center text-sm font-medium"
-                    style={{ color: mutedText }}
+                    style={{ color: "var(--app-muted-text)" }}
                   >
                     {isThemeLoading
                       ? "Loading theme..."
@@ -324,15 +316,17 @@ const PosLoginComponent = () => {
                     <div
                       className="flex h-14 items-center rounded-full border px-4 shadow-[0_6px_18px_rgba(0,0,0,0.04)]"
                       style={{
-                        borderColor: toRgba(accent, 0.32),
-                        backgroundColor: toRgba(surface, 1),
+                        borderColor:
+                          "color-mix(in srgb, var(--app-accent) 32%, transparent)",
+                        backgroundColor: "var(--app-surface)",
                       }}
                     >
                       <div
                         className="mr-3 grid h-8 w-8 place-items-center rounded-full"
                         style={{
-                          backgroundColor: toRgba(accent, 0.12),
-                          color: accent,
+                          backgroundColor:
+                            "color-mix(in srgb, var(--app-accent) 12%, transparent)",
+                          color: "var(--app-accent)",
                         }}
                       >
                         <FiUser className="h-4 w-4" />
@@ -346,7 +340,7 @@ const PosLoginComponent = () => {
                         placeholder="Username"
                         className="h-full w-full border-none bg-transparent text-center text-[17px] font-medium outline-none"
                         style={{
-                          color: text,
+                          color: "var(--app-text)",
                         }}
                         autoComplete="username"
                       />
@@ -357,15 +351,17 @@ const PosLoginComponent = () => {
                     <div
                       className="flex h-14 items-center rounded-full border px-4 shadow-[0_6px_18px_rgba(0,0,0,0.04)]"
                       style={{
-                        borderColor: toRgba(accent, 0.24),
-                        backgroundColor: toRgba(surface, 1),
+                        borderColor:
+                          "color-mix(in srgb, var(--app-accent) 24%, transparent)",
+                        backgroundColor: "var(--app-surface)",
                       }}
                     >
                       <div
                         className="mr-3 grid h-8 w-8 place-items-center rounded-full"
                         style={{
-                          backgroundColor: toRgba(accent, 0.12),
-                          color: accent,
+                          backgroundColor:
+                            "color-mix(in srgb, var(--app-accent) 12%, transparent)",
+                          color: "var(--app-accent)",
                         }}
                       >
                         <FiLock className="h-4 w-4" />
@@ -384,7 +380,7 @@ const PosLoginComponent = () => {
                         placeholder="••••••"
                         className="h-full w-full border-none bg-transparent text-center text-[17px] font-medium tracking-[0.2em] outline-none"
                         style={{
-                          color: text,
+                          color: "var(--app-text)",
                         }}
                         autoComplete="current-password"
                       />
@@ -394,7 +390,7 @@ const PosLoginComponent = () => {
                         onClick={() => setShowPassword((prev) => !prev)}
                         className="ml-3 grid h-8 w-8 place-items-center rounded-full transition"
                         style={{
-                          color: toRgba(text, 0.7),
+                          color: "var(--app-muted-text)",
                         }}
                       >
                         {showPassword ? (
@@ -411,11 +407,12 @@ const PosLoginComponent = () => {
                       type="button"
                       onClick={handleOpenConfirm}
                       disabled={isDisabled || isSubmitting}
-                      className="mx-auto flex h-[52px] w-[190px] items-center justify-center rounded-full px-6 text-[18px] font-semibold shadow-[0_14px_28px_rgba(0,0,0,0.18)] transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+                      className="mx-auto flex h-[52px] w-[190px] items-center justify-center rounded-full px-6 text-[18px] font-semibold transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
                       style={{
-                        backgroundColor: accent,
+                        background:
+                          "linear-gradient(180deg, var(--app-accent) 0%, var(--app-accent-secondary) 100%)",
                         color: buttonTextColor,
-                        boxShadow: `0 14px 28px ${accentGlow}`,
+                        boxShadow: "0 14px 28px var(--app-accent-glow)",
                       }}
                     >
                       {!apiHost ? (
@@ -439,7 +436,7 @@ const PosLoginComponent = () => {
 
                 <div
                   className="mt-12 text-center text-[15px] font-semibold sm:mt-16"
-                  style={{ color: toRgba(text, 0.62) }}
+                  style={{ color: "var(--app-muted-text)" }}
                 >
                   Restaurant (Version: 1.0.1-1)
                 </div>
@@ -461,10 +458,8 @@ const PosLoginComponent = () => {
               <div
                 className="absolute inset-0"
                 style={{
-                  background: `linear-gradient(to left, transparent 0%, ${toRgba(
-                    bg,
-                    0.04,
-                  )} 55%, ${toRgba(surface, 0.02)} 100%)`,
+                  background:
+                    "linear-gradient(to left, transparent 0%, color-mix(in srgb, var(--app-bg) 4%, transparent) 55%, color-mix(in srgb, var(--app-surface) 2%, transparent) 100%)",
                 }}
               />
             </section>
