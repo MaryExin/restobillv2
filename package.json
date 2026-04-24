@@ -40,9 +40,7 @@
     "escpos-network": "^3.0.0-alpha.5",
     "escpos-usb": "^3.0.0-alpha.4",
     "exceljs": "^4.4.0",
-    "expo-secure-store": "^12.8.1",
     "file-saver": "^2.0.5",
-    "force": "^0.0.3",
     "framer-motion": "^10.15.0",
     "hamburger-react": "^2.5.1",
     "install": "^0.13.0",
@@ -73,6 +71,7 @@
     "react-virtualized-auto-sizer": "^2.0.3",
     "react-window": "^1.8.10",
     "recharts": "^2.7.1",
+    "serialport": "^13.0.0",
     "swiper": "^9.4.1",
     "to-words": "^4.0.1",
     "usb": "^2.17.0",
@@ -138,6 +137,10 @@
         "to": "businessInfo.json"
       }
     ],
+    "npmRebuild": false,
+    "nodeGypRebuild": false,
+    "buildDependenciesFromSource": false,
+    "beforeBuild": "electron/beforeBuild.cjs",
     "win": {
       "target": [
         {

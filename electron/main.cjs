@@ -1,6 +1,9 @@
 const { app, BrowserWindow, ipcMain, protocol, session } = require("electron");
 
 const net = require("net");
+function getSerialPort() {
+  return require("serialport").SerialPort;
+}
 
 const path = require("path");
 const fs = require("fs");
@@ -16,6 +19,14 @@ const EXTRA_PAGE_HEIGHT_PX = 80;
 const RECEIPT_WIDTH_MICRONS = 80000;
 const MIN_RECEIPT_HEIGHT_MICRONS = 50000;
 const MAX_RECEIPT_HEIGHT_MICRONS = 1200000;
+
+process.on("uncaughtException", (err) => {
+  console.error("uncaughtException:", err);
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("unhandledRejection:", reason);
+});
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -334,7 +345,7 @@ function getPrinterHost() {
       console.warn(
         `[ESC/POS PRINT] printer.txt not found at: ${printerFilePath}`,
       );
-      return "192.168.100.126"; // fallback default
+      return "192.168.100.83"; // fallback default
     }
 
     const host = fs.readFileSync(printerFilePath, "utf8").trim();
@@ -343,14 +354,14 @@ function getPrinterHost() {
       console.warn(
         "[ESC/POS PRINT] printer.txt is empty. Using fallback host.",
       );
-      return "192.168.100.126";
+      return "192.168.100.83";
     }
 
     console.log(`[ESC/POS PRINT] Loaded printer host from file: ${host}`);
     return host;
   } catch (error) {
     console.error("[ESC/POS PRINT] Failed to read printer.txt:", error);
-    return "192.168.100.126"; // fallback default
+    return "192.168.100.83"; // fallback default
   }
 }
 
@@ -480,20 +491,20 @@ function escposResolvePrinterTarget(printerNameFromPayload = "") {
 
   if (!raw) {
     return {
-      host: "192.168.100.126",
+      host: "192.168.100.83",
       port: 9100,
     };
   }
 
   // supports:
-  // "192.168.100.126"
-  // "192.168.100.126:9100"
-  // "EPSON@192.168.100.126:9100"
+  // "192.168.100.83"
+  // "192.168.100.83:9100"
+  // "EPSON@192.168.100.83:9100"
   const afterAt = raw.includes("@") ? raw.split("@").pop() : raw;
   const [hostPart, portPart] = String(afterAt).split(":");
 
   return {
-    host: hostPart || "192.168.100.126",
+    host: hostPart || "192.168.100.83",
     port: Number(portPart || 9100),
   };
 }
@@ -971,6 +982,309 @@ function writeBufferToEscposTcp({ host, port = 9100, buffer, timeout = 5000 }) {
   });
 }
 
+// printer.txt rules:
+//   192.168.100.83  -> WiFi/network printer on port 9100
+//   bt:COM3         -> Bluetooth serial printer on COM3
+//   network:192.168.100.83:9100 is also supported
+function parsePrinterConnection(value = "") {
+  const raw = String(value || "").trim();
+
+  if (!raw) {
+    return {
+      type: "network",
+      host: "192.168.100.83",
+      port: 9100,
+    };
+  }
+
+  if (raw.toLowerCase().startsWith("network:")) {
+    const payload = raw.slice("network:".length).trim();
+    const [host, port] = payload.split(":");
+
+    return {
+      type: "network",
+      host: host || "192.168.100.83",
+      port: Number(port || 9100),
+    };
+  }
+
+  if (raw.toLowerCase().startsWith("bt:")) {
+    const portName = raw.slice("bt:".length).trim();
+
+    if (!portName) {
+      throw new Error("Invalid Bluetooth format. Example: bt:COM3");
+    }
+
+    return {
+      type: "bluetooth",
+      portName,
+      baudRate: 9600,
+    };
+  }
+
+  if (raw.toLowerCase().startsWith("usb:")) {
+    const payload = raw.slice("usb:".length).trim();
+
+    const vidMatch = payload.match(/VID\s*=\s*(0x[0-9a-f]+|\d+)/i);
+    const pidMatch = payload.match(/PID\s*=\s*(0x[0-9a-f]+|\d+)/i);
+
+    if (!vidMatch || !pidMatch) {
+      throw new Error("Invalid USB format. Example: usb:VID=0x0483,PID=0x070b");
+    }
+
+    return {
+      type: "usb",
+      vendorId: Number(vidMatch[1]),
+      productId: Number(pidMatch[1]),
+    };
+  }
+
+  const [host, port] = raw.split(":");
+  return {
+    type: "network",
+    host: host || "192.168.100.83",
+    port: Number(port || 9100),
+  };
+}
+
+function getPrinterConnectionConfig() {
+  const printerPath = getPrinterFilePath();
+  const raw = readTextFileSafe(printerPath);
+  return parsePrinterConnection(raw);
+}
+
+function checkEscposNetworkConnection(host, port = 9100, timeout = 5000) {
+  return new Promise((resolve) => {
+    const client = new net.Socket();
+    let finished = false;
+
+    const done = (result) => {
+      if (finished) return;
+      finished = true;
+      try {
+        client.destroy();
+      } catch {}
+      resolve(result);
+    };
+
+    client.setTimeout(timeout);
+
+    client.on("connect", () => {
+      done({
+        success: true,
+        type: "network",
+        message: `WiFi/network ESC/POS printer reachable at ${host}:${port}`,
+      });
+    });
+
+    client.on("timeout", () => {
+      done({
+        success: false,
+        type: "network",
+        message: `WiFi/network printer connection timed out (${host}:${port}).`,
+      });
+    });
+
+    client.on("error", (err) => {
+      done({
+        success: false,
+        type: "network",
+        message: err.message || `WiFi/network printer connection failed (${host}:${port}).`,
+      });
+    });
+
+    client.connect(port, host);
+  });
+}
+
+function checkEscposUsbConnection(vendorId, productId) {
+  return {
+    success: false,
+    type: "usb",
+    message: "USB printer checking is not enabled in this merged main.cjs. Use WiFi or Bluetooth.",
+    vendorId,
+    productId,
+  };
+}
+
+function checkEscposBluetoothConnection(portName, baudRate = 9600) {
+  return new Promise((resolve) => {
+    let port;
+    let finished = false;
+
+    const done = (result) => {
+      if (finished) return;
+      finished = true;
+
+      try {
+        if (port?.isOpen) {
+          return port.close(() => resolve(result));
+        }
+      } catch {}
+
+      resolve(result);
+    };
+
+    try {
+      const SerialPort = getSerialPort();
+      port = new SerialPort({
+        path: portName,
+        baudRate,
+        autoOpen: false,
+      });
+
+      port.open((openErr) => {
+        if (openErr) {
+          return done({
+            success: false,
+            type: "bluetooth",
+            message: `Cannot open Bluetooth port ${portName}`,
+            error: openErr.message,
+          });
+        }
+
+        const initCommand = Buffer.from([0x1b, 0x40]);
+
+        port.write(initCommand, (writeErr) => {
+          if (writeErr) {
+            return done({
+              success: false,
+              type: "bluetooth",
+              message: `Bluetooth port opened but ESC/POS init failed on ${portName}`,
+              error: writeErr.message,
+            });
+          }
+
+          port.drain((drainErr) => {
+            if (drainErr) {
+              return done({
+                success: false,
+                type: "bluetooth",
+                message: `Bluetooth port opened but drain failed on ${portName}`,
+                error: drainErr.message,
+              });
+            }
+
+            return done({
+              success: true,
+              type: "bluetooth",
+              message: `Bluetooth ESC/POS printer reachable on ${portName}`,
+            });
+          });
+        });
+      });
+    } catch (error) {
+      return done({
+        success: false,
+        type: "bluetooth",
+        message: `Bluetooth printer check failed for ${portName}`,
+        error: error.message,
+      });
+    }
+  });
+}
+
+function writeBufferToEscposBluetooth(portName, buffer, baudRate = 9600) {
+  return new Promise((resolve) => {
+    let port;
+    let finished = false;
+
+    const done = (result) => {
+      if (finished) return;
+      finished = true;
+
+      try {
+        if (port?.isOpen) {
+          return port.close(() => resolve(result));
+        }
+      } catch {}
+
+      resolve(result);
+    };
+
+    try {
+      const SerialPort = getSerialPort();
+      port = new SerialPort({
+        path: portName,
+        baudRate,
+        autoOpen: false,
+      });
+
+      port.open((openErr) => {
+        if (openErr) {
+          return done({
+            success: false,
+            type: "bluetooth",
+            message: `Cannot open Bluetooth port ${portName}`,
+            error: openErr.message,
+          });
+        }
+
+        port.write(buffer, (writeErr) => {
+          if (writeErr) {
+            return done({
+              success: false,
+              type: "bluetooth",
+              message: `Bluetooth print write failed on ${portName}`,
+              error: writeErr.message,
+            });
+          }
+
+          port.drain((drainErr) => {
+            if (drainErr) {
+              return done({
+                success: false,
+                type: "bluetooth",
+                message: `Bluetooth print drain failed on ${portName}`,
+                error: drainErr.message,
+              });
+            }
+
+            return done({
+              success: true,
+              type: "bluetooth",
+              message: `Printed successfully via Bluetooth on ${portName}`,
+            });
+          });
+        });
+      });
+    } catch (error) {
+      return done({
+        success: false,
+        type: "bluetooth",
+        message: `Bluetooth print failed on ${portName}`,
+        error: error.message,
+      });
+    }
+  });
+}
+
+async function writeEscposBuffer(buffer) {
+  const config = getPrinterConnectionConfig();
+
+  if (config.type === "bluetooth") {
+    return await writeBufferToEscposBluetooth(
+      config.portName,
+      buffer,
+      config.baudRate,
+    );
+  }
+
+  if (config.type === "usb") {
+    return {
+      success: false,
+      type: "usb",
+      message: "USB printing is not enabled in this merged main.cjs. Use printer.txt = 192.168.100.83 for WiFi or bt:COM3 for Bluetooth.",
+    };
+  }
+
+  return await writeBufferToEscposTcp({
+    host: config.host,
+    port: config.port,
+    buffer,
+  });
+}
+
 app.whenReady().then(() => {
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     const existingHeaders = details.responseHeaders || {};
@@ -1035,50 +1349,89 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle("test-escpos", async () => {
-    const host = getPrinterHost();
-    const port = 9100;
+    try {
+      const payload = Buffer.concat([
+        Buffer.from([0x1b, 0x40]),
+        Buffer.from("ESC/POS TEST PRINT\n\nHELLO\n\n\n", "ascii"),
+        Buffer.from([0x1d, 0x56, 0x00]),
+      ]);
 
-    return await new Promise((resolve) => {
-      const client = new net.Socket();
-      let finished = false;
-
-      const done = (result) => {
-        if (finished) return;
-        finished = true;
-        try {
-          client.destroy();
-        } catch {}
-        resolve(result);
+      return await writeEscposBuffer(payload);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message || "Test print failed",
       };
+    }
+  });
 
-      client.setTimeout(5000);
+  // ipcMain.handle("test-escpos", async () => {
+  //   const host = getPrinterHost();
+  //   const port = 9100;
 
-      client.on("connect", () => {
-        console.log(`[ESC/POS TEST] Connected to ${host}:${port}`);
-        done({
-          success: true,
-          message: `Printer reachable at ${host}:${port}`,
-        });
-      });
+  //   return await new Promise((resolve) => {
+  //     const client = new net.Socket();
+  //     let finished = false;
 
-      client.on("timeout", () => {
-        console.error("[ESC/POS TEST] Socket timeout");
-        done({
-          success: false,
-          message: "Printer socket timeout",
-        });
-      });
+  //     const done = (result) => {
+  //       if (finished) return;
+  //       finished = true;
+  //       try {
+  //         client.destroy();
+  //       } catch {}
+  //       resolve(result);
+  //     };
 
-      client.on("error", (err) => {
-        console.error("[ESC/POS TEST] Socket error:", err);
-        done({
-          success: false,
-          message: err?.message || "Printer connection failed",
-        });
-      });
+  //     client.setTimeout(5000);
 
-      client.connect(port, host);
-    });
+  //     client.on("connect", () => {
+  //       console.log(`[ESC/POS TEST] Connected to ${host}:${port}`);
+  //       done({
+  //         success: true,
+  //         message: `Printer reachable at ${host}:${port}`,
+  //       });
+  //     });
+
+  //     client.on("timeout", () => {
+  //       console.error("[ESC/POS TEST] Socket timeout");
+  //       done({
+  //         success: false,
+  //         message: "Printer socket timeout",
+  //       });
+  //     });
+
+  //     client.on("error", (err) => {
+  //       console.error("[ESC/POS TEST] Socket error:", err);
+  //       done({
+  //         success: false,
+  //         message: err?.message || "Printer connection failed",
+  //       });
+  //     });
+
+  //     client.connect(port, host);
+  //   });
+  // });
+
+  ipcMain.handle("read-business-info", async () => {
+    try {
+      const filePath = app.isPackaged
+        ? path.join(process.resourcesPath, "businessInfo.json")
+        : path.join(__dirname, "businessInfo.json");
+
+      if (!fs.existsSync(filePath)) {
+        return { success: false, message: "businessInfo.json not found" };
+      }
+
+      const raw = fs.readFileSync(filePath, "utf-8");
+      const data = JSON.parse(raw);
+
+      return { success: true, data };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message || "Failed to read businessInfo.json",
+      };
+    }
   });
 
   let lastWarmupAt = 0;
@@ -1157,8 +1510,6 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle("print-escpos", async (_event, data) => {
-    const host = getPrinterHost();
-    const port = 9100;
     const LINE_WIDTH = 42;
 
     const repeat = (char, length) => String(char || "").repeat(length || 0);
@@ -1200,226 +1551,159 @@ app.whenReady().then(() => {
       });
 
     try {
-      return await new Promise((resolve) => {
-        const client = new net.Socket();
-        let finished = false;
+      console.log("[ESC/POS PRINT] Payload:", data);
 
-        const done = (result) => {
-          if (finished) return;
-          finished = true;
-          try {
-            client.destroy();
-          } catch {}
-          resolve(result);
-        };
+      const chunks = [];
+      const { table, items, total, instructions, printMode, transactionId } =
+        data || {};
 
-        client.setTimeout(10000);
+      const initPrinter = Buffer.from([0x1b, 0x40]);
+      const alignLeft = Buffer.from([0x1b, 0x61, 0x00]);
+      const alignCenter = Buffer.from([0x1b, 0x61, 0x01]);
+      const alignRight = Buffer.from([0x1b, 0x61, 0x02]);
+      const boldOn = Buffer.from([0x1b, 0x45, 0x01]);
+      const boldOff = Buffer.from([0x1b, 0x45, 0x00]);
+      const doubleSizeOn = Buffer.from([0x1d, 0x21, 0x11]);
+      const normalSize = Buffer.from([0x1d, 0x21, 0x00]);
+      const cutPaper = Buffer.from([0x1d, 0x56, 0x00]);
+      const nl = (count = 1) => Buffer.from("\n".repeat(count), "ascii");
+      const txt = (value) => Buffer.from(String(value || ""), "ascii");
 
-        client.on("connect", () => {
-          try {
-            console.log(`[ESC/POS PRINT] Connected to ${host}:${port}`);
-            console.log("[ESC/POS PRINT] Payload:", data);
+      let status = "NEW ORDER";
+      if (printMode === "duplicate") {
+        status = "DUPLICATE COPY";
+      } else if (printMode === "additional") {
+        status = "ADDITIONAL ORDER";
+      } else if (printMode === "new") {
+        status = "NEW ORDER";
+      } else if (transactionId) {
+        status = "ADDITIONAL ORDER";
+      }
 
-            const chunks = [];
-            const {
-              table,
-              items,
-              total,
-              instructions,
-              printMode,
-              transactionId,
-            } = data || {};
+      chunks.push(initPrinter);
 
-            const initPrinter = Buffer.from([0x1b, 0x40]);
-            const alignLeft = Buffer.from([0x1b, 0x61, 0x00]);
-            const alignCenter = Buffer.from([0x1b, 0x61, 0x01]);
-            const alignRight = Buffer.from([0x1b, 0x61, 0x02]);
-            const boldOn = Buffer.from([0x1b, 0x45, 0x01]);
-            const boldOff = Buffer.from([0x1b, 0x45, 0x00]);
-            const doubleSizeOn = Buffer.from([0x1d, 0x21, 0x11]);
-            const normalSize = Buffer.from([0x1d, 0x21, 0x00]);
-            const cutPaper = Buffer.from([0x1d, 0x56, 0x00]);
-            const nl = (count = 1) => Buffer.from("\n".repeat(count), "ascii");
-            const txt = (value) => Buffer.from(String(value || ""), "ascii");
+      // Header
+      chunks.push(alignCenter);
+      chunks.push(boldOn);
+      chunks.push(txt("ORDER SUMMARY"));
+      chunks.push(nl());
+      chunks.push(boldOff);
 
-            let status = "NEW ORDER";
-            if (printMode === "duplicate") {
-              status = "DUPLICATE COPY";
-            } else if (printMode === "additional") {
-              status = "ADDITIONAL ORDER";
-            } else if (printMode === "new") {
-              status = "NEW ORDER";
-            } else if (transactionId) {
-              status = "ADDITIONAL ORDER";
-            }
+      chunks.push(normalSize);
+      chunks.push(txt(`Transaction ID: ${transactionId || "-"}`));
+      chunks.push(nl());
+      chunks.push(txt(`Table: ${table || "-"}`));
+      chunks.push(nl());
+      chunks.push(txt(new Date().toLocaleString()));
+      chunks.push(nl());
 
-            chunks.push(initPrinter);
+      chunks.push(txt(repeat("-", LINE_WIDTH)));
+      chunks.push(nl());
 
-            // Header
-            chunks.push(alignCenter);
-            chunks.push(boldOn);
-            chunks.push(txt("ORDER SUMMARY"));
-            chunks.push(nl());
-            chunks.push(boldOff);
+      // Column header
+      chunks.push(alignLeft);
+      chunks.push(boldOn);
+      chunks.push(txt(formatLeftRight("Item", "Qty  Price")));
+      chunks.push(nl());
+      chunks.push(boldOff);
 
-            chunks.push(normalSize);
-            chunks.push(txt(`Table: ${table || "-"}`));
-            chunks.push(nl());
-            chunks.push(txt(new Date().toLocaleString()));
-            chunks.push(nl());
+      chunks.push(txt(repeat("-", LINE_WIDTH)));
+      chunks.push(nl());
 
-            chunks.push(txt(repeat("-", LINE_WIDTH)));
-            chunks.push(nl());
+      // Items
+      if (!Array.isArray(items) || items.length === 0) {
+        chunks.push(alignCenter);
+        chunks.push(txt("Cart is empty"));
+        chunks.push(nl());
+      } else {
+        chunks.push(alignLeft);
 
-            // Column header
-            chunks.push(alignLeft);
-            chunks.push(boldOn);
-            chunks.push(txt(formatLeftRight("Item", "Qty  Price")));
-            chunks.push(nl());
-            chunks.push(boldOff);
+        items.forEach((item) => {
+          const nameLines = wrapText(
+            String(item?.name || "").toUpperCase(),
+            20,
+          );
+          const qty = String(item?.quantity || 0);
+          const lineTotal =
+            Number(item?.price || 0) * Number(item?.quantity || 0);
+          const price = `P${peso(lineTotal)}`;
 
-            chunks.push(txt(repeat("-", LINE_WIDTH)));
-            chunks.push(nl());
-
-            // Items
-            if (!Array.isArray(items) || items.length === 0) {
-              chunks.push(alignCenter);
-              chunks.push(txt("Cart is empty"));
-              chunks.push(nl());
+          nameLines.forEach((line, index) => {
+            if (index === 0) {
+              chunks.push(txt(formatLeftRight(line, `${qty} ${price}`)));
             } else {
-              chunks.push(alignLeft);
-
-              items.forEach((item) => {
-                const nameLines = wrapText(
-                  String(item?.name || "").toUpperCase(),
-                  20,
-                );
-                const qty = String(item?.quantity || 0);
-                const lineTotal =
-                  Number(item?.price || 0) * Number(item?.quantity || 0);
-                const price = `P${peso(lineTotal)}`;
-
-                nameLines.forEach((line, index) => {
-                  if (index === 0) {
-                    chunks.push(txt(formatLeftRight(line, `${qty} ${price}`)));
-                  } else {
-                    chunks.push(txt(line));
-                  }
-                  chunks.push(nl());
-                });
-
-                if (item?.itemInstruction) {
-                  wrapText(`Note: ${item.itemInstruction}`, LINE_WIDTH).forEach(
-                    (line) => {
-                      chunks.push(txt(line));
-                      chunks.push(nl());
-                    },
-                  );
-                }
-
-                // if (item?.code) {
-                //   chunks.push(Buffer.from([0x1b, 0x4d, 0x01]));
-                //   chunks.push(txt(String(item.code)));
-                //   chunks.push(nl());
-                //   chunks.push(Buffer.from([0x1b, 0x4d, 0x00])); // back to normal font
-                // }
-              });
+              chunks.push(txt(line));
             }
-
-            chunks.push(txt(repeat("-", LINE_WIDTH)));
             chunks.push(nl());
+          });
 
-            // Total
-            chunks.push(alignRight);
-            chunks.push(boldOn);
-            chunks.push(doubleSizeOn);
-            chunks.push(txt(`TOTAL: P${peso(total)}`));
-            chunks.push(nl());
-            chunks.push(normalSize);
-            chunks.push(boldOff);
-
-            // Instructions
-            if (instructions) {
-              chunks.push(alignLeft);
-              chunks.push(txt(repeat("-", LINE_WIDTH)));
-              chunks.push(nl());
-              chunks.push(txt("INSTRUCTIONS"));
-              chunks.push(nl());
-
-              wrapText(instructions, LINE_WIDTH).forEach((line) => {
+          if (item?.itemInstruction) {
+            wrapText(`Note: ${item.itemInstruction}`, LINE_WIDTH).forEach(
+              (line) => {
                 chunks.push(txt(line));
                 chunks.push(nl());
-              });
-            }
-
-            // Status
-            chunks.push(alignCenter);
-            chunks.push(boldOn);
-            chunks.push(doubleSizeOn);
-
-            wrapText(status, 16).forEach((line) => {
-              chunks.push(txt(line));
-              chunks.push(nl());
-            });
-
-            chunks.push(normalSize);
-            chunks.push(boldOff);
-
-            // Footer
-            chunks.push(txt("Thank you for your order!"));
-            chunks.push(nl());
-            chunks.push(txt("Please present this to the counter."));
-            chunks.push(nl(3));
-            chunks.push(cutPaper);
-
-            const payload = Buffer.concat(chunks);
-
-            client.write(payload, (err) => {
-              if (err) {
-                console.error("[ESC/POS PRINT] Write error:", err);
-                return done({
-                  success: false,
-                  message: err?.message || "Failed to write to printer",
-                });
-              }
-
-              client.end();
-            });
-          } catch (error) {
-            console.error("[ESC/POS PRINT] Build/print error:", error);
-            done({
-              success: false,
-              message: error?.message || "ESC/POS print failed",
-            });
+              },
+            );
           }
-        });
 
-        client.on("timeout", () => {
-          console.error("[ESC/POS PRINT] Socket timeout");
-          done({
-            success: false,
-            message: "Printer socket timeout",
-          });
+          // if (item?.code) {
+          //   chunks.push(Buffer.from([0x1b, 0x4d, 0x01]));
+          //   chunks.push(txt(String(item.code)));
+          //   chunks.push(nl());
+          //   chunks.push(Buffer.from([0x1b, 0x4d, 0x00])); // back to normal font
+          // }
         });
+      }
 
-        client.on("error", (err) => {
-          console.error("[ESC/POS PRINT] Socket error:", err);
-          done({
-            success: false,
-            message: err?.message || "Printer connection error",
-          });
+      chunks.push(txt(repeat("-", LINE_WIDTH)));
+      chunks.push(nl());
+
+      // Total
+      chunks.push(alignRight);
+      chunks.push(boldOn);
+      chunks.push(doubleSizeOn);
+      chunks.push(txt(`TOTAL: P${peso(total)}`));
+      chunks.push(nl());
+      chunks.push(normalSize);
+      chunks.push(boldOff);
+
+      // Instructions
+      if (instructions) {
+        chunks.push(alignLeft);
+        chunks.push(txt(repeat("-", LINE_WIDTH)));
+        chunks.push(nl());
+        chunks.push(txt("INSTRUCTIONS"));
+        chunks.push(nl());
+
+        wrapText(instructions, LINE_WIDTH).forEach((line) => {
+          chunks.push(txt(line));
+          chunks.push(nl());
         });
+      }
 
-        client.on("close", () => {
-          console.log("[ESC/POS PRINT] Connection closed");
-          done({
-            success: true,
-            message: "Printed successfully",
-          });
-        });
+      // Status
+      chunks.push(alignCenter);
+      chunks.push(boldOn);
+      chunks.push(doubleSizeOn);
 
-        client.connect(port, host);
+      wrapText(status, 16).forEach((line) => {
+        chunks.push(txt(line));
+        chunks.push(nl());
       });
+
+      chunks.push(normalSize);
+      chunks.push(boldOff);
+
+      // Footer
+      chunks.push(txt("Thank you for your order!"));
+      chunks.push(nl());
+      chunks.push(txt("Please present this to the counter."));
+      chunks.push(nl(3));
+      chunks.push(nl(3));
+      chunks.push(cutPaper);
+
+      const payload = Buffer.concat(chunks);
+      return await writeEscposBuffer(payload);
     } catch (error) {
       console.error("ESC/POS print error:", error);
       return {
@@ -1430,399 +1714,306 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle("print-escposdiscount", async (_event, data) => {
-    const host = getPrinterHost();
-    const port = 9100;
     const LINE_WIDTH = 42;
 
     try {
-      return await new Promise((resolve) => {
-        const client = new net.Socket();
-        let finished = false;
+      console.log("[ESC/POS DISCOUNT] Payload:", data);
 
-        const done = (result) => {
-          if (finished) return;
-          finished = true;
-          try {
-            client.destroy();
-          } catch {}
-          resolve(result);
-        };
+      const chunks = [];
+      const {
+        transaction = {},
+        items = [],
+        computed = {},
+        dateFrom,
+      } = data || {};
 
-        client.setTimeout(10000);
+      const business = escposPickBusinessInfo(data);
 
-        client.on("connect", () => {
-          try {
-            console.log(`[ESC/POS DISCOUNT] Connected to ${host}:${port}`);
-            console.log("[ESC/POS DISCOUNT] Payload:", data);
+      const initPrinter = Buffer.from([0x1b, 0x40]);
+      const alignLeft = Buffer.from([0x1b, 0x61, 0x00]);
+      const alignCenter = Buffer.from([0x1b, 0x61, 0x01]);
+      const boldOn = Buffer.from([0x1b, 0x45, 0x01]);
+      const boldOff = Buffer.from([0x1b, 0x45, 0x00]);
+      const doubleSizeOn = Buffer.from([0x1d, 0x21, 0x11]);
+      const normalSize = Buffer.from([0x1d, 0x21, 0x00]);
+      const cutPaper = Buffer.from([0x1d, 0x56, 0x00]);
+      const nl = (count = 1) => Buffer.from("\n".repeat(count), "ascii");
+      const txt = (value) => Buffer.from(String(value || ""), "ascii");
 
-            const chunks = [];
-            const {
-              transaction = {},
-              items = [],
-              computed = {},
-              dateFrom,
-            } = data || {};
+      const safeItems = Array.isArray(items) ? items : [];
+      const safeComputed = computed || {};
 
-            const business = escposPickBusinessInfo(data);
-
-            const initPrinter = Buffer.from([0x1b, 0x40]);
-            const alignLeft = Buffer.from([0x1b, 0x61, 0x00]);
-            const alignCenter = Buffer.from([0x1b, 0x61, 0x01]);
-            const boldOn = Buffer.from([0x1b, 0x45, 0x01]);
-            const boldOff = Buffer.from([0x1b, 0x45, 0x00]);
-            const doubleSizeOn = Buffer.from([0x1d, 0x21, 0x11]);
-            const normalSize = Buffer.from([0x1d, 0x21, 0x00]);
-            const cutPaper = Buffer.from([0x1d, 0x56, 0x00]);
-            const nl = (count = 1) => Buffer.from("\n".repeat(count), "ascii");
-            const txt = (value) => Buffer.from(String(value || ""), "ascii");
-
-            const safeItems = Array.isArray(items) ? items : [];
-            const safeComputed = computed || {};
-
-            const peso = (value) =>
-              Number(value || 0).toLocaleString("en-PH", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              });
-
-            const signedNegativePeso = (value) => `- ${peso(value)}`;
-
-            const line = () => {
-              chunks.push(txt(escposRepeat("-", LINE_WIDTH)));
-              chunks.push(nl());
-            };
-
-            const pushWrapped = (value, width = LINE_WIDTH) => {
-              escposWrapText(String(value || ""), width).forEach((wrapped) => {
-                chunks.push(txt(wrapped));
-                chunks.push(nl());
-              });
-            };
-
-            const pushLR = (label, value, width = LINE_WIDTH) => {
-              chunks.push(
-                txt(
-                  escposFormatLeftRight(
-                    String(label || ""),
-                    String(value || ""),
-                    width,
-                  ),
-                ),
-              );
-              chunks.push(nl());
-            };
-
-            const activeBreakdown = Array.isArray(
-              safeComputed?.discountBreakdown,
-            )
-              ? safeComputed.discountBreakdown.filter(
-                  (entry) =>
-                    Number(entry?.qualifiedCount || 0) > 0 ||
-                    Number(entry?.discountAmount || 0) > 0,
-                )
-              : [];
-
-            const totalQualifiedAll = Number(
-              safeComputed?.totalQualifiedAll ||
-                safeComputed?.totalQualifiedCount ||
-                0,
-            );
-
-            const statutoryQualifiedCount = Number(
-              safeComputed?.statutoryQualifiedCount || 0,
-            );
-
-            const grossTotal = Number(safeComputed?.grossTotal || 0);
-            const netAfterDiscount = Number(
-              safeComputed?.netAfterDiscount || 0,
-            );
-            const totalVatExemption = Number(
-              safeComputed?.totalVatExemption || 0,
-            );
-
-            const billingRows = [
-              ["Trans. No.", transaction?.transaction_id || "-"],
-              [
-                "Billing No.",
-                transaction?.billing_no || transaction?.billingNo || "-",
-              ],
-              [
-                "Invoice No.",
-                transaction?.invoice_no || transaction?.invoiceNo || "-",
-              ],
-              ["Trans. Date", transaction?.transaction_date || dateFrom || "-"],
-              ["Trans. Time", transaction?.transaction_time || "-"],
-              ["Terminal No.", transaction?.terminal_number || "-"],
-              ["Order Type", transaction?.order_type || "-"],
-              ["Ref./Tag #", transaction?.table_number || "-"],
-              ["Cashier", transaction?.cashier || "-"],
-            ];
-
-            const formatItemRow = (name, qty, amt) => {
-              const nameWidth = 20;
-              const qtyWidth = 8;
-              const amtWidth = 14;
-
-              return (
-                escposPadRight(name, nameWidth) +
-                escposPadRight(qty, qtyWidth) +
-                escposPadLeft(amt, amtWidth)
-              );
-            };
-
-            chunks.push(initPrinter);
-
-            // HEADER
-            chunks.push(alignCenter);
-            chunks.push(boldOn);
-            // chunks.push(doubleSizeOn);
-            chunks.push(
-              txt(
-                escposSafeText(
-                  business.companyName,
-                  "CRABS N CRACK SEAFOOD HOUSE",
-                ),
-              ),
-            );
-            chunks.push(nl());
-            chunks.push(normalSize);
-            chunks.push(txt(escposSafeText(business.storeName, "STORE")));
-            chunks.push(nl());
-
-            if (business.corpName) {
-              chunks.push(txt(escposSafeText(business.corpName, "")));
-              chunks.push(nl());
-            }
-
-            chunks.push(boldOff);
-
-            if (business.address) {
-              pushWrapped(business.address);
-            }
-
-            if (business.tin) {
-              chunks.push(
-                txt(`VAT REG TIN: ${escposSafeText(business.tin, "N/A")}`),
-              );
-              chunks.push(nl());
-            }
-
-            if (business.machineNumber) {
-              chunks.push(
-                txt(`MIN: ${escposSafeText(business.machineNumber, "N/A")}`),
-              );
-              chunks.push(nl());
-            }
-
-            if (business.serialNumber) {
-              chunks.push(
-                txt(`S/N: ${escposSafeText(business.serialNumber, "N/A")}`),
-              );
-              chunks.push(nl());
-            }
-
-            line();
-
-            // TITLE
-            chunks.push(alignCenter);
-            chunks.push(boldOn);
-            chunks.push(doubleSizeOn);
-            chunks.push(txt("BILLING"));
-            chunks.push(nl());
-            chunks.push(normalSize);
-            chunks.push(boldOff);
-
-            line();
-
-            // BILLING INFO
-            chunks.push(alignLeft);
-            billingRows.forEach(([label, value]) => {
-              pushLR(`${label}:`, value);
-            });
-
-            line();
-
-            // ITEMS
-            chunks.push(boldOn);
-            chunks.push(txt(formatItemRow("Item", "Qty", "Amt")));
-            chunks.push(nl());
-            chunks.push(boldOff);
-            line();
-
-            if (!safeItems.length) {
-              chunks.push(alignCenter);
-              chunks.push(txt("No items"));
-              chunks.push(nl());
-              chunks.push(alignLeft);
-            } else {
-              safeItems.forEach((item) => {
-                const qty = Number(item?.sales_quantity || 0);
-                const price = Number(item?.selling_price || 0);
-                const lineTotal = qty * price;
-
-                const isDiscountable =
-                  String(item?.isDiscountable || "")
-                    .trim()
-                    .toLowerCase() === "yes";
-
-                const itemLabel = String(
-                  item?.item_name || item?.product_id || item?.name || "-",
-                ).toUpperCase();
-
-                const itemText = `${itemLabel}${isDiscountable ? " (D)" : ""}`;
-                const qtyText = `${qty} ${item?.unit_of_measure || ""}`.trim();
-                const amtText = peso(lineTotal);
-
-                const nameLines = escposWrapText(itemText, 20);
-
-                nameLines.forEach((entry, index) => {
-                  if (index === 0) {
-                    chunks.push(
-                      txt(formatItemRow(`* ${entry}`, qtyText, amtText)),
-                    );
-                  } else {
-                    chunks.push(txt(entry));
-                  }
-                  chunks.push(nl());
-                });
-              });
-            }
-
-            line();
-
-            // SALES / DISCOUNT SECTION
-            pushLR("TOTAL SALES:", peso(grossTotal));
-
-            activeBreakdown.forEach((entry) => {
-              if (Number(entry?.discountAmount || 0) > 0) {
-                pushLR(
-                  `${String(entry?.label || "DISCOUNT").toUpperCase()}:`,
-                  signedNegativePeso(entry.discountAmount),
-                );
-              }
-            });
-
-            if (totalVatExemption > 0) {
-              pushLR("VAT EXEMPTION:", signedNegativePeso(totalVatExemption));
-            }
-
-            line();
-
-            // AMOUNT DUE
-            chunks.push(boldOn);
-            chunks.push(doubleSizeOn);
-            pushLR("AMOUNT DUE:", peso(netAfterDiscount));
-            chunks.push(normalSize);
-            chunks.push(boldOff);
-
-            line();
-
-            // VAT SECTION
-            pushLR("VATABLE SALES:", peso(safeComputed?.vatableSales));
-            pushLR("VAT AMOUNT:", peso(safeComputed?.vatableSalesVat));
-            pushLR("VAT EXEMPT SALES:", peso(safeComputed?.vatExemptSales));
-            pushLR("VAT EXEMPTION:", peso(safeComputed?.totalVatExemption));
-            pushLR("ZERO RATED SALES:", peso(safeComputed?.vatZeroRatedSales));
-
-            line();
-
-            // QUALIFIED / BREAKDOWN SECTION
-            pushLR(
-              "Total Customers:",
-              String(safeComputed?.safeCustomerCount ?? 0),
-            );
-            pushLR("Total Qualified:", String(totalQualifiedAll));
-            pushLR("Statutory Qualified:", String(statutoryQualifiedCount));
-
-            activeBreakdown.forEach((entry) => {
-              pushLR(
-                `${entry.label} Count:`,
-                String(entry?.qualifiedCount || 0),
-              );
-              pushLR(
-                `${entry.label} Amount:`,
-                peso(entry?.discountAmount || 0),
-              );
-            });
-
-            pushLR(
-              "Discountable Gross:",
-              peso(safeComputed?.discountableGross),
-            );
-            pushLR("Discountable Base:", peso(safeComputed?.discountableBase));
-
-            line();
-
-            // SIGNATURE
-            chunks.push(txt("Customer Signature:"));
-            chunks.push(nl());
-            chunks.push(txt("________________________________"));
-            chunks.push(nl(2));
-
-            line();
-
-            // FOOTER
-            chunks.push(alignCenter);
-            chunks.push(boldOn);
-            chunks.push(txt("Thank you"));
-            chunks.push(nl());
-            chunks.push(txt("Please come again."));
-            chunks.push(nl());
-            chunks.push(boldOff);
-
-            chunks.push(nl(3));
-            chunks.push(cutPaper);
-
-            const payload = Buffer.concat(chunks);
-
-            client.write(payload, (err) => {
-              if (err) {
-                console.error("[ESC/POS DISCOUNT] Write error:", err);
-                return done({
-                  success: false,
-                  message:
-                    err?.message ||
-                    "Failed to write discount receipt to printer",
-                });
-              }
-
-              client.end();
-            });
-          } catch (error) {
-            console.error("[ESC/POS DISCOUNT] Build/print error:", error);
-            done({
-              success: false,
-              message: error?.message || "ESC/POS discount print failed",
-            });
-          }
+      const peso = (value) =>
+        Number(value || 0).toLocaleString("en-PH", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
         });
 
-        client.on("timeout", () => {
-          console.error("[ESC/POS DISCOUNT] Socket timeout");
-          done({
-            success: false,
-            message: "Discount printer socket timeout",
-          });
-        });
+      const signedNegativePeso = (value) => `- ${peso(value)}`;
 
-        client.on("error", (err) => {
-          console.error("[ESC/POS DISCOUNT] Socket error:", err);
-          done({
-            success: false,
-            message: err?.message || "Discount printer connection error",
-          });
-        });
+      const line = () => {
+        chunks.push(txt(escposRepeat("-", LINE_WIDTH)));
+        chunks.push(nl());
+      };
 
-        client.on("close", () => {
-          console.log("[ESC/POS DISCOUNT] Connection closed");
-          done({
-            success: true,
-            message: "Discount receipt printed successfully",
-          });
+      const pushWrapped = (value, width = LINE_WIDTH) => {
+        escposWrapText(String(value || ""), width).forEach((wrapped) => {
+          chunks.push(txt(wrapped));
+          chunks.push(nl());
         });
+      };
 
-        client.connect(port, host);
+      const pushLR = (label, value, width = LINE_WIDTH) => {
+        chunks.push(
+          txt(
+            escposFormatLeftRight(
+              String(label || ""),
+              String(value || ""),
+              width,
+            ),
+          ),
+        );
+        chunks.push(nl());
+      };
+
+      const activeBreakdown = Array.isArray(safeComputed?.discountBreakdown)
+        ? safeComputed.discountBreakdown.filter(
+            (entry) =>
+              Number(entry?.qualifiedCount || 0) > 0 ||
+              Number(entry?.discountAmount || 0) > 0,
+          )
+        : [];
+
+      const totalQualifiedAll = Number(
+        safeComputed?.totalQualifiedAll ||
+          safeComputed?.totalQualifiedCount ||
+          0,
+      );
+
+      const statutoryQualifiedCount = Number(
+        safeComputed?.statutoryQualifiedCount || 0,
+      );
+
+      const grossTotal = Number(safeComputed?.grossTotal || 0);
+      const netAfterDiscount = Number(safeComputed?.netAfterDiscount || 0);
+      const totalVatExemption = Number(safeComputed?.totalVatExemption || 0);
+
+      const billingRows = [
+        ["Trans. No.", transaction?.transaction_id || "-"],
+        [
+          "Billing No.",
+          transaction?.billing_no || transaction?.billingNo || "-",
+        ],
+        [
+          "Invoice No.",
+          transaction?.invoice_no || transaction?.invoiceNo || "-",
+        ],
+        ["Trans. Date", transaction?.transaction_date || dateFrom || "-"],
+        ["Trans. Time", transaction?.transaction_time || "-"],
+        ["Terminal No.", transaction?.terminal_number || "-"],
+        ["Order Type", transaction?.order_type || "-"],
+        ["Ref./Tag #", transaction?.table_number || "-"],
+        ["Cashier", transaction?.cashier || "-"],
+      ];
+
+      const formatItemRow = (name, qty, amt) => {
+        const nameWidth = 20;
+        const qtyWidth = 8;
+        const amtWidth = 14;
+
+        return (
+          escposPadRight(name, nameWidth) +
+          escposPadRight(qty, qtyWidth) +
+          escposPadLeft(amt, amtWidth)
+        );
+      };
+
+      chunks.push(initPrinter);
+
+      // HEADER
+      chunks.push(alignCenter);
+      chunks.push(boldOn);
+      chunks.push(
+        txt(
+          escposSafeText(business.companyName, "CRABS N CRACK SEAFOOD HOUSE"),
+        ),
+      );
+      chunks.push(nl());
+      chunks.push(normalSize);
+      chunks.push(txt(escposSafeText(business.storeName, "STORE")));
+      chunks.push(nl());
+
+      if (business.corpName) {
+        chunks.push(txt(escposSafeText(business.corpName, "")));
+        chunks.push(nl());
+      }
+
+      chunks.push(boldOff);
+
+      if (business.address) {
+        pushWrapped(business.address);
+      }
+
+      if (business.tin) {
+        chunks.push(txt(`VAT REG TIN: ${escposSafeText(business.tin, "N/A")}`));
+        chunks.push(nl());
+      }
+
+      if (business.machineNumber) {
+        chunks.push(
+          txt(`MIN: ${escposSafeText(business.machineNumber, "N/A")}`),
+        );
+        chunks.push(nl());
+      }
+
+      if (business.serialNumber) {
+        chunks.push(
+          txt(`S/N: ${escposSafeText(business.serialNumber, "N/A")}`),
+        );
+        chunks.push(nl());
+      }
+
+      line();
+
+      // TITLE
+      chunks.push(alignCenter);
+      chunks.push(boldOn);
+      chunks.push(doubleSizeOn);
+      chunks.push(txt("BILLING"));
+      chunks.push(nl());
+      chunks.push(normalSize);
+      chunks.push(boldOff);
+
+      line();
+
+      // BILLING INFO
+      chunks.push(alignLeft);
+      billingRows.forEach(([label, value]) => {
+        pushLR(`${label}:`, value);
       });
+
+      line();
+
+      // ITEMS
+      chunks.push(boldOn);
+      chunks.push(txt(formatItemRow("Item", "Qty", "Amt")));
+      chunks.push(nl());
+      chunks.push(boldOff);
+      line();
+
+      if (!safeItems.length) {
+        chunks.push(alignCenter);
+        chunks.push(txt("No items"));
+        chunks.push(nl());
+        chunks.push(alignLeft);
+      } else {
+        safeItems.forEach((item) => {
+          const qty = Number(item?.sales_quantity || 0);
+          const price = Number(item?.selling_price || 0);
+          const lineTotal = qty * price;
+
+          const isDiscountable =
+            String(item?.isDiscountable || "")
+              .trim()
+              .toLowerCase() === "yes";
+
+          const itemLabel = String(
+            item?.item_name || item?.product_id || item?.name || "-",
+          ).toUpperCase();
+
+          const itemText = `${itemLabel}${isDiscountable ? " (D)" : ""}`;
+          const qtyText = `${qty} ${item?.unit_of_measure || ""}`.trim();
+          const amtText = peso(lineTotal);
+
+          const nameLines = escposWrapText(itemText, 20);
+
+          nameLines.forEach((entry, index) => {
+            if (index === 0) {
+              chunks.push(txt(formatItemRow(`* ${entry}`, qtyText, amtText)));
+            } else {
+              chunks.push(txt(entry));
+            }
+            chunks.push(nl());
+          });
+        });
+      }
+
+      line();
+
+      // SALES / DISCOUNT SECTION
+      pushLR("TOTAL SALES:", peso(grossTotal));
+
+      activeBreakdown.forEach((entry) => {
+        if (Number(entry?.discountAmount || 0) > 0) {
+          pushLR(
+            `${String(entry?.label || "DISCOUNT").toUpperCase()}:`,
+            signedNegativePeso(entry.discountAmount),
+          );
+        }
+      });
+
+      if (totalVatExemption > 0) {
+        pushLR("VAT EXEMPTION:", signedNegativePeso(totalVatExemption));
+      }
+
+      line();
+
+      // AMOUNT DUE
+      chunks.push(boldOn);
+      chunks.push(doubleSizeOn);
+      pushLR("AMOUNT DUE:", peso(netAfterDiscount));
+      chunks.push(normalSize);
+      chunks.push(boldOff);
+
+      line();
+
+      // VAT SECTION
+      pushLR("VATABLE SALES:", peso(safeComputed?.vatableSales));
+      pushLR("VAT AMOUNT:", peso(safeComputed?.vatableSalesVat));
+      pushLR("VAT EXEMPT SALES:", peso(safeComputed?.vatExemptSales));
+      pushLR("VAT EXEMPTION:", peso(safeComputed?.totalVatExemption));
+      pushLR("ZERO RATED SALES:", peso(safeComputed?.vatZeroRatedSales));
+
+      line();
+
+      // QUALIFIED / BREAKDOWN SECTION
+      pushLR("Total Customers:", String(safeComputed?.safeCustomerCount ?? 0));
+      pushLR("Total Qualified:", String(totalQualifiedAll));
+      pushLR("Statutory Qualified:", String(statutoryQualifiedCount));
+
+      activeBreakdown.forEach((entry) => {
+        pushLR(`${entry.label} Count:`, String(entry?.qualifiedCount || 0));
+        pushLR(`${entry.label} Amount:`, peso(entry?.discountAmount || 0));
+      });
+
+      pushLR("Discountable Gross:", peso(safeComputed?.discountableGross));
+      pushLR("Discountable Base:", peso(safeComputed?.discountableBase));
+
+      line();
+
+      // SIGNATURE
+      chunks.push(txt("Customer Signature:"));
+      chunks.push(nl());
+      chunks.push(txt("________________________________"));
+      chunks.push(nl(2));
+
+      line();
+
+      // FOOTER
+      chunks.push(alignCenter);
+      chunks.push(boldOn);
+      chunks.push(txt("Thank you"));
+      chunks.push(nl());
+      chunks.push(txt("Please come again."));
+      chunks.push(nl(3));
+      chunks.push(boldOff);
+
+      chunks.push(nl(3));
+      chunks.push(cutPaper);
+
+      const payload = Buffer.concat(chunks);
+
+      return await writeEscposBuffer(payload);
     } catch (error) {
       console.error("ESC/POS discount print error:", error);
       return {
@@ -1833,560 +2024,458 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle("print-escpospospaymentreceipt", async (_event, data) => {
-    const host = getPrinterHost();
-    const port = 9100;
     const LINE_WIDTH = 42;
 
-    // const { host, port } = escposResolvePrinterTarget(data?.printerName);
-
     try {
-      return await new Promise((resolve) => {
-        const client = new net.Socket();
-        let finished = false;
+      console.log("[ESC/POS PAYMENT] Payload:", data);
 
-        const done = (result) => {
-          if (finished) return;
-          finished = true;
-          try {
-            client.destroy();
-          } catch {}
-          resolve(result);
-        };
+      const chunks = [];
+      const {
+        transaction = {},
+        items = [],
+        computed = {},
+        payments = [],
+        otherCharges = [],
+        customerCards = [],
+        isDuplicateCopy = false,
+        terminalConfig = {},
+        businessInfo = {},
+      } = data || {};
 
-        client.setTimeout(10000);
+      const safeTransaction = transaction || {};
+      const safeComputed = computed || {};
+      const safeItems = Array.isArray(items) ? items : [];
+      const safePayments = Array.isArray(payments) ? payments : [];
+      const safeOtherCharges = Array.isArray(otherCharges) ? otherCharges : [];
+      const safeCustomerCards = Array.isArray(customerCards)
+        ? customerCards
+        : [];
 
-        client.on("connect", () => {
-          try {
-            console.log(`[ESC/POS PAYMENT] Connected to ${host}:${port}`);
-            console.log("[ESC/POS PAYMENT] Payload:", data);
-
-            const chunks = [];
-            const {
-              transaction = {},
-              items = [],
-              computed = {},
-              payments = [],
-              otherCharges = [],
-              customerCards = [],
-              isDuplicateCopy = false,
-              terminalConfig = {},
-              businessInfo = {},
-            } = data || {};
-
-            const safeTransaction = transaction || {};
-            const safeComputed = computed || {};
-            const safeItems = Array.isArray(items) ? items : [];
-            const safePayments = Array.isArray(payments) ? payments : [];
-            const safeOtherCharges = Array.isArray(otherCharges)
-              ? otherCharges
-              : [];
-            const safeCustomerCards = Array.isArray(customerCards)
-              ? customerCards
-              : [];
-
-            const paymentLabel =
-              safePayments.length > 0
-                ? [
-                    ...new Set(
-                      safePayments
-                        .map((p) => String(p?.payment_method || "").trim())
-                        .filter(Boolean),
-                    ),
-                  ].join(", ")
-                : safeTransaction?.payment_method || "Cash";
-
-            const activeBreakdown = Array.isArray(
-              safeComputed?.discountBreakdown,
-            )
-              ? safeComputed.discountBreakdown.filter(
-                  (entry) =>
-                    Number(entry?.qualifiedCount || 0) > 0 ||
-                    Number(entry?.discountAmount || 0) > 0,
-                )
-              : [];
-
-            const paymentBreakdown = escposBuildPaymentBreakdown(safePayments);
-
-            const shouldShowDiscountSummary =
-              Number(safeComputed?.safeCustomerCount || 0) > 0 ||
-              Number(
-                safeComputed?.totalQualifiedCount ||
-                  safeComputed?.totalQualifiedAll ||
-                  0,
-              ) > 0 ||
-              Number(safeComputed?.statutoryQualifiedCount || 0) > 0 ||
-              activeBreakdown.length > 0;
-
-            const splitAddressLines = (value) =>
-              String(value || "")
-                .split(/\r?\n|\|/)
-                .map((line) => line.trim())
-                .filter(Boolean);
-
-            const companyName = String(
-              businessInfo?.companyName || "COMPANY",
-            ).trim();
-
-            const storeName = String(businessInfo?.storeName || "STORE").trim();
-
-            const corpName = String(
-              businessInfo?.corpName || "CORPORATION",
-            ).trim();
-
-            const storeAddress = splitAddressLines(
-              businessInfo?.address || terminalConfig?.unitAddress || "ADDRESS",
-            );
-
-            const storeTin = String(
-              businessInfo?.tin || terminalConfig?.vatTin || "STORE TIN",
-            ).trim();
-
-            const machineNumber = String(
-              businessInfo?.machineNumber ||
-                terminalConfig?.machineNumber ||
-                "MACHINE NUMBER",
-            ).trim();
-
-            const serialNumber = String(
-              businessInfo?.serialNumber ||
-                terminalConfig?.serialNumber ||
-                "SERIAL NUMBER",
-            ).trim();
-
-            const posProviderName = String(
-              businessInfo?.posProviderName || "POS PROVIDER NAME",
-            ).trim();
-
-            const posProviderAddress = splitAddressLines(
-              businessInfo?.posProviderAddress || "POS PROVIDER ADDRESS",
-            );
-
-            const posProviderTin = String(
-              businessInfo?.posProviderTin || "POS PROVIDER TIN",
-            ).trim();
-
-            const posProviderBirAccreNo = String(
-              businessInfo?.posProviderBirAccreNo || "POS PROVIDER ACCRE NO.",
-            ).trim();
-
-            const posProviderAccreDateIssued = String(
-              businessInfo?.posProviderAccreDateIssued || "ACCRE DATE ISSUED",
-            ).trim();
-
-            const posProviderPTUNo = String(
-              businessInfo?.posProviderPTUNo || "PTU No.",
-            ).trim();
-
-            const posProviderPTUDateIssued = String(
-              businessInfo?.posProviderPTUDateIssued || "PTU DATE ISSUED",
-            ).trim();
-
-            const initPrinter = Buffer.from([0x1b, 0x40]);
-            const alignLeft = Buffer.from([0x1b, 0x61, 0x00]);
-            const alignCenter = Buffer.from([0x1b, 0x61, 0x01]);
-            const boldOn = Buffer.from([0x1b, 0x45, 0x01]);
-            const boldOff = Buffer.from([0x1b, 0x45, 0x00]);
-            const doubleSizeOn = Buffer.from([0x1d, 0x21, 0x11]);
-            const doubleWidthOn = Buffer.from([0x1d, 0x21, 0x10]);
-            const normalSize = Buffer.from([0x1d, 0x21, 0x00]);
-            const cutPaper = Buffer.from([0x1d, 0x56, 0x00]);
-            const nl = (count = 1) => Buffer.from("\n".repeat(count), "ascii");
-            const txt = (value) => Buffer.from(String(value || ""), "ascii");
-
-            const pushWrapped = (value, width = LINE_WIDTH) => {
-              escposWrapText(String(value || ""), width).forEach((line) => {
-                chunks.push(txt(line));
-                chunks.push(nl());
-              });
-            };
-
-            const pushDivider = () => {
-              chunks.push(txt(escposRepeat("-", LINE_WIDTH)));
-              chunks.push(nl());
-            };
-
-            const pushMetaRow = (label, value) => {
-              const left = `${label}`;
-              const right = escposSafeText(value, "-");
-
-              if (left.length + right.length <= LINE_WIDTH) {
-                chunks.push(
-                  txt(escposFormatLeftRight(left, right, LINE_WIDTH)),
-                );
-                chunks.push(nl());
-              } else {
-                chunks.push(txt(left));
-                chunks.push(nl());
-                escposWrapText(right, LINE_WIDTH).forEach((line) => {
-                  chunks.push(txt(line));
-                  chunks.push(nl());
-                });
-              }
-            };
-
-            const formatItemRow = (name, qty, amt) => {
-              const nameWidth = 21;
-              const qtyWidth = 7;
-              const amtWidth = 14;
-
-              return (
-                escposPadRight(name, nameWidth) +
-                escposPadRight(qty, qtyWidth) +
-                escposPadLeft(amt, amtWidth)
-              );
-            };
-
-            chunks.push(initPrinter);
-
-            // HEADER
-            chunks.push(alignCenter);
-            chunks.push(boldOn);
-            chunks.push(txt(companyName));
-            chunks.push(nl());
-            chunks.push(txt(String(storeName).toUpperCase()));
-            chunks.push(nl());
-
-            if (corpName) {
-              chunks.push(txt(String(corpName).toUpperCase()));
-              chunks.push(nl());
-            }
-
-            chunks.push(boldOff);
-
-            storeAddress.forEach((line) => {
-              chunks.push(txt(line));
-              chunks.push(nl());
-            });
-
-            if (storeTin) {
-              chunks.push(txt(`VAT REG TIN: ${storeTin}`));
-              chunks.push(nl());
-            }
-
-            chunks.push(txt(`MIN: ${machineNumber || "-"}`));
-            chunks.push(nl());
-            chunks.push(txt(`S/N: ${serialNumber || "-"}`));
-            chunks.push(nl());
-
-            pushDivider();
-
-            // INVOICE TITLE
-            chunks.push(alignCenter);
-            chunks.push(boldOn);
-            chunks.push(doubleWidthOn);
-            chunks.push(txt("INVOICE"));
-            chunks.push(nl());
-            chunks.push(normalSize);
-            chunks.push(boldOff);
-
-            if (isDuplicateCopy) {
-              chunks.push(boldOn);
-              chunks.push(txt("DUPLICATE INVOICE COPY"));
-              chunks.push(nl());
-              chunks.push(boldOff);
-            }
-
-            // META
-            chunks.push(alignLeft);
-            pushMetaRow("Trans. No.:", safeTransaction?.transaction_id || "-");
-            pushMetaRow("INV#:", safeTransaction?.invoice_no || "-");
-            pushMetaRow(
-              "Trans. Date:",
-              safeTransaction?.transaction_date || "-",
-            );
-            pushMetaRow(
-              "Trans. Time:",
-              safeTransaction?.transaction_time || "-",
-            );
-            pushMetaRow(
-              "Terminal No.:",
-              safeTransaction?.terminal_number ||
-                terminalConfig?.terminalNumber ||
-                "-",
-            );
-            pushMetaRow("Order Type:", safeTransaction?.order_type || "-");
-            pushMetaRow("Ref./Tag #:", safeTransaction?.table_number || "-");
-            pushMetaRow("Cashier:", safeTransaction?.cashier || "-");
-
-            pushDivider();
-
-            // ITEMS
-            chunks.push(boldOn);
-            chunks.push(txt(formatItemRow("Item", "Qty", "Amt")));
-            chunks.push(nl());
-            chunks.push(boldOff);
-
-            safeItems.forEach((item, index) => {
-              const qty = Number(item?.sales_quantity || 0);
-              const price = Number(item?.selling_price || 0);
-              const lineTotal = qty * price;
-              const isDiscountable = escposYesNoToBool(item?.isDiscountable);
-              const itemLabel = String(
-                item?.item_name || item?.product_id || "-",
-              ).toUpperCase();
-
-              const nameWithFlags = `* ${itemLabel}${isDiscountable ? " (D)" : ""}`;
-              const nameLines = escposWrapText(nameWithFlags, 15);
-              const qtyText = `${qty}${item?.unit_of_measure ? ` ${item.unit_of_measure}` : ""}`;
-              const amtText = `${escposPeso(lineTotal)}${item?.vatable === "Yes" ? "V" : ""}`;
-
-              nameLines.forEach((line, lineIndex) => {
-                if (lineIndex === 0) {
-                  chunks.push(txt(formatItemRow(line, qtyText, amtText)));
-                } else {
-                  chunks.push(txt(line));
-                }
-                chunks.push(nl());
-              });
-            });
-
-            pushDivider();
-
-            // TOTAL SALES / DISCOUNTS / OTHER CHARGES
-            pushMetaRow("TOTAL SALES:", escposPeso(safeComputed?.grossTotal));
-
-            activeBreakdown.forEach((entry) => {
-              if (Number(entry?.discountAmount || 0) > 0) {
-                pushMetaRow(
-                  `${String(entry?.label || "DISCOUNT").toUpperCase()}:`,
-                  escposSignedNegativePeso(entry?.discountAmount),
-                );
-              }
-            });
-
-            if (Number(safeComputed?.totalVatExemption || 0) > 0) {
-              pushMetaRow(
-                "VAT EXEMPTION:",
-                escposSignedNegativePeso(safeComputed?.totalVatExemption),
-              );
-            }
-
-            safeOtherCharges.forEach((charge) => {
-              pushMetaRow(
-                `${String(charge?.particulars || "OTHER CHARGE").toUpperCase()}:`,
-                escposPeso(charge?.amount),
-              );
-            });
-
-            pushDivider();
-
-            // AMOUNT DUE
-            chunks.push(boldOn);
-            chunks.push(doubleSizeOn);
-            chunks.push(
-              txt(
-                escposFormatLeftRight(
-                  "AMOUNT DUE:",
-                  escposPeso(safeComputed?.totalAmountDue),
-                  LINE_WIDTH,
-                ),
+      const paymentLabel =
+        safePayments.length > 0
+          ? [
+              ...new Set(
+                safePayments
+                  .map((p) => String(p?.payment_method || "").trim())
+                  .filter(Boolean),
               ),
-            );
-            chunks.push(nl());
-            chunks.push(normalSize);
-            chunks.push(boldOff);
+            ].join(", ")
+          : safeTransaction?.payment_method || "Cash";
 
-            pushDivider();
+      const activeBreakdown = Array.isArray(safeComputed?.discountBreakdown)
+        ? safeComputed.discountBreakdown.filter(
+            (entry) =>
+              Number(entry?.qualifiedCount || 0) > 0 ||
+              Number(entry?.discountAmount || 0) > 0,
+          )
+        : [];
 
-            // PAYMENT
-            if (paymentBreakdown.length > 0) {
-              pushMetaRow("PAYMENT:", "");
+      const paymentBreakdown = escposBuildPaymentBreakdown(safePayments);
 
-              paymentBreakdown.forEach((payment, index) => {
-                pushMetaRow(
-                  index === paymentBreakdown.length - 1
-                    ? `(${payment.method}):`
-                    : `${payment.method}:`,
-                  escposPeso(payment.amount),
-                );
-              });
+      const shouldShowDiscountSummary =
+        Number(safeComputed?.safeCustomerCount || 0) > 0 ||
+        Number(
+          safeComputed?.totalQualifiedCount ||
+            safeComputed?.totalQualifiedAll ||
+            0,
+        ) > 0 ||
+        Number(safeComputed?.statutoryQualifiedCount || 0) > 0 ||
+        activeBreakdown.length > 0;
 
-              pushMetaRow(
-                "TOTAL PAYMENT:",
-                escposPeso(safeComputed?.totalPaid),
-              );
-            } else {
-              pushMetaRow(
-                `PAYMENT (${paymentLabel}):`,
-                escposPeso(safeComputed?.totalPaid),
-              );
-            }
+      const splitAddressLines = (value) =>
+        String(value || "")
+          .split(/\r?\n|\|/)
+          .map((line) => line.trim())
+          .filter(Boolean);
 
-            pushMetaRow("CHANGE:", escposPeso(safeComputed?.changeAmount));
+      const companyName = String(businessInfo?.companyName || "COMPANY").trim();
 
-            pushDivider();
+      const storeName = String(businessInfo?.storeName || "STORE").trim();
 
-            // VAT SUMMARY
-            pushMetaRow(
-              "VATABLE SALES:",
-              escposPeso(safeComputed?.vatableSales),
-            );
-            pushMetaRow(
-              "VAT AMOUNT:",
-              escposPeso(safeComputed?.vatableSalesVat),
-            );
-            pushMetaRow(
-              "VAT EXEMPT SALES:",
-              escposPeso(safeComputed?.vatExemptSales),
-            );
-            pushMetaRow(
-              "VAT EXEMPTION:",
-              escposPeso(safeComputed?.totalVatExemption),
-            );
-            pushMetaRow(
-              "ZERO RATED SALES:",
-              escposPeso(safeComputed?.vatZeroRatedSales),
-            );
+      const corpName = String(businessInfo?.corpName || "CORPORATION").trim();
 
-            if (shouldShowDiscountSummary) {
-              pushDivider();
+      const storeAddress = splitAddressLines(
+        businessInfo?.address || terminalConfig?.unitAddress || "ADDRESS",
+      );
 
-              pushMetaRow(
-                "Total Customers:",
-                Number(safeComputed?.safeCustomerCount || 0),
-              );
+      const storeTin = String(
+        businessInfo?.tin || terminalConfig?.vatTin || "STORE TIN",
+      ).trim();
 
-              pushMetaRow(
-                "Total Qualified:",
-                Number(
-                  safeComputed?.totalQualifiedCount ||
-                    safeComputed?.totalQualifiedAll ||
-                    0,
-                ),
-              );
+      const machineNumber = String(
+        businessInfo?.machineNumber ||
+          terminalConfig?.machineNumber ||
+          "MACHINE NUMBER",
+      ).trim();
 
-              activeBreakdown.forEach((entry) => {
-                pushMetaRow(
-                  escposGetDiscountCountLabel(entry),
-                  Number(entry?.qualifiedCount || 0),
-                );
+      const serialNumber = String(
+        businessInfo?.serialNumber ||
+          terminalConfig?.serialNumber ||
+          "SERIAL NUMBER",
+      ).trim();
 
-                pushMetaRow(
-                  escposGetDiscountAmountLabel(entry),
-                  escposPeso(entry?.discountAmount),
-                );
-              });
+      const posProviderName = String(
+        businessInfo?.posProviderName || "POS PROVIDER NAME",
+      ).trim();
 
-              pushMetaRow(
-                "Discountable Gross:",
-                escposPeso(safeComputed?.discountableGross),
-              );
+      const posProviderAddress = splitAddressLines(
+        businessInfo?.posProviderAddress || "POS PROVIDER ADDRESS",
+      );
 
-              pushMetaRow(
-                "Discountable Base:",
-                escposPeso(safeComputed?.discountableBase),
-              );
-            }
+      const posProviderTin = String(
+        businessInfo?.posProviderTin || "POS PROVIDER TIN",
+      ).trim();
 
-            if (safeCustomerCards.length > 0) {
-              pushDivider();
+      const posProviderBirAccreNo = String(
+        businessInfo?.posProviderBirAccreNo || "POS PROVIDER ACCRE NO.",
+      ).trim();
 
-              chunks.push(boldOn);
-              chunks.push(txt("DISCOUNT CUSTOMER DETAILS"));
-              chunks.push(nl());
-              chunks.push(boldOff);
+      const posProviderAccreDateIssued = String(
+        businessInfo?.posProviderAccreDateIssued || "ACCRE DATE ISSUED",
+      ).trim();
 
-              safeCustomerCards.forEach((card, index) => {
-                if (index > 0) {
-                  chunks.push(nl());
-                }
+      const posProviderPTUNo = String(
+        businessInfo?.posProviderPTUNo || "PTU No.",
+      ).trim();
 
-                pushMetaRow("Name:", card?.customer_name || "");
-                pushMetaRow("ID:", card?.customer_exclusive_id || "");
-                pushMetaRow("Signature:", "");
-              });
-            }
+      const posProviderPTUDateIssued = String(
+        businessInfo?.posProviderPTUDateIssued || "PTU DATE ISSUED",
+      ).trim();
 
-            pushDivider();
+      const initPrinter = Buffer.from([0x1b, 0x40]);
+      const alignLeft = Buffer.from([0x1b, 0x61, 0x00]);
+      const alignCenter = Buffer.from([0x1b, 0x61, 0x01]);
+      const boldOn = Buffer.from([0x1b, 0x45, 0x01]);
+      const boldOff = Buffer.from([0x1b, 0x45, 0x00]);
+      const doubleSizeOn = Buffer.from([0x1d, 0x21, 0x11]);
+      const doubleWidthOn = Buffer.from([0x1d, 0x21, 0x10]);
+      const normalSize = Buffer.from([0x1d, 0x21, 0x00]);
+      const cutPaper = Buffer.from([0x1d, 0x56, 0x00]);
+      const nl = (count = 1) => Buffer.from("\n".repeat(count), "ascii");
+      const txt = (value) => Buffer.from(String(value || ""), "ascii");
 
-            chunks.push(alignCenter);
-            chunks.push(boldOn);
-            chunks.push(txt("Thank you"));
-            chunks.push(nl());
-            chunks.push(txt("Please come again."));
-            chunks.push(nl());
-            chunks.push(boldOff);
-
-            chunks.push(nl());
-
-            if (posProviderName) {
-              chunks.push(boldOn);
-              pushWrapped(`SUPPLIER: ${posProviderName}`, LINE_WIDTH);
-              chunks.push(boldOff);
-            }
-
-            posProviderAddress.forEach((line) => pushWrapped(line, LINE_WIDTH));
-
-            if (posProviderTin)
-              pushWrapped(`TIN: ${posProviderTin}`, LINE_WIDTH);
-            if (posProviderBirAccreNo)
-              pushWrapped(`BIR ACC#: ${posProviderBirAccreNo}`, LINE_WIDTH);
-            if (posProviderAccreDateIssued)
-              pushWrapped(
-                `DATE ISSUED: ${posProviderAccreDateIssued}`,
-                LINE_WIDTH,
-              );
-            if (posProviderPTUNo)
-              pushWrapped(`PTU: ${posProviderPTUNo}`, LINE_WIDTH);
-            if (posProviderPTUDateIssued)
-              pushWrapped(
-                `PTU DATE ISSUED: ${posProviderPTUDateIssued}`,
-                LINE_WIDTH,
-              );
-
-            chunks.push(nl(3));
-            chunks.push(cutPaper);
-
-            const payload = Buffer.concat(chunks);
-
-            client.write(payload, (err) => {
-              if (err) {
-                console.error("[ESC/POS PAYMENT] Write error:", err);
-                return done({
-                  success: false,
-                  message:
-                    err?.message ||
-                    "Failed to write payment receipt to printer",
-                });
-              }
-
-              client.end();
-            });
-          } catch (error) {
-            console.error("[ESC/POS PAYMENT] Build/print error:", error);
-            done({
-              success: false,
-              message: error?.message || "ESC/POS payment print failed",
-            });
-          }
+      const pushWrapped = (value, width = LINE_WIDTH) => {
+        escposWrapText(String(value || ""), width).forEach((line) => {
+          chunks.push(txt(line));
+          chunks.push(nl());
         });
+      };
 
-        client.on("timeout", () => {
-          console.error("[ESC/POS PAYMENT] Socket timeout");
-          done({
-            success: false,
-            message: "Payment printer socket timeout",
+      const pushDivider = () => {
+        chunks.push(txt(escposRepeat("-", LINE_WIDTH)));
+        chunks.push(nl());
+      };
+
+      const pushMetaRow = (label, value) => {
+        const left = `${label}`;
+        const right = escposSafeText(value, "-");
+
+        if (left.length + right.length <= LINE_WIDTH) {
+          chunks.push(txt(escposFormatLeftRight(left, right, LINE_WIDTH)));
+          chunks.push(nl());
+        } else {
+          chunks.push(txt(left));
+          chunks.push(nl());
+          escposWrapText(right, LINE_WIDTH).forEach((line) => {
+            chunks.push(txt(line));
+            chunks.push(nl());
           });
-        });
+        }
+      };
 
-        client.on("error", (err) => {
-          console.error("[ESC/POS PAYMENT] Socket error:", err);
-          done({
-            success: false,
-            message: err?.message || "Payment printer connection error",
-          });
-        });
+      const formatItemRow = (name, qty, amt) => {
+        const nameWidth = 21;
+        const qtyWidth = 7;
+        const amtWidth = 14;
 
-        client.on("close", () => {
-          console.log("[ESC/POS PAYMENT] Connection closed");
-          done({
-            success: true,
-            message: "POS payment receipt printed successfully",
-          });
-        });
+        return (
+          escposPadRight(name, nameWidth) +
+          escposPadRight(qty, qtyWidth) +
+          escposPadLeft(amt, amtWidth)
+        );
+      };
 
-        client.connect(port, host);
+      chunks.push(initPrinter);
+
+      // HEADER
+      chunks.push(alignCenter);
+      chunks.push(boldOn);
+      chunks.push(txt(companyName));
+      chunks.push(nl());
+      chunks.push(txt(String(storeName).toUpperCase()));
+      chunks.push(nl());
+
+      if (corpName) {
+        chunks.push(txt(String(corpName).toUpperCase()));
+        chunks.push(nl());
+      }
+
+      chunks.push(boldOff);
+
+      storeAddress.forEach((line) => {
+        chunks.push(txt(line));
+        chunks.push(nl());
       });
+
+      if (storeTin) {
+        chunks.push(txt(`VAT REG TIN: ${storeTin}`));
+        chunks.push(nl());
+      }
+
+      chunks.push(txt(`MIN: ${machineNumber || "-"}`));
+      chunks.push(nl());
+      chunks.push(txt(`S/N: ${serialNumber || "-"}`));
+      chunks.push(nl());
+
+      pushDivider();
+
+      // INVOICE TITLE
+      chunks.push(alignCenter);
+      chunks.push(boldOn);
+      chunks.push(doubleWidthOn);
+      chunks.push(txt("INVOICE"));
+      chunks.push(nl());
+      chunks.push(normalSize);
+      chunks.push(boldOff);
+
+      if (isDuplicateCopy) {
+        chunks.push(boldOn);
+        chunks.push(txt("DUPLICATE INVOICE COPY"));
+        chunks.push(nl());
+        chunks.push(boldOff);
+      }
+
+      // META
+      chunks.push(alignLeft);
+      pushMetaRow("Trans. No.:", safeTransaction?.transaction_id || "-");
+      pushMetaRow("INV#:", safeTransaction?.invoice_no || "-");
+      pushMetaRow("Trans. Date:", safeTransaction?.transaction_date || "-");
+      pushMetaRow("Trans. Time:", safeTransaction?.transaction_time || "-");
+      pushMetaRow(
+        "Terminal No.:",
+        safeTransaction?.terminal_number ||
+          terminalConfig?.terminalNumber ||
+          "-",
+      );
+      pushMetaRow("Order Type:", safeTransaction?.order_type || "-");
+      pushMetaRow("Ref./Tag #:", safeTransaction?.table_number || "-");
+      pushMetaRow("Cashier:", safeTransaction?.cashier || "-");
+
+      pushDivider();
+
+      // ITEMS
+      chunks.push(boldOn);
+      chunks.push(txt(formatItemRow("Item", "Qty", "Amt")));
+      chunks.push(nl());
+      chunks.push(boldOff);
+
+      safeItems.forEach((item, index) => {
+        const qty = Number(item?.sales_quantity || 0);
+        const price = Number(item?.selling_price || 0);
+        const lineTotal = qty * price;
+        const isDiscountable = escposYesNoToBool(item?.isDiscountable);
+        const itemLabel = String(
+          item?.item_name || item?.product_id || "-",
+        ).toUpperCase();
+
+        const nameWithFlags = `* ${itemLabel}${isDiscountable ? " (D)" : ""}`;
+        const nameLines = escposWrapText(nameWithFlags, 15);
+        const qtyText = `${qty}${item?.unit_of_measure ? ` ${item.unit_of_measure}` : ""}`;
+        const amtText = `${escposPeso(lineTotal)}${item?.vatable === "Yes" ? "V" : ""}`;
+
+        nameLines.forEach((line, lineIndex) => {
+          if (lineIndex === 0) {
+            chunks.push(txt(formatItemRow(line, qtyText, amtText)));
+          } else {
+            chunks.push(txt(line));
+          }
+          chunks.push(nl());
+        });
+      });
+
+      pushDivider();
+
+      // TOTAL SALES / DISCOUNTS / OTHER CHARGES
+      pushMetaRow("TOTAL SALES:", escposPeso(safeComputed?.grossTotal));
+
+      activeBreakdown.forEach((entry) => {
+        if (Number(entry?.discountAmount || 0) > 0) {
+          pushMetaRow(
+            `${String(entry?.label || "DISCOUNT").toUpperCase()}:`,
+            escposSignedNegativePeso(entry?.discountAmount),
+          );
+        }
+      });
+
+      if (Number(safeComputed?.totalVatExemption || 0) > 0) {
+        pushMetaRow(
+          "VAT EXEMPTION:",
+          escposSignedNegativePeso(safeComputed?.totalVatExemption),
+        );
+      }
+
+      safeOtherCharges.forEach((charge) => {
+        pushMetaRow(
+          `${String(charge?.particulars || "OTHER CHARGE").toUpperCase()}:`,
+          escposPeso(charge?.amount),
+        );
+      });
+
+      pushDivider();
+
+      // AMOUNT DUE
+      chunks.push(boldOn);
+      chunks.push(doubleSizeOn);
+      chunks.push(
+        txt(
+          escposFormatLeftRight(
+            "AMOUNT DUE:",
+            escposPeso(safeComputed?.totalAmountDue),
+            LINE_WIDTH,
+          ),
+        ),
+      );
+      chunks.push(nl());
+      chunks.push(normalSize);
+      chunks.push(boldOff);
+
+      pushDivider();
+
+      // PAYMENT
+      if (paymentBreakdown.length > 0) {
+        pushMetaRow("PAYMENT:", "");
+
+        paymentBreakdown.forEach((payment, index) => {
+          pushMetaRow(
+            index === paymentBreakdown.length - 1
+              ? `(${payment.method}):`
+              : `${payment.method}:`,
+            escposPeso(payment.amount),
+          );
+        });
+
+        pushMetaRow("TOTAL PAYMENT:", escposPeso(safeComputed?.totalPaid));
+      } else {
+        pushMetaRow(
+          `PAYMENT (${paymentLabel}):`,
+          escposPeso(safeComputed?.totalPaid),
+        );
+      }
+
+      pushMetaRow("CHANGE:", escposPeso(safeComputed?.changeAmount));
+
+      pushDivider();
+
+      // VAT SUMMARY
+      pushMetaRow("VATABLE SALES:", escposPeso(safeComputed?.vatableSales));
+      pushMetaRow("VAT AMOUNT:", escposPeso(safeComputed?.vatableSalesVat));
+      pushMetaRow(
+        "VAT EXEMPT SALES:",
+        escposPeso(safeComputed?.vatExemptSales),
+      );
+      pushMetaRow(
+        "VAT EXEMPTION:",
+        escposPeso(safeComputed?.totalVatExemption),
+      );
+      pushMetaRow(
+        "ZERO RATED SALES:",
+        escposPeso(safeComputed?.vatZeroRatedSales),
+      );
+
+      if (shouldShowDiscountSummary) {
+        pushDivider();
+
+        pushMetaRow(
+          "Total Customers:",
+          Number(safeComputed?.safeCustomerCount || 0),
+        );
+
+        pushMetaRow(
+          "Total Qualified:",
+          Number(
+            safeComputed?.totalQualifiedCount ||
+              safeComputed?.totalQualifiedAll ||
+              0,
+          ),
+        );
+
+        activeBreakdown.forEach((entry) => {
+          pushMetaRow(
+            escposGetDiscountCountLabel(entry),
+            Number(entry?.qualifiedCount || 0),
+          );
+
+          pushMetaRow(
+            escposGetDiscountAmountLabel(entry),
+            escposPeso(entry?.discountAmount),
+          );
+        });
+
+        pushMetaRow(
+          "Discountable Gross:",
+          escposPeso(safeComputed?.discountableGross),
+        );
+
+        pushMetaRow(
+          "Discountable Base:",
+          escposPeso(safeComputed?.discountableBase),
+        );
+      }
+
+      if (safeCustomerCards.length > 0) {
+        pushDivider();
+
+        chunks.push(boldOn);
+        chunks.push(txt("DISCOUNT CUSTOMER DETAILS"));
+        chunks.push(nl());
+        chunks.push(boldOff);
+
+        safeCustomerCards.forEach((card, index) => {
+          if (index > 0) {
+            chunks.push(nl());
+          }
+
+          pushMetaRow("Name:", card?.customer_name || "");
+          pushMetaRow("ID:", card?.customer_exclusive_id || "");
+          pushMetaRow("Signature:", "");
+        });
+      }
+
+      pushDivider();
+
+      chunks.push(alignCenter);
+      chunks.push(boldOn);
+      chunks.push(txt("Thank you"));
+      chunks.push(nl());
+      chunks.push(txt("Please come again."));
+      chunks.push(nl());
+      chunks.push(boldOff);
+
+      chunks.push(nl());
+
+      if (posProviderName) {
+        chunks.push(boldOn);
+        pushWrapped(`SUPPLIER: ${posProviderName}`, LINE_WIDTH);
+        chunks.push(boldOff);
+      }
+
+      posProviderAddress.forEach((line) => pushWrapped(line, LINE_WIDTH));
+
+      if (posProviderTin) pushWrapped(`TIN: ${posProviderTin}`, LINE_WIDTH);
+      if (posProviderBirAccreNo)
+        pushWrapped(`BIR ACC#: ${posProviderBirAccreNo}`, LINE_WIDTH);
+      if (posProviderAccreDateIssued)
+        pushWrapped(`DATE ISSUED: ${posProviderAccreDateIssued}`, LINE_WIDTH);
+      if (posProviderPTUNo) pushWrapped(`PTU: ${posProviderPTUNo}`, LINE_WIDTH);
+      if (posProviderPTUDateIssued)
+        pushWrapped(`PTU DATE ISSUED: ${posProviderPTUDateIssued}`, LINE_WIDTH);
+
+      chunks.push(nl(3));
+      chunks.push(nl(3));
+      chunks.push(cutPaper);
+
+      const payload = Buffer.concat(chunks);
+      return await writeEscposBuffer(payload);
     } catch (error) {
       console.error("ESC/POS POS payment print error:", error);
       return {
@@ -2397,512 +2486,394 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle("print-escposxzreading", async (_event, data) => {
-    const host = getPrinterHost();
-    const port = 9100;
     const LINE_WIDTH = 42;
 
     try {
-      return await new Promise((resolve) => {
-        const client = new net.Socket();
-        let finished = false;
-
-        const done = (result) => {
-          if (finished) return;
-          finished = true;
-          try {
-            client.destroy();
-          } catch {}
-          resolve(result);
-        };
-
-        client.setTimeout(10000);
-
-        client.on("connect", () => {
-          try {
-            console.log(`[ESC/POS XZ] Connected to ${host}:${port}`);
-            console.log("[ESC/POS XZ] Payload:", data);
-
-            const { payload = {}, isZReading = false } = data || {};
-            const safeData = payload || {};
-            const chunks = [];
-
-            const initPrinter = Buffer.from([0x1b, 0x40]);
-            const alignLeft = Buffer.from([0x1b, 0x61, 0x00]);
-            const alignCenter = Buffer.from([0x1b, 0x61, 0x01]);
-            const boldOn = Buffer.from([0x1b, 0x45, 0x01]);
-            const boldOff = Buffer.from([0x1b, 0x45, 0x00]);
-            const doubleSizeOn = Buffer.from([0x1d, 0x21, 0x11]);
-            const doubleWidthOn = Buffer.from([0x1d, 0x21, 0x10]);
-            const normalSize = Buffer.from([0x1d, 0x21, 0x00]);
-            const cutPaper = Buffer.from([0x1d, 0x56, 0x00]);
-            const nl = (count = 1) => Buffer.from("\n".repeat(count), "ascii");
-            const txt = (value) => Buffer.from(String(value || ""), "ascii");
-
-            const escposSafeText = (value, fallback = "") => {
-              const str = String(value ?? fallback ?? "");
-              return str.replace(/[^\x20-\x7E]/g, " ").trim() || fallback;
-            };
-
-            const escposPeso = (value) =>
-              Number(value || 0).toLocaleString("en-PH", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              });
-
-            const escposRepeat = (char, count) =>
-              String(char || "-").repeat(count);
-
-            const escposPadRight = (value, width) => {
-              const str = String(value || "");
-              if (str.length >= width) return str.slice(0, width);
-              return str + " ".repeat(width - str.length);
-            };
-
-            const escposPadLeft = (value, width) => {
-              const str = String(value || "");
-              if (str.length >= width) return str.slice(0, width);
-              return " ".repeat(width - str.length) + str;
-            };
-
-            const escposFormatLeftRight = (left, right, width = LINE_WIDTH) => {
-              const l = String(left || "");
-              const r = String(right || "");
-              if (l.length + r.length >= width) {
-                return `${l} ${r}`;
-              }
-              return l + " ".repeat(width - l.length - r.length) + r;
-            };
-
-            const escposWrapText = (value, width = LINE_WIDTH) => {
-              const text = String(value || "").trim();
-              if (!text) return [""];
-              const words = text.split(/\s+/);
-              const lines = [];
-              let current = "";
-
-              for (const word of words) {
-                if (!current) {
-                  current = word;
-                  continue;
-                }
-
-                if ((current + " " + word).length <= width) {
-                  current += " " + word;
-                } else {
-                  lines.push(current);
-                  current = word;
-                }
-              }
-
-              if (current) lines.push(current);
-
-              return lines.length ? lines : [text];
-            };
-
-            const pushWrapped = (value, width = LINE_WIDTH) => {
-              escposWrapText(String(value || ""), width).forEach((line) => {
-                chunks.push(txt(line));
-                chunks.push(nl());
-              });
-            };
-
-            const pushDivider = () => {
-              chunks.push(txt(escposRepeat("-", LINE_WIDTH)));
-              chunks.push(nl());
-            };
-
-            const pushMetaRow = (label, value) => {
-              const left = `${label}`;
-              const right = escposSafeText(value, "-");
-
-              if (left.length + right.length <= LINE_WIDTH) {
-                chunks.push(
-                  txt(escposFormatLeftRight(left, right, LINE_WIDTH)),
-                );
-                chunks.push(nl());
-              } else {
-                chunks.push(txt(left));
-                chunks.push(nl());
-                escposWrapText(right, LINE_WIDTH).forEach((line) => {
-                  chunks.push(txt(line));
-                  chunks.push(nl());
-                });
-              }
-            };
-
-            const splitAddressLines = (value) =>
-              String(value || "")
-                .split(/\r?\n|\|/)
-                .map((line) => line.trim())
-                .filter(Boolean);
-
-            const companyName = String(
-              safeData.companyName || "COMPANY",
-            ).trim();
-            const storeName = String(safeData.storeName || "STORE").trim();
-            const corpName = String(safeData.corpName || "").trim();
-            const storeAddress = splitAddressLines(
-              safeData.address || "ADDRESS",
-            );
-            const storeTin = String(safeData.tin || "").trim();
-            const machineNumber = String(safeData.machineNumber || "").trim();
-            const serialNumber = String(safeData.serialNumber || "").trim();
-
-            chunks.push(initPrinter);
-
-            // HEADER
-            chunks.push(alignCenter);
-            chunks.push(boldOn);
-            chunks.push(txt(companyName));
-            chunks.push(nl());
-            chunks.push(txt(String(storeName).toUpperCase()));
-            chunks.push(nl());
-
-            if (corpName) {
-              chunks.push(txt(String(corpName).toUpperCase()));
-              chunks.push(nl());
-            }
-
-            chunks.push(boldOff);
-
-            storeAddress.forEach((line) => {
-              chunks.push(txt(line));
-              chunks.push(nl());
-            });
-
-            if (storeTin) {
-              chunks.push(txt(`TIN: ${storeTin}`));
-              chunks.push(nl());
-            }
-
-            chunks.push(txt(`MIN: ${machineNumber || "-"}`));
-            chunks.push(nl());
-            chunks.push(txt(`S/N: ${serialNumber || "-"}`));
-            chunks.push(nl());
-
-            pushDivider();
-
-            // TITLE
-            chunks.push(alignCenter);
-            chunks.push(boldOn);
-            chunks.push(doubleWidthOn);
-            chunks.push(txt(isZReading ? "Z-READING" : "X-READING"));
-            chunks.push(nl());
-            chunks.push(normalSize);
-            chunks.push(boldOff);
-
-            if (safeData.reprintDateTime) {
-              chunks.push(alignCenter);
-              chunks.push(txt(`Reprint Date: ${safeData.reprintDateTime}`));
-              chunks.push(nl());
-            }
-
-            chunks.push(alignLeft);
-
-            if (isZReading) {
-              const vatExemptionValue =
-                safeData.vatExemption ??
-                safeData.lessVatExemption ??
-                safeData.vatExemptVat ??
-                0;
-
-              pushMetaRow("Date Issued:", safeData.reportDate || "-");
-              pushMetaRow("Time:", safeData.reportTime || "-");
-              pushMetaRow("Beg SI No.:", safeData.begSI || "-");
-              pushMetaRow("End SI No.:", safeData.endSI || "-");
-              pushMetaRow("Beg Void No.:", safeData.begVoid || "-");
-              pushMetaRow("End Void No.:", safeData.endVoid || "-");
-              pushMetaRow("Beg Return No.:", safeData.begReturn || "-");
-              pushMetaRow("End Return No.:", safeData.endReturn || "-");
-              pushMetaRow("Reset Counter No.:", safeData.resetCounterNo || 0);
-              pushMetaRow("Z Counter No.:", safeData.zCounterNo || 0);
-
-              pushDivider();
-
-              pushMetaRow(
-                "Present Accum. Sales:",
-                escposPeso(safeData.presentAccumulatedSales),
-              );
-              pushMetaRow(
-                "Previous Accum. Sales:",
-                escposPeso(safeData.previousAccumulatedSales),
-              );
-              pushMetaRow(
-                "Sales for the Day:",
-                escposPeso(safeData.salesForTheDay),
-              );
-
-              pushDivider();
-
-              chunks.push(boldOn);
-              chunks.push(txt("BREAKDOWN OF SALES"));
-              chunks.push(nl());
-              chunks.push(boldOff);
-
-              pushMetaRow("VATABLE SALES:", escposPeso(safeData.vatableSales));
-              pushMetaRow("VAT AMOUNT:", escposPeso(safeData.vatAmount));
-              pushMetaRow(
-                "VAT-EXEMPT SALES:",
-                escposPeso(safeData.vatExemptSales),
-              );
-              pushMetaRow("VAT EXEMPTION:", escposPeso(vatExemptionValue));
-              pushMetaRow(
-                "ZERO RATED SALES:",
-                escposPeso(safeData.zeroRatedSales),
-              );
-              pushMetaRow("OTHER CHARGES:", escposPeso(safeData.otherCharges));
-
-              pushDivider();
-
-              pushMetaRow("Gross Amount:", escposPeso(safeData.grossAmount));
-              pushMetaRow("Discount:", escposPeso(safeData.lessDiscount));
-              pushMetaRow("VAT Exemption:", escposPeso(vatExemptionValue));
-              pushMetaRow("Refund:", escposPeso(safeData.lessReturn));
-              pushMetaRow("Void:", escposPeso(safeData.lessVoid));
-              pushMetaRow(
-                "VAT Adjustment:",
-                escposPeso(safeData.lessVatAdjustment),
-              );
-
-              chunks.push(boldOn);
-              pushMetaRow("Net Amount:", escposPeso(safeData.netAmount));
-              chunks.push(boldOff);
-
-              pushDivider();
-
-              chunks.push(boldOn);
-              chunks.push(txt("DISCOUNT SUMMARY"));
-              chunks.push(nl());
-              chunks.push(boldOff);
-
-              pushMetaRow("SC Disc:", escposPeso(safeData.scDisc));
-              pushMetaRow("PWD Disc:", escposPeso(safeData.pwdDisc));
-              pushMetaRow("NAAC Disc:", escposPeso(safeData.naacDisc));
-              pushMetaRow(
-                "Solo Parent Disc:",
-                escposPeso(safeData.soloParentDisc),
-              );
-              pushMetaRow("Other Disc:", escposPeso(safeData.otherDisc));
-
-              pushDivider();
-
-              chunks.push(boldOn);
-              chunks.push(txt("SALES ADJUSTMENT"));
-              chunks.push(nl());
-              chunks.push(boldOff);
-
-              pushMetaRow("Void:", escposPeso(safeData.salesAdjustmentVoid));
-              pushMetaRow(
-                "Return:",
-                escposPeso(safeData.salesAdjustmentReturn),
-              );
-
-              pushDivider();
-
-              chunks.push(boldOn);
-              chunks.push(txt("VAT ADJUSTMENT"));
-              chunks.push(nl());
-              chunks.push(boldOff);
-
-              pushMetaRow(
-                "SC Trans VAT Adj:",
-                escposPeso(safeData.scTransVatAdj),
-              );
-              pushMetaRow(
-                "PWD Trans VAT Adj:",
-                escposPeso(safeData.pwdTransVatAdj),
-              );
-              pushMetaRow(
-                "Reg Disc Trans VAT Adj:",
-                escposPeso(safeData.regDiscTransVatAdj),
-              );
-              pushMetaRow(
-                "Zero Rated Trans VAT Adj:",
-                escposPeso(safeData.zeroRatedTransVatAdj),
-              );
-              pushMetaRow("VAT on Return:", escposPeso(safeData.vatOnReturn));
-              pushMetaRow(
-                "Other VAT Adjustments:",
-                escposPeso(safeData.otherVatAdjustments),
-              );
-
-              pushDivider();
-
-              chunks.push(boldOn);
-              chunks.push(txt("TRANSACTION SUMMARY"));
-              chunks.push(nl());
-              chunks.push(boldOff);
-
-              pushMetaRow("Cash In Drawer:", escposPeso(safeData.cashInDrawer));
-              pushMetaRow("Cheque:", escposPeso(safeData.cheque));
-              pushMetaRow("Credit Card:", escposPeso(safeData.creditCard));
-              pushMetaRow(
-                "Other Payments:",
-                escposPeso(safeData.otherPayments),
-              );
-              pushMetaRow("Opening Fund:", escposPeso(safeData.openingFund));
-              pushMetaRow(
-                "Less Withdrawal:",
-                escposPeso(safeData.lessWithdrawal),
-              );
-              pushMetaRow(
-                "Payments Received:",
-                escposPeso(safeData.paymentsReceived),
-              );
-
-              chunks.push(boldOn);
-              pushMetaRow("Short / Over:", escposPeso(safeData.shortOver));
-              chunks.push(boldOff);
-            } else {
-              const otherPaymentsBreakdown = Array.isArray(
-                safeData?.otherPaymentsBreakdown,
-              )
-                ? safeData.otherPaymentsBreakdown
-                : Array.isArray(safeData?.paymentBreakdown)
-                  ? safeData.paymentBreakdown
-                  : [];
-
-              pushMetaRow("Report Date:", safeData.reportDate || "-");
-              pushMetaRow("Report Time:", safeData.reportTime || "-");
-              pushMetaRow("Start Date/Time:", safeData.startDateTime || "-");
-              pushMetaRow("End Date/Time:", safeData.endDateTime || "-");
-              pushMetaRow("Cashier:", safeData.cashier || "-");
-              pushMetaRow("Beg. INV.:", safeData.begOR || "-");
-              pushMetaRow("End INV.:", safeData.endOR || "-");
-
-              pushDivider();
-
-              chunks.push(boldOn);
-              chunks.push(txt("PAYMENTS"));
-              chunks.push(nl());
-              chunks.push(boldOff);
-
-              pushMetaRow("Opening Fund:", escposPeso(safeData.openingFund));
-              pushMetaRow("Cash:", escposPeso(safeData.cash));
-              pushMetaRow("Cheque:", escposPeso(safeData.cheque));
-              pushMetaRow("Credit Card:", escposPeso(safeData.creditCard));
-              pushMetaRow(
-                "Other Payments:",
-                escposPeso(
-                  safeData.otherPaymentsTotal ?? safeData.otherPayments ?? 0,
-                ),
-              );
-
-              if (otherPaymentsBreakdown.length > 0) {
-                otherPaymentsBreakdown.forEach((item) => {
-                  pushMetaRow(
-                    `- ${item?.payment_method || "Other"}:`,
-                    escposPeso(item?.payment_amount || 0),
-                  );
-                });
-              } else {
-                pushMetaRow("- None:", escposPeso(0));
-              }
-
-              chunks.push(boldOn);
-              pushMetaRow(
-                "Total Payments:",
-                escposPeso(safeData.totalPayments),
-              );
-              chunks.push(boldOff);
-
-              pushMetaRow("Void:", escposPeso(safeData.void));
-              pushMetaRow("Refund:", escposPeso(safeData.refund));
-              pushMetaRow("Withdrawal:", escposPeso(safeData.withdrawal));
-
-              pushDivider();
-
-              chunks.push(boldOn);
-              chunks.push(txt("SUMMARY"));
-              chunks.push(nl());
-              chunks.push(boldOff);
-
-              pushMetaRow(
-                "Cash In Drawer:",
-                escposPeso(safeData.summaryCashInDrawer),
-              );
-              pushMetaRow("Cheque:", escposPeso(safeData.summaryCheque));
-              pushMetaRow(
-                "Credit Card:",
-                escposPeso(safeData.summaryCreditCard),
-              );
-              pushMetaRow(
-                "Other Payments:",
-                escposPeso(safeData.summaryOtherPayments),
-              );
-              pushMetaRow(
-                "Opening Fund:",
-                escposPeso(safeData.summaryOpeningFund),
-              );
-              pushMetaRow(
-                "Withdrawal:",
-                escposPeso(safeData.summaryWithdrawal),
-              );
-              pushMetaRow(
-                "Payments Received:",
-                escposPeso(safeData.summaryPaymentsReceived),
-              );
-
-              chunks.push(boldOn);
-              pushMetaRow(
-                "Short / Over:",
-                escposPeso(safeData.summaryShortOver),
-              );
-              chunks.push(boldOff);
-            }
-
-            chunks.push(nl(3));
-            chunks.push(cutPaper);
-
-            const finalPayload = Buffer.concat(chunks);
-
-            client.write(finalPayload, (err) => {
-              if (err) {
-                console.error("[ESC/POS XZ] Write error:", err);
-                return done({
-                  success: false,
-                  message:
-                    err?.message || "Failed to write X/Z reading to printer",
-                });
-              }
-
-              client.end();
-            });
-          } catch (error) {
-            console.error("[ESC/POS XZ] Build/print error:", error);
-            done({
-              success: false,
-              message: error?.message || "ESC/POS X/Z reading print failed",
-            });
+      console.log("[ESC/POS XZ] Payload:", data);
+
+      const { payload = {}, isZReading = false } = data || {};
+      const safeData = payload || {};
+      const chunks = [];
+
+      const initPrinter = Buffer.from([0x1b, 0x40]);
+      const alignLeft = Buffer.from([0x1b, 0x61, 0x00]);
+      const alignCenter = Buffer.from([0x1b, 0x61, 0x01]);
+      const boldOn = Buffer.from([0x1b, 0x45, 0x01]);
+      const boldOff = Buffer.from([0x1b, 0x45, 0x00]);
+      const doubleSizeOn = Buffer.from([0x1d, 0x21, 0x11]);
+      const doubleWidthOn = Buffer.from([0x1d, 0x21, 0x10]);
+      const normalSize = Buffer.from([0x1d, 0x21, 0x00]);
+      const cutPaper = Buffer.from([0x1d, 0x56, 0x00]);
+      const nl = (count = 1) => Buffer.from("\n".repeat(count), "ascii");
+      const txt = (value) => Buffer.from(String(value || ""), "ascii");
+
+      const escposSafeText = (value, fallback = "") => {
+        const str = String(value ?? fallback ?? "");
+        return str.replace(/[^\x20-\x7E]/g, " ").trim() || fallback;
+      };
+
+      const escposPeso = (value) =>
+        Number(value || 0).toLocaleString("en-PH", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
+
+      const escposRepeat = (char, count) => String(char || "-").repeat(count);
+
+      const escposPadRight = (value, width) => {
+        const str = String(value || "");
+        if (str.length >= width) return str.slice(0, width);
+        return str + " ".repeat(width - str.length);
+      };
+
+      const escposPadLeft = (value, width) => {
+        const str = String(value || "");
+        if (str.length >= width) return str.slice(0, width);
+        return " ".repeat(width - str.length) + str;
+      };
+
+      const escposFormatLeftRight = (left, right, width = LINE_WIDTH) => {
+        const l = String(left || "");
+        const r = String(right || "");
+        if (l.length + r.length >= width) {
+          return `${l} ${r}`;
+        }
+        return l + " ".repeat(width - l.length - r.length) + r;
+      };
+
+      const escposWrapText = (value, width = LINE_WIDTH) => {
+        const text = String(value || "").trim();
+        if (!text) return [""];
+        const words = text.split(/\s+/);
+        const lines = [];
+        let current = "";
+
+        for (const word of words) {
+          if (!current) {
+            current = word;
+            continue;
           }
-        });
 
-        client.on("timeout", () => {
-          console.error("[ESC/POS XZ] Socket timeout");
-          done({
-            success: false,
-            message: "X/Z reading printer socket timeout",
+          if ((current + " " + word).length <= width) {
+            current += " " + word;
+          } else {
+            lines.push(current);
+            current = word;
+          }
+        }
+
+        if (current) lines.push(current);
+
+        return lines.length ? lines : [text];
+      };
+
+      const pushWrapped = (value, width = LINE_WIDTH) => {
+        escposWrapText(String(value || ""), width).forEach((line) => {
+          chunks.push(txt(line));
+          chunks.push(nl());
+        });
+      };
+
+      const pushDivider = () => {
+        chunks.push(txt(escposRepeat("-", LINE_WIDTH)));
+        chunks.push(nl());
+      };
+
+      const pushMetaRow = (label, value) => {
+        const left = `${label}`;
+        const right = escposSafeText(value, "-");
+
+        if (left.length + right.length <= LINE_WIDTH) {
+          chunks.push(txt(escposFormatLeftRight(left, right, LINE_WIDTH)));
+          chunks.push(nl());
+        } else {
+          chunks.push(txt(left));
+          chunks.push(nl());
+          escposWrapText(right, LINE_WIDTH).forEach((line) => {
+            chunks.push(txt(line));
+            chunks.push(nl());
           });
-        });
+        }
+      };
 
-        client.on("error", (err) => {
-          console.error("[ESC/POS XZ] Socket error:", err);
-          done({
-            success: false,
-            message: err?.message || "X/Z reading printer connection error",
-          });
-        });
+      const splitAddressLines = (value) =>
+        String(value || "")
+          .split(/\r?\n|\|/)
+          .map((line) => line.trim())
+          .filter(Boolean);
 
-        client.on("close", () => {
-          console.log("[ESC/POS XZ] Connection closed");
-          done({
-            success: true,
-            message: "X/Z reading printed successfully",
-          });
-        });
+      const companyName = String(safeData.companyName || "COMPANY").trim();
+      const storeName = String(safeData.storeName || "STORE").trim();
+      const corpName = String(safeData.corpName || "").trim();
+      const storeAddress = splitAddressLines(safeData.address || "ADDRESS");
+      const storeTin = String(safeData.tin || "").trim();
+      const machineNumber = String(safeData.machineNumber || "").trim();
+      const serialNumber = String(safeData.serialNumber || "").trim();
 
-        client.connect(port, host);
+      chunks.push(initPrinter);
+
+      // HEADER
+      chunks.push(alignCenter);
+      chunks.push(boldOn);
+      chunks.push(txt(companyName));
+      chunks.push(nl());
+      chunks.push(txt(String(storeName).toUpperCase()));
+      chunks.push(nl());
+
+      if (corpName) {
+        chunks.push(txt(String(corpName).toUpperCase()));
+        chunks.push(nl());
+      }
+
+      chunks.push(boldOff);
+
+      storeAddress.forEach((line) => {
+        chunks.push(txt(line));
+        chunks.push(nl());
       });
+
+      if (storeTin) {
+        chunks.push(txt(`TIN: ${storeTin}`));
+        chunks.push(nl());
+      }
+
+      chunks.push(txt(`MIN: ${machineNumber || "-"}`));
+      chunks.push(nl());
+      chunks.push(txt(`S/N: ${serialNumber || "-"}`));
+      chunks.push(nl());
+
+      pushDivider();
+
+      // TITLE
+      chunks.push(alignCenter);
+      chunks.push(boldOn);
+      chunks.push(doubleWidthOn);
+      chunks.push(txt(isZReading ? "Z-READING" : "X-READING"));
+      chunks.push(nl());
+      chunks.push(normalSize);
+      chunks.push(boldOff);
+
+      if (safeData.reprintDateTime) {
+        chunks.push(alignCenter);
+        chunks.push(txt(`Reprint Date: ${safeData.reprintDateTime}`));
+        chunks.push(nl());
+      }
+
+      chunks.push(alignLeft);
+
+      if (isZReading) {
+        const vatExemptionValue =
+          safeData.vatExemption ??
+          safeData.lessVatExemption ??
+          safeData.vatExemptVat ??
+          0;
+
+        pushMetaRow("Date Issued:", safeData.reportDate || "-");
+        pushMetaRow("Time:", safeData.reportTime || "-");
+        pushMetaRow("Beg SI No.:", safeData.begSI || "-");
+        pushMetaRow("End SI No.:", safeData.endSI || "-");
+        pushMetaRow("Beg Void No.:", safeData.begVoid || "-");
+        pushMetaRow("End Void No.:", safeData.endVoid || "-");
+        pushMetaRow("Beg Return No.:", safeData.begReturn || "-");
+        pushMetaRow("End Return No.:", safeData.endReturn || "-");
+        pushMetaRow("Reset Counter No.:", safeData.resetCounterNo || 0);
+        pushMetaRow("Z Counter No.:", safeData.zCounterNo || 0);
+
+        pushDivider();
+
+        pushMetaRow(
+          "Present Accum. Sales:",
+          escposPeso(safeData.presentAccumulatedSales),
+        );
+        pushMetaRow(
+          "Previous Accum. Sales:",
+          escposPeso(safeData.previousAccumulatedSales),
+        );
+        pushMetaRow("Sales for the Day:", escposPeso(safeData.salesForTheDay));
+
+        pushDivider();
+
+        chunks.push(boldOn);
+        chunks.push(txt("BREAKDOWN OF SALES"));
+        chunks.push(nl());
+        chunks.push(boldOff);
+
+        pushMetaRow("VATABLE SALES:", escposPeso(safeData.vatableSales));
+        pushMetaRow("VAT AMOUNT:", escposPeso(safeData.vatAmount));
+        pushMetaRow("VAT-EXEMPT SALES:", escposPeso(safeData.vatExemptSales));
+        pushMetaRow("VAT EXEMPTION:", escposPeso(vatExemptionValue));
+        pushMetaRow("ZERO RATED SALES:", escposPeso(safeData.zeroRatedSales));
+        pushMetaRow("OTHER CHARGES:", escposPeso(safeData.otherCharges));
+
+        pushDivider();
+
+        pushMetaRow("Gross Amount:", escposPeso(safeData.grossAmount));
+        pushMetaRow("Discount:", escposPeso(safeData.lessDiscount));
+        pushMetaRow("VAT Exemption:", escposPeso(vatExemptionValue));
+        pushMetaRow("Refund:", escposPeso(safeData.lessReturn));
+        pushMetaRow("Void:", escposPeso(safeData.lessVoid));
+        pushMetaRow("VAT Adjustment:", escposPeso(safeData.lessVatAdjustment));
+
+        chunks.push(boldOn);
+        pushMetaRow("Net Amount:", escposPeso(safeData.netAmount));
+        chunks.push(boldOff);
+
+        pushDivider();
+
+        chunks.push(boldOn);
+        chunks.push(txt("DISCOUNT SUMMARY"));
+        chunks.push(nl());
+        chunks.push(boldOff);
+
+        pushMetaRow("SC Disc:", escposPeso(safeData.scDisc));
+        pushMetaRow("PWD Disc:", escposPeso(safeData.pwdDisc));
+        pushMetaRow("NAAC Disc:", escposPeso(safeData.naacDisc));
+        pushMetaRow("Solo Parent Disc:", escposPeso(safeData.soloParentDisc));
+        pushMetaRow("Other Disc:", escposPeso(safeData.otherDisc));
+
+        pushDivider();
+
+        chunks.push(boldOn);
+        chunks.push(txt("SALES ADJUSTMENT"));
+        chunks.push(nl());
+        chunks.push(boldOff);
+
+        pushMetaRow("Void:", escposPeso(safeData.salesAdjustmentVoid));
+        pushMetaRow("Return:", escposPeso(safeData.salesAdjustmentReturn));
+
+        pushDivider();
+
+        chunks.push(boldOn);
+        chunks.push(txt("VAT ADJUSTMENT"));
+        chunks.push(nl());
+        chunks.push(boldOff);
+
+        pushMetaRow("SC Trans VAT Adj:", escposPeso(safeData.scTransVatAdj));
+        pushMetaRow("PWD Trans VAT Adj:", escposPeso(safeData.pwdTransVatAdj));
+        pushMetaRow(
+          "Reg Disc Trans VAT Adj:",
+          escposPeso(safeData.regDiscTransVatAdj),
+        );
+        pushMetaRow(
+          "Zero Rated Trans VAT Adj:",
+          escposPeso(safeData.zeroRatedTransVatAdj),
+        );
+        pushMetaRow("VAT on Return:", escposPeso(safeData.vatOnReturn));
+        pushMetaRow(
+          "Other VAT Adjustments:",
+          escposPeso(safeData.otherVatAdjustments),
+        );
+
+        pushDivider();
+
+        chunks.push(boldOn);
+        chunks.push(txt("TRANSACTION SUMMARY"));
+        chunks.push(nl());
+        chunks.push(boldOff);
+
+        pushMetaRow("Cash In Drawer:", escposPeso(safeData.cashInDrawer));
+        pushMetaRow("Cheque:", escposPeso(safeData.cheque));
+        pushMetaRow("Credit Card:", escposPeso(safeData.creditCard));
+        pushMetaRow("Other Payments:", escposPeso(safeData.otherPayments));
+        pushMetaRow("Opening Fund:", escposPeso(safeData.openingFund));
+        pushMetaRow("Less Withdrawal:", escposPeso(safeData.lessWithdrawal));
+        pushMetaRow(
+          "Payments Received:",
+          escposPeso(safeData.paymentsReceived),
+        );
+
+        chunks.push(boldOn);
+        pushMetaRow("Short / Over:", escposPeso(safeData.shortOver));
+        chunks.push(boldOff);
+      } else {
+        const otherPaymentsBreakdown = Array.isArray(
+          safeData?.otherPaymentsBreakdown,
+        )
+          ? safeData.otherPaymentsBreakdown
+          : Array.isArray(safeData?.paymentBreakdown)
+            ? safeData.paymentBreakdown
+            : [];
+
+        pushMetaRow("Report Date:", safeData.reportDate || "-");
+        pushMetaRow("Report Time:", safeData.reportTime || "-");
+        pushMetaRow("Start Date/Time:", safeData.startDateTime || "-");
+        pushMetaRow("End Date/Time:", safeData.endDateTime || "-");
+        pushMetaRow("Cashier:", safeData.cashier || "-");
+        pushMetaRow("Beg. INV.:", safeData.begOR || "-");
+        pushMetaRow("End INV.:", safeData.endOR || "-");
+
+        pushDivider();
+
+        chunks.push(boldOn);
+        chunks.push(txt("PAYMENTS"));
+        chunks.push(nl());
+        chunks.push(boldOff);
+
+        pushMetaRow("Opening Fund:", escposPeso(safeData.openingFund));
+        pushMetaRow("Cash:", escposPeso(safeData.cash));
+        pushMetaRow("Cheque:", escposPeso(safeData.cheque));
+        pushMetaRow("Credit Card:", escposPeso(safeData.creditCard));
+        pushMetaRow(
+          "Other Payments:",
+          escposPeso(
+            safeData.otherPaymentsTotal ?? safeData.otherPayments ?? 0,
+          ),
+        );
+
+        if (otherPaymentsBreakdown.length > 0) {
+          otherPaymentsBreakdown.forEach((item) => {
+            pushMetaRow(
+              `- ${item?.payment_method || "Other"}:`,
+              escposPeso(item?.payment_amount || 0),
+            );
+          });
+        } else {
+          pushMetaRow("- None:", escposPeso(0));
+        }
+
+        chunks.push(boldOn);
+        pushMetaRow("Total Payments:", escposPeso(safeData.totalPayments));
+        chunks.push(boldOff);
+
+        pushMetaRow("Void:", escposPeso(safeData.void));
+        pushMetaRow("Refund:", escposPeso(safeData.refund));
+        pushMetaRow("Withdrawal:", escposPeso(safeData.withdrawal));
+
+        pushDivider();
+
+        chunks.push(boldOn);
+        chunks.push(txt("SUMMARY"));
+        chunks.push(nl());
+        chunks.push(boldOff);
+
+        pushMetaRow(
+          "Cash In Drawer:",
+          escposPeso(safeData.summaryCashInDrawer),
+        );
+        pushMetaRow("Cheque:", escposPeso(safeData.summaryCheque));
+        pushMetaRow("Credit Card:", escposPeso(safeData.summaryCreditCard));
+        pushMetaRow(
+          "Other Payments:",
+          escposPeso(safeData.summaryOtherPayments),
+        );
+        pushMetaRow("Opening Fund:", escposPeso(safeData.summaryOpeningFund));
+        pushMetaRow("Withdrawal:", escposPeso(safeData.summaryWithdrawal));
+        pushMetaRow(
+          "Payments Received:",
+          escposPeso(safeData.summaryPaymentsReceived),
+        );
+
+        chunks.push(boldOn);
+        pushMetaRow("Short / Over:", escposPeso(safeData.summaryShortOver));
+        chunks.push(boldOff);
+      }
+
+      chunks.push(nl(3));
+      chunks.push(nl(3));
+      chunks.push(cutPaper);
+
+      const finalPayload = Buffer.concat(chunks);
+      return await writeEscposBuffer(finalPayload);
     } catch (error) {
       console.error("ESC/POS X/Z reading print error:", error);
       return {
@@ -2913,286 +2884,206 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle("print-escpossalesperproduct", async (_event, data) => {
-    const host = getPrinterHost();
-    const port = 9100;
     const LINE_WIDTH = 42;
 
     try {
-      return await new Promise((resolve) => {
-        const client = new net.Socket();
-        let finished = false;
+      console.log("[ESC/POS SALES PER PRODUCT] Payload:", data);
 
-        const done = (result) => {
-          if (finished) return;
-          finished = true;
-          try {
-            client.destroy();
-          } catch {}
-          resolve(result);
-        };
+      const chunks = [];
+      const {
+        title = "SALES REPORT",
+        dateFrom = "",
+        dateTo = "",
+        printedAt = "",
+        items = [],
+        totals = {},
+      } = data || {};
 
-        client.setTimeout(10000);
+      const safeItems = Array.isArray(items) ? items : [];
+      const safeTotals = totals || {};
 
-        client.on("connect", () => {
-          try {
-            console.log(
-              `[ESC/POS SALES PER PRODUCT] Connected to ${host}:${port}`,
-            );
-            console.log("[ESC/POS SALES PER PRODUCT] Payload:", data);
+      const initPrinter = Buffer.from([0x1b, 0x40]);
+      const alignLeft = Buffer.from([0x1b, 0x61, 0x00]);
+      const alignCenter = Buffer.from([0x1b, 0x61, 0x01]);
+      const boldOn = Buffer.from([0x1b, 0x45, 0x01]);
+      const boldOff = Buffer.from([0x1b, 0x45, 0x00]);
+      const doubleWidthOn = Buffer.from([0x1d, 0x21, 0x10]);
+      const normalSize = Buffer.from([0x1d, 0x21, 0x00]);
+      const cutPaper = Buffer.from([0x1d, 0x56, 0x00]);
 
-            const chunks = [];
-            const {
-              title = "SALES REPORT",
-              dateFrom = "",
-              dateTo = "",
-              printedAt = "",
-              items = [],
-              totals = {},
-            } = data || {};
+      const nl = (count = 1) => Buffer.from("\n".repeat(count), "ascii");
+      const txt = (value) => Buffer.from(String(value || ""), "ascii");
 
-            const safeItems = Array.isArray(items) ? items : [];
-            const safeTotals = totals || {};
+      const escposSafeText = (value, fallback = "") => {
+        const str = String(value ?? fallback ?? "");
+        return str.replace(/[^\x20-\x7E]/g, " ").trim() || fallback;
+      };
 
-            const initPrinter = Buffer.from([0x1b, 0x40]);
-            const alignLeft = Buffer.from([0x1b, 0x61, 0x00]);
-            const alignCenter = Buffer.from([0x1b, 0x61, 0x01]);
-            const boldOn = Buffer.from([0x1b, 0x45, 0x01]);
-            const boldOff = Buffer.from([0x1b, 0x45, 0x00]);
-            const doubleWidthOn = Buffer.from([0x1d, 0x21, 0x10]);
-            const normalSize = Buffer.from([0x1d, 0x21, 0x00]);
-            const cutPaper = Buffer.from([0x1d, 0x56, 0x00]);
+      const escposPeso = (value) =>
+        Number(value || 0).toLocaleString("en-PH", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
 
-            const nl = (count = 1) => Buffer.from("\n".repeat(count), "ascii");
-            const txt = (value) => Buffer.from(String(value || ""), "ascii");
+      const escposRepeat = (char, count) => String(char || "-").repeat(count);
 
-            const escposSafeText = (value, fallback = "") => {
-              const str = String(value ?? fallback ?? "");
-              return str.replace(/[^\x20-\x7E]/g, " ").trim() || fallback;
-            };
+      const escposPadRight = (value, width) => {
+        const str = String(value || "");
+        if (str.length >= width) return str.slice(0, width);
+        return str + " ".repeat(width - str.length);
+      };
 
-            const escposPeso = (value) =>
-              Number(value || 0).toLocaleString("en-PH", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              });
+      const escposPadLeft = (value, width) => {
+        const str = String(value || "");
+        if (str.length >= width) return str.slice(0, width);
+        return " ".repeat(width - str.length) + str;
+      };
 
-            const escposRepeat = (char, count) =>
-              String(char || "-").repeat(count);
+      const escposWrapText = (value, width = LINE_WIDTH) => {
+        const text = String(value || "").trim();
+        if (!text) return [""];
 
-            const escposPadRight = (value, width) => {
-              const str = String(value || "");
-              if (str.length >= width) return str.slice(0, width);
-              return str + " ".repeat(width - str.length);
-            };
+        const words = text.split(/\s+/);
+        const lines = [];
+        let current = "";
 
-            const escposPadLeft = (value, width) => {
-              const str = String(value || "");
-              if (str.length >= width) return str.slice(0, width);
-              return " ".repeat(width - str.length) + str;
-            };
-
-            const escposWrapText = (value, width = LINE_WIDTH) => {
-              const text = String(value || "").trim();
-              if (!text) return [""];
-
-              const words = text.split(/\s+/);
-              const lines = [];
-              let current = "";
-
-              for (const word of words) {
-                if (!current) {
-                  current = word;
-                  continue;
-                }
-
-                if ((current + " " + word).length <= width) {
-                  current += " " + word;
-                } else {
-                  lines.push(current);
-                  current = word;
-                }
-              }
-
-              if (current) lines.push(current);
-              return lines.length ? lines : [text];
-            };
-
-            const escposFormatLeftRight = (left, right, width = LINE_WIDTH) => {
-              const l = String(left || "");
-              const r = String(right || "");
-
-              if (l.length + r.length >= width) {
-                return `${l} ${r}`;
-              }
-
-              return l + " ".repeat(width - l.length - r.length) + r;
-            };
-
-            const pushDivider = () => {
-              chunks.push(txt(escposRepeat("-", LINE_WIDTH)));
-              chunks.push(nl());
-            };
-
-            const pushWrappedCentered = (value, width = LINE_WIDTH) => {
-              escposWrapText(value, width).forEach((line) => {
-                chunks.push(txt(line));
-                chunks.push(nl());
-              });
-            };
-
-            const pushMetaRow = (label, value) => {
-              const left = String(label || "");
-              const right = escposSafeText(value, "-");
-
-              if (left.length + right.length <= LINE_WIDTH) {
-                chunks.push(
-                  txt(escposFormatLeftRight(left, right, LINE_WIDTH)),
-                );
-                chunks.push(nl());
-              } else {
-                chunks.push(txt(left));
-                chunks.push(nl());
-                escposWrapText(right, LINE_WIDTH).forEach((line) => {
-                  chunks.push(txt(line));
-                  chunks.push(nl());
-                });
-              }
-            };
-
-            const formatItemRow = (name, qty, amt) => {
-              const nameWidth = 22;
-              const qtyWidth = 6;
-              const amtWidth = 14;
-
-              return (
-                escposPadRight(name, nameWidth) +
-                escposPadRight(qty, qtyWidth) +
-                escposPadLeft(amt, amtWidth)
-              );
-            };
-
-            chunks.push(initPrinter);
-
-            chunks.push(alignCenter);
-            chunks.push(boldOn);
-            chunks.push(doubleWidthOn);
-            pushWrappedCentered(String(title || "SALES REPORT").toUpperCase());
-            chunks.push(normalSize);
-            chunks.push(boldOff);
-
-            chunks.push(txt(`${dateFrom || "-"} - ${dateTo || "-"}`));
-            chunks.push(nl());
-
-            pushDivider();
-
-            chunks.push(alignLeft);
-            chunks.push(boldOn);
-            chunks.push(txt(formatItemRow("ITEM", "QTY", "TOTAL")));
-            chunks.push(nl());
-            chunks.push(boldOff);
-
-            safeItems.forEach((item) => {
-              const itemName = String(item?.name || "-").toUpperCase();
-              const qtyText = String(Number(item?.qty || 0));
-              const amtText = escposPeso(item?.amount || 0);
-
-              const nameLines = escposWrapText(itemName, 22);
-
-              nameLines.forEach((line, index) => {
-                if (index === 0) {
-                  chunks.push(txt(formatItemRow(line, qtyText, amtText)));
-                } else {
-                  chunks.push(txt(line));
-                }
-                chunks.push(nl());
-              });
-
-              if (nameLines.length > 1) {
-                chunks.push(nl());
-              }
-
-              // if (item?.code) {
-              //   const codeLines = escposWrapText(
-              //     `CODE: ${String(item.code).toUpperCase()}`,
-              //     LINE_WIDTH,
-              //   );
-              //   codeLines.forEach((line) => {
-              //     chunks.push(txt(line));
-              //     chunks.push(nl());
-              //   });
-              // }
-            });
-
-            pushDivider();
-
-            pushMetaRow("TOTAL QTY:", Number(safeTotals.qty || 0));
-            pushMetaRow(
-              "GRAND TOTAL:",
-              `P${escposPeso(safeTotals.amount || 0)}`,
-            );
-
-            pushDivider();
-
-            chunks.push(alignCenter);
-            chunks.push(txt(`DATE: ${printedAt || "-"}`));
-            chunks.push(nl(3));
-            chunks.push(cutPaper);
-
-            const payload = Buffer.concat(chunks);
-
-            client.write(payload, (err) => {
-              if (err) {
-                console.error("[ESC/POS SALES PER PRODUCT] Write error:", err);
-                return done({
-                  success: false,
-                  message:
-                    err?.message ||
-                    "Failed to write sales per product report to printer",
-                });
-              }
-
-              client.end();
-            });
-          } catch (error) {
-            console.error(
-              "[ESC/POS SALES PER PRODUCT] Build/print error:",
-              error,
-            );
-            done({
-              success: false,
-              message:
-                error?.message || "ESC/POS sales per product print failed",
-            });
+        for (const word of words) {
+          if (!current) {
+            current = word;
+            continue;
           }
-        });
 
-        client.on("timeout", () => {
-          console.error("[ESC/POS SALES PER PRODUCT] Socket timeout");
-          done({
-            success: false,
-            message: "Sales per product printer socket timeout",
+          if ((current + " " + word).length <= width) {
+            current += " " + word;
+          } else {
+            lines.push(current);
+            current = word;
+          }
+        }
+
+        if (current) lines.push(current);
+        return lines.length ? lines : [text];
+      };
+
+      const escposFormatLeftRight = (left, right, width = LINE_WIDTH) => {
+        const l = String(left || "");
+        const r = String(right || "");
+
+        if (l.length + r.length >= width) {
+          return `${l} ${r}`;
+        }
+
+        return l + " ".repeat(width - l.length - r.length) + r;
+      };
+
+      const pushDivider = () => {
+        chunks.push(txt(escposRepeat("-", LINE_WIDTH)));
+        chunks.push(nl());
+      };
+
+      const pushWrappedCentered = (value, width = LINE_WIDTH) => {
+        escposWrapText(value, width).forEach((line) => {
+          chunks.push(txt(line));
+          chunks.push(nl());
+        });
+      };
+
+      const pushMetaRow = (label, value) => {
+        const left = String(label || "");
+        const right = escposSafeText(value, "-");
+
+        if (left.length + right.length <= LINE_WIDTH) {
+          chunks.push(txt(escposFormatLeftRight(left, right, LINE_WIDTH)));
+          chunks.push(nl());
+        } else {
+          chunks.push(txt(left));
+          chunks.push(nl());
+          escposWrapText(right, LINE_WIDTH).forEach((line) => {
+            chunks.push(txt(line));
+            chunks.push(nl());
           });
+        }
+      };
+
+      const formatItemRow = (name, qty, amt) => {
+        const nameWidth = 22;
+        const qtyWidth = 6;
+        const amtWidth = 14;
+
+        return (
+          escposPadRight(name, nameWidth) +
+          escposPadRight(qty, qtyWidth) +
+          escposPadLeft(amt, amtWidth)
+        );
+      };
+
+      chunks.push(initPrinter);
+
+      chunks.push(alignCenter);
+      chunks.push(boldOn);
+      chunks.push(doubleWidthOn);
+      pushWrappedCentered(String(title || "SALES REPORT").toUpperCase());
+      chunks.push(normalSize);
+      chunks.push(boldOff);
+
+      chunks.push(txt(`${dateFrom || "-"} - ${dateTo || "-"}`));
+      chunks.push(nl());
+
+      pushDivider();
+
+      chunks.push(alignLeft);
+      chunks.push(boldOn);
+      chunks.push(txt(formatItemRow("ITEM", "QTY", "TOTAL")));
+      chunks.push(nl());
+      chunks.push(boldOff);
+
+      safeItems.forEach((item) => {
+        const itemName = String(item?.name || "-").toUpperCase();
+        const qtyText = String(Number(item?.qty || 0));
+        const amtText = escposPeso(item?.amount || 0);
+
+        const nameLines = escposWrapText(itemName, 22);
+
+        nameLines.forEach((line, index) => {
+          if (index === 0) {
+            chunks.push(txt(formatItemRow(line, qtyText, amtText)));
+          } else {
+            chunks.push(txt(line));
+          }
+          chunks.push(nl());
         });
 
-        client.on("error", (err) => {
-          console.error("[ESC/POS SALES PER PRODUCT] Socket error:", err);
-          done({
-            success: false,
-            message:
-              err?.message || "Sales per product printer connection error",
-          });
-        });
+        if (nameLines.length > 1) {
+          chunks.push(nl());
+        }
 
-        client.on("close", () => {
-          console.log("[ESC/POS SALES PER PRODUCT] Connection closed");
-          done({
-            success: true,
-            message: "Sales per product report printed successfully",
-          });
-        });
-
-        client.connect(port, host);
+        // if (item?.code) {
+        //   const codeLines = escposWrapText(
+        //     `CODE: ${String(item.code).toUpperCase()}`,
+        //     LINE_WIDTH,
+        //   );
+        //   codeLines.forEach((line) => {
+        //     chunks.push(txt(line));
+        //     chunks.push(nl());
+        //   });
+        // }
       });
+
+      pushDivider();
+
+      pushMetaRow("TOTAL QTY:", Number(safeTotals.qty || 0));
+      pushMetaRow("GRAND TOTAL:", `P${escposPeso(safeTotals.amount || 0)}`);
+
+      pushDivider();
+
+      chunks.push(alignCenter);
+      chunks.push(txt(`DATE: ${printedAt || "-"}`));
+      chunks.push(nl(3));
+      chunks.push(nl(3));
+      chunks.push(cutPaper);
+
+      const payload = Buffer.concat(chunks);
+      return await writeEscposBuffer(payload);
     } catch (error) {
       console.error("ESC/POS sales per product print error:", error);
       return {
@@ -3203,8 +3094,6 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle("print-escposbilling", async (_event, data) => {
-    const host = getPrinterHost();
-    const port = 9100;
     const LINE_WIDTH = 42;
 
     const repeat = (char, length) => String(char || "").repeat(length || 0);
@@ -3272,227 +3161,163 @@ app.whenReady().then(() => {
     const safeNumber = (value) => Number(value || 0);
 
     try {
-      return await new Promise((resolve) => {
-        const client = new net.Socket();
-        let finished = false;
+      console.log("[ESC/POS BILLING] Payload:", data);
 
-        const done = (result) => {
-          if (finished) return;
-          finished = true;
-          try {
-            client.destroy();
-          } catch {}
-          resolve(result);
-        };
+      const chunks = [];
+      const { transaction, detailedproduct } = data || {};
 
-        client.setTimeout(10000);
+      const initPrinter = Buffer.from([0x1b, 0x40]);
+      const alignLeft = Buffer.from([0x1b, 0x61, 0x00]);
+      const alignCenter = Buffer.from([0x1b, 0x61, 0x01]);
+      const alignRight = Buffer.from([0x1b, 0x61, 0x02]);
+      const boldOn = Buffer.from([0x1b, 0x45, 0x01]);
+      const boldOff = Buffer.from([0x1b, 0x45, 0x00]);
+      const doubleSizeOn = Buffer.from([0x1d, 0x21, 0x11]);
+      const normalSize = Buffer.from([0x1d, 0x21, 0x00]);
+      const cutPaper = Buffer.from([0x1d, 0x56, 0x00]);
+      const nl = (count = 1) => Buffer.from("\n".repeat(count), "ascii");
+      const txt = (value) => Buffer.from(String(value || ""), "ascii");
 
-        client.on("connect", () => {
-          try {
-            console.log(`[ESC/POS BILLING] Connected to ${host}:${port}`);
-            console.log("[ESC/POS BILLING] Payload:", data);
+      const items = Array.isArray(detailedproduct) ? detailedproduct : [];
 
-            const chunks = [];
-            const { transaction, detailedproduct } = data || {};
+      const computedTotalSales = items.reduce((total, item) => {
+        const price = safeNumber(item?.selling_price);
+        const quantity = safeNumber(item?.sales_quantity);
+        return total + price * quantity;
+      }, 0);
 
-            const initPrinter = Buffer.from([0x1b, 0x40]);
-            const alignLeft = Buffer.from([0x1b, 0x61, 0x00]);
-            const alignCenter = Buffer.from([0x1b, 0x61, 0x01]);
-            const alignRight = Buffer.from([0x1b, 0x61, 0x02]);
-            const boldOn = Buffer.from([0x1b, 0x45, 0x01]);
-            const boldOff = Buffer.from([0x1b, 0x45, 0x00]);
-            const doubleSizeOn = Buffer.from([0x1d, 0x21, 0x11]);
-            const normalSize = Buffer.from([0x1d, 0x21, 0x00]);
-            const cutPaper = Buffer.from([0x1d, 0x56, 0x00]);
-            const nl = (count = 1) => Buffer.from("\n".repeat(count), "ascii");
-            const txt = (value) => Buffer.from(String(value || ""), "ascii");
+      const discount = safeNumber(transaction?.Discount);
+      const amountDue = computedTotalSales - discount;
 
-            const items = Array.isArray(detailedproduct) ? detailedproduct : [];
+      const billingRows = [
+        ["Trans No", transaction?.transaction_id || "N/A"],
+        ["Billing No", transaction?.billing_no || "N/A"],
+        ["Trans Date", transaction?.transaction_date || "N/A"],
+        ["Trans Time", transaction?.transaction_time || "N/A"],
+        ["Terminal No", transaction?.terminal_number || "N/A"],
+        ["Order Type", transaction?.order_type || "N/A"],
+        ["Ref Tag", transaction?.table_number || "N/A"],
+        ["Cashier", transaction?.cashier || "N/A"],
+      ];
 
-            const computedTotalSales = items.reduce((total, item) => {
-              const price = safeNumber(item?.selling_price);
-              const quantity = safeNumber(item?.sales_quantity);
-              return total + price * quantity;
-            }, 0);
+      chunks.push(initPrinter);
 
-            const discount = safeNumber(transaction?.Discount);
-            const amountDue = computedTotalSales - discount;
+      // Header
+      chunks.push(alignCenter);
+      chunks.push(boldOn);
+      chunks.push(txt("CRABS N CRACK SEAFOOD HOUSE"));
+      chunks.push(nl());
+      chunks.push(txt("AND SHAKING CRABS - GUIGUINTO"));
+      chunks.push(nl());
+      chunks.push(boldOff);
 
-            const billingRows = [
-              ["Trans No", transaction?.transaction_id || "N/A"],
-              ["Billing No", transaction?.billing_no || "N/A"],
-              ["Trans Date", transaction?.transaction_date || "N/A"],
-              ["Trans Time", transaction?.transaction_time || "N/A"],
-              ["Terminal No", transaction?.terminal_number || "N/A"],
-              ["Order Type", transaction?.order_type || "N/A"],
-              ["Ref Tag", transaction?.table_number || "N/A"],
-              ["Cashier", transaction?.cashier || "N/A"],
-            ];
+      chunks.push(txt("ARU FOOD CORP."));
+      chunks.push(nl());
+      chunks.push(txt("PLARIDEL BYPASS ROAD TIAONG GUIGUINTO"));
+      chunks.push(nl());
+      chunks.push(txt("BULACAN"));
+      chunks.push(nl());
+      chunks.push(txt("VAT REG TIN: 634-742-586-00013"));
+      chunks.push(nl());
+      chunks.push(txt("MIN: 26032413224205435"));
+      chunks.push(nl());
+      chunks.push(txt("S/N: 2510AI5508128156WL24026"));
+      chunks.push(nl());
 
-            chunks.push(initPrinter);
+      chunks.push(txt(repeat("-", LINE_WIDTH)));
+      chunks.push(nl());
 
-            // Header
-            chunks.push(alignCenter);
-            chunks.push(boldOn);
-            chunks.push(txt("CRABS N CRACK SEAFOOD HOUSE"));
-            chunks.push(nl());
-            chunks.push(txt("AND SHAKING CRABS - GUIGUINTO"));
-            chunks.push(nl());
-            chunks.push(boldOff);
+      chunks.push(alignCenter);
+      chunks.push(boldOn);
+      chunks.push(doubleSizeOn);
+      chunks.push(txt("BILLING"));
+      chunks.push(nl());
+      chunks.push(normalSize);
+      chunks.push(boldOff);
 
-            chunks.push(txt("ARU FOOD CORP."));
-            chunks.push(nl());
-            chunks.push(txt("PLARIDEL BYPASS ROAD TIAONG GUIGUINTO"));
-            chunks.push(nl());
-            chunks.push(txt("BULACAN"));
-            chunks.push(nl());
-            chunks.push(txt("VAT REG TIN: 634-742-586-00013"));
-            chunks.push(nl());
-            chunks.push(txt("MIN: 26032413224205435"));
-            chunks.push(nl());
-            chunks.push(txt("S/N: 2510AI5508128156WL24026"));
-            chunks.push(nl());
-
-            chunks.push(txt(repeat("-", LINE_WIDTH)));
-            chunks.push(nl());
-
-            chunks.push(alignCenter);
-            chunks.push(boldOn);
-            chunks.push(doubleSizeOn);
-            chunks.push(txt("BILLING"));
-            chunks.push(nl());
-            chunks.push(normalSize);
-            chunks.push(boldOff);
-
-            // Billing details
-            chunks.push(alignLeft);
-            billingRows.forEach(([label, value]) => {
-              chunks.push(txt(formatLeftRight(`${label}:`, value)));
-              chunks.push(nl());
-            });
-
-            chunks.push(txt(repeat("-", LINE_WIDTH)));
-            chunks.push(nl());
-
-            // Items table
-            chunks.push(boldOn);
-            chunks.push(txt(formatItemRow("Item", "Qty", "Amt")));
-            chunks.push(nl());
-            chunks.push(boldOff);
-
-            if (!items.length) {
-              chunks.push(alignCenter);
-              chunks.push(txt("No items"));
-              chunks.push(nl());
-              chunks.push(alignLeft);
-            } else {
-              items.forEach((item) => {
-                const name = String(item?.item_name || "");
-                const qty =
-                  `${item?.sales_quantity || 0} ${item?.unit_of_measure || ""}`.trim();
-                const lineTotal =
-                  safeNumber(item?.selling_price) *
-                  safeNumber(item?.sales_quantity);
-                const amt = peso(lineTotal);
-
-                const nameLines = wrapText(name, 16);
-
-                nameLines.forEach((line, index) => {
-                  if (index === 0) {
-                    chunks.push(txt(formatItemRow(line, qty, amt)));
-                  } else {
-                    chunks.push(txt(line));
-                  }
-                  chunks.push(nl());
-                });
-              });
-            }
-
-            chunks.push(txt(repeat("-", LINE_WIDTH)));
-            chunks.push(nl());
-
-            // Totals
-            chunks.push(
-              txt(formatLeftRight("Total Sales:", peso(computedTotalSales))),
-            );
-            chunks.push(nl());
-            chunks.push(txt(formatLeftRight("Discount:", peso(discount))));
-            chunks.push(nl());
-
-            chunks.push(boldOn);
-            chunks.push(doubleSizeOn);
-            chunks.push(txt(formatLeftRight("Amount Due:", peso(amountDue))));
-            chunks.push(nl());
-            chunks.push(normalSize);
-            chunks.push(boldOff);
-
-            chunks.push(txt(repeat("-", LINE_WIDTH)));
-            chunks.push(nl());
-
-            // Customer section
-            chunks.push(txt("Customer Name:"));
-            chunks.push(nl());
-            chunks.push(txt("Customer ID:"));
-            chunks.push(nl());
-            chunks.push(txt("TIN:"));
-            chunks.push(nl());
-            chunks.push(txt("Address:"));
-            chunks.push(nl());
-            chunks.push(txt("Customer Signature:"));
-            chunks.push(nl());
-            chunks.push(txt("_______________________________"));
-            chunks.push(nl(3));
-
-            chunks.push(cutPaper);
-
-            const payload = Buffer.concat(chunks);
-
-            client.write(payload, (err) => {
-              if (err) {
-                console.error("[ESC/POS BILLING] Write error:", err);
-                return done({
-                  success: false,
-                  message: err?.message || "Failed to write billing to printer",
-                });
-              }
-
-              client.end();
-            });
-          } catch (error) {
-            console.error("[ESC/POS BILLING] Build/print error:", error);
-            done({
-              success: false,
-              message: error?.message || "ESC/POS billing print failed",
-            });
-          }
-        });
-
-        client.on("timeout", () => {
-          console.error("[ESC/POS BILLING] Socket timeout");
-          done({
-            success: false,
-            message: "Billing printer socket timeout",
-          });
-        });
-
-        client.on("error", (err) => {
-          console.error("[ESC/POS BILLING] Socket error:", err);
-          done({
-            success: false,
-            message: err?.message || "Billing printer connection error",
-          });
-        });
-
-        client.on("close", () => {
-          console.log("[ESC/POS BILLING] Connection closed");
-          done({
-            success: true,
-            message: "Billing printed successfully",
-          });
-        });
-
-        client.connect(port, host);
+      // Billing details
+      chunks.push(alignLeft);
+      billingRows.forEach(([label, value]) => {
+        chunks.push(txt(formatLeftRight(`${label}:`, value)));
+        chunks.push(nl());
       });
+
+      chunks.push(txt(repeat("-", LINE_WIDTH)));
+      chunks.push(nl());
+
+      // Items table
+      chunks.push(boldOn);
+      chunks.push(txt(formatItemRow("Item", "Qty", "Amt")));
+      chunks.push(nl());
+      chunks.push(boldOff);
+
+      if (!items.length) {
+        chunks.push(alignCenter);
+        chunks.push(txt("No items"));
+        chunks.push(nl());
+        chunks.push(alignLeft);
+      } else {
+        items.forEach((item) => {
+          const name = String(item?.item_name || "");
+          const qty =
+            `${item?.sales_quantity || 0} ${item?.unit_of_measure || ""}`.trim();
+          const lineTotal =
+            safeNumber(item?.selling_price) * safeNumber(item?.sales_quantity);
+          const amt = peso(lineTotal);
+
+          const nameLines = wrapText(name, 16);
+
+          nameLines.forEach((line, index) => {
+            if (index === 0) {
+              chunks.push(txt(formatItemRow(line, qty, amt)));
+            } else {
+              chunks.push(txt(line));
+            }
+            chunks.push(nl());
+          });
+        });
+      }
+
+      chunks.push(txt(repeat("-", LINE_WIDTH)));
+      chunks.push(nl());
+
+      // Totals
+      chunks.push(
+        txt(formatLeftRight("Total Sales:", peso(computedTotalSales))),
+      );
+      chunks.push(nl());
+      chunks.push(txt(formatLeftRight("Discount:", peso(discount))));
+      chunks.push(nl());
+
+      chunks.push(boldOn);
+      chunks.push(doubleSizeOn);
+      chunks.push(txt(formatLeftRight("Amount Due:", peso(amountDue))));
+      chunks.push(nl());
+      chunks.push(normalSize);
+      chunks.push(boldOff);
+
+      chunks.push(txt(repeat("-", LINE_WIDTH)));
+      chunks.push(nl());
+
+      // Customer section
+      chunks.push(txt("Customer Name:"));
+      chunks.push(nl());
+      chunks.push(txt("Customer ID:"));
+      chunks.push(nl());
+      chunks.push(txt("TIN:"));
+      chunks.push(nl());
+      chunks.push(txt("Address:"));
+      chunks.push(nl());
+      chunks.push(txt("Customer Signature:"));
+      chunks.push(nl());
+      chunks.push(txt("_______________________________"));
+      chunks.push(nl(3));
+      chunks.push(nl(3));
+
+      chunks.push(cutPaper);
+
+      const payload = Buffer.concat(chunks);
+      return await writeEscposBuffer(payload);
     } catch (error) {
       console.error("ESC/POS billing print error:", error);
       return {
@@ -3829,6 +3654,30 @@ app.whenReady().then(() => {
       } catch (closeError) {
         console.error("Error while closing print window:", closeError);
       }
+    }
+  });
+
+  ipcMain.handle("check-escpos-printer", async () => {
+    try {
+      const config = getPrinterConnectionConfig();
+
+      if (config.type === "bluetooth") {
+        return await checkEscposBluetoothConnection(
+          config.portName,
+          config.baudRate,
+        );
+      }
+
+      if (config.type === "usb") {
+        return checkEscposUsbConnection(config.vendorId, config.productId);
+      }
+
+      return await checkEscposNetworkConnection(config.host, config.port);
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message || "Printer check failed",
+      };
     }
   });
 

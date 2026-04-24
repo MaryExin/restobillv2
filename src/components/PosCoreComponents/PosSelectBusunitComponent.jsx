@@ -631,6 +631,7 @@ const PosSelectBusunitComponent = () => {
         "-",
       unitCode:
         shiftDetails?.Unit_Code || selectedBUData?.info?.unitCode || "-",
+      terminalNumber: shiftDetails?.terminal?.terminalNumber || "1",
       unitName: shiftDetails?.Unit_Name || selectedBUData?.label || "-",
       shiftStatus: shiftDetails?.Shift_Status || "-",
       shiftId: shiftDetails?.Shift_ID || "-",
@@ -708,6 +709,10 @@ const PosSelectBusunitComponent = () => {
     localStorage.setItem(
       "posBusinessCategoryCode",
       liveDisplayInfo.categoryCode || "",
+    );
+    localStorage.setItem(
+      "posTerminalNumber",
+      liveDisplayInfo.terminalNumber || "",
     );
     localStorage.setItem("posBusinessUnitCode", liveDisplayInfo.unitCode || "");
     localStorage.setItem("posBusinessUnitName", liveDisplayInfo.unitName || "");

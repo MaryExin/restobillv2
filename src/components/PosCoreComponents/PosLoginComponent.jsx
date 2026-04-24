@@ -244,6 +244,30 @@ const PosLoginComponent = () => {
     }
   };
 
+  // const handleInspectUsbPrinter = async () => {
+  //   console.log("button clicked");
+
+  //   try {
+  //     const result = await window.electronAPI.checkEscposPrinter();
+  //     console.log("Printer check result:", result);
+  //     alert(JSON.stringify(result, null, 2));
+  //   } catch (error) {
+  //     console.error("Printer check failed:", error);
+  //     alert(error?.message || "Printer check failed");
+  //   }
+  // };
+
+  // const handleTestPrint = async () => {
+  //   try {
+  //     const result = await window.electronAPI.testEscpos();
+  //     console.log("Test print result:", result);
+  //     alert(JSON.stringify(result, null, 2));
+  //   } catch (error) {
+  //     console.error("Test print failed:", error);
+  //     alert(error?.message || "Test print failed");
+  //   }
+  // };
+
   return (
     <>
       <div
@@ -409,7 +433,7 @@ const PosLoginComponent = () => {
                   <div className="pt-4">
                     <button
                       type="button"
-                      onClick={handleOpenConfirm}
+                      onClick={handleConfirmedLogin}
                       disabled={isDisabled || isSubmitting}
                       className="mx-auto flex h-[52px] w-[190px] items-center justify-center rounded-full px-6 text-[18px] font-semibold shadow-[0_14px_28px_rgba(0,0,0,0.18)] transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
                       style={{

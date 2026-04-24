@@ -40,6 +40,7 @@ import {
   BuildOrderReceiptHtml,
 } from "../../utils/BuildOrderlistPrintHtml";
 import useGetDefaultPrinter from "../../hooks/useGetDefaultPrinter";
+
 const Orderlist = ({
   tableselected,
   setshoworderlist,
@@ -392,14 +393,14 @@ const Orderlist = ({
   //   });
   // };
 
-  const handlePrintAdditionalOrderElectron = async () => {
+  const handlePrintAdditionalOrderElectron = async (transactionIds) => {
     try {
       const printResult = await window.electronAPI.printEscPos({
         table: tableselected,
         items: additionalCartItems,
         total: additionalTotalPrice,
         instructions,
-        transactionId,
+        transactionId: transactionId ? transactionId : transactionIds,
         printMode: transactionId ? "additional" : "new",
       });
 
@@ -1575,26 +1576,31 @@ const Orderlist = ({
       const formData = new FormData();
       const txId = transactionId || Date.now();
 
-      // read terminal config from public folder
-      let terminalNumber = "1";
+      // let terminalNumber = "1";
 
-      try {
-        const terminalRes = await fetch(
-          `${import.meta.env.BASE_URL}businessInfo.json`,
-        );
+      // try {
+      //   if (window.electronAPI?.readBusinessInfo) {
+      //     const result = await window.electronAPI.readBusinessInfo();
 
-        if (!terminalRes.ok) {
-          throw new Error(`HTTP ${terminalRes.status}`);
-        }
+      //     if (result?.success) {
+      //       terminalNumber = result.data?.terminalId || "1";
+      //     } else {
+      //       console.warn(
+      //         "Failed to load terminal config, using default terminal 1",
+      //         result?.message,
+      //       );
+      //     }
+      //   } else {
+      //     console.warn("electronAPI.readBusinessInfo is not available");
+      //   }
+      // } catch (err) {
+      //   console.warn(
+      //     "Failed to load terminal config, using default terminal 1",
+      //     err,
+      //   );
+      // }
 
-        const terminalData = await terminalRes.json();
-        terminalNumber = terminalData?.terminalId || "1";
-      } catch (err) {
-        console.warn(
-          "Failed to load terminal config, using default terminal 1",
-          err,
-        );
-      }
+      // console.log("Using terminal number:", terminalNumber);
 
       // get logged in user info
       const loggedUserId =
@@ -1615,7 +1621,10 @@ const Orderlist = ({
           hour12: true,
         }),
       );
-      formData.append("terminal_number", terminalNumber);
+      formData.append(
+        "terminal_number",
+        localStorage.getItem("posTerminalNumber"),
+      );
       formData.append("order_slip_no", txId);
       formData.append("table_number", tableselected);
       formData.append("order_type", orderTypeName);
@@ -1670,6 +1679,7 @@ const Orderlist = ({
         ok: true,
         txId,
         isUpdate: !!transactionId,
+        transaction_id: result.transaction_id || txId,
       };
     } catch (error) {
       console.error(error);
@@ -1697,7 +1707,7 @@ const Orderlist = ({
       setShowConfirmModal(false);
       setShowqrModal(false);
 
-      await handlePrintAdditionalOrderElectron();
+      await handlePrintAdditionalOrderElectron(result.transaction_id);
     } catch (error) {
       console.error("Confirm transaction error:", error);
     } finally {
@@ -2123,11 +2133,11 @@ const Orderlist = ({
 
     formData.append(
       "source_terminal_number",
-      source_summary?.terminal_number || "1",
+      localStorage.getItem("posTerminalNumber") || "1",
     );
     formData.append(
       "destination_terminal_number",
-      destination_summary?.terminal_number || "1",
+      localStorage.getItem("posTerminalNumber") || "1",
     );
 
     formData.append(
@@ -2320,7 +2330,10 @@ const Orderlist = ({
       formData.append("remarks", finalRemarks);
       formData.append("cashier", userName);
       formData.append("transaction_date", dateSelected || "");
-      formData.append("terminal_number", "1");
+      formData.append(
+        "terminal_number",
+        localStorage.getItem("posTerminalNumber"),
+      );
       formData.append("order_slip_no", transactionId);
       formData.append("transaction_type", finalTransactionType);
       formData.append("user_id", userId);

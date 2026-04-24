@@ -405,7 +405,7 @@ const LayoutPos = ({ children }) => {
         selectedCashier="All Cashiers"
         categoryCode={branchInfo.categoryCode}
         unitCode={branchInfo.unitCode}
-        terminalNumber={branchInfo.terminalNo}
+        terminalNumber={localStorage.getItem("posTerminalNumber")}
         corpName={branchInfo.corpName}
         shiftingDate={dateselection?.Opening_DateTime?.split(" ")[0]}
         xEndpoint="/api/generate_x_reading_pdf.php"
