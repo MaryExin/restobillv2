@@ -1576,33 +1576,6 @@ const Orderlist = ({
       const formData = new FormData();
       const txId = transactionId || Date.now();
 
-      // let terminalNumber = "1";
-
-      // try {
-      //   if (window.electronAPI?.readBusinessInfo) {
-      //     const result = await window.electronAPI.readBusinessInfo();
-
-      //     if (result?.success) {
-      //       terminalNumber = result.data?.terminalId || "1";
-      //     } else {
-      //       console.warn(
-      //         "Failed to load terminal config, using default terminal 1",
-      //         result?.message,
-      //       );
-      //     }
-      //   } else {
-      //     console.warn("electronAPI.readBusinessInfo is not available");
-      //   }
-      // } catch (err) {
-      //   console.warn(
-      //     "Failed to load terminal config, using default terminal 1",
-      //     err,
-      //   );
-      // }
-
-      // console.log("Using terminal number:", terminalNumber);
-
-      // get logged in user info
       const loggedUserId =
         localStorage.getItem("userId") ||
         sessionStorage.getItem("userId") ||
