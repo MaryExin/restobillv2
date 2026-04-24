@@ -14,6 +14,8 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import useApiHost from "../../../hooks/useApiHost";
 import { useTheme } from "../../../context/ThemeContext";
+import ModalYesNoReusable from "../../Modals/ModalYesNoReusable";
+import ModalSuccessNavToSelf from "../../Modals/ModalSuccessNavToSelf";
 
 const safeValue = (value, fallback = "") => {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
@@ -679,6 +681,8 @@ const PosAppearance = ({ adaptivePalette = [], getContrastText }) => {
   const [saveMessage, setSaveMessage] = useState("");
   const [saveStatus, setSaveStatus] = useState("");
   const [isPaletteModalOpen, setIsPaletteModalOpen] = useState(false);
+  const [isYesNoModalOpen, setIsYesNoModalOpen] = useState(false);
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
 
   const [imageFiles, setImageFiles] = useState({
     Logo_Url_File: null,
@@ -991,6 +995,7 @@ const PosAppearance = ({ adaptivePalette = [], getContrastText }) => {
 
         setSaveStatus("success");
         setSaveMessage(result.message || "Theme saved successfully.");
+        setIsSuccessModalOpen(true);
 
         await refreshThemeSettings?.();
       } else {
@@ -1504,7 +1509,7 @@ const PosAppearance = ({ adaptivePalette = [], getContrastText }) => {
             <div className="flex justify-start lg:justify-end">
               <button
                 type="button"
-                onClick={handleSave}
+                onClick={() => setIsYesNoModalOpen(true)}
                 disabled={isSavingTheme || isThemeLoading}
                 className="rounded-[22px] px-8 py-4 text-[11px] font-black uppercase tracking-[0.22em] transition-all hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 sm:px-12"
                 style={{
@@ -1521,6 +1526,25 @@ const PosAppearance = ({ adaptivePalette = [], getContrastText }) => {
           </div>
         </div>
       </div>
+
+      {isYesNoModalOpen && (
+        <ModalYesNoReusable
+          header="Apply Theme"
+          message="Are you sure you want to save and apply the current appearance settings?"
+          setYesNoModalOpen={setIsYesNoModalOpen}
+          triggerYesNoEvent={handleSave}
+          isLoading={isSavingTheme}
+        />
+      )}
+
+      {isSuccessModalOpen && (
+        <ModalSuccessNavToSelf
+          header="Theme Saved"
+          message="Appearance settings applied successfully."
+          setIsModalOpen={setIsSuccessModalOpen}
+          button="Accept"
+        />
+      )}
     </>
   );
 };
