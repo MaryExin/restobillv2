@@ -14,6 +14,8 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
   const [selectedDate, setSelectedDate] = useState("");
   const receiptRef = useRef(null); // Reference to the receipt for PDF export
 
+  console.log(localStorage.getItem("posTerminalNumber"));
+
   const {
     businessInfo,
     isLoading: isBusInfoLoading,
@@ -74,7 +76,7 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
         tin: businessInfo.tin || "",
         machineNumber: businessInfo.machineNumber || "",
         serialNumber: businessInfo.serialNumber || "",
-        terminalNumber: businessInfo.terminalNumber || "1",
+        terminalNumber: localStorage.getItem("posTerminalNumber") || "1",
         ptuNumber: businessInfo.posProviderPTUNo || "",
         ptuDateIssued: businessInfo.posProviderPTUDateIssued || "",
         reprintDateTime: displayData.reprintDateTime || "",
@@ -86,9 +88,9 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
         // posProviderAccreDateIssued: businessInfo.posProviderAccreDateIssued || "",
 
         vatExemption:
-          businessInfo.vatExemption ??
-          businessInfo.lessVatExemption ??
-          businessInfo.vatExemptVat ??
+          source.vatExemption ??
+          source.lessVatExemption ??
+          source.vatExemptVat ??
           0,
       };
 

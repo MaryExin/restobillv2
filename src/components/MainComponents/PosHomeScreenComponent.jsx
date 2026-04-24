@@ -13,7 +13,7 @@ const branchInfo = {
   userName: "Supervisor Admin",
   userRole: "Manager",
   shiftStatus: "Closed",
-  terminalNo: "1",
+  terminalNo: localStorage.getItem("posTerminalNumber") || "1",
   shiftNo: "14",
   openingDate: "Feb 25, 2026 07:53 AM",
   openedBy: "Supervisor Admin",
