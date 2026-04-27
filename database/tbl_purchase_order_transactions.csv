@@ -1,0 +1,1 @@
+AutoNum,transaction_id,Category_Code,Unit_Code,Project_Code,product_id,barcode,sku,item_name,unit_of_measure,quantity,unit_price,discount,amount,bill_to,ship_to,po_date,po_no,pr_no,pr_date,consignment,business_style,phone,department,memo,prepared_by,checked_by,approved_by,acknowledged_by,remarks,status

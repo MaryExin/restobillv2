@@ -1,0 +1,45 @@
+<?php
+
+class PrChargeDeductionController
+{
+    /**
+     * Added for PHP 8.2+ compatibility (avoid dynamic properties deprecation).
+     */
+    protected $gateway;
+    protected $user_id;
+
+
+    public function __construct($gateway, $user_id)
+    {
+        $this->gateway = $gateway;
+        $this->user_id = $user_id;
+    }
+
+    public function processviewRequest(string $method, $data): void
+    {
+
+        $data = (array) json_decode(file_get_contents("php://input"), true);
+        
+        if ($method == "POST") 
+        {
+
+            $this->gateway->viewDeductions($this->user_id, $data);  
+
+        }
+    }
+
+    public function processRequest(string $method, $data): void
+    {
+
+        $data = (array) json_decode(file_get_contents("php://input"), true);
+        
+        if ($method == "POST") 
+        {
+
+            $this->gateway->insertDeductions($this->user_id, $data);  
+
+        }
+    }
+
+}
+?>

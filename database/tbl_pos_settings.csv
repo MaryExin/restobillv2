@@ -1,0 +1,17 @@
+ID,category,description,value
+1,General,Maximize Window,False
+2,General,Enable Item Pictures,False
+3,General,Enable Reference / Table Numbers,True
+4,General,Enable Transaction Date,False
+5,General,Enable Dine-In / Take-Out,True
+6,General,Enable Special Instructions,True
+7,General,Enable Toggle for Zero Prices,False
+8,Receipt,Enable Company Name,True
+9,Receipt,Enable Business Unit Name,True
+10,Receipt,Enable Company Address,True
+11,Receipt,Enable TIN,True
+12,Receipt,Enable VAT-Exempt Sales,True
+14,Receipt,Show SKU,False
+15,Receipt,Template,Template 01
+16,General,Screen Type,Type A (Generic)
+17,General,Barcode Scanning,Type C (QR Code)

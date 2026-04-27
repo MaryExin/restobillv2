@@ -1,0 +1,15 @@
+AutoNum,transaction_type,transaction_type_description
+1,CV,Check Voucher
+2,JV,Journal Voucher
+3,PCV,Petty Cash Voucher
+4,SLS-COL,Sales Collection
+5,BIL-COL,Billing Collection
+6,SALES,Sales
+7,CONTR,Contract
+8,BIL,Billing
+9,PYL,Payroll
+10,COOP,Cooperative
+11,INV,Inventory
+12,DEP,Depreciation
+13,AMORT,Amortization
+14,POS,Point of Sales

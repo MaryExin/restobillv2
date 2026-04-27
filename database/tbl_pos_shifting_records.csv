@@ -1,0 +1,2 @@
+ID,Category_Code,Unit_Code,Shift_ID,terminal_number,Opening_User_ID,Opening_DateTime,Opening_Cash_Count,Closing_User_ID,Closing_DateTime,Closing_Cash_Count,Beg_OR,End_OR,Beg_VoidNo,End_VoidNo,Beg_RefundNo,End_RefundNo,Z_Counter_No,Grand_Accum_Sales,Shift_Status,Remarks,Status,Date_Recorded
+1,LIGHTERRA,BU-f84babace67a,1,1,2147483647,2026-04-26 18:20:23,5000,0,0000-00-00 00:00:00,0,0,0,0,0,0,0,0,0,Open,,Active,2026-04-26 18:20:23

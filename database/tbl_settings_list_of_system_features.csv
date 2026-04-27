@@ -1,0 +1,139 @@
+ID,system_order,system_module,category_order,category,feature_order,feature_description
+1,200000,Accounting System,100,Main Window,101,Main Window
+2,200000,Accounting System,100,Category A,102,Sub Window
+3,200000,Accounting System,200,Category B,201,Feature 01
+4,200000,Accounting System,300,Category C,301,Feature 02
+5,200000,Accounting System,400,Category D,401,Feature 03
+6,300000,Vouchering System,100,Main Window,101,Main Window
+7,300000,Vouchering System,100,Category A,102,Sub Window
+8,300000,Vouchering System,200,Category B,201,Feature 01
+9,300000,Vouchering System,300,Category C,301,Feature 02
+10,300000,Vouchering System,400,Category D,401,Feature 03
+11,400000,Sales and Collection,100,Main Window,101,Main Window
+12,400000,Sales and Collection,100,Category A,102,Sub Window
+13,400000,Sales and Collection,200,Category B,201,Feature 01
+14,400000,Sales and Collection,300,Category C,301,Feature 02
+15,400000,Sales and Collection,400,Category D,401,Feature 03
+16,500000,Billing and Collection,100,Main Window,101,Main Window
+17,500000,Billing and Collection,100,Category A,102,Sub Window
+18,500000,Billing and Collection,200,Category B,201,Feature 01
+19,500000,Billing and Collection,300,Category C,301,Feature 02
+20,500000,Billing and Collection,400,Category D,401,Feature 03
+21,600000,Inventory System,100,Main Window,101,Main Window
+22,600000,Inventory System,200,Product Masterlist,201,Add
+23,600000,Inventory System,200,Product Masterlist,202,Edit
+24,600000,Inventory System,200,Product Masterlist,203,View Details
+25,600000,Inventory System,200,Product Masterlist,204,Delete
+26,700000,Payroll System,100,Main Window,101,Main Window
+27,700000,Payroll System,100,Category A,102,Sub Window
+28,700000,Payroll System,200,Category B,201,Feature 01
+29,700000,Payroll System,300,Category C,301,Feature 02
+30,700000,Payroll System,400,Category D,401,Feature 03
+31,800000,Point of Sales,100,Main Window,101,Main Window
+32,800000,Point of Sales,200,Transactions,201,View
+33,800000,Point of Sales,200,Transactions,202,Add
+34,800000,Point of Sales,200,Transactions,203,Edit
+35,800000,Point of Sales,200,Transactions,204,Void
+36,900000,Fixed Assets Management,100,Main Window,101,Main Window
+37,900000,Fixed Assets Management,100,Category A,102,Sub Window
+38,900000,Fixed Assets Management,200,Category B,201,Feature 01
+39,900000,Fixed Assets Management,300,Category C,301,Feature 02
+40,900000,Fixed Assets Management,400,Category D,401,Feature 03
+44,200000,Accounting System,100,Category C,302,Sample Feature
+45,300000,Vouchering System,100,Category A,103,New Feature
+46,200000,Accounting System,100,Category A,103,Sub Window 2
+47,200000,Accounting System,100,Category A,104,Sub Window 3
+48,200000,Accounting System,100,Category A,105,Sub WIndow 4
+49,300000,Vouchering System,400,Category D,402,Feature 04
+50,100000,System Settings,100,Main Window,101,Main Window
+51,100000,System Settings,200,My Account,201,Update Password
+52,100000,System Settings,300,Preferences,301,Change Theme
+53,100000,System Settings,700,Projects,701,View
+54,100000,System Settings,700,Projects,702,Add
+55,100000,System Settings,700,Projects,703,Edit
+56,100000,System Settings,700,Projects,704,Delete
+57,100000,System Settings,900,Account Class,901,View
+58,100000,System Settings,900,Account Class,902,Add
+59,100000,System Settings,900,Account Class,903,Edit
+60,100000,System Settings,900,Account Class,904,Delete
+61,100000,System Settings,400,User Accounts,401,View
+62,100000,System Settings,400,User Accounts,402,Add
+63,100000,System Settings,400,User Accounts,403,Edit
+64,100000,System Settings,400,User Accounts,404,Delete
+65,100000,System Settings,400,User Accounts,406,View Credentials
+66,100000,System Settings,400,User Accounts,407,Assign Credentials
+67,100000,System Settings,500,Chart of Accounts,501,View
+68,100000,System Settings,500,Chart of Accounts,502,Add
+69,100000,System Settings,500,Chart of Accounts,503,Edit
+70,100000,System Settings,500,Chart of Accounts,504,Delete
+71,100000,System Settings,600,Supplier List,601,View
+72,100000,System Settings,600,Supplier List,602,Add
+73,100000,System Settings,600,Supplier List,603,Edit
+74,100000,System Settings,600,Supplier List,604,Delete
+75,100000,System Settings,800,Cost Center,801,View
+76,100000,System Settings,800,Cost Center,802,Add
+77,100000,System Settings,800,Cost Center,803,Edit
+78,100000,System Settings,800,Cost Center,804,Delete
+79,100000,System Settings,400,User Accounts,405,Sample
+80,110000,School Management System,100,Main Window,101,Main Window
+81,120000,Cooperative Management System,100,Main Window,101,Main Window
+82,600000,Inventory System,100,Main Window,101,Main Window
+87,600000,Inventory System,200,Product Masterlist,205,Print
+88,600000,Inventory System,200,Product Masterlist,206,Export
+89,600000,Inventory System,200,Product Masterlist,207,Import
+90,600000,Inventory System,300,Inventory In,301,Add
+91,600000,Inventory System,300,Inventory In,302,Edit
+92,600000,Inventory System,300,Inventory In,303,Delete
+93,600000,Inventory System,300,Inventory In,304,Print
+94,600000,Inventory System,300,Inventory In,305,PO list
+95,600000,Inventory System,300,Inventory In,306,PO Select
+96,600000,Inventory System,400,Inventory Out,401,Add
+97,600000,Inventory System,400,Inventory Out,402,Edit
+98,600000,Inventory System,400,Inventory Out,403,Delete
+99,600000,Inventory System,400,Inventory Out,404,Print
+100,600000,Inventory System,400,Inventory Out,405,upload
+101,600000,Inventory System,400,Inventory Out,406,Import
+102,600000,Inventory System,500,Purchase Order,501,Add
+103,600000,Inventory System,500,Purchase Order,502,Edit
+104,600000,Inventory System,500,Purchase Order,503,Delete
+105,600000,Inventory System,500,Purchase Order,504,Print
+106,600000,Inventory System,500,Purchase Order,505,Upload
+107,600000,Inventory System,500,Purchase Order,506,Import
+108,600000,Inventory System,600,Customer Purchase Order,601,Add
+109,600000,Inventory System,600,Customer Purchase Order,602,Add New Customer
+110,600000,Inventory System,600,Customer Purchase Order,603,Edit
+111,600000,Inventory System,600,Customer Purchase Order,604,Delete
+112,600000,Inventory System,600,Customer Purchase Order,605,Print
+113,600000,Inventory System,600,Customer Purchase Order,606,Upload
+114,600000,Inventory System,600,Customer Purchase Order,607,Import
+115,600000,Inventory System,700,Preferences,701,Change Theme
+116,600000,Inventory System,500,Purchase Order,507,PO Approved
+117,600000,Inventory System,800,Purchase Request,801,Add
+118,600000,Inventory System,800,Purchase Request,802,Edit
+119,600000,Inventory System,800,Purchase Request,803,Delete
+120,600000,Inventory System,800,Purchase Request,804,Print
+121,600000,Inventory System,800,Purchase Request,805,Upload
+122,600000,Inventory System,800,Purchase Request,806,Import
+123,600000,Inventory System,800,Purchase Request,807,PR Approved
+124,600000,Inventory System,500,Purchase Order,508,PR List
+125,600000,Inventory System,500,Purchase Order,509,PR Select
+126,800000,Point of Sales,200,Transactions,205,Refund
+127,600000,Inventory System,200,Product Masterlist,208,Unit Price
+128,600000,Inventory System,200,Product Masterlist,209,Selling Price
+129,600000,Inventory System,200,Product Masterlist,210,Open Inventory
+130,600000,Inventory System,200,Product Masterlist,211,Close Inventory
+131,600000,Inventory System,200,Product Masterlist,212,View Item Transaction
+132,600000,Inventory System,900,Inventory Loss,901,Add
+133,600000,Inventory System,900,Inventory Loss,902,Edit
+134,600000,Inventory System,900,Inventory Loss,903,Delete
+135,600000,Inventory System,900,Inventory Loss,904,Print
+136,600000,Inventory System,1000,Product Masterlist History,1001,History
+137,600000,Inventory System,1000,Product Masterlist History,1002,History Export
+138,600000,Inventory System,1000,Product Masterlist History,1003,History Delete
+139,800000,Point of Sales,300,Product List,301,Add
+140,800000,Point of Sales,300,Product List,302,Edit
+141,800000,Point of Sales,300,Product List,303,Delete
+142,800000,Point of Sales,400,Reports,401,Perform X-Reading
+143,800000,Point of Sales,400,Reports,402,Perform Z-Reading
+144,800000,Point of Sales,200,Transactions,206,Open New Day
+145,800000,Point of Sales,200,Transactions,207,Discounts
