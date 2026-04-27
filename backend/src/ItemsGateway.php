@@ -1,0 +1,327 @@
+<?php
+
+class ItemsGateway
+{
+
+    private $conn;
+
+    public function __construct(Database $database)
+    {
+
+        $this->conn = $database->getConnection();
+
+    }
+
+    public function getAllData()
+    {
+
+        try {
+
+            $sql = "SELECT * FROM lkp_build_of_products Where deletestatus = 'Active' ORDER BY seq";
+
+            $stmt = $this->conn->prepare($sql);
+
+            $stmt->execute();
+
+            $data = [];
+
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+
+                $data[] = $row;
+
+            }
+
+            return $data;
+
+        } catch (Exception $e) {
+
+            echo json_encode(["message" => "Registration error"]);
+
+            exit;
+
+        }
+
+    }
+
+    public function getAllStockItemsData()
+    {
+
+        try {
+
+            $sql = "SELECT * FROM lkp_build_of_products
+            UNION
+            SELECT lkp_raw_mats.seq, lkp_raw_mats.mat_code, lkp_raw_mats.desc,
+            lkp_raw_mats.mat_qty, lkp_raw_mats.uomval, lkp_raw_mats.uom, lkp_raw_mats.cost_per_uom,
+            null, lkp_raw_mats.level, null, null, lkp_raw_mats.expiry_days, lkp_raw_mats.rawmats_parent,
+            lkp_raw_mats.deletestatus, lkp_raw_mats.usertracker, lkp_raw_mats.createdtime
+            FROM lkp_raw_mats
+            Where deletestatus = 'Active' ORDER BY `desc`";
+
+            $stmt = $this->conn->prepare($sql);
+
+            $stmt->execute();
+
+            $data = [];
+
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+
+                $data[] = $row;
+
+            }
+
+            return $data;
+
+        } catch (Exception $e) {
+
+            echo json_encode(["message" => "Registration error"]);
+
+            exit;
+
+        }
+
+    }
+
+    public function getbyPageData($pageIndex, $pageData)
+    {
+
+        $sql = "SELECT * FROM lkp_employee_position Where deletestatus = 'Active' ORDER BY seq LIMIT $pageIndex, $pageData";
+
+        $stmt = $this->conn->prepare($sql);
+
+        $stmt->execute();
+
+        $data = [];
+
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+
+            $data[] = $row;
+
+        }
+
+        return $data;
+
+    }
+
+    public function getForUser($user_id, $id): array
+    {
+
+        $sql = "SELECT *
+
+
+
+                FROM tbl_tasks
+
+
+
+                WHERE id = :id
+
+
+
+                AND user_id = :user_id";
+
+        $stmt = $this->conn->prepare($sql);
+
+        $stmt->bindValue(":id", $id, PDO::PARAM_INT);
+
+        $stmt->bindValue(":user_id", $user_id, PDO::PARAM_INT);
+
+        $stmt->execute();
+
+        $data = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($data !== false) {
+
+            $data['is_completed'] = (bool) $data['is_completed'];
+
+        }
+
+        return $data;
+
+    }
+
+    public function createForUser($user_id, $data)
+    {
+
+        $sql = "INSERT INTO lkp_employee_position ()
+
+
+
+                VALUES (default, CONCAT('EP-',ShortUUID()),:empposition_name, 'Active', :user_tracker, DATE_ADD(NOW(), INTERVAL 8 HOUR))";
+
+        $stmt = $this->conn->prepare($sql);
+
+        $stmt->bindValue(":empposition_name", $data["empposition_name"], PDO::PARAM_STR);
+
+        $stmt->bindValue(":user_tracker", $user_id, PDO::PARAM_STR);
+
+        $stmt->execute();
+
+        echo json_encode(["message" => "Success"]);
+
+    }
+
+    public function rejectemployeepositions($user_id, string $id)
+    {
+
+        $sql = "UPDATE lkp_employee_position
+
+                SET
+
+                    deletestatus = 'Inactive',
+
+                    usertracker  = :usertracker
+
+                WHERE
+
+                      empposition_code   = :id";
+
+        $stmt = $this->conn->prepare($sql);
+
+        $stmt->bindValue(":id", $id, PDO::PARAM_STR);
+
+        $stmt->bindValue(":usertracker", $user_id, PDO::PARAM_STR);
+
+        $stmt->execute();
+
+        return $stmt->rowCount();
+
+    }
+
+    public function editemployeeposition($user_id, $id)
+    {
+
+        $emppositoncode = $id["empposition_code"];
+
+        $emppositonid = join($emppositoncode);
+
+        $sql = "UPDATE lkp_employee_position
+
+                SET
+
+                    empposition_name   = :empposition_name ,
+
+                    usertracker  = :usertracker
+
+                WHERE
+
+                      empposition_code   = :id";
+
+        $stmt = $this->conn->prepare($sql);
+
+        $stmt->bindValue(":empposition_name", $id["empposition_name"], PDO::PARAM_STR);
+
+        $stmt->bindValue(":usertracker", $user_id, PDO::PARAM_STR);
+
+        $stmt->bindValue(":id", $emppositonid, PDO::PARAM_STR);
+
+        $stmt->execute();
+
+        return $stmt->rowCount();
+
+    }
+
+    public function updateForUser(int $user_id, string $id, array $data): int
+    {
+
+        $fields = [];
+
+        if (!empty($data["name"])) {
+
+            $fields["name"] = [
+
+                $data["name"],
+
+                PDO::PARAM_STR,
+
+            ];
+
+        }
+
+        if (array_key_exists("priority", $data)) {
+
+            $fields["priority"] = [
+
+                $data["priority"],
+
+                $data["priority"] === null ? PDO::PARAM_NULL : PDO::PARAM_INT,
+
+            ];
+
+        }
+
+        if (array_key_exists("is_completed", $data)) {
+
+            $fields["is_completed"] = [
+
+                $data["is_completed"],
+
+                PDO::PARAM_BOOL,
+
+            ];
+
+        }
+
+        if (empty($fields)) {
+
+            return 0;
+
+        } else {
+
+            $sets = array_map(function ($value) {
+
+                return "$value = :$value";
+
+            }, array_keys($fields));
+
+            $sql = "UPDATE tbl_tasks"
+
+            . " SET " . implode(", ", $sets)
+
+                . " WHERE id = :id"
+
+                . " AND user_id = :user_id";
+
+            $stmt = $this->conn->prepare($sql);
+
+            $stmt->bindValue(":id", $id, PDO::PARAM_INT);
+
+            $stmt->bindValue(":user_id", $user_id, PDO::PARAM_INT);
+
+            foreach ($fields as $name => $values) {
+
+                $stmt->bindValue(":$name", $values[0], $values[1]);
+
+            }
+
+            $stmt->execute();
+
+            return $stmt->rowCount();
+
+        }
+
+    }
+
+    public function deletedataWithIds($ids)
+    {
+
+        foreach ($ids as $id) {
+
+            $sql = "DELETE FROM tbl_sales
+
+
+
+                WHERE uuid = :id";
+
+            $stmt = $this->conn->prepare($sql);
+
+            $stmt->bindValue(":id", $id, PDO::PARAM_STR);
+
+            $stmt->execute();
+
+        }
+
+        return $stmt->rowCount();
+
+    }
+
+}

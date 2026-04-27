@@ -1,0 +1,8 @@
+seq,product_id,category_code,unit_code,inventory_type,item_category,item_name,item_description,unit_of_measure,item_color,item_brand,item_variant,item_size,unit_cost,selling_price,vatable,bar_code,sku,isDiscountable,beginning_inventory,actual_count,remaining_count,variance,safety_stock,reordering_point,status
+1,BD-c9879cae9255,LIGHTERRA,BU-f84babace67a,ALL,MAINS,AZURE CREAM TRUFFLE PASTA,AZURE CREAM TRUFFLE PASTA,PLATE,,BR-eea59c756cb4,,,50,173,Yes,,,Yes,0,0,0,,0,0,Active
+2,BD-83ee9667927c,LIGHTERRA,BU-f84babace67a,ALL,BEVERAGES,COFFEE,COFFEE,CUP,,BR-eea59c756cb4,,,20,139,Yes,,,Yes,0,0,0,,0,0,Active
+3,BD-f236abac96b7,LIGHTERRA,BU-f84babace67a,ALL,BEVERAGES,COKE,COKE,CAN,,BR-eea59c756cb4,,,5,18,No,,,Yes,0,0,0,,0,0,Active
+4,BD-a98bf479d327,LIGHTERRA,BU-f84babace67a,ALL,DESSERTS,GOLDEN MIDNIGHT CHEESECAKE,GOLDEN MIDNIGHT CHEESECAKE,SLICE,,BR-eea59c756cb4,,,80,231,Yes,,,Yes,0,0,0,,0,0,Active
+5,BD-c655442743fc,LIGHTERRA,BU-f84babace67a,ALL,MAINS,LIGHTERRA GOLD FLAME BURGER,LIGHTERRA GOLD FLAME BURGER,PC,,BR-eea59c756cb4,,,100,404,Yes,,,Yes,0,0,0,,0,0,Active
+6,BD-459b634148d0,LIGHTERRA,BU-f84babace67a,ALL,MAINS,MIDNIGHT GOLD STEAK PLATE,MIDNIGHT GOLD STEAK PLATE,PLATE,,BR-eea59c756cb4,,,350,1155,Yes,,,Yes,0,0,0,,0,0,Active
+7,BD-9242de8dd081,LIGHTERRA,BU-f84babace67a,ALL,BEVERAGES,SAPPHIRE CITRUS COOLER,SAPPHIRE CITRUS COOLER,CUP,,BR-eea59c756cb4,,,30,116,Yes,,,Yes,0,0,0,,0,0,Active

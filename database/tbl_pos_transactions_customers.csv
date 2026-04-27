@@ -1,0 +1,5 @@
+ID,transaction_id,Category_Code,Unit_Code,Project_Code,transaction_date,customer_id
+1,1000000002,LIGHTERRA,BU-f84babace67a,,2026-04-26,1
+2,1000000002,LIGHTERRA,BU-f84babace67a,,2026-04-26,2
+3,1000000001,LIGHTERRA,BU-f84babace67a,,2026-04-26,1
+4,1000000001,LIGHTERRA,BU-f84babace67a,,2026-04-26,2

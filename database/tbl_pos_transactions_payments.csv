@@ -1,0 +1,4 @@
+ID,transaction_id,Category_Code,Unit_Code,Project_Code,transaction_date,payment_method,payment_amount,payment_reference
+1,1000000003,LIGHTERRA,BU-f84babace67a,,2026-04-26,Cash,1070,
+2,1000000002,LIGHTERRA,BU-f84babace67a,,2026-04-26,Cash,2160,
+3,1000000001,LIGHTERRA,BU-f84babace67a,,2026-04-26,Cash,1713.8571428571,

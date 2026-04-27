@@ -1,0 +1,1 @@
+AutoNum,transaction_id,beginning_date,ending_date,Category_Code,Unit_Code,product_id,item_category,barcode,sku,item_name,unit_of_measure,unit_price,selling_price,beginning_inventory,total_in,item_return,item_repair,total_out,sponsorship,freebies,assorted,portioning,item_usage,sales,item_damage,item_spoilage,item_expired,ending_inventory,actual_count,variance,prepared_by,status

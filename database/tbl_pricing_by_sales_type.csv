@@ -1,0 +1,4 @@
+seq,busunitcode,sales_type_id,pricing_category,deletestatus,usertracker,createdtime
+1,BU-f84babace67a,ST-36d8565b11d5,PC-208c7db6414d,Active,202602461836,2026-04-26 10:15:39
+2,BU-f84babace67a,ST-7e22b48a282d,PC-23664751414d,Active,202602461836,2026-04-26 10:15:39
+3,BU-f84babace67a,ST-ed02eb98496b,PC-26ab532c414d,Active,202602461836,2026-04-26 10:15:39
