@@ -1,0 +1,10 @@
+ID,ATC,Title,Description,Percentage
+1,WC158,Goods,Income payment made by top withholding agents to their local/resident supplier of goods other than those covered by other rates of withholding tax,1
+2,WC120,Contractors,Income payments to certain contractors,2
+3,WC160,Services,Income payment made by top withholding agents to their local/resident supplier of services other than those covered by other rates of withholding tax,2
+4,WI010,Professional fees < 3M,"Professional fees (Lawyers, CPA's, Engineers, etc.)- if the gross income for the current year did not exceed 3M",2
+5,WI515,Commissions,"Commissions, rebates, discounts and other similar considerations paid/granted to independent and/or exclusive sales representatives and marketing agents and sub-agents of companies, including multi-level marketing companies.",5
+6,WC100,Rentals,"Rentals: On gross rental or lease for the continued use or possession of personal property in excess of Ten thousand pesos (P 10,000) annually and real property used in business which the payor or obligor has not taken title or is not taking title, or in which has no equity; poles, satellites, transmission facilities and billboards.",5
+7,WI140,Gross commission or service fee,"EWT on gross commission or service fees of custom, insurance, stock, real estate , immigration and commercial brokers & fees of agents.",10
+8,WI011,Professional fees > 3M,"Professional fees (Lawyers, CPA's, Engineers, etc.) - if gross income is more than 3M or VAT registered regardless of amount",10
+9,WC250,Royalty payments,"All kinds of royalty payments to citizens, resident aliens and NRAETB (other than WI380 and WI341), domestic and resident foreign corporations",20

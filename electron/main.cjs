@@ -1,6 +1,8 @@
 const { app, BrowserWindow, ipcMain, protocol, session } = require("electron");
 
+const { spawn } = require("child_process");
 const net = require("net");
+const os = require("os");
 function getSerialPort() {
   return require("serialport").SerialPort;
 }
@@ -162,6 +164,38 @@ function writeJsonFileSafe(filePath, data) {
   }
 }
 
+function stripWindowsPrinterPrefix(value = "") {
+  const raw = String(value || "").trim();
+  const lower = raw.toLowerCase();
+  const prefixes = ["windows:", "win:", "system:", "spooler:", "printer:"];
+
+  for (const prefix of prefixes) {
+    if (lower.startsWith(prefix)) {
+      return raw.slice(prefix.length).trim();
+    }
+  }
+
+  return raw;
+}
+
+function isEscposConnectionText(value = "") {
+  const raw = String(value || "").trim();
+  const lower = raw.toLowerCase();
+
+  return (
+    lower.startsWith("network:") ||
+    lower.startsWith("bt:") ||
+    lower.startsWith("usb:") ||
+    lower === "usb" ||
+    /^(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?$/.test(raw)
+  );
+}
+
+function normalizeSystemPrinterName(value = "") {
+  const raw = stripWindowsPrinterPrefix(value);
+  return isEscposConnectionText(raw) ? "" : raw;
+}
+
 function normalizeBusinessInfo(payload = {}) {
   return {
     companyName: String(payload?.companyName || "").trim(),
@@ -208,10 +242,14 @@ function createBusinessInfoBackup(data) {
   }
 }
 
-function getDefaultPrinterNameFromFile() {
+function getConfiguredPrinterTextFromFile() {
   const printerPath = getPrinterFilePath();
   console.log("Reading printer.txt from:", printerPath);
   return readTextFileSafe(printerPath);
+}
+
+function getDefaultPrinterNameFromFile() {
+  return normalizeSystemPrinterName(getConfiguredPrinterTextFromFile());
 }
 
 function mapPrinterInfo(printer) {
@@ -229,6 +267,37 @@ async function getPrintersFromWindow(targetWindow) {
   if (!targetWindow || targetWindow.isDestroyed()) return [];
   const printers = await targetWindow.webContents.getPrintersAsync();
   return Array.isArray(printers) ? printers : [];
+}
+
+async function resolveWindowsPrinterName(preferredPrinterName = "") {
+  const candidates = [
+    normalizeSystemPrinterName(preferredPrinterName),
+    getDefaultPrinterNameFromFile(),
+  ].filter(Boolean);
+
+  let printers = [];
+  try {
+    const targetWindow = BrowserWindow.getFocusedWindow() || win;
+    printers = await getPrintersFromWindow(targetWindow);
+  } catch (error) {
+    console.error("Failed to resolve Windows printer list:", error);
+  }
+
+  for (const candidate of candidates) {
+    const matchedPrinter = printers.find(
+      (printer) =>
+        String(printer?.name || "").trim() === String(candidate || "").trim(),
+    );
+
+    if (matchedPrinter?.name) {
+      return matchedPrinter.name;
+    }
+  }
+
+  const defaultPrinter = printers.find((printer) => printer?.isDefault);
+  if (defaultPrinter?.name) return defaultPrinter.name;
+
+  return candidates[0] || "";
 }
 
 async function waitForReceiptLayout(targetWindow) {
@@ -928,6 +997,387 @@ function buildZReadingEscposBuffer(data = {}) {
   return Buffer.concat(chunks);
 }
 
+function getEscposUsbAdapter() {
+  return require("escpos-usb");
+}
+
+function formatUsbTarget(vendorId, productId) {
+  if (vendorId === null || vendorId === undefined) return "first USB printer";
+
+  const toHex = (value) =>
+    `0x${Number(value || 0)
+      .toString(16)
+      .padStart(4, "0")}`;
+
+  return `${toHex(vendorId)}:${toHex(productId)}`;
+}
+
+function closeEscposUsbDevice(device) {
+  return new Promise((resolve) => {
+    if (!device) return resolve();
+
+    try {
+      device.close(() => resolve());
+    } catch {
+      resolve();
+    }
+  });
+}
+
+function writeBufferToEscposUsb({
+  vendorId = null,
+  productId = null,
+  buffer,
+  timeout = 7000,
+}) {
+  return new Promise((resolve) => {
+    let device = null;
+    let finished = false;
+
+    const target = formatUsbTarget(vendorId, productId);
+    const timer = setTimeout(() => {
+      done({
+        success: false,
+        type: "usb",
+        message: `USB printer write timed out (${target}).`,
+        vendorId,
+        productId,
+      });
+    }, timeout);
+
+    const done = async (result) => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      await closeEscposUsbDevice(device);
+      resolve(result);
+    };
+
+    try {
+      const USB = getEscposUsbAdapter();
+      device =
+        vendorId !== null && productId !== null
+          ? new USB(vendorId, productId)
+          : new USB();
+
+      device.open((openErr) => {
+        if (openErr) {
+          return done({
+            success: false,
+            type: "usb",
+            message: `Cannot open USB ESC/POS printer (${target}).`,
+            error: openErr.message,
+            vendorId,
+            productId,
+          });
+        }
+
+        device.write(buffer, (writeErr) => {
+          if (writeErr) {
+            return done({
+              success: false,
+              type: "usb",
+              message: `USB ESC/POS print write failed (${target}).`,
+              error: writeErr.message,
+              vendorId,
+              productId,
+            });
+          }
+
+          return done({
+            success: true,
+            type: "usb",
+            message: `Printed successfully via USB ESC/POS (${target}).`,
+            vendorId,
+            productId,
+          });
+        });
+      });
+    } catch (error) {
+      return done({
+        success: false,
+        type: "usb",
+        message: `USB ESC/POS print failed (${target}).`,
+        error: error.message,
+        vendorId,
+        productId,
+      });
+    }
+  });
+}
+
+function checkEscposUsbConnection(vendorId = null, productId = null) {
+  return writeBufferToEscposUsb({
+    vendorId,
+    productId,
+    buffer: Buffer.from([0x1b, 0x40]),
+    timeout: 5000,
+  }).then((result) => ({
+    ...result,
+    message: result.success
+      ? `USB ESC/POS printer reachable (${formatUsbTarget(vendorId, productId)}).`
+      : result.message,
+  }));
+}
+
+const WINDOWS_RAW_PRINT_SCRIPT = `
+$ErrorActionPreference = "Stop"
+
+$printerName = $env:RAW_PRINT_PRINTER
+$filePath = $env:RAW_PRINT_FILE
+
+if ([string]::IsNullOrWhiteSpace($printerName)) {
+  throw "RAW_PRINT_PRINTER is empty."
+}
+
+if ([string]::IsNullOrWhiteSpace($filePath) -or -not (Test-Path -LiteralPath $filePath)) {
+  throw "Raw print file not found: $filePath"
+}
+
+Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+
+public class RawPrinterHelper {
+  [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+  public class DOCINFOA {
+    [MarshalAs(UnmanagedType.LPStr)]
+    public string pDocName;
+    [MarshalAs(UnmanagedType.LPStr)]
+    public string pOutputFile;
+    [MarshalAs(UnmanagedType.LPStr)]
+    public string pDataType;
+  }
+
+  [DllImport("winspool.Drv", EntryPoint = "OpenPrinterA", SetLastError = true, CharSet = CharSet.Ansi, ExactSpelling = true, CallingConvention = CallingConvention.StdCall)]
+  public static extern bool OpenPrinter(string szPrinter, out IntPtr hPrinter, IntPtr pd);
+
+  [DllImport("winspool.Drv", EntryPoint = "ClosePrinter", SetLastError = true, ExactSpelling = true, CallingConvention = CallingConvention.StdCall)]
+  public static extern bool ClosePrinter(IntPtr hPrinter);
+
+  [DllImport("winspool.Drv", EntryPoint = "StartDocPrinterA", SetLastError = true, CharSet = CharSet.Ansi, ExactSpelling = true, CallingConvention = CallingConvention.StdCall)]
+  public static extern bool StartDocPrinter(IntPtr hPrinter, Int32 level, [In, MarshalAs(UnmanagedType.LPStruct)] DOCINFOA di);
+
+  [DllImport("winspool.Drv", EntryPoint = "EndDocPrinter", SetLastError = true, ExactSpelling = true, CallingConvention = CallingConvention.StdCall)]
+  public static extern bool EndDocPrinter(IntPtr hPrinter);
+
+  [DllImport("winspool.Drv", EntryPoint = "StartPagePrinter", SetLastError = true, ExactSpelling = true, CallingConvention = CallingConvention.StdCall)]
+  public static extern bool StartPagePrinter(IntPtr hPrinter);
+
+  [DllImport("winspool.Drv", EntryPoint = "EndPagePrinter", SetLastError = true, ExactSpelling = true, CallingConvention = CallingConvention.StdCall)]
+  public static extern bool EndPagePrinter(IntPtr hPrinter);
+
+  [DllImport("winspool.Drv", EntryPoint = "WritePrinter", SetLastError = true, ExactSpelling = true, CallingConvention = CallingConvention.StdCall)]
+  public static extern bool WritePrinter(IntPtr hPrinter, IntPtr pBytes, Int32 dwCount, out Int32 dwWritten);
+
+  public static void SendBytes(string printerName, byte[] bytes) {
+    IntPtr hPrinter;
+
+    if (!OpenPrinter(printerName.Normalize(), out hPrinter, IntPtr.Zero)) {
+      throw new Exception("OpenPrinter failed: " + Marshal.GetLastWin32Error());
+    }
+
+    DOCINFOA di = new DOCINFOA();
+    di.pDocName = "ESC/POS Receipt";
+    di.pDataType = "RAW";
+
+    IntPtr pUnmanagedBytes = IntPtr.Zero;
+
+    try {
+      if (!StartDocPrinter(hPrinter, 1, di)) {
+        throw new Exception("StartDocPrinter failed: " + Marshal.GetLastWin32Error());
+      }
+
+      try {
+        if (!StartPagePrinter(hPrinter)) {
+          throw new Exception("StartPagePrinter failed: " + Marshal.GetLastWin32Error());
+        }
+
+        pUnmanagedBytes = Marshal.AllocCoTaskMem(bytes.Length);
+        Marshal.Copy(bytes, 0, pUnmanagedBytes, bytes.Length);
+
+        Int32 dwWritten = 0;
+        if (!WritePrinter(hPrinter, pUnmanagedBytes, bytes.Length, out dwWritten)) {
+          throw new Exception("WritePrinter failed: " + Marshal.GetLastWin32Error());
+        }
+
+        if (dwWritten != bytes.Length) {
+          throw new Exception("Only wrote " + dwWritten + " of " + bytes.Length + " bytes.");
+        }
+
+        EndPagePrinter(hPrinter);
+      } finally {
+        EndDocPrinter(hPrinter);
+      }
+    } finally {
+      if (pUnmanagedBytes != IntPtr.Zero) {
+        Marshal.FreeCoTaskMem(pUnmanagedBytes);
+      }
+
+      ClosePrinter(hPrinter);
+    }
+  }
+}
+"@
+
+[byte[]]$bytes = [System.IO.File]::ReadAllBytes($filePath)
+[RawPrinterHelper]::SendBytes($printerName, $bytes)
+`;
+
+const WINDOWS_RAW_PRINT_ENCODED_COMMAND = Buffer.from(
+  WINDOWS_RAW_PRINT_SCRIPT,
+  "utf16le",
+).toString("base64");
+
+function writeBufferToWindowsRawPrinter({
+  printerName,
+  buffer,
+  timeout = 20000,
+}) {
+  return new Promise((resolve) => {
+    const rawPrinterName = normalizeSystemPrinterName(printerName);
+
+    if (process.platform !== "win32") {
+      return resolve({
+        success: false,
+        type: "windows-raw",
+        message: "Windows RAW printer fallback is only available on Windows.",
+      });
+    }
+
+    if (!rawPrinterName) {
+      return resolve({
+        success: false,
+        type: "windows-raw",
+        message: "No Windows printer name is available for USB fallback.",
+      });
+    }
+
+    if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
+      return resolve({
+        success: false,
+        type: "windows-raw",
+        message: "No ESC/POS data was provided for Windows RAW printing.",
+      });
+    }
+
+    const tempDir = (() => {
+      try {
+        return app.getPath("temp");
+      } catch {
+        return os.tmpdir();
+      }
+    })();
+    const rawFilePath = path.join(
+      tempDir,
+      `restobill-escpos-${process.pid}-${Date.now()}.bin`,
+    );
+
+    let child = null;
+    let finished = false;
+    let stdout = "";
+    let stderr = "";
+
+    const cleanup = () => {
+      try {
+        fs.unlinkSync(rawFilePath);
+      } catch {}
+    };
+
+    const done = (result) => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      cleanup();
+      resolve(result);
+    };
+
+    const timer = setTimeout(() => {
+      try {
+        child?.kill();
+      } catch {}
+
+      done({
+        success: false,
+        type: "windows-raw",
+        printerName: rawPrinterName,
+        message: `Windows RAW print timed out (${rawPrinterName}).`,
+      });
+    }, timeout);
+
+    try {
+      fs.writeFileSync(rawFilePath, buffer);
+
+      child = spawn(
+        "powershell.exe",
+        [
+          "-NoProfile",
+          "-NonInteractive",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-EncodedCommand",
+          WINDOWS_RAW_PRINT_ENCODED_COMMAND,
+        ],
+        {
+          windowsHide: true,
+          env: {
+            ...process.env,
+            RAW_PRINT_FILE: rawFilePath,
+            RAW_PRINT_PRINTER: rawPrinterName,
+          },
+        },
+      );
+
+      child.stdout.on("data", (chunk) => {
+        stdout += chunk.toString();
+      });
+
+      child.stderr.on("data", (chunk) => {
+        stderr += chunk.toString();
+      });
+
+      child.on("error", (error) => {
+        done({
+          success: false,
+          type: "windows-raw",
+          printerName: rawPrinterName,
+          message: `Windows RAW print failed (${rawPrinterName}).`,
+          error: error.message,
+        });
+      });
+
+      child.on("close", (code) => {
+        if (code === 0) {
+          return done({
+            success: true,
+            type: "windows-raw",
+            printerName: rawPrinterName,
+            message: `Printed successfully via Windows USB printer (${rawPrinterName}).`,
+          });
+        }
+
+        return done({
+          success: false,
+          type: "windows-raw",
+          printerName: rawPrinterName,
+          message:
+            stderr.trim() ||
+            stdout.trim() ||
+            `Windows RAW print failed with exit code ${code}.`,
+        });
+      });
+    } catch (error) {
+      return done({
+        success: false,
+        type: "windows-raw",
+        printerName: rawPrinterName,
+        message: `Windows RAW print failed (${rawPrinterName}).`,
+        error: error.message,
+      });
+    }
+  });
+}
+
 function writeBufferToEscposTcp({ host, port = 9100, buffer, timeout = 5000 }) {
   return new Promise((resolve) => {
     const client = new net.Socket();
@@ -982,10 +1432,29 @@ function writeBufferToEscposTcp({ host, port = 9100, buffer, timeout = 5000 }) {
   });
 }
 
+function parseEscposUsbId(value = "") {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+
+  if (/^0x[0-9a-f]+$/i.test(raw)) {
+    return parseInt(raw, 16);
+  }
+
+  if (/^[0-9a-f]+$/i.test(raw) && /[a-f]/i.test(raw)) {
+    return parseInt(raw, 16);
+  }
+
+  const numeric = Number(raw);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
 // printer.txt rules:
-//   192.168.100.83  -> WiFi/network printer on port 9100
-//   bt:COM3         -> Bluetooth serial printer on COM3
-//   network:192.168.100.83:9100 is also supported
+//   192.168.100.83              -> WiFi/network printer on port 9100
+//   network:192.168.100.83:9100 -> WiFi/network printer with explicit port
+//   bt:COM3                     -> Bluetooth serial printer on COM3
+//   usb:auto                    -> first USB ESC/POS printer discovered
+//   usb:VID=0x0483,PID=0x070b   -> USB ESC/POS printer by vendor/product ID
+//   windows:POS-80C             -> Windows-installed USB printer queue
 function parsePrinterConnection(value = "") {
   const raw = String(value || "").trim();
 
@@ -994,6 +1463,39 @@ function parsePrinterConnection(value = "") {
       type: "network",
       host: "192.168.100.83",
       port: 9100,
+    };
+  }
+
+  const lower = raw.toLowerCase();
+
+  if (lower === "usb") {
+    return {
+      type: "usb",
+      vendorId: null,
+      productId: null,
+    };
+  }
+
+  const prefixedWindowsPrinterName = [
+    "windows:",
+    "win:",
+    "system:",
+    "spooler:",
+    "printer:",
+  ].find((prefix) => lower.startsWith(prefix));
+
+  if (prefixedWindowsPrinterName) {
+    const printerName = raw.slice(prefixedWindowsPrinterName.length).trim();
+
+    if (!printerName) {
+      throw new Error(
+        "Invalid Windows printer format. Example: windows:POS-80C",
+      );
+    }
+
+    return {
+      type: "windows-raw",
+      printerName,
     };
   }
 
@@ -1025,17 +1527,33 @@ function parsePrinterConnection(value = "") {
   if (raw.toLowerCase().startsWith("usb:")) {
     const payload = raw.slice("usb:".length).trim();
 
+    if (!payload || ["auto", "default", "first"].includes(payload.toLowerCase())) {
+      return {
+        type: "usb",
+        vendorId: null,
+        productId: null,
+      };
+    }
+
     const vidMatch = payload.match(/VID\s*=\s*(0x[0-9a-f]+|\d+)/i);
     const pidMatch = payload.match(/PID\s*=\s*(0x[0-9a-f]+|\d+)/i);
+    const pairMatch = payload.match(
+      /^\s*(0x[0-9a-f]+|[0-9a-f]+)\s*[:/,]\s*(0x[0-9a-f]+|[0-9a-f]+)\s*$/i,
+    );
 
-    if (!vidMatch || !pidMatch) {
-      throw new Error("Invalid USB format. Example: usb:VID=0x0483,PID=0x070b");
+    const vendorId = parseEscposUsbId(vidMatch?.[1] || pairMatch?.[1]);
+    const productId = parseEscposUsbId(pidMatch?.[1] || pairMatch?.[2]);
+
+    if (vendorId === null || productId === null) {
+      throw new Error(
+        "Invalid USB format. Example: usb:VID=0x0483,PID=0x070b or usb:auto",
+      );
     }
 
     return {
       type: "usb",
-      vendorId: Number(vidMatch[1]),
-      productId: Number(pidMatch[1]),
+      vendorId,
+      productId,
     };
   }
 
@@ -1095,16 +1613,6 @@ function checkEscposNetworkConnection(host, port = 9100, timeout = 5000) {
 
     client.connect(port, host);
   });
-}
-
-function checkEscposUsbConnection(vendorId, productId) {
-  return {
-    success: false,
-    type: "usb",
-    message: "USB printer checking is not enabled in this merged main.cjs. Use WiFi or Bluetooth.",
-    vendorId,
-    productId,
-  };
 }
 
 function checkEscposBluetoothConnection(portName, baudRate = 9600) {
@@ -1259,9 +1767,7 @@ function writeBufferToEscposBluetooth(portName, buffer, baudRate = 9600) {
   });
 }
 
-async function writeEscposBuffer(buffer) {
-  const config = getPrinterConnectionConfig();
-
+async function writeEscposBufferToConfiguredTarget(config, buffer, options = {}) {
   if (config.type === "bluetooth") {
     return await writeBufferToEscposBluetooth(
       config.portName,
@@ -1271,11 +1777,21 @@ async function writeEscposBuffer(buffer) {
   }
 
   if (config.type === "usb") {
-    return {
-      success: false,
-      type: "usb",
-      message: "USB printing is not enabled in this merged main.cjs. Use printer.txt = 192.168.100.83 for WiFi or bt:COM3 for Bluetooth.",
-    };
+    return await writeBufferToEscposUsb({
+      vendorId: config.vendorId,
+      productId: config.productId,
+      buffer,
+    });
+  }
+
+  if (config.type === "windows-raw") {
+    const printerName = await resolveWindowsPrinterName(
+      config.printerName || options.printerName,
+    );
+    return await writeBufferToWindowsRawPrinter({
+      printerName,
+      buffer,
+    });
   }
 
   return await writeBufferToEscposTcp({
@@ -1283,6 +1799,156 @@ async function writeEscposBuffer(buffer) {
     port: config.port,
     buffer,
   });
+}
+
+function formatPrintAttempt(label, result) {
+  return `${label}: ${result?.message || result?.error || "failed"}`;
+}
+
+function buildPrintFailureMessage(primaryResult, fallbackResults) {
+  const messages = [
+    formatPrintAttempt("Primary ESC/POS", primaryResult),
+    ...fallbackResults.map((result) => formatPrintAttempt("Fallback", result)),
+  ];
+
+  return messages.join(" | ");
+}
+
+async function writeEscposBuffer(buffer, options = {}) {
+  const config = getPrinterConnectionConfig();
+  const fallbackResults = [];
+  const primaryResult = await writeEscposBufferToConfiguredTarget(
+    config,
+    buffer,
+    options,
+  );
+
+  if (primaryResult?.success) return primaryResult;
+
+  if (config.type !== "usb" && options.tryUsbFallback !== false) {
+    const usbResult = await writeBufferToEscposUsb({ buffer });
+
+    if (usbResult?.success) {
+      return {
+        ...usbResult,
+        fallback: true,
+        primaryType: config.type,
+        primaryMessage: primaryResult?.message || "",
+      };
+    }
+
+    fallbackResults.push(usbResult);
+  }
+
+  if (options.tryWindowsFallback !== false) {
+    const printerName = await resolveWindowsPrinterName(options.printerName);
+    const windowsResult = await writeBufferToWindowsRawPrinter({
+      printerName,
+      buffer,
+    });
+
+    if (windowsResult?.success) {
+      return {
+        ...windowsResult,
+        fallback: true,
+        primaryType: config.type,
+        primaryMessage: primaryResult?.message || "",
+      };
+    }
+
+    fallbackResults.push(windowsResult);
+  }
+
+  return {
+    ...primaryResult,
+    success: false,
+    message: buildPrintFailureMessage(primaryResult, fallbackResults),
+    fallbackResults,
+  };
+}
+
+async function checkWindowsRawPrinterConnection(preferredPrinterName = "") {
+  const printerName = await resolveWindowsPrinterName(preferredPrinterName);
+
+  if (!printerName) {
+    return {
+      success: false,
+      type: "windows-raw",
+      message: "No Windows printer queue is available for USB fallback.",
+    };
+  }
+
+  return {
+    success: true,
+    type: "windows-raw",
+    printerName,
+    message: `Windows USB printer fallback is available (${printerName}).`,
+  };
+}
+
+async function checkConfiguredEscposConnection(config) {
+  if (config.type === "bluetooth") {
+    return await checkEscposBluetoothConnection(
+      config.portName,
+      config.baudRate,
+    );
+  }
+
+  if (config.type === "usb") {
+    return await checkEscposUsbConnection(config.vendorId, config.productId);
+  }
+
+  if (config.type === "windows-raw") {
+    return await checkWindowsRawPrinterConnection(config.printerName);
+  }
+
+  return await checkEscposNetworkConnection(config.host, config.port);
+}
+
+async function checkEscposConnectionWithFallback() {
+  const config = getPrinterConnectionConfig();
+  const primaryResult = await checkConfiguredEscposConnection(config);
+
+  if (primaryResult?.success) return primaryResult;
+
+  const fallbackResults = [];
+
+  if (config.type !== "usb") {
+    const usbResult = await checkEscposUsbConnection();
+
+    if (usbResult?.success) {
+      return {
+        ...usbResult,
+        fallback: true,
+        primaryType: config.type,
+        primaryMessage: primaryResult?.message || "",
+      };
+    }
+
+    fallbackResults.push(usbResult);
+  }
+
+  if (config.type !== "windows-raw") {
+    const windowsResult = await checkWindowsRawPrinterConnection();
+
+    if (windowsResult?.success) {
+      return {
+        ...windowsResult,
+        fallback: true,
+        primaryType: config.type,
+        primaryMessage: primaryResult?.message || "",
+      };
+    }
+
+    fallbackResults.push(windowsResult);
+  }
+
+  return {
+    ...primaryResult,
+    success: false,
+    message: buildPrintFailureMessage(primaryResult, fallbackResults),
+    fallbackResults,
+  };
 }
 
 app.whenReady().then(() => {
@@ -1437,9 +2103,6 @@ app.whenReady().then(() => {
   let lastWarmupAt = 0;
 
   ipcMain.handle("warmup-escpos", async () => {
-    const host = getPrinterHost();
-    const port = 9100;
-
     if (Date.now() - lastWarmupAt < 30000) {
       return {
         success: true,
@@ -1448,59 +2111,19 @@ app.whenReady().then(() => {
     }
 
     try {
-      return await new Promise((resolve) => {
-        const client = new net.Socket();
-        let finished = false;
-
-        const done = (result) => {
-          if (finished) return;
-          finished = true;
-
-          try {
-            client.destroy();
-          } catch {}
-
-          resolve(result);
-        };
-
-        client.setTimeout(5000);
-
-        client.on("connect", () => {
-          const initPrinter = Buffer.from([0x1b, 0x40]);
-
-          client.write(initPrinter, (err) => {
-            if (err) {
-              return done({
-                success: false,
-                message: err?.message || "Warm-up write failed",
-              });
-            }
-
-            lastWarmupAt = Date.now();
-
-            done({
-              success: true,
-              message: "Printer connection warmed up",
-            });
-          });
-        });
-
-        client.on("timeout", () => {
-          done({
-            success: false,
-            message: "Printer warm-up timeout",
-          });
-        });
-
-        client.on("error", (err) => {
-          done({
-            success: false,
-            message: err?.message || "Printer warm-up connection error",
-          });
-        });
-
-        client.connect(port, host);
+      const result = await writeEscposBuffer(Buffer.from([0x1b, 0x40]), {
+        tryWindowsFallback: false,
       });
+
+      if (result?.success) {
+        lastWarmupAt = Date.now();
+        return {
+          ...result,
+          message: result.message || "Printer connection warmed up",
+        };
+      }
+
+      return result;
     } catch (error) {
       return {
         success: false,
@@ -1703,7 +2326,9 @@ app.whenReady().then(() => {
       chunks.push(cutPaper);
 
       const payload = Buffer.concat(chunks);
-      return await writeEscposBuffer(payload);
+      return await writeEscposBuffer(payload, {
+        printerName: data?.printerName,
+      });
     } catch (error) {
       console.error("ESC/POS print error:", error);
       return {
@@ -2013,7 +2638,9 @@ app.whenReady().then(() => {
 
       const payload = Buffer.concat(chunks);
 
-      return await writeEscposBuffer(payload);
+      return await writeEscposBuffer(payload, {
+        printerName: data?.printerName,
+      });
     } catch (error) {
       console.error("ESC/POS discount print error:", error);
       return {
@@ -2475,7 +3102,9 @@ app.whenReady().then(() => {
       chunks.push(cutPaper);
 
       const payload = Buffer.concat(chunks);
-      return await writeEscposBuffer(payload);
+      return await writeEscposBuffer(payload, {
+        printerName: data?.printerName,
+      });
     } catch (error) {
       console.error("ESC/POS POS payment print error:", error);
       return {
@@ -2873,7 +3502,9 @@ app.whenReady().then(() => {
       chunks.push(cutPaper);
 
       const finalPayload = Buffer.concat(chunks);
-      return await writeEscposBuffer(finalPayload);
+      return await writeEscposBuffer(finalPayload, {
+        printerName: data?.printerName,
+      });
     } catch (error) {
       console.error("ESC/POS X/Z reading print error:", error);
       return {
@@ -3083,7 +3714,9 @@ app.whenReady().then(() => {
       chunks.push(cutPaper);
 
       const payload = Buffer.concat(chunks);
-      return await writeEscposBuffer(payload);
+      return await writeEscposBuffer(payload, {
+        printerName: data?.printerName,
+      });
     } catch (error) {
       console.error("ESC/POS sales per product print error:", error);
       return {
@@ -3317,7 +3950,9 @@ app.whenReady().then(() => {
       chunks.push(cutPaper);
 
       const payload = Buffer.concat(chunks);
-      return await writeEscposBuffer(payload);
+      return await writeEscposBuffer(payload, {
+        printerName: data?.printerName,
+      });
     } catch (error) {
       console.error("ESC/POS billing print error:", error);
       return {
@@ -3459,8 +4094,9 @@ app.whenReady().then(() => {
       const printerFromFile = getDefaultPrinterNameFromFile();
 
       const resolvedPrinterName =
-        String(printerName || "").trim() ||
-        String(printerFromFile || "").trim();
+        normalizeSystemPrinterName(printerName) ||
+        normalizeSystemPrinterName(printerFromFile) ||
+        (await resolveWindowsPrinterName(""));
 
       console.log("print-receipt payload:", {
         printerName,
@@ -3481,7 +4117,7 @@ app.whenReady().then(() => {
       if (!resolvedPrinterName) {
         return {
           success: false,
-          message: "No printer name provided and printer.txt is empty.",
+          message: "No Windows printer is available.",
         };
       }
 
@@ -3659,20 +4295,7 @@ app.whenReady().then(() => {
 
   ipcMain.handle("check-escpos-printer", async () => {
     try {
-      const config = getPrinterConnectionConfig();
-
-      if (config.type === "bluetooth") {
-        return await checkEscposBluetoothConnection(
-          config.portName,
-          config.baudRate,
-        );
-      }
-
-      if (config.type === "usb") {
-        return checkEscposUsbConnection(config.vendorId, config.productId);
-      }
-
-      return await checkEscposNetworkConnection(config.host, config.port);
+      return await checkEscposConnectionWithFallback();
     } catch (error) {
       return {
         success: false,

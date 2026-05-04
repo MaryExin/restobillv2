@@ -1,0 +1,10 @@
+ID,Category_Code,CostCenter_Code,CostCenter_Name,CostCenter_Notes,Status,Remarks
+1,ABC Corp.,80001,Cost Center 01,,Active,Not yet sync
+2,DEF Corp.,80001,Cost Center 01,,Active,Not yet sync
+3,XYZ Corp.,80001,Cost Center 01,,Active,Not yet sync
+4,ABC Corp.,80002,Cost Center 02,,Active,Not yet sync
+5,DEF Corp.,80002,Cost Center 02,,Active,Not yet sync
+6,XYZ Corp.,80002,Cost Center 02,,Active,Not yet sync
+7,ABC Corp.,80003,Cost Center 03,,Active,Not yet sync
+8,DEF Corp.,80003,Cost Center 03,,Active,Not yet sync
+9,XYZ Corp.,80003,Cost Center 03,,Active,Not yet sync

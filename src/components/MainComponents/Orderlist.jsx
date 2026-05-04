@@ -402,6 +402,7 @@ const Orderlist = ({
         instructions,
         transactionId: transactionId ? transactionId : transactionIds,
         printMode: transactionId ? "additional" : "new",
+        printerName: printerName || defaultPrinterName || "",
       });
 
       console.log("ESC/POS additional print result:", printResult);
@@ -430,6 +431,7 @@ const Orderlist = ({
         total: totalPrice,
         instructions,
         transactionId,
+        printerName: printerName || defaultPrinterName || "",
         printMode:
           printMode === "auto"
             ? transactionId
@@ -460,6 +462,7 @@ const Orderlist = ({
       const printResult = await window.electronAPI.printEscPosBilling({
         transaction,
         detailedproduct: detailedItems,
+        printerName: printerName || defaultPrinterName || "",
         title: transaction?.billing_no
           ? `billing-${transaction.billing_no}`
           : transaction?.transaction_id

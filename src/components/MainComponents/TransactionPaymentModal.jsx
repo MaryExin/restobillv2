@@ -1937,6 +1937,9 @@ export default function TransactionPaymentModal({
             },
             body: JSON.stringify({
               transaction_id: transaction.transaction_id,
+              category_code: terminalConfig.categoryCode,
+              unit_code: terminalConfig.unitCode,
+              terminal_number: terminalConfig.terminalNumber,
             }),
           },
         );
@@ -2344,6 +2347,9 @@ export default function TransactionPaymentModal({
     try {
       const payload = {
         transaction_id: transaction.transaction_id,
+        category_code: terminalConfig.categoryCode,
+        unit_code: terminalConfig.unitCode,
+        terminal_number: terminalConfig.terminalNumber,
         user_id: loggedUserId,
         user_name: loggedUserName,
         cashier: loggedUserName,

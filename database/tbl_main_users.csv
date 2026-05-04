@@ -1,0 +1,3 @@
+ID,User_ID,User_Name,User_Password,First_Name,Middle_Initial,Last_Name,Gender,User_Role,Notes,Status,Remarks,preference_theme_style,preference_theme_color_1,preference_theme_color_2,preference_theme_color_3,preference_theme_color_4
+21,424,admin,12345,Supervisor,,Admin,,Manager,,Active,Not yet sync,Theme 7,"212, 91, 17","231, 127, 34","234, 118, 16","248, 139, 43"
+22,425,cashier,123,Cashier,,Staff,,Cashier,,Active,Not yet sync,Theme 1,"25, 100, 80","32, 197, 183","24, 151, 143","84, 186, 185"

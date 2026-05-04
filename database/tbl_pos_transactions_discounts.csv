@@ -1,0 +1,5 @@
+id,transaction_id,Category_Code,Unit_Code,customer_id,discount_type,discount_amount,customer_name,date_of_birth,gender,tin,contact_no,status,usertracker,created_at
+1,1000000001,LIGHTERRA,BU-f84babace67a,1,Senior Citizen,69.11,,,,,,Active,jdelarentrepsbpo@gmail.com,2026-04-26 18:21:59
+2,1000000001,LIGHTERRA,BU-f84babace67a,2,PWD,69.11,,,,,,Active,jdelarentrepsbpo@gmail.com,2026-04-26 18:21:59
+3,1000000002,LIGHTERRA,BU-f84babace67a,1,Senior Citizen,112.50,,,,,,Active,jdelarentrepsbpo@gmail.com,2026-04-26 18:22:39
+4,1000000002,LIGHTERRA,BU-f84babace67a,2,Senior Citizen,112.50,,,,,,Active,jdelarentrepsbpo@gmail.com,2026-04-26 18:22:39

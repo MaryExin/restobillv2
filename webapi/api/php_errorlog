@@ -1,0 +1,22 @@
+[27-Jan-2026 19:49:57 ASIA/MANILA] [PLAN EMAIL ERROR] SQLSTATE[42S22]: Column not found: 1054 Unknown column 'empid' in 'field list'
+[27-Jan-2026 19:59:13 ASIA/MANILA] [PLAN EMAIL ERROR] SQLSTATE[42S22]: Column not found: 1054 Unknown column 'empid' in 'field list'
+[27-Jan-2026 20:09:00 ASIA/MANILA] [PLAN EMAIL ERROR] SQLSTATE[42S22]: Column not found: 1054 Unknown column 'empid' in 'field list'
+[27-Jan-2026 20:47:06 ASIA/MANILA] [PLAN EMAIL ERROR] SQLSTATE[42S22]: Column not found: 1054 Unknown column 'empid' in 'field list'
+[27-Jan-2026 20:48:52 ASIA/MANILA] [PLAN EMAIL ERROR] SQLSTATE[42S22]: Column not found: 1054 Unknown column 'empid' in 'field list'
+[27-Jan-2026 20:59:44 ASIA/MANILA] [PLAN EMAIL ERROR] SQLSTATE[42S22]: Column not found: 1054 Unknown column 'empid' in 'field list'
+[27-Jan-2026 21:02:12 ASIA/MANILA] [PLAN EMAIL ERROR] SQLSTATE[42S22]: Column not found: 1054 Unknown column 'empid' in 'field list'
+[27-Jan-2026 21:07:17 ASIA/MANILA] [PLAN EMAIL ERROR] SQLSTATE[42S22]: Column not found: 1054 Unknown column 'empid' in 'field list'
+[28-Jan-2026 10:11:11 ASIA/MANILA] [PLAN EMAIL ERROR] SQLSTATE[42S22]: Column not found: 1054 Unknown column 'empid' in 'field list'
+[28-Jan-2026 10:31:17 ASIA/MANILA] [PLAN EMAIL ERROR] SQLSTATE[42S22]: Column not found: 1054 Unknown column 'empid' in 'field list'
+[28-Jan-2026 10:34:36 ASIA/MANILA] [PLAN EMAIL ERROR] SQLSTATE[42S22]: Column not found: 1054 Unknown column 'empid' in 'field list'
+[31-Jan-2026 08:22:24 ASIA/MANILA] OtherMOP error: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'db3nc6slu9ve8i.tbl_sales_payments' doesn't exist
+[31-Jan-2026 08:22:28 ASIA/MANILA] OtherMOP error: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'db3nc6slu9ve8i.tbl_sales_payments' doesn't exist
+[31-Jan-2026 08:22:40 ASIA/MANILA] OtherMOP error: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'db3nc6slu9ve8i.tbl_sales_payments' doesn't exist
+[31-Jan-2026 08:22:44 ASIA/MANILA] OtherMOP error: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'db3nc6slu9ve8i.tbl_sales_payments' doesn't exist
+[31-Jan-2026 08:32:35 ASIA/MANILA] OtherMOP error: SQLSTATE[HY093]: Invalid parameter number: parameter was not defined
+[31-Jan-2026 08:32:39 ASIA/MANILA] OtherMOP error: SQLSTATE[HY093]: Invalid parameter number: parameter was not defined
+[31-Jan-2026 08:32:47 ASIA/MANILA] OtherMOP error: SQLSTATE[HY093]: Invalid parameter number: parameter was not defined
+[20-Feb-2026 13:23:27 ASIA/MANILA] PHP Parse error:  syntax error, unexpected token ",", expecting "]" in /home/customer/www/jeremiahd199.sg-host.com/public_html/api/readbyuserrole.php on line 55
+[20-Feb-2026 13:23:27 ASIA/MANILA] PHP Parse error:  syntax error, unexpected token ",", expecting "]" in /home/customer/www/jeremiahd199.sg-host.com/public_html/api/readbyuserrole.php on line 55
+[20-Feb-2026 13:23:33 ASIA/MANILA] PHP Parse error:  syntax error, unexpected token ",", expecting "]" in /home/customer/www/jeremiahd199.sg-host.com/public_html/api/readbyuserrole.php on line 55
+[20-Feb-2026 13:23:33 ASIA/MANILA] PHP Parse error:  syntax error, unexpected token ",", expecting "]" in /home/customer/www/jeremiahd199.sg-host.com/public_html/api/readbyuserrole.php on line 55

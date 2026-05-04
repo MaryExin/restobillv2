@@ -1,0 +1,3 @@
+seq,sales_type_id,description,deletestatus,createdtime
+1,ST-36d8565b11d5,Dine In,Active,2025-02-22 10:24:50
+2,ST-32bd1763ef44,Take Out,Active,2025-02-22 10:23:45

@@ -542,6 +542,10 @@ const ModalDiscountTransaction = ({
       },
       body: JSON.stringify({
         transaction_id: transaction.transaction_id,
+        category_code:
+          transaction?.Category_Code || transaction?.category_code || "",
+        unit_code: transaction?.Unit_Code || transaction?.unit_code || "",
+        terminal_number: transaction?.terminal_number || "",
       }),
     })
       .then((res) => res.json())

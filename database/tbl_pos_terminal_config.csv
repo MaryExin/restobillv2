@@ -1,0 +1,2 @@
+id,categoryCode,unitCode,businessUnitName,terminalNumber,corpName,machineNumber,serialNumber,ptuNumber,ptuDateIssued,status,created_at,updated_at
+1,LIGHTERRA,BU-f84babace67a,LIGHTERRA PLARIDEL BISTRO,1,LIGHTERRA CORPORATION,26032413224205435,2510AI5508128156WL24026,FP032026-25A0595551-00013,3/24/2026,Active,2026-03-25 09:20:15,2026-04-26 18:01:55
