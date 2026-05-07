@@ -1527,7 +1527,10 @@ function parsePrinterConnection(value = "") {
   if (raw.toLowerCase().startsWith("usb:")) {
     const payload = raw.slice("usb:".length).trim();
 
-    if (!payload || ["auto", "default", "first"].includes(payload.toLowerCase())) {
+    if (
+      !payload ||
+      ["auto", "default", "first"].includes(payload.toLowerCase())
+    ) {
       return {
         type: "usb",
         vendorId: null,
@@ -1607,7 +1610,9 @@ function checkEscposNetworkConnection(host, port = 9100, timeout = 5000) {
       done({
         success: false,
         type: "network",
-        message: err.message || `WiFi/network printer connection failed (${host}:${port}).`,
+        message:
+          err.message ||
+          `WiFi/network printer connection failed (${host}:${port}).`,
       });
     });
 
@@ -1767,7 +1772,11 @@ function writeBufferToEscposBluetooth(portName, buffer, baudRate = 9600) {
   });
 }
 
-async function writeEscposBufferToConfiguredTarget(config, buffer, options = {}) {
+async function writeEscposBufferToConfiguredTarget(
+  config,
+  buffer,
+  options = {},
+) {
   if (config.type === "bluetooth") {
     return await writeBufferToEscposBluetooth(
       config.portName,
@@ -1968,42 +1977,54 @@ app.whenReady().then(() => {
 
     let nextCsp = cspValue || "default-src 'self'";
 
+    // ===== IMG SRC =====
     if (hasImgSrc) {
       nextCsp = nextCsp.replace(
         /(^|;)\s*img-src\s+([^;]*)/i,
         (match, prefix, sources) => {
           let nextSources = sources;
+
           if (!/\bhttp:\/\/localhost\b/i.test(nextSources)) {
             nextSources += " http://localhost";
           }
           if (!/\bhttp:\/\/127\.0\.0\.1\b/i.test(nextSources)) {
             nextSources += " http://127.0.0.1";
           }
+          if (!/\bhttp:\/\/192\.168\.100.126\b/i.test(nextSources)) {
+            nextSources += " http://192.168.100.126";
+          }
+
           return `${prefix} img-src ${nextSources.trim()}`;
         },
       );
     } else {
       nextCsp +=
-        "; img-src 'self' data: asset: https: http://localhost http://127.0.0.1";
+        "; img-src 'self' data: asset: https: http://localhost http://127.0.0.1 http://192.168.100.126";
     }
 
+    // ===== CONNECT SRC =====
     if (hasConnectSrc) {
       nextCsp = nextCsp.replace(
         /(^|;)\s*connect-src\s+([^;]*)/i,
         (match, prefix, sources) => {
           let nextSources = sources;
+
           if (!/\bhttp:\/\/localhost\b/i.test(nextSources)) {
             nextSources += " http://localhost";
           }
           if (!/\bhttp:\/\/127\.0\.0\.1\b/i.test(nextSources)) {
             nextSources += " http://127.0.0.1";
           }
+          if (!/\bhttp:\/\/192\.168\.100.126\b/i.test(nextSources)) {
+            nextSources += " http://192.168.10.126";
+          }
+
           return `${prefix} connect-src ${nextSources.trim()}`;
         },
       );
     } else {
       nextCsp +=
-        "; connect-src 'self' https: http://localhost http://127.0.0.1 ws: wss:";
+        "; connect-src 'self' https: http://localhost http://127.0.0.1 http://192.168.10.126 ws: wss:";
     }
 
     callback({
@@ -2355,6 +2376,7 @@ app.whenReady().then(() => {
       const business = escposPickBusinessInfo(data);
 
       const initPrinter = Buffer.from([0x1b, 0x40]);
+      const openDrawer = Buffer.from([0x1b, 0x70, 0x00, 0x19, 0xfa]);
       const alignLeft = Buffer.from([0x1b, 0x61, 0x00]);
       const alignCenter = Buffer.from([0x1b, 0x61, 0x01]);
       const boldOn = Buffer.from([0x1b, 0x45, 0x01]);
@@ -2454,6 +2476,7 @@ app.whenReady().then(() => {
       };
 
       chunks.push(initPrinter);
+      chunks.push(openDrawer);
 
       // HEADER
       chunks.push(alignCenter);
@@ -2770,6 +2793,7 @@ app.whenReady().then(() => {
       ).trim();
 
       const initPrinter = Buffer.from([0x1b, 0x40]);
+      const openDrawer = Buffer.from([0x1b, 0x70, 0x00, 0x19, 0xfa]);
       const alignLeft = Buffer.from([0x1b, 0x61, 0x00]);
       const alignCenter = Buffer.from([0x1b, 0x61, 0x01]);
       const boldOn = Buffer.from([0x1b, 0x45, 0x01]);
@@ -2823,6 +2847,7 @@ app.whenReady().then(() => {
       };
 
       chunks.push(initPrinter);
+      chunks.push(openDrawer);
 
       // HEADER
       chunks.push(alignCenter);
