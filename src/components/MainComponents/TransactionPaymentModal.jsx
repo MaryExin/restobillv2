@@ -56,6 +56,8 @@ const buildImagePath = (name) => {
 const buildInitialDiscountState = () => ({
   senior: { qualifiedCount: 0, manualAmount: "" },
   pwd: { qualifiedCount: 0, manualAmount: "" },
+  naac: { qualifiedCount: 0, manualAmount: "" },
+  soloParent: { qualifiedCount: 0, manualAmount: "" },
   manual: { qualifiedCount: 0, manualAmount: "" },
 });
 
@@ -849,6 +851,22 @@ const DiscountSetupModal = ({
       description: "20% prorated base + 12% VAT exemption",
       showManual: false,
       amount: computed.discountBreakdown.find((x) => x.key === "pwd")
+        ?.discountAmount,
+    },
+    {
+      key: "naac",
+      label: "National Athletes and Coaches (NAAC)",
+      description: "20% prorated base + 12% VAT exemption",
+      showManual: false,
+      amount: computed.discountBreakdown.find((x) => x.key === "naac")
+        ?.discountAmount,
+    },
+    {
+      key: "soloParent",
+      label: "Solo Parent",
+      description: "10% prorated base + 12% VAT exemption",
+      showManual: false,
+      amount: computed.discountBreakdown.find((x) => x.key === "soloParent")
         ?.discountAmount,
     },
     {
@@ -1937,9 +1955,6 @@ export default function TransactionPaymentModal({
             },
             body: JSON.stringify({
               transaction_id: transaction.transaction_id,
-              category_code: terminalConfig.categoryCode,
-              unit_code: terminalConfig.unitCode,
-              terminal_number: terminalConfig.terminalNumber,
             }),
           },
         );
@@ -1960,10 +1975,12 @@ export default function TransactionPaymentModal({
         const discountCounts = data?.discount_counts || {
           senior: 0,
           pwd: 0,
+          naac: 0,
+          soloParent: 0,
           manual: 0,
         };
 
-        setItems(detailItems);
+         setItems(detailItems);
 
         setPayments(
           detailPayments.length > 0
@@ -1994,12 +2011,22 @@ export default function TransactionPaymentModal({
 
         const rawSenior = Number(discountCounts.senior || 0);
         const rawPwd = Number(discountCounts.pwd || 0);
+        const rawNaac = Number(discountCounts.naac || discountCounts.NAAC || 0);
+        const rawSoloParent = Number(
+          discountCounts.soloParent ||
+            discountCounts.solo_parent ||
+            discountCounts["Solo Parent"] ||
+            0,
+        );
         const rawManual = Number(discountCounts.manual || 0);
 
-        const totalQualifiedFromBreakdown = rawSenior + rawPwd + rawManual;
+        const totalQualifiedFromBreakdown =
+          rawSenior + rawPwd + rawNaac + rawSoloParent + rawManual;
 
         let clampedSenior = rawSenior;
         let clampedPwd = rawPwd;
+        let clampedNaac = rawNaac;
+        let clampedSoloParent = rawSoloParent;
         let clampedManual = rawManual;
 
         if (totalQualifiedFromBreakdown > safeHeadCount) {
@@ -2008,6 +2035,14 @@ export default function TransactionPaymentModal({
           const manualReduce = Math.min(clampedManual, overflow);
           clampedManual -= manualReduce;
           overflow -= manualReduce;
+
+          const soloParentReduce = Math.min(clampedSoloParent, overflow);
+          clampedSoloParent -= soloParentReduce;
+          overflow -= soloParentReduce;
+
+          const naacReduce = Math.min(clampedNaac, overflow);
+          clampedNaac -= naacReduce;
+          overflow -= naacReduce;
 
           const pwdReduce = Math.min(clampedPwd, overflow);
           clampedPwd -= pwdReduce;
@@ -2024,9 +2059,13 @@ export default function TransactionPaymentModal({
               safeHeadCount,
               rawSenior,
               rawPwd,
+              rawNaac,
+              rawSoloParent,
               rawManual,
               clampedSenior,
               clampedPwd,
+              clampedNaac,
+              clampedSoloParent,
               clampedManual,
             },
           );
@@ -2041,6 +2080,14 @@ export default function TransactionPaymentModal({
           },
           pwd: {
             qualifiedCount: clampedPwd,
+            manualAmount: "",
+          },
+          naac: {
+            qualifiedCount: clampedNaac,
+            manualAmount: "",
+          },
+          soloParent: {
+            qualifiedCount: clampedSoloParent,
             manualAmount: "",
           },
           manual: {
@@ -2058,7 +2105,14 @@ export default function TransactionPaymentModal({
         setCustomerCards(
           discountRows.length > 0
             ? discountRows
-                .slice(0, clampedSenior + clampedPwd + clampedManual)
+                .slice(
+                  0,
+                  clampedSenior +
+                    clampedPwd +
+                    clampedNaac +
+                    clampedSoloParent +
+                    clampedManual,
+                )
                 .map((row) => ({
                   customer_exclusive_id: row.customer_id || "",
                   customer_name: row.customer_name || "",
@@ -2087,6 +2141,8 @@ export default function TransactionPaymentModal({
     return (
       Number(discountState?.senior?.qualifiedCount || 0) +
       Number(discountState?.pwd?.qualifiedCount || 0) +
+      Number(discountState?.naac?.qualifiedCount || 0) +
+      Number(discountState?.soloParent?.qualifiedCount || 0) +
       Number(discountState?.manual?.qualifiedCount || 0)
     );
   }, [discountState]);
@@ -2120,6 +2176,15 @@ export default function TransactionPaymentModal({
       Math.floor(Number(discountState?.pwd?.qualifiedCount || 0)),
       0,
     );
+    const rawNaacCount = Math.max(
+      Math.floor(Number(discountState?.naac?.qualifiedCount || 0)),
+      0,
+    );
+
+    const rawSoloParentCount = Math.max(
+      Math.floor(Number(discountState?.soloParent?.qualifiedCount || 0)),
+      0,
+    );
     const rawManualCount = Math.max(
       Math.floor(Number(discountState?.manual?.qualifiedCount || 0)),
       0,
@@ -2130,8 +2195,14 @@ export default function TransactionPaymentModal({
     );
 
     const totalQualifiedAllLocal =
-      rawSeniorCount + rawPwdCount + rawManualCount;
-    const statutoryQualifiedCount = rawSeniorCount + rawPwdCount;
+      rawSeniorCount +
+      rawPwdCount +
+      rawNaacCount +
+      rawSoloParentCount +
+      rawManualCount;
+
+    const statutoryQualifiedCount =
+      rawSeniorCount + rawPwdCount + rawNaacCount + rawSoloParentCount;
 
     const statutoryQualifiedRatio =
       safeCustomerCount > 0
@@ -2194,12 +2265,26 @@ export default function TransactionPaymentModal({
       safeCustomerCount > 0
         ? discountableBase * (rawPwdCount / safeCustomerCount)
         : 0;
+    const naacProratedBase =
+      safeCustomerCount > 0
+        ? discountableBase * (rawNaacCount / safeCustomerCount)
+        : 0;
 
+    const soloParentProratedBase =
+      safeCustomerCount > 0
+        ? discountableBase * (rawSoloParentCount / safeCustomerCount)
+        : 0;
     const seniorDiscountAmount = seniorProratedBase * 0.2;
     const seniorVatExemption = seniorProratedBase * 0.12;
 
     const pwdDiscountAmount = pwdProratedBase * 0.2;
     const pwdVatExemption = pwdProratedBase * 0.12;
+
+    const naacDiscountAmount = naacProratedBase * 0.2;
+    const naacVatExemption = naacProratedBase * 0.12;
+
+    const soloParentDiscountAmount = soloParentProratedBase * 0.1;
+    const soloParentVatExemption = soloParentProratedBase * 0.12;
 
     const manualDiscountAmount = manualAmount;
     const manualVatExemption = 0;
@@ -2220,6 +2305,22 @@ export default function TransactionPaymentModal({
         proratedBase: pwdProratedBase,
         discountAmount: pwdDiscountAmount,
         vatExemption: pwdVatExemption,
+      },
+      {
+        key: "naac",
+        label: "NAAC",
+        qualifiedCount: rawNaacCount,
+        proratedBase: naacProratedBase,
+        discountAmount: naacDiscountAmount,
+        vatExemption: naacVatExemption,
+      },
+      {
+        key: "soloParent",
+        label: "Solo Parent",
+        qualifiedCount: rawSoloParentCount,
+        proratedBase: soloParentProratedBase,
+        discountAmount: soloParentDiscountAmount,
+        vatExemption: soloParentVatExemption,
       },
       {
         key: "manual",
