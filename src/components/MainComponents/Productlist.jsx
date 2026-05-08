@@ -42,7 +42,7 @@ const ProductList = () => {
   const [passwordInput, setPasswordInput] = useState("");
   const [passError, setPassError] = useState(false);
 
-  const ADMIN_PASSWORD = "1324";
+  const ADMIN_PASSWORD = "1";
 
   const handlePasswordSubmit = (e) => {
     e.preventDefault();
@@ -556,11 +556,12 @@ const ProductList = () => {
                       }`}
                     >
                       <ProductImage
-                        src={`${imageBaseUrl}${item.product_id}.png`}
-                        alt={item.item_name}
-                        className="object-cover w-full h-full"
-                        wrapperClassName="w-full h-full overflow-hidden rounded-[26px]"
-                      />
+                      src={`${apiHost}/item_pictures/${item.item_name}.jpg`}
+                      alt={item.item_name}
+                      className="object-cover w-full h-full"
+                      wrapperClassName="w-full h-full overflow-hidden rounded-[26px]"
+                      fallbackSrc={`${apiHost}/item_pictures/default.jpg`}
+                    />
                     </div>
 
                     <div className="px-1">
