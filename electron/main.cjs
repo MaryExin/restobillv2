@@ -1990,8 +1990,8 @@ app.whenReady().then(() => {
           if (!/\bhttp:\/\/127\.0\.0\.1\b/i.test(nextSources)) {
             nextSources += " http://127.0.0.1";
           }
-          if (!/\bhttp:\/\/192\.168\.100.126\b/i.test(nextSources)) {
-            nextSources += " http://192.168.100.126";
+          if (!/\bhttp:\/\/192\.168\.100.11\b/i.test(nextSources)) {
+            nextSources += " http://192.168.100.11";
           }
 
           return `${prefix} img-src ${nextSources.trim()}`;
@@ -1999,7 +1999,7 @@ app.whenReady().then(() => {
       );
     } else {
       nextCsp +=
-        "; img-src 'self' data: asset: https: http://localhost http://127.0.0.1 http://192.168.100.126";
+        "; img-src 'self' data: asset: https: http://localhost http://127.0.0.1 http://192.168.100.11";
     }
 
     // ===== CONNECT SRC =====
@@ -2015,8 +2015,8 @@ app.whenReady().then(() => {
           if (!/\bhttp:\/\/127\.0\.0\.1\b/i.test(nextSources)) {
             nextSources += " http://127.0.0.1";
           }
-          if (!/\bhttp:\/\/192\.168\.100.126\b/i.test(nextSources)) {
-            nextSources += " http://192.168.10.126";
+          if (!/\bhttp:\/\/192\.168\.100.11\b/i.test(nextSources)) {
+            nextSources += " http://192.168.10.11";
           }
 
           return `${prefix} connect-src ${nextSources.trim()}`;
@@ -2024,7 +2024,7 @@ app.whenReady().then(() => {
       );
     } else {
       nextCsp +=
-        "; connect-src 'self' https: http://localhost http://127.0.0.1 http://192.168.10.126 ws: wss:";
+        "; connect-src 'self' https: http://localhost http://127.0.0.1 http://192.168.10.11 ws: wss:";
     }
 
     callback({
