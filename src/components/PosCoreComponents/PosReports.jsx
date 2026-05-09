@@ -228,24 +228,30 @@ const PosReports = ({
       color: "#64748b",
       action: () => setActiveModal("logs"),
     },
-    { label: "Sync Data", icon: FaSyncAlt, color: "#60a5fa", comingSoon: true },
+    // { label: "Sync Data", icon: FaSyncAlt, color: "#60a5fa", comingSoon: true },
     {
       label: "XML",
       icon: FaCode,
       color: "#10b981",
       action: () => setActiveModal("xml"),
     },
+    {
+      label: "Pricing Management",
+      icon: FaTag,
+      color: "#10b981",
+      action: () => setActiveModal("priceChange"),
+    },
   ];
 
   // Logic: Append Price Change button if current user is 'LightemAdmin'
-  if (currentUserName === "LightemAdmin") {
-    reportItems.push({
-      label: "Price Change",
-      icon: FaTag,
-      color: "#ec4899",
-      action: () => setActiveModal("priceChange"),
-    });
-  }
+  // if (currentUserName === "LightemAdmin") {
+  //   reportItems.push({
+  //     label: "Price Change",
+  //     icon: FaTag,
+  //     color: "#ec4899",
+  //     action: () => setActiveModal("priceChange"),
+  //   });
+  // }
 
   return createPortal(
     <>
