@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Search, Edit3, X, ChevronDown, Loader2, 
+  Search, Edit3, X, ChevronDown, Loader2, Camera,
   AlertCircle, Image as ImageIcon, Type, Tag, ShoppingBag, Plus, RefreshCw, CheckCircle2
 } from 'lucide-react';
 
@@ -21,24 +21,18 @@ const PricingDashboard = ({ isOpen, onClose }) => {
   const [selectedService, setSelectedService] = useState('');
   const [enablePictures, setEnablePictures] = useState(true);
 
-  // Success Notification State
+  // Success Notification
   const [showSuccess, setShowSuccess] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
 
-  // Add Product Modal States
+  // Add Product State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newProduct, setNewProduct] = useState({
-    inv_code: '', 
-    item_name: '',
-    item_category: '',
-    unit_of_measure: 'PC',
-    srp: '',
-    vatable: 'Yes',
-    isDiscountable: 'Yes',
-    target_sales_type: '' 
+    inv_code: '', item_name: '', item_category: '', unit_of_measure: 'PC',
+    srp: '', vatable: 'Yes', isDiscountable: 'Yes', target_sales_type: '' 
   });
 
-  // Edit Price Modal States
+  // Edit Price State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [newPrice, setNewPrice] = useState('');
@@ -57,17 +51,32 @@ const PricingDashboard = ({ isOpen, onClose }) => {
         if (!selectedService) setSelectedService(response.data[0].service_type || 'DINE-IN');
         if (!activeCategory) setActiveCategory(response.data[0].item_category || 'OTHERS');
       }
-    } catch (error) { 
-        console.error("Fetch Error:", error); 
-    } finally { 
-        setLoading(false); 
-    }
+    } catch (error) { console.error("Fetch Error:", error); } finally { setLoading(false); }
   };
 
   const triggerSuccess = (msg) => {
     setSuccessMsg(msg);
     setShowSuccess(true);
     setTimeout(() => setShowSuccess(false), 3000);
+  };
+
+  // Image Upload Logic
+  const handleImageUpload = async (e, itemName) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('item_name', itemName);
+    formData.append('action', 'upload_image');
+    try {
+      const response = await axios.post(`${apiHost}/api/pricing_engine.php`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      if (response.data.status === "success") {
+        fetchPricingData(); 
+        triggerSuccess("Product image updated!");
+      }
+    } catch (error) { alert("Upload failed."); }
   };
 
   const generateInvCode = () => {
@@ -77,11 +86,7 @@ const PricingDashboard = ({ isOpen, onClose }) => {
 
   const handleOpenAddModal = () => {
     generateInvCode();
-    setNewProduct(prev => ({ 
-      ...prev, 
-      target_sales_type: selectedService,
-      item_category: categories[0] || '' 
-    }));
+    setNewProduct(prev => ({ ...prev, target_sales_type: selectedService, item_category: categories[0] || '' }));
     setIsAddModalOpen(true);
   };
 
@@ -94,48 +99,31 @@ const PricingDashboard = ({ isOpen, onClose }) => {
 
   const handleAddProduct = async () => {
     const userId = localStorage.getItem('user_id') || '0';
-    if (!newProduct.item_name || !newProduct.srp) {
-        alert("Product Name and SRP are required.");
-        return;
-    }
     try {
       const response = await axios.post(`${apiHost}/api/pricing_engine.php`, {
-        action: 'add',
-        ...newProduct,
-        user_id: userId
+        action: 'add', ...newProduct, user_id: userId
       });
-
       if (response.data.status === "success") {
         setIsAddModalOpen(false);
         fetchPricingData();
-        triggerSuccess("Product successfully added to Masterlist!");
-      } else {
-        alert(response.data.message);
+        triggerSuccess("New product added successfully!");
       }
-    } catch (error) { 
-        alert("Failed to communicate with server."); 
-    }
+    } catch (error) { alert("Error adding product."); }
   };
 
   const executeUpdate = async () => {
     const userId = localStorage.getItem('user_id') || '0';
     try {
       const response = await axios.post(`${apiHost}/api/pricing_engine.php`, {
-        action: 'update',
-        inv_code: editingItem.inv_code,
-        new_price: parseFloat(newPrice),
-        service_type: selectedService,
-        user_id: userId,
-        user_name: localStorage.getItem('email') || 'system'
+        action: 'update', inv_code: editingItem.inv_code, new_price: parseFloat(newPrice),
+        service_type: selectedService, user_id: userId
       });
       if (response.data.status === "success") {
         setIsModalOpen(false);
         fetchPricingData();
         triggerSuccess("Price updated successfully!");
       }
-    } catch (error) { 
-        alert("Update failed."); 
-    }
+    } catch (error) { alert("Update failed."); }
   };
 
   if (!isOpen) return null;
@@ -145,8 +133,7 @@ const PricingDashboard = ({ isOpen, onClose }) => {
   const uomList = ["PC", "BOX", "KILO", "PACK", "BOTTLE"];
   
   const filteredProducts = products.filter(item => 
-    item.service_type === selectedService && 
-    (item.item_category || 'OTHERS') === activeCategory &&
+    item.service_type === selectedService && (item.item_category || 'OTHERS') === activeCategory &&
     item.item_description?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -162,47 +149,27 @@ const PricingDashboard = ({ isOpen, onClose }) => {
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-xl" style={{ backgroundColor: COLORS.brandLighter, color: COLORS.brand }}><Tag size={18} /></div>
                 <div>
-                  <h1 className="text-lg font-black leading-none tracking-tight uppercase text-slate-700">Pricing Engine</h1>
+                  <h1 className="text-lg font-black tracking-tight uppercase">Pricing Engine</h1>
                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Terminal: <span style={{ color: COLORS.brand }}>{selectedService}</span></p>
                 </div>
               </div>
-              
               <div className="flex items-center gap-3">
-                <button onClick={handleOpenAddModal} className="flex items-center gap-2 px-5 py-2.5 text-white transition-all rounded-2xl active:scale-95 shadow-lg shadow-blue-600/20"
-                  style={{ backgroundColor: COLORS.brand }}>
-                  <Plus size={16} strokeWidth={3} />
-                  <span className="text-[11px] font-black uppercase tracking-widest">New Product</span>
+                <button onClick={handleOpenAddModal} className="flex items-center gap-2 px-5 py-2.5 text-white rounded-2xl bg-blue-600 shadow-lg shadow-blue-600/20">
+                  <Plus size={16}/><span className="text-[11px] font-black uppercase">New Product</span>
                 </button>
-
-                <div className="relative">
-                  <select value={selectedService} onChange={(e) => setSelectedService(e.target.value)}
-                    className="appearance-none bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 pr-10 text-[11px] font-black text-slate-600 outline-none">
-                    {serviceTypes.map((type, i) => <option key={i} value={type}>{type}</option>)}
-                  </select>
-                  <ChevronDown className="absolute -translate-y-1/2 pointer-events-none right-3 top-1/2 text-slate-400" size={12} />
-                </div>
-
-                <button onClick={() => setEnablePictures(!enablePictures)}
-                  className={`p-2.5 rounded-xl border transition-all ${enablePictures ? 'border-blue-100 text-blue-600 bg-blue-50' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
-                  {enablePictures ? <ImageIcon size={16} /> : <Type size={16} />}
-                </button>
-
+                <select value={selectedService} onChange={(e) => setSelectedService(e.target.value)} className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-[11px] font-black outline-none">
+                  {serviceTypes.map((type, i) => <option key={i} value={type}>{type}</option>)}
+                </select>
                 <div className="relative">
                   <Search className="absolute -translate-y-1/2 left-3 top-1/2 text-slate-300" size={14} />
-                  <input type="text" placeholder="Search inventory..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-                    className="py-2.5 pl-9 pr-4 bg-slate-50 rounded-xl border border-slate-100 text-[11px] font-bold outline-none w-48 focus:w-64 transition-all" />
+                  <input type="text" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="py-2.5 pl-9 pr-4 bg-slate-50 rounded-xl border text-[11px] font-bold outline-none w-48 focus:w-64 transition-all" />
                 </div>
                 <button onClick={onClose} className="p-2 transition-colors text-slate-300 hover:text-rose-500"><X size={20} /></button>
               </div>
             </div>
-
             <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
               {categories.map((cat, idx) => (
-                <button key={idx} onClick={() => setActiveCategory(cat)}
-                  style={activeCategory === cat ? { backgroundColor: COLORS.brand, borderColor: COLORS.brand } : {}}
-                  className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase transition-all border ${
-                    activeCategory === cat ? "text-white shadow-md scale-105" : "bg-white text-slate-400 border-slate-100 hover:bg-slate-50"
-                  }`}>{cat}</button>
+                <button key={idx} onClick={() => setActiveCategory(cat)} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase border transition-all ${activeCategory === cat ? "bg-blue-600 border-blue-600 text-white shadow-md scale-105" : "bg-white text-slate-400 border-slate-100"}`}>{cat}</button>
               ))}
             </div>
           </div>
@@ -210,33 +177,36 @@ const PricingDashboard = ({ isOpen, onClose }) => {
           {/* GRID */}
           <div className="flex-1 p-8 overflow-y-auto bg-[#fcfdfe] no-scrollbar">
             {loading ? (
-              <div className="flex flex-col items-center justify-center gap-3 mt-20">
-                <Loader2 style={{ color: COLORS.brand }} className="animate-spin" size={32} />
-                <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest italic">Syncing Pricing Data...</p>
-              </div>
+              <div className="flex justify-center mt-20"><Loader2 className="text-blue-600 animate-spin" size={32} /></div>
             ) : (
               <div className={`grid gap-5 ${enablePictures ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5' : 'grid-cols-1'}`}>
                 {filteredProducts.map((item, idx) => (
-                  <motion.div layout key={idx} className={`relative flex flex-col overflow-hidden rounded-[2.2rem] border border-slate-100 bg-white transition-all hover:shadow-xl group ${!enablePictures && 'h-20 flex-row items-center px-6'}`}>
+                  <motion.div layout key={idx} className="relative flex flex-col overflow-hidden rounded-[2.2rem] border border-slate-100 bg-white shadow-sm group">
                     {enablePictures && (
                       <div className="relative w-full overflow-hidden aspect-square bg-slate-50">
-                        <img src={`${apiHost}/item_pictures/${item.item_description}.jpg`} className="object-cover w-full h-full transition-transform duration-500 group-hover:scale-110"
-                          onError={(e) => { e.target.src = `${apiHost}/item_pictures/default.jpg?t=${Date.now()}`; }} />
+                        <img 
+                          src={`${apiHost}/item_pictures/${item.item_description}.jpg?t=${new Date().getTime()}`} 
+                          className="object-cover w-full h-full transition-transform group-hover:scale-105"
+                          onError={(e) => { e.target.src = `${apiHost}/item_pictures/default.jpg`; }} 
+                        />
                       </div>
                     )}
-                    <div className={`p-5 flex flex-col justify-between flex-1 ${!enablePictures && 'p-0 ml-4'}`}>
+                    <div className="flex flex-col justify-between flex-1 p-5">
                       <div>
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <ShoppingBag size={10} style={{ color: COLORS.brand }} />
-                          <p className="text-[8px] font-black uppercase tracking-tighter" style={{ color: COLORS.brand }}>{item.inv_code}</p>
-                        </div>
+                        <p className="text-[8px] font-black uppercase text-blue-600">{item.inv_code}</p>
                         <h3 className="text-[11px] font-black text-slate-700 leading-tight uppercase line-clamp-2">{item.item_description}</h3>
                       </div>
                       <div className="flex items-end justify-between mt-4">
-                        <p className="text-[18px] font-black leading-none tracking-tighter" style={{ color: COLORS.brand }}>₱{Number(item.srp).toLocaleString()}</p>
-                        <button onClick={() => openEditModal(item)} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-white hover:bg-blue-600 transition-all shadow-sm">
-                          <Edit3 size={14} />
-                        </button>
+                        <p className="text-[18px] font-black text-blue-600">₱{Number(item.srp).toLocaleString()}</p>
+                        <div className="flex items-center gap-2">
+                          <label className="p-2.5 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors cursor-pointer shadow-sm border border-blue-100">
+                            <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageUpload(e, item.item_description)} />
+                            <Camera size={14} strokeWidth={2.5} />
+                          </label>
+                          <button onClick={() => openEditModal(item)} className="p-2.5 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors shadow-sm border border-blue-100">
+                            <Edit3 size={14} strokeWidth={2.5} />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </motion.div>
@@ -251,13 +221,10 @@ const PricingDashboard = ({ isOpen, onClose }) => {
       <AnimatePresence>
         {showSuccess && (
           <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-            className="fixed bottom-10 z-[10000000] flex items-center gap-4 px-8 py-5 bg-white border border-blue-100 rounded-3xl shadow-2xl"
+            className="fixed bottom-10 z-[10000000] flex items-center gap-4 px-8 py-5 bg-white border border-blue-100 rounded-3xl shadow-2xl left-1/2 -translate-x-1/2"
           >
-            <div className="p-2 text-blue-600 rounded-full bg-blue-50"><CheckCircle2 size={24} /></div>
-            <div>
-              <p className="text-[10px] font-black uppercase text-blue-600">Success</p>
-              <p className="text-[13px] font-bold text-slate-700">{successMsg}</p>
-            </div>
+            <CheckCircle2 className="text-blue-600" size={24} />
+            <p className="text-[13px] font-bold text-slate-700">{successMsg}</p>
           </motion.div>
         )}
       </AnimatePresence>
@@ -272,76 +239,62 @@ const PricingDashboard = ({ isOpen, onClose }) => {
               <h2 className="mb-8 text-xs font-black uppercase text-slate-700 tracking-[0.2em] flex items-center gap-2">
                 <Plus size={16} className="text-blue-600" /> New Inventory Entry
               </h2>
-              
               <div className="space-y-5 text-left">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Product ID</label>
+                    <label className="text-[9px] font-black text-slate-400 uppercase">Product ID</label>
                     <div className="relative mt-1">
                       <input type="text" readOnly value={newProduct.inv_code} className="w-full px-4 py-3 bg-slate-50 rounded-xl text-[11px] font-black text-blue-600 border border-slate-100" />
                       <button onClick={generateInvCode} className="absolute -translate-y-1/2 right-3 top-1/2 text-slate-300 hover:text-blue-500"><RefreshCw size={14}/></button>
                     </div>
                   </div>
                   <div>
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Sales Mode</label>
-                    <select value={newProduct.target_sales_type} onChange={(e) => setNewProduct({...newProduct, target_sales_type: e.target.value})}
-                       className="w-full mt-1 px-4 py-3 bg-slate-50 rounded-xl text-[11px] font-black text-slate-600 border border-slate-100 outline-none">
+                    <label className="text-[9px] font-black text-slate-400 uppercase">Sales Mode</label>
+                    <select value={newProduct.target_sales_type} onChange={(e) => setNewProduct({...newProduct, target_sales_type: e.target.value})} className="w-full mt-1 px-4 py-3 bg-slate-50 rounded-xl text-[11px] font-black border border-slate-100 outline-none">
                        {serviceTypes.map((type, i) => <option key={i} value={type}>{type}</option>)}
                     </select>
                   </div>
                 </div>
-
                 <div>
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Product Name</label>
-                  <input type="text" value={newProduct.item_name} onChange={(e) => setNewProduct({...newProduct, item_name: e.target.value})}
-                    className="w-full mt-1 px-4 py-3 bg-slate-50 rounded-xl text-[11px] font-bold border border-slate-100" placeholder="Enter name..." />
+                  <label className="text-[9px] font-black text-slate-400 uppercase">Product Name</label>
+                  <input type="text" value={newProduct.item_name} onChange={(e) => setNewProduct({...newProduct, item_name: e.target.value})} className="w-full mt-1 px-4 py-3 bg-slate-50 rounded-xl text-[11px] font-bold border border-slate-100 outline-none" placeholder="Enter name..." />
                 </div>
-
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Category</label>
-                    <select value={newProduct.item_category} onChange={(e) => setNewProduct({...newProduct, item_category: e.target.value})}
-                       className="w-full mt-1 px-4 py-3 bg-slate-50 rounded-xl text-[11px] font-black text-slate-600 border border-slate-100 outline-none uppercase">
+                    <label className="text-[9px] font-black text-slate-400 uppercase">Category</label>
+                    <select value={newProduct.item_category} onChange={(e) => setNewProduct({...newProduct, item_category: e.target.value})} className="w-full mt-1 px-4 py-3 bg-slate-50 rounded-xl text-[11px] font-black border border-slate-100 uppercase">
                        {categories.map((cat, i) => <option key={i} value={cat}>{cat}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">UOM</label>
-                    <select value={newProduct.unit_of_measure} onChange={(e) => setNewProduct({...newProduct, unit_of_measure: e.target.value})}
-                       className="w-full mt-1 px-4 py-3 bg-slate-50 rounded-xl text-[11px] font-black text-slate-600 border border-slate-100 outline-none">
+                    <label className="text-[9px] font-black text-slate-400 uppercase">UOM</label>
+                    <select value={newProduct.unit_of_measure} onChange={(e) => setNewProduct({...newProduct, unit_of_measure: e.target.value})} className="w-full mt-1 px-4 py-3 bg-slate-50 rounded-xl text-[11px] font-black border border-slate-100">
                        {uomList.map((u, i) => <option key={i} value={u}>{u}</option>)}
                     </select>
                   </div>
                 </div>
-
                 <div>
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">SRP</label>
-                  <input type="number" value={newProduct.srp} onChange={(e) => setNewProduct({...newProduct, srp: e.target.value})}
-                    className="w-full px-4 py-3 mt-1 text-lg font-black text-blue-600 border outline-none bg-slate-50 rounded-xl border-slate-100" placeholder="0.00" />
+                  <label className="text-[9px] font-black text-slate-400 uppercase">Selling Price (SRP)</label>
+                  <input type="number" value={newProduct.srp} onChange={(e) => setNewProduct({...newProduct, srp: e.target.value})} className="w-full px-4 py-3 mt-1 text-lg font-black text-blue-600 border outline-none bg-slate-50 rounded-xl" placeholder="0.00" />
                 </div>
-
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Vatable</label>
-                    <select value={newProduct.vatable} onChange={(e) => setNewProduct({...newProduct, vatable: e.target.value})}
-                       className="w-full mt-1 px-4 py-3 bg-slate-50 rounded-xl text-[11px] font-black text-slate-600 border border-slate-100 outline-none">
+                    <label className="text-[9px] font-black text-slate-400 uppercase">Vatable</label>
+                    <select value={newProduct.vatable} onChange={(e) => setNewProduct({...newProduct, vatable: e.target.value})} className="w-full mt-1 px-4 py-3 bg-slate-50 rounded-xl text-[11px] font-black border border-slate-100">
                        <option value="Yes">Yes</option><option value="No">No</option>
                     </select>
                   </div>
                   <div>
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Discountable</label>
-                    <select value={newProduct.isDiscountable} onChange={(e) => setNewProduct({...newProduct, isDiscountable: e.target.value})}
-                       className="w-full mt-1 px-4 py-3 bg-slate-50 rounded-xl text-[11px] font-black text-slate-600 border border-slate-100 outline-none">
+                    <label className="text-[9px] font-black text-slate-400 uppercase">Discountable</label>
+                    <select value={newProduct.isDiscountable} onChange={(e) => setNewProduct({...newProduct, isDiscountable: e.target.value})} className="w-full mt-1 px-4 py-3 bg-slate-50 rounded-xl text-[11px] font-black border border-slate-100">
                        <option value="Yes">Yes</option><option value="No">No</option>
                     </select>
                   </div>
                 </div>
               </div>
-
               <div className="grid grid-cols-2 gap-3 mt-10">
                 <button onClick={() => setIsAddModalOpen(false)} className="py-4 bg-slate-100 text-slate-500 text-[10px] font-black uppercase rounded-[1.2rem]">Abort</button>
-                <button onClick={handleAddProduct} className="py-4 text-white text-[10px] font-black uppercase rounded-[1.2rem] shadow-lg shadow-blue-600/20"
-                  style={{ backgroundColor: COLORS.brand }}>Save Entry</button>
+                <button onClick={handleAddProduct} className="py-4 text-white text-[10px] font-black uppercase rounded-[1.2rem] bg-blue-600 shadow-lg shadow-blue-600/20">Save Entry</button>
               </div>
             </motion.div>
           </div>
@@ -352,29 +305,29 @@ const PricingDashboard = ({ isOpen, onClose }) => {
       <AnimatePresence>
         {isModalOpen && (
           <div className="fixed inset-0 z-[9999999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
               className="w-full max-w-[300px] bg-white rounded-[2.5rem] p-10 shadow-2xl text-center border border-white"
             >
               {!showConfirm ? (
                 <>
                   <div className="flex items-center justify-center mx-auto mb-4 w-14 h-14 rounded-2xl" style={{ backgroundColor: COLORS.brandLighter, color: COLORS.brand }}><Edit3 size={24} /></div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] mb-2" style={{ color: COLORS.brand }}>{selectedService}</p>
+                  <p className="text-[10px] font-black uppercase text-blue-600 mb-2">{selectedService}</p>
                   <h2 className="mb-8 text-xs font-black leading-snug uppercase text-slate-700 line-clamp-2">{editingItem?.item_description}</h2>
                   <div className="relative mb-8 group">
                     <span className="absolute text-xl font-black -translate-y-1/2 left-5 top-1/2 text-slate-300">₱</span>
                     <input autoFocus type="number" value={newPrice} onChange={(e) => setNewPrice(e.target.value)}
                       className="w-full py-5 pl-10 pr-6 text-3xl font-black transition-all border-2 outline-none bg-slate-50 border-slate-50 rounded-2xl text-slate-800 focus:border-blue-500 focus:bg-white" />
                   </div>
-                  <button onClick={() => setShowConfirm(true)} className="w-full py-4 text-white text-[11px] font-black uppercase rounded-2xl shadow-lg shadow-blue-600/20" style={{ backgroundColor: COLORS.brand }}>Update Price</button>
+                  <button onClick={() => setShowConfirm(true)} className="w-full py-4 text-white text-[11px] font-black uppercase rounded-2xl shadow-lg bg-blue-600">Update Price</button>
                   <button onClick={() => setIsModalOpen(false)} className="mt-4 text-[10px] font-black uppercase text-slate-400">Cancel</button>
                 </>
               ) : (
                 <div className="py-2">
-                  <div className="flex items-center justify-center w-16 h-16 mx-auto mb-6 rounded-full" style={{ backgroundColor: COLORS.brandLighter, color: COLORS.brand }}><AlertCircle size={32} /></div>
-                  <h3 className="mb-2 text-lg font-black tracking-tight uppercase text-slate-800">Confirm Sync?</h3>
+                  <div className="flex items-center justify-center w-16 h-16 mx-auto mb-6 text-blue-600 rounded-full bg-blue-50"><AlertCircle size={32} /></div>
+                  <h3 className="mb-2 text-lg font-black tracking-tight uppercase text-slate-800">Confirm Change?</h3>
                   <div className="grid grid-cols-2 gap-4 mt-8">
                     <button onClick={() => setShowConfirm(false)} className="py-4 bg-slate-100 text-slate-500 text-[10px] font-black rounded-xl uppercase">No</button>
-                    <button onClick={executeUpdate} className="py-4 text-white text-[10px] font-black rounded-xl uppercase shadow-lg shadow-blue-600/20" style={{ backgroundColor: COLORS.brand }}>Confirm</button>
+                    <button onClick={executeUpdate} className="py-4 text-white text-[10px] font-black rounded-xl uppercase bg-blue-600 shadow-lg shadow-blue-600/20">Confirm</button>
                   </div>
                 </div>
               )}
@@ -385,5 +338,4 @@ const PricingDashboard = ({ isOpen, onClose }) => {
     </>
   );
 };
-
 export default PricingDashboard;
