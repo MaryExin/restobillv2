@@ -338,5 +338,4 @@ const PricingDashboard = ({ isOpen, onClose }) => {
     </>
   );
 };
-
 export default PricingDashboard;
