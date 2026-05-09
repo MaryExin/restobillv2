@@ -2643,14 +2643,9 @@ const Orderlist = ({
       {filteredProducts && filteredProducts.map((p, i) => (
         <motion.button
           key={p.item_code || i}
-          /* Hover: Bahagyang aangat */
           whileHover={{ y: -8, scale: 1.02, rotate: 0.5 }}
-          
-          /* Click: Standard scale down na lang para sa tactile feel */
           whileTap={{ scale: 0.95 }}
-          
           onClick={() => addToCart(p)}
-          
           className="group relative flex w-full flex-col overflow-hidden rounded-[2.5rem] border transition-all duration-500 shadow-lg hover:shadow-2xl"
           style={{
             borderColor: isDark ? "rgba(255,255,255,0.1)" : "var(--app-border)",
@@ -2659,7 +2654,7 @@ const Orderlist = ({
             minWidth: "140px" 
           }}
         >
-          {/* SAFE +1 POP-UP: Lilitaw at aangat lang kapag clinick ang button */}
+          {/* SAFE +1 POP-UP */}
           <motion.div 
             className="absolute inset-0 flex items-center justify-center pointer-events-none z-[100] opacity-0"
             initial={false}
@@ -2691,7 +2686,10 @@ const Orderlist = ({
                 alt={p.item_name}
                 className="object-cover w-full h-full transition-transform duration-700 group-hover:scale-125"
                 onError={(e) => {
-                  e.target.src = `${apiHost}/item_pictures/default.jpg`;
+                  /* DITO ANG SOLUSYON: 
+                    Magdagdag ng timestamp (?t=) para ma-bypass ang cache sa production/app mode.
+                  */
+                  e.target.src = `${apiHost}/item_pictures/default.jpg?t=${Date.now()}`;
                   e.target.onerror = null; 
                 }}
               />

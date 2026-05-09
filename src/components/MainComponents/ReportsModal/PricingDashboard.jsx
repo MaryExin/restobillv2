@@ -1,88 +1,148 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Search, Edit3, X, ChevronDown, Loader2, 
-  AlertCircle, DollarSign, RefreshCw 
+  AlertCircle, Image as ImageIcon, Type, Tag, ShoppingBag, Plus, RefreshCw, CheckCircle2
 } from 'lucide-react';
 
 const COLORS = {
-  brand: "#2563eb", 
-  brandLighter: "rgba(37, 99, 235, 0.1)",
+  brand: "#2563eb",
+  brandLighter: "rgba(37, 99, 235, 0.05)",
+  brandShadow: "rgba(37, 99, 235, 0.2)",
 };
 
 const PricingDashboard = ({ isOpen, onClose }) => {
+  const apiHost = "http://localhost"; 
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeCategory, setActiveCategory] = useState('');
   const [selectedService, setSelectedService] = useState('');
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [enablePictures, setEnablePictures] = useState(true);
 
+  // Success Notification State
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
+
+  // Add Product Modal States
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newProduct, setNewProduct] = useState({
+    inv_code: '', 
+    item_name: '',
+    item_category: '',
+    unit_of_measure: 'PC',
+    srp: '',
+    vatable: 'Yes',
+    isDiscountable: 'Yes',
+    target_sales_type: '' 
+  });
+
+  // Edit Price Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [newPrice, setNewPrice] = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
 
   useEffect(() => {
-    if (isOpen) {
-      fetchPricingData();
-      triggerBackgroundSync();
-    }
+    if (isOpen) fetchPricingData();
   }, [isOpen]);
 
   const fetchPricingData = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('http://localhost/api/get_pricing.php');
+      const response = await axios.get(`${apiHost}/api/get_pricing.php`);
       setProducts(response.data);
       if (response.data.length > 0) {
-        if (!selectedService) setSelectedService(response.data[0].service_type);
+        if (!selectedService) setSelectedService(response.data[0].service_type || 'DINE-IN');
         if (!activeCategory) setActiveCategory(response.data[0].item_category || 'OTHERS');
       }
-    } catch (error) { console.error(error); } finally { setLoading(false); }
+    } catch (error) { 
+        console.error("Fetch Error:", error); 
+    } finally { 
+        setLoading(false); 
+    }
   };
 
-  const triggerBackgroundSync = () => {
-    setIsSyncing(true);
-    axios.get('http://localhost/api/sync_to_web.php').finally(() => setIsSyncing(false));
+  const triggerSuccess = (msg) => {
+    setSuccessMsg(msg);
+    setShowSuccess(true);
+    setTimeout(() => setShowSuccess(false), 3000);
+  };
+
+  const generateInvCode = () => {
+    const randomDigits = Math.floor(1000000000 + Math.random() * 9000000000);
+    setNewProduct(prev => ({ ...prev, inv_code: `BD-${randomDigits}` }));
+  };
+
+  const handleOpenAddModal = () => {
+    generateInvCode();
+    setNewProduct(prev => ({ 
+      ...prev, 
+      target_sales_type: selectedService,
+      item_category: categories[0] || '' 
+    }));
+    setIsAddModalOpen(true);
   };
 
   const openEditModal = (item) => {
     setEditingItem(item);
-    setNewPrice(item.srp); 
-    setIsModalOpen(true);   
-    setShowConfirm(false);  
+    setNewPrice(item.srp);
+    setShowConfirm(false);
+    setIsModalOpen(true);
+  };
+
+  const handleAddProduct = async () => {
+    const userId = localStorage.getItem('user_id') || '0';
+    if (!newProduct.item_name || !newProduct.srp) {
+        alert("Product Name and SRP are required.");
+        return;
+    }
+    try {
+      const response = await axios.post(`${apiHost}/api/pricing_engine.php`, {
+        action: 'add',
+        ...newProduct,
+        user_id: userId
+      });
+
+      if (response.data.status === "success") {
+        setIsAddModalOpen(false);
+        fetchPricingData();
+        triggerSuccess("Product successfully added to Masterlist!");
+      } else {
+        alert(response.data.message);
+      }
+    } catch (error) { 
+        alert("Failed to communicate with server."); 
+    }
   };
 
   const executeUpdate = async () => {
     const userId = localStorage.getItem('user_id') || '0';
-    const userEmail = localStorage.getItem('email') || 'system@internal.com';
-    const pCode = editingItem?.pricing_code || 'N/A';
-
     try {
-      const response = await axios.post('http://localhost/api/update_pricing.php', {
+      const response = await axios.post(`${apiHost}/api/pricing_engine.php`, {
+        action: 'update',
         inv_code: editingItem.inv_code,
-        pricing_code: pCode,
         new_price: parseFloat(newPrice),
         service_type: selectedService,
         user_id: userId,
-        user_name: userEmail 
+        user_name: localStorage.getItem('email') || 'system'
       });
-
       if (response.data.status === "success") {
         setIsModalOpen(false);
         fetchPricingData();
-        triggerBackgroundSync();
+        triggerSuccess("Price updated successfully!");
       }
-    } catch (error) {
-      alert("Error: Update failed.");
+    } catch (error) { 
+        alert("Update failed."); 
     }
   };
 
   if (!isOpen) return null;
 
   const categories = [...new Set(products.map(p => p.item_category || 'OTHERS'))];
-  const serviceTypes = [...new Set(products.map(p => p.service_type))];
+  const serviceTypes = [...new Set(products.map(p => p.service_type))].filter(Boolean);
+  const uomList = ["PC", "BOX", "KILO", "PACK", "BOTTLE"];
   
   const filteredProducts = products.filter(item => 
     item.service_type === selectedService && 
@@ -91,128 +151,238 @@ const PricingDashboard = ({ isOpen, onClose }) => {
   );
 
   return (
-    <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 font-sans">
-      <div className="flex flex-col w-full h-full max-w-[1200px] max-h-[90vh] bg-[#fcfdfe] rounded-3xl overflow-hidden shadow-2xl border border-slate-100 transition-colors">
-        
-        {/* HEADER */}
-        <div className="p-6 bg-white border-b border-slate-100">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <div className="p-1.5 rounded-lg" style={{ backgroundColor: COLORS.brandLighter, color: COLORS.brand }}>
-                  <DollarSign size={20} strokeWidth={3} />
+    <>
+      <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/60 backdrop-blur-md p-6 font-sans overflow-hidden text-slate-700">
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+          className="flex flex-col w-full h-full max-w-[1200px] max-h-[90vh] bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden"
+        >
+          {/* HEADER */}
+          <div className="p-6 border-b border-slate-50">
+            <div className="flex items-center justify-between gap-4 mb-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl" style={{ backgroundColor: COLORS.brandLighter, color: COLORS.brand }}><Tag size={18} /></div>
+                <div>
+                  <h1 className="text-lg font-black leading-none tracking-tight uppercase text-slate-700">Pricing Engine</h1>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Terminal: <span style={{ color: COLORS.brand }}>{selectedService}</span></p>
                 </div>
-                <h1 className="text-2xl font-black tracking-tight uppercase text-slate-800">Pricing Dashboard</h1>
               </div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-10">Local Engine + Cloud Sync Queue</p>
-            </div>
-            
-            <div className="flex items-center gap-4">
-              <div className="relative min-w-[200px]">
-                <label className="text-[8px] font-black text-slate-400 uppercase absolute -top-4 left-1">Service Type</label>
-                <select value={selectedService} onChange={(e) => setSelectedService(e.target.value)}
-                  className="w-full p-2.5 pl-4 pr-10 text-xs font-black bg-slate-50 border border-slate-100 rounded-xl outline-none text-slate-700">
-                  {serviceTypes.map((type, i) => <option key={i} value={type}>{type}</option>)}
-                </select>
-                <ChevronDown className="absolute -translate-y-1/2 pointer-events-none right-3 top-1/2 text-slate-400" size={14} />
-              </div>
+              
+              <div className="flex items-center gap-3">
+                <button onClick={handleOpenAddModal} className="flex items-center gap-2 px-5 py-2.5 text-white transition-all rounded-2xl active:scale-95 shadow-lg shadow-blue-600/20"
+                  style={{ backgroundColor: COLORS.brand }}>
+                  <Plus size={16} strokeWidth={3} />
+                  <span className="text-[11px] font-black uppercase tracking-widest">New Product</span>
+                </button>
 
-              <div className="relative w-72">
-                <Search className="absolute -translate-y-1/2 left-3 top-1/2 text-slate-300" size={16} />
-                <input type="text" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full py-2.5 pl-10 pr-4 bg-slate-50 rounded-xl border border-slate-100 text-xs font-bold outline-none text-slate-800" />
-              </div>
-              <button onClick={onClose} className="p-2 text-slate-300 hover:text-red-500"><X size={24} /></button>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 pt-4 pb-2 overflow-x-auto border-t no-scrollbar border-slate-50">
-            {categories.map((cat, idx) => (
-              <button key={idx} onClick={() => setActiveCategory(cat)}
-                style={{ 
-                    backgroundColor: activeCategory === cat ? COLORS.brand : 'transparent',
-                    color: activeCategory === cat ? 'white' : '#64748b',
-                    borderColor: activeCategory === cat ? COLORS.brand : '#f1f5f9'
-                }}
-                className={`flex-shrink-0 px-5 py-2 rounded-xl text-[11px] transition-all border font-bold hover:bg-slate-50 ${activeCategory === cat ? 'hover:bg-blue-700' : ''}`}>
-                {cat}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* LIST */}
-        <div className="flex-1 p-8 overflow-y-auto bg-[#f8fafc]">
-          {loading ? (
-            <div className="flex justify-center mt-20"><Loader2 className="animate-spin" style={{ color: COLORS.brand }} /></div>
-          ) : (
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-3 lg:grid-cols-4">
-              {filteredProducts.map((item, idx) => (
-                <div key={idx} className="flex flex-col justify-between p-5 transition-all bg-white border shadow-sm border-slate-100 rounded-2xl h-44 group hover:shadow-lg">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 pr-4">
-                      <p className="text-[9px] font-black mb-1 uppercase tracking-tighter" style={{ color: COLORS.brand }}>{item.inv_code}</p>
-                      <h3 className="text-xs font-bold leading-tight uppercase text-slate-700 line-clamp-2">{item.item_description}</h3>
-                    </div>
-                    <button onClick={() => openEditModal(item)} className="p-2 transition-all rounded-lg bg-slate-50 text-slate-400 hover:text-white hover:bg-blue-600">
-                      <Edit3 size={14} />
-                    </button>
-                  </div>
-                  
-                  <div className="flex items-end justify-between pt-3 mt-3 border-t border-slate-50">
-                    <div className="text-left">
-                      <p className="text-[7px] font-black text-slate-300 uppercase">Cost (40%)</p>
-                      <p className="text-[10px] font-medium text-slate-500">
-                        ₱{item.cost_per_uom ? Number(item.cost_per_uom).toLocaleString(undefined, {minimumFractionDigits: 2}) : '0.00'}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[8px] font-black text-slate-300 uppercase">Active SRP</p>
-                      <div className="flex items-start leading-none" style={{ color: COLORS.brand }}>
-                        <span className="text-xs mt-0.5 font-bold">₱</span>
-                        <span className="text-2xl font-normal tracking-tighter">{Number(item.srp).toLocaleString()}</span>
-                      </div>
-                    </div>
-                  </div>
+                <div className="relative">
+                  <select value={selectedService} onChange={(e) => setSelectedService(e.target.value)}
+                    className="appearance-none bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 pr-10 text-[11px] font-black text-slate-600 outline-none">
+                    {serviceTypes.map((type, i) => <option key={i} value={type}>{type}</option>)}
+                  </select>
+                  <ChevronDown className="absolute -translate-y-1/2 pointer-events-none right-3 top-1/2 text-slate-400" size={12} />
                 </div>
+
+                <button onClick={() => setEnablePictures(!enablePictures)}
+                  className={`p-2.5 rounded-xl border transition-all ${enablePictures ? 'border-blue-100 text-blue-600 bg-blue-50' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
+                  {enablePictures ? <ImageIcon size={16} /> : <Type size={16} />}
+                </button>
+
+                <div className="relative">
+                  <Search className="absolute -translate-y-1/2 left-3 top-1/2 text-slate-300" size={14} />
+                  <input type="text" placeholder="Search inventory..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+                    className="py-2.5 pl-9 pr-4 bg-slate-50 rounded-xl border border-slate-100 text-[11px] font-bold outline-none w-48 focus:w-64 transition-all" />
+                </div>
+                <button onClick={onClose} className="p-2 transition-colors text-slate-300 hover:text-rose-500"><X size={20} /></button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+              {categories.map((cat, idx) => (
+                <button key={idx} onClick={() => setActiveCategory(cat)}
+                  style={activeCategory === cat ? { backgroundColor: COLORS.brand, borderColor: COLORS.brand } : {}}
+                  className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase transition-all border ${
+                    activeCategory === cat ? "text-white shadow-md scale-105" : "bg-white text-slate-400 border-slate-100 hover:bg-slate-50"
+                  }`}>{cat}</button>
               ))}
             </div>
-          )}
-        </div>
+          </div>
 
-        {/* EDIT MODAL */}
+          {/* GRID */}
+          <div className="flex-1 p-8 overflow-y-auto bg-[#fcfdfe] no-scrollbar">
+            {loading ? (
+              <div className="flex flex-col items-center justify-center gap-3 mt-20">
+                <Loader2 style={{ color: COLORS.brand }} className="animate-spin" size={32} />
+                <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest italic">Syncing Pricing Data...</p>
+              </div>
+            ) : (
+              <div className={`grid gap-5 ${enablePictures ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5' : 'grid-cols-1'}`}>
+                {filteredProducts.map((item, idx) => (
+                  <motion.div layout key={idx} className={`relative flex flex-col overflow-hidden rounded-[2.2rem] border border-slate-100 bg-white transition-all hover:shadow-xl group ${!enablePictures && 'h-20 flex-row items-center px-6'}`}>
+                    {enablePictures && (
+                      <div className="relative w-full overflow-hidden aspect-square bg-slate-50">
+                        <img src={`${apiHost}/item_pictures/${item.item_description}.jpg`} className="object-cover w-full h-full transition-transform duration-500 group-hover:scale-110"
+                          onError={(e) => { e.target.src = `${apiHost}/item_pictures/default.jpg?t=${Date.now()}`; }} />
+                      </div>
+                    )}
+                    <div className={`p-5 flex flex-col justify-between flex-1 ${!enablePictures && 'p-0 ml-4'}`}>
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <ShoppingBag size={10} style={{ color: COLORS.brand }} />
+                          <p className="text-[8px] font-black uppercase tracking-tighter" style={{ color: COLORS.brand }}>{item.inv_code}</p>
+                        </div>
+                        <h3 className="text-[11px] font-black text-slate-700 leading-tight uppercase line-clamp-2">{item.item_description}</h3>
+                      </div>
+                      <div className="flex items-end justify-between mt-4">
+                        <p className="text-[18px] font-black leading-none tracking-tighter" style={{ color: COLORS.brand }}>₱{Number(item.srp).toLocaleString()}</p>
+                        <button onClick={() => openEditModal(item)} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-white hover:bg-blue-600 transition-all shadow-sm">
+                          <Edit3 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </div>
+        </motion.div>
+      </div>
+
+      {/* SUCCESS TOAST */}
+      <AnimatePresence>
+        {showSuccess && (
+          <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            className="fixed bottom-10 z-[10000000] flex items-center gap-4 px-8 py-5 bg-white border border-blue-100 rounded-3xl shadow-2xl"
+          >
+            <div className="p-2 text-blue-600 rounded-full bg-blue-50"><CheckCircle2 size={24} /></div>
+            <div>
+              <p className="text-[10px] font-black uppercase text-blue-600">Success</p>
+              <p className="text-[13px] font-bold text-slate-700">{successMsg}</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ADD PRODUCT MODAL */}
+      <AnimatePresence>
+        {isAddModalOpen && (
+          <div className="fixed inset-0 z-[9999999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+              className="w-full max-w-[450px] bg-white rounded-[2.5rem] p-10 shadow-2xl border border-white max-h-[90vh] overflow-y-auto no-scrollbar"
+            >
+              <h2 className="mb-8 text-xs font-black uppercase text-slate-700 tracking-[0.2em] flex items-center gap-2">
+                <Plus size={16} className="text-blue-600" /> New Inventory Entry
+              </h2>
+              
+              <div className="space-y-5 text-left">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Product ID</label>
+                    <div className="relative mt-1">
+                      <input type="text" readOnly value={newProduct.inv_code} className="w-full px-4 py-3 bg-slate-50 rounded-xl text-[11px] font-black text-blue-600 border border-slate-100" />
+                      <button onClick={generateInvCode} className="absolute -translate-y-1/2 right-3 top-1/2 text-slate-300 hover:text-blue-500"><RefreshCw size={14}/></button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Sales Mode</label>
+                    <select value={newProduct.target_sales_type} onChange={(e) => setNewProduct({...newProduct, target_sales_type: e.target.value})}
+                       className="w-full mt-1 px-4 py-3 bg-slate-50 rounded-xl text-[11px] font-black text-slate-600 border border-slate-100 outline-none">
+                       {serviceTypes.map((type, i) => <option key={i} value={type}>{type}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Product Name</label>
+                  <input type="text" value={newProduct.item_name} onChange={(e) => setNewProduct({...newProduct, item_name: e.target.value})}
+                    className="w-full mt-1 px-4 py-3 bg-slate-50 rounded-xl text-[11px] font-bold border border-slate-100" placeholder="Enter name..." />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Category</label>
+                    <select value={newProduct.item_category} onChange={(e) => setNewProduct({...newProduct, item_category: e.target.value})}
+                       className="w-full mt-1 px-4 py-3 bg-slate-50 rounded-xl text-[11px] font-black text-slate-600 border border-slate-100 outline-none uppercase">
+                       {categories.map((cat, i) => <option key={i} value={cat}>{cat}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">UOM</label>
+                    <select value={newProduct.unit_of_measure} onChange={(e) => setNewProduct({...newProduct, unit_of_measure: e.target.value})}
+                       className="w-full mt-1 px-4 py-3 bg-slate-50 rounded-xl text-[11px] font-black text-slate-600 border border-slate-100 outline-none">
+                       {uomList.map((u, i) => <option key={i} value={u}>{u}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">SRP</label>
+                  <input type="number" value={newProduct.srp} onChange={(e) => setNewProduct({...newProduct, srp: e.target.value})}
+                    className="w-full px-4 py-3 mt-1 text-lg font-black text-blue-600 border outline-none bg-slate-50 rounded-xl border-slate-100" placeholder="0.00" />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Vatable</label>
+                    <select value={newProduct.vatable} onChange={(e) => setNewProduct({...newProduct, vatable: e.target.value})}
+                       className="w-full mt-1 px-4 py-3 bg-slate-50 rounded-xl text-[11px] font-black text-slate-600 border border-slate-100 outline-none">
+                       <option value="Yes">Yes</option><option value="No">No</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Discountable</label>
+                    <select value={newProduct.isDiscountable} onChange={(e) => setNewProduct({...newProduct, isDiscountable: e.target.value})}
+                       className="w-full mt-1 px-4 py-3 bg-slate-50 rounded-xl text-[11px] font-black text-slate-600 border border-slate-100 outline-none">
+                       <option value="Yes">Yes</option><option value="No">No</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 mt-10">
+                <button onClick={() => setIsAddModalOpen(false)} className="py-4 bg-slate-100 text-slate-500 text-[10px] font-black uppercase rounded-[1.2rem]">Abort</button>
+                <button onClick={handleAddProduct} className="py-4 text-white text-[10px] font-black uppercase rounded-[1.2rem] shadow-lg shadow-blue-600/20"
+                  style={{ backgroundColor: COLORS.brand }}>Save Entry</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* EDIT PRICE MODAL */}
+      <AnimatePresence>
         {isModalOpen && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center p-6 bg-black/20 backdrop-blur-md">
-            <div className="w-full max-w-xs bg-white border border-slate-100 shadow-2xl rounded-[2rem] p-8 text-center animate-in zoom-in duration-150">
+          <div className="fixed inset-0 z-[9999999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+              className="w-full max-w-[300px] bg-white rounded-[2.5rem] p-10 shadow-2xl text-center border border-white"
+            >
               {!showConfirm ? (
                 <>
-                  <p className="text-[9px] font-black uppercase tracking-widest mb-1" style={{ color: COLORS.brand }}>Adjust Price</p>
-                  <h2 className="mb-6 text-sm font-black leading-tight uppercase text-slate-800">{editingItem?.item_description}</h2>
-                  <div className="relative mb-4">
-                    <span className="absolute text-sm font-bold -translate-y-1/2 left-4 top-1/2 text-slate-400">₱</span>
+                  <div className="flex items-center justify-center mx-auto mb-4 w-14 h-14 rounded-2xl" style={{ backgroundColor: COLORS.brandLighter, color: COLORS.brand }}><Edit3 size={24} /></div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] mb-2" style={{ color: COLORS.brand }}>{selectedService}</p>
+                  <h2 className="mb-8 text-xs font-black leading-snug uppercase text-slate-700 line-clamp-2">{editingItem?.item_description}</h2>
+                  <div className="relative mb-8 group">
+                    <span className="absolute text-xl font-black -translate-y-1/2 left-5 top-1/2 text-slate-300">₱</span>
                     <input autoFocus type="number" value={newPrice} onChange={(e) => setNewPrice(e.target.value)}
-                      className="w-full py-3.5 pl-8 pr-4 bg-slate-50 border-none rounded-xl text-lg font-normal text-slate-700 outline-none" />
+                      className="w-full py-5 pl-10 pr-6 text-3xl font-black transition-all border-2 outline-none bg-slate-50 border-slate-50 rounded-2xl text-slate-800 focus:border-blue-500 focus:bg-white" />
                   </div>
-                  <button onClick={() => setShowConfirm(true)} style={{ backgroundColor: COLORS.brand }}
-                    className="w-full py-4 text-xs font-black tracking-widest text-white uppercase transition-transform shadow-lg rounded-xl active:scale-95">Update Price</button>
-                  <button onClick={() => setIsModalOpen(false)} className="mt-4 text-[10px] font-bold uppercase text-slate-400 hover:text-slate-600">Cancel</button>
+                  <button onClick={() => setShowConfirm(true)} className="w-full py-4 text-white text-[11px] font-black uppercase rounded-2xl shadow-lg shadow-blue-600/20" style={{ backgroundColor: COLORS.brand }}>Update Price</button>
+                  <button onClick={() => setIsModalOpen(false)} className="mt-4 text-[10px] font-black uppercase text-slate-400">Cancel</button>
                 </>
               ) : (
-                <div className="duration-300 animate-in fade-in">
-                  <AlertCircle className="mx-auto mb-4" size={36} style={{ color: COLORS.brand }} />
-                  <h3 className="mb-1 text-lg font-black tracking-tighter uppercase text-slate-800">Confirm Update</h3>
-                  <div className="grid grid-cols-2 gap-3 mt-6">
-                    <button onClick={() => setShowConfirm(false)} className="py-3.5 bg-slate-100 text-slate-500 font-black rounded-xl text-[10px] uppercase hover:bg-slate-200">Abort</button>
-                    <button onClick={executeUpdate} style={{ backgroundColor: COLORS.brand }}
-                      className="py-3.5 text-white font-black rounded-xl text-[10px] uppercase shadow-md transition-opacity hover:opacity-90">Confirm</button>
+                <div className="py-2">
+                  <div className="flex items-center justify-center w-16 h-16 mx-auto mb-6 rounded-full" style={{ backgroundColor: COLORS.brandLighter, color: COLORS.brand }}><AlertCircle size={32} /></div>
+                  <h3 className="mb-2 text-lg font-black tracking-tight uppercase text-slate-800">Confirm Sync?</h3>
+                  <div className="grid grid-cols-2 gap-4 mt-8">
+                    <button onClick={() => setShowConfirm(false)} className="py-4 bg-slate-100 text-slate-500 text-[10px] font-black rounded-xl uppercase">No</button>
+                    <button onClick={executeUpdate} className="py-4 text-white text-[10px] font-black rounded-xl uppercase shadow-lg shadow-blue-600/20" style={{ backgroundColor: COLORS.brand }}>Confirm</button>
                   </div>
                 </div>
               )}
-            </div>
+            </motion.div>
           </div>
         )}
-      </div>
-    </div>
+      </AnimatePresence>
+    </>
   );
 };
 
