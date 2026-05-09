@@ -60,7 +60,7 @@ const PricingDashboard = ({ isOpen, onClose }) => {
     setTimeout(() => setShowSuccess(false), 3000);
   };
 
-  // Image Upload Logic
+  // Image Upload Logic with Cache Busting
   const handleImageUpload = async (e, itemName) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -73,8 +73,9 @@ const PricingDashboard = ({ isOpen, onClose }) => {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       if (response.data.status === "success") {
+        // Refreshing data will trigger the new timestamp in the img src
         fetchPricingData(); 
-        triggerSuccess("Product image updated!");
+        triggerSuccess("Product image updated successfully!");
       }
     } catch (error) { alert("Upload failed."); }
   };
@@ -184,16 +185,20 @@ const PricingDashboard = ({ isOpen, onClose }) => {
                   <motion.div layout key={idx} className="relative flex flex-col overflow-hidden rounded-[2.2rem] border border-slate-100 bg-white shadow-sm group">
                     {enablePictures && (
                       <div className="relative w-full overflow-hidden aspect-square bg-slate-50">
+                        {/* THE IMAGE PATH INCLUDES A DYNAMIC TIMESTAMP TO BYPASS BROWSER CACHE */}
                         <img 
                           src={`${apiHost}/item_pictures/${item.item_description}.jpg?t=${new Date().getTime()}`} 
                           className="object-cover w-full h-full transition-transform group-hover:scale-105"
-                          onError={(e) => { e.target.src = `${apiHost}/item_pictures/default.jpg`; }} 
+                          onError={(e) => { e.target.src = `${apiHost}/item_pictures/default.jpg?t=${new Date().getTime()}`; }} 
                         />
                       </div>
                     )}
                     <div className="flex flex-col justify-between flex-1 p-5">
                       <div>
-                        <p className="text-[8px] font-black uppercase text-blue-600">{item.inv_code}</p>
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <ShoppingBag size={10} style={{ color: COLORS.brand }} />
+                          <p className="text-[8px] font-black uppercase tracking-tighter" style={{ color: COLORS.brand }}>{item.inv_code}</p>
+                        </div>
                         <h3 className="text-[11px] font-black text-slate-700 leading-tight uppercase line-clamp-2">{item.item_description}</h3>
                       </div>
                       <div className="flex items-end justify-between mt-4">
@@ -229,7 +234,7 @@ const PricingDashboard = ({ isOpen, onClose }) => {
         )}
       </AnimatePresence>
 
-      {/* ADD PRODUCT MODAL */}
+      {/* ADD MODAL */}
       <AnimatePresence>
         {isAddModalOpen && (
           <div className="fixed inset-0 z-[9999999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
@@ -338,4 +343,5 @@ const PricingDashboard = ({ isOpen, onClose }) => {
     </>
   );
 };
+
 export default PricingDashboard;
