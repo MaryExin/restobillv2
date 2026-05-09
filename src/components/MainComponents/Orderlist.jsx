@@ -2638,75 +2638,103 @@ const Orderlist = ({
               </div>
 
 <div className="flex-1 min-h-0 overflow-hidden"> 
-  <div className="h-full p-4 pt-2 overflow-y-auto no-scrollbar">
-    <div className="grid grid-cols-2 gap-8 p-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3">
-      {filteredProducts.map((p, i) => (
+  <div className="h-full p-6 pt-2 overflow-y-auto no-scrollbar">
+    <div className="grid grid-cols-2 gap-6 p-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4">
+      {filteredProducts && filteredProducts.map((p, i) => (
         <motion.button
-          key={i}
-          whileHover={{ y: -6, scale: 1.01 }}
-          whileTap={{ scale: 0.98 }}
+          key={p.item_code || i}
+          /* Hover: Bahagyang aangat */
+          whileHover={{ y: -8, scale: 1.02, rotate: 0.5 }}
+          
+          /* Click: Standard scale down na lang para sa tactile feel */
+          whileTap={{ scale: 0.95 }}
+          
           onClick={() => addToCart(p)}
-          className="group relative flex w-full flex-col overflow-hidden rounded-[32px] border text-left transition-all duration-300"
+          
+          className="group relative flex w-full flex-col overflow-hidden rounded-[2.5rem] border transition-all duration-500 shadow-lg hover:shadow-2xl"
           style={{
-            borderColor: "var(--app-border)",
-            backgroundColor: "var(--app-surface)",
-            /* Maintained square shape but with fixed content protection */
-            aspectRatio: enableItemPictures ? "1/1" : "auto",
-            minWidth: "200px" 
+            borderColor: isDark ? "rgba(255,255,255,0.1)" : "var(--app-border)",
+            backgroundColor: isDark ? "rgba(30, 41, 59, 0.5)" : "var(--app-surface)",
+            backdropFilter: "blur(12px)",
+            minWidth: "140px" 
           }}
         >
-          {/* 1. TOP SECTION: Reduced image height to 50% to ensure price room */}
+          {/* SAFE +1 POP-UP: Lilitaw at aangat lang kapag clinick ang button */}
+          <motion.div 
+            className="absolute inset-0 flex items-center justify-center pointer-events-none z-[100] opacity-0"
+            initial={false}
+            whileTap={{ 
+              opacity: [0, 1, 0], 
+              y: [0, -100], 
+              scale: [0.5, 1.5, 1],
+              transition: { duration: 0.6, ease: "easeOut" } 
+            }}
+          >
+            <span className="text-3xl italic font-black drop-shadow-lg" style={{ color: "var(--app-accent)" }}>
+              +1
+            </span>
+          </motion.div>
+
+          {/* THEME-BASED GLOW BORDER */}
+          <div className="absolute inset-0 transition-opacity duration-500 opacity-0 pointer-events-none group-hover:opacity-100">
+            <div 
+              className="absolute inset-0 animate-pulse opacity-10" 
+              style={{ background: "var(--app-accent)" }}
+            />
+          </div>
+
+          {/* 1. SQUARE IMAGE SECTION */}
           {enableItemPictures && (
-            <div className="relative h-[50%] w-full overflow-hidden shrink-0 bg-slate-200/5 flex items-center justify-center">
+            <div className="relative flex items-center justify-center w-full overflow-hidden aspect-square shrink-0 bg-slate-800/10">
               <img
                 src={`${apiHost}/item_pictures/${p.item_name}.jpg`}
                 alt={p.item_name}
-                className="object-cover w-full h-full transition-transform duration-500 group-hover:scale-110"
+                className="object-cover w-full h-full transition-transform duration-700 group-hover:scale-125"
                 onError={(e) => {
                   e.target.src = `${apiHost}/item_pictures/default.jpg`;
                   e.target.onerror = null; 
                 }}
               />
-              {/* Blue accent line exactly at the bottom of image */}
-              <div
-                className="absolute inset-x-0 bottom-0 z-10 h-1"
-                style={{
-                  background: "linear-gradient(to right, transparent, var(--app-accent), transparent)",
-                }}
-              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60" />
+              
+              <div className="absolute top-3 left-3 px-2 py-1 rounded-lg bg-black/40 backdrop-blur-md border border-white/10 text-[8px] font-black text-white uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all">
+                {p.item_category || 'Hot Item'}
+              </div>
             </div>
           )}
 
-          {/* 2. BOTTOM SECTION: Controlled text height and fixed price */}
-          <div className="relative flex flex-col justify-between flex-1 p-4 pt-3 pb-6">
-            <div className="flex-1 min-h-0">
-              <h4
-                /* Limits to 2 lines so it doesn't push the price out */
-                className="line-clamp-2 break-words text-[13px] font-black leading-tight"
+          {/* 2. PREMIUM INFO SECTION */}
+          <div className="relative z-10 flex flex-col justify-between flex-1 p-4 pb-6 text-left">
+            <div className="flex-1 min-h-[32px]">
+              <h4 
+                className="line-clamp-2 break-words text-[12px] font-black leading-tight mb-1 uppercase tracking-tight transition-colors duration-300"
                 style={{ color: "var(--app-text)" }}
               >
                 {p.item_name}
               </h4>
             </div>
 
-            {/* Price Section: Using pb-6 and shrink-0 to prevent cut-off */}
-            <div className="flex justify-end mt-auto shrink-0">
+            <div className="flex items-end justify-between mt-2 shrink-0">
+               <div className="flex items-center justify-center w-6 h-6 transition-all rounded-full opacity-0 group-hover:opacity-100"
+                    style={{ backgroundColor: "var(--app-accent)", opacity: 0.1 }}>
+                  <FaPlus size={8} style={{ color: "var(--app-accent)" }} />
+               </div>
+
               <div className="text-right">
-                <p
-                  className="mb-0 text-[8px] font-bold uppercase tracking-[0.15em]"
-                  style={{ color: "var(--app-muted-text)" }}
-                >
+                <p className="mb-0 text-[7px] font-black uppercase tracking-[0.2em]"
+                   style={{ color: "var(--app-muted-text)" }}>
                   Price
                 </p>
-                <p
-                  className="text-[20px] font-black leading-none"
-                  style={{ color: "var(--app-accent)" }}
-                >
+                <p className="text-[18px] font-black leading-none"
+                   style={{ color: "var(--app-accent)" }}>
                   ₱{Number(p.selling_price || 0).toLocaleString()}
                 </p>
               </div>
             </div>
           </div>
+          
+          <div className="absolute bottom-0 left-0 w-0 h-1 transition-all duration-500 group-hover:w-full" 
+               style={{ backgroundColor: "var(--app-accent)" }} />
         </motion.button>
       ))}
     </div>
@@ -4232,7 +4260,7 @@ const Orderlist = ({
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
+ <AnimatePresence>
   {summaryCart && (
     <motion.div
       initial={{ opacity: 0 }}
@@ -4244,46 +4272,51 @@ const Orderlist = ({
         initial={{ scale: 0.95, y: 20 }}
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.95, y: 20 }}
-        className={`w-full max-w-sm overflow-hidden rounded-lg shadow-2xl transition-colors ${
+        className={`w-full max-w-sm overflow-hidden rounded-[2rem] shadow-2xl transition-colors ${
           isDark ? "bg-slate-900 border border-white/10" : "bg-white border border-slate-200"
         }`}
       >
-        {/* ORDER SLIP */}
-        <div className="p-6 text-center border-b-2 border-dashed border-slate-300/50">
-          <h2 className={`text-xl font-black uppercase tracking-tighter ${isDark ? "text-white" : "text-slate-900"}`}>
+        {/* ORDER SLIP HEADER */}
+        <div className="p-8 text-center border-b-2 border-dashed border-slate-300/50">
+          <h2 className={`text-2xl font-black uppercase tracking-tighter ${isDark ? "text-white" : "text-slate-900"}`}>
             Order Summary
           </h2>
-          {/* <p className="text-[10px] font-bold text-blue-500 mt-1 uppercase tracking-widest">
-            Summary
-          </p> */}
-          <div className={`mt-4 py-2 border-y border-slate-100/10 font-mono text-sm font-bold ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+          <div className={`mt-4 py-2 border-y border-slate-100/10 font-mono text-base font-bold ${isDark ? "text-slate-300" : "text-slate-700"}`}>
             TABLE: {tableselected}
           </div>
         </div>
 
         {/* ITEMS LIST (RECEIPT STYLE) */}
-        <div className="p-6 overflow-y-auto max-h-[50vh] no-scrollbar font-mono">
-          <div className="space-y-4">
+        <div className="p-8 overflow-y-auto max-h-[50vh] no-scrollbar font-mono">
+          <div className="space-y-6">
             {groupedSummaryOrders.map((group) => (
               <div key={group.category}>
-                <p className="text-[9px] font-bold text-slate-500 mb-2 uppercase tracking-widest">
+                <p className="text-[10px] font-black text-blue-500 mb-4 uppercase tracking-[0.3em] text-center italic">
                   -- {group.category} --
                 </p>
+                
                 {group.items.map((item, idx) => (
-                  <div key={idx} className="mb-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <span className={`text-sm font-bold flex-1 ${isDark ? "text-white" : "text-slate-800"}`}>
-                        {item.quantity}x {item.name}
-                      </span>
-                      <span className={`text-sm font-bold ${isDark ? "text-slate-400" : "text-slate-600"}`}>
-                        ₱{(item.price * item.quantity).toLocaleString()}
-                      </span>
+                  <div key={idx} className="mb-4 last:mb-0">
+                    <div className="flex flex-col gap-1">
+                      {/* ITEM ROW: Quantity, Name, and Total Price */}
+                      <div className="flex items-start justify-between gap-4">
+                        <span className={`text-base font-black leading-tight uppercase flex-1 ${isDark ? "text-white" : "text-slate-800"}`}>
+                          {item.quantity}x {item.name}
+                        </span>
+                        <span className={`text-base font-black shrink-0 ${isDark ? "text-blue-500" : "text-blue-600"}`}>
+                          ₱{(item.price * item.quantity).toLocaleString()}
+                        </span>
+                      </div>
+
+                      {/* SPECIAL INSTRUCTIONS (Kung meron) */}
+                      {item.itemInstruction && (
+                        <div className="px-3 py-1 mt-1 border-l-2 rounded-r-lg bg-rose-500/5 border-rose-500/50">
+                          <p className="text-[10px] text-rose-500 font-bold italic leading-tight uppercase">
+                            ** {item.itemInstruction}
+                          </p>
+                        </div>
+                      )}
                     </div>
-                    {item.itemInstruction && (
-                      <p className="text-[10px] text-rose-500 font-bold mt-1 ml-4 leading-tight">
-                        ** {item.itemInstruction}
-                      </p>
-                    )}
                   </div>
                 ))}
               </div>
@@ -4291,29 +4324,29 @@ const Orderlist = ({
           </div>
 
           {/* TOTAL AREA */}
-          <div className="pt-4 mt-6 border-t-2 border-dashed border-slate-300/50">
-            <div className="flex items-center justify-between">
-              <span className={`text-xs font-bold ${isDark ? "text-slate-500" : "text-slate-500"}`}>TOTAL ITEMS:</span>
-              <span className={`text-xs font-bold ${isDark ? "text-slate-300" : "text-slate-700"}`}>{totalItems}</span>
+          <div className="pt-6 mt-6 border-t-4 border-double border-slate-300/50">
+            <div className="flex items-center justify-between opacity-60">
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">TOTAL ITEMS:</span>
+              <span className={`text-sm font-black ${isDark ? "text-slate-300" : "text-slate-700"}`}>{totalItems}</span>
             </div>
             <div className="flex items-center justify-between mt-2">
-              <span className={`text-base font-black ${isDark ? "text-white" : "text-slate-900"}`}>AMOUNT DUE:</span>
-              <span className="text-xl font-black text-blue-500">₱{totalPrice.toLocaleString()}</span>
+              <span className={`text-lg font-black ${isDark ? "text-white" : "text-slate-900"}`}>AMOUNT DUE:</span>
+              <span className="text-2xl font-black tracking-tighter text-blue-500">₱{totalPrice.toLocaleString()}</span>
             </div>
           </div>
         </div>
 
         {/* ACTION BUTTONS */}
-        <div className="flex flex-col gap-2 p-6 pt-0">
+        <div className="flex flex-col gap-3 p-8 pt-0">
           <button
             onClick={handleGenerateQR}
-            className="w-full py-4 font-black text-white transition-all bg-blue-600 shadow-lg rounded-2xl hover:bg-blue-500 shadow-blue-600/20 active:scale-95"
+            className="w-full py-5 font-black text-white text-lg transition-all bg-blue-600 shadow-xl rounded-[1.5rem] hover:bg-blue-500 shadow-blue-600/30 active:scale-95 uppercase tracking-widest"
           >
             CONFIRM ORDER
           </button>
           <button
             onClick={() => setSummaryCart(false)}
-            className={`w-full py-3 text-xs font-bold uppercase tracking-widest transition-all ${
+            className={`w-full py-2 text-[10px] font-black uppercase tracking-[0.3em] transition-all ${
               isDark ? "text-slate-500 hover:text-white" : "text-slate-400 hover:text-slate-600"
             }`}
           >
