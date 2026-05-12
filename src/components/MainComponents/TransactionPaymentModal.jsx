@@ -42,6 +42,68 @@ const formatAmountInput = (value) => {
 
 const negativePeso = (value) => `- ${peso(value)}`;
 const toNum = (value) => Number(value || 0);
+const roundMoney = (value) => Math.round(Number(value || 0) * 100) / 100;
+
+const applyDiscountCeiling = (breakdown, ceilingAmount) => {
+  const rawTotalDiscount = breakdown.reduce(
+    (sum, entry) => sum + Number(entry.discountAmount || 0),
+    0,
+  );
+  const safeCeiling = Number(ceilingAmount || 0);
+
+  if (!Number.isFinite(safeCeiling) || safeCeiling <= 0) {
+    return {
+      discountBreakdown: breakdown,
+      rawTotalDiscount,
+      totalDiscount: rawTotalDiscount,
+      isDiscountCeilingApplied: false,
+    };
+  }
+
+  if (rawTotalDiscount <= safeCeiling || rawTotalDiscount <= 0) {
+    return {
+      discountBreakdown: breakdown,
+      rawTotalDiscount,
+      totalDiscount: rawTotalDiscount,
+      isDiscountCeilingApplied: false,
+    };
+  }
+
+  let assigned = 0;
+  const discountEntries = breakdown.filter(
+    (entry) => Number(entry.discountAmount || 0) > 0,
+  );
+
+  const cappedBreakdown = breakdown.map((entry) => {
+    const discountAmount = Number(entry.discountAmount || 0);
+
+    if (discountAmount <= 0) {
+      return entry;
+    }
+
+    const isLastDiscountEntry =
+      discountEntries[discountEntries.length - 1]?.key === entry.key;
+    const cappedAmount = isLastDiscountEntry
+      ? roundMoney(safeCeiling - assigned)
+      : roundMoney((discountAmount / rawTotalDiscount) * safeCeiling);
+
+    assigned = roundMoney(assigned + cappedAmount);
+
+    return {
+      ...entry,
+      originalDiscountAmount: discountAmount,
+      discountAmount: Math.max(cappedAmount, 0),
+      isDiscountCeilingApplied: true,
+    };
+  });
+
+  return {
+    discountBreakdown: cappedBreakdown,
+    rawTotalDiscount,
+    totalDiscount: safeCeiling,
+    isDiscountCeilingApplied: true,
+  };
+};
 
 const yesNoToBool = (value) =>
   String(value || "")
@@ -58,7 +120,12 @@ const buildInitialDiscountState = () => ({
   pwd: { qualifiedCount: 0, manualAmount: "" },
   naac: { qualifiedCount: 0, manualAmount: "" },
   soloParent: { qualifiedCount: 0, manualAmount: "" },
-  manual: { qualifiedCount: 0, manualAmount: "" },
+  manual: {
+    qualifiedCount: 0,
+    manualAmount: "",
+    manualPercent: "",
+    manualMode: "amount",
+  },
 });
 
 const createEmptyPaymentRow = () => ({
@@ -810,6 +877,7 @@ const DiscountSetupModal = ({
   discountState,
   setDiscountState,
   computed,
+  discountCeilingAmount = 0,
   readOnly = false,
 }) => {
   const inputClass = isDark
@@ -832,6 +900,18 @@ const DiscountSetupModal = ({
       [key]: {
         ...prev[key],
         manualAmount: value,
+        manualMode: "amount",
+      },
+    }));
+  };
+
+  const handleManualPercentChange = (key, value) => {
+    setDiscountState((prev) => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        manualPercent: value,
+        manualMode: "percent",
       },
     }));
   };
@@ -872,7 +952,7 @@ const DiscountSetupModal = ({
     {
       key: "manual",
       label: "Manual Discount",
-      description: "Direct amount, no VAT exemption",
+      description: "Direct amount or percentage, no VAT exemption",
       showManual: true,
       amount: computed.discountBreakdown.find((x) => x.key === "manual")
         ?.discountAmount,
@@ -972,22 +1052,81 @@ const DiscountSetupModal = ({
                     </div>
 
                     {card.showManual ? (
-                      <div>
-                        <label className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
-                          Manual Amount
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={discountState[card.key].manualAmount}
-                          disabled={readOnly}
-                          onChange={(e) =>
-                            handleManualAmountChange(card.key, e.target.value)
-                          }
-                          onFocus={handleSelectAllOnFocus}
-                          className={`w-full rounded-2xl px-3 py-3 text-sm outline-none ${inputClass}`}
-                        />
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div>
+                          <label className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
+                            Manual Amount
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={
+                              discountState[card.key].manualMode === "percent"
+                                ? discountState[card.key].manualPercent === ""
+                                  ? ""
+                                  : roundMoney(
+                                      computed.discountableGross *
+                                        (Number(
+                                          discountState[card.key]
+                                            .manualPercent || 0,
+                                        ) /
+                                          100),
+                                    )
+                                : discountState[card.key].manualAmount
+                            }
+                            disabled={readOnly}
+                            onChange={(e) =>
+                              handleManualAmountChange(card.key, e.target.value)
+                            }
+                            onFocus={handleSelectAllOnFocus}
+                            className={`w-full rounded-2xl px-3 py-3 text-sm outline-none ${inputClass}`}
+                            placeholder="0.00"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
+                            Percent
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            value={
+                              discountState[card.key].manualMode === "percent"
+                                ? discountState[card.key].manualPercent
+                                : computed.discountableGross > 0 &&
+                                    Number(
+                                      discountState[card.key].manualAmount || 0,
+                                    ) > 0
+                                  ? roundMoney(
+                                      (Number(
+                                        discountState[card.key].manualAmount ||
+                                          0,
+                                      ) /
+                                        computed.discountableGross) *
+                                        100,
+                                    )
+                                  : ""
+                            }
+                            disabled={readOnly}
+                            onChange={(e) =>
+                              handleManualPercentChange(
+                                card.key,
+                                e.target.value,
+                              )
+                            }
+                            onFocus={handleSelectAllOnFocus}
+                            className={`w-full rounded-2xl px-3 py-3 text-sm outline-none ${inputClass}`}
+                            placeholder="%"
+                          />
+                        </div>
+
+                        <p className="md:col-span-2 text-[10px] font-semibold text-slate-500">
+                          Percentage is computed from discountable gross.
+                        </p>
                       </div>
                     ) : (
                       <div
@@ -1055,9 +1194,16 @@ const DiscountSetupModal = ({
                       <span className="text-[12px] font-bold">
                         {entry.label}
                       </span>
-                      <span className="text-[13px] font-black text-red-500">
-                        {negativePeso(entry.discountAmount)}
-                      </span>
+                      <div className="text-right">
+                        {entry.isDiscountCeilingApplied ? (
+                          <div className="text-[10px] font-bold text-slate-500 line-through">
+                            {negativePeso(entry.originalDiscountAmount)}
+                          </div>
+                        ) : null}
+                        <span className="text-[13px] font-black text-red-500">
+                          {negativePeso(entry.discountAmount)}
+                        </span>
+                      </div>
                     </div>
                     <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-slate-500">
                       <span>Count: {entry.qualifiedCount}</span>
@@ -1072,6 +1218,20 @@ const DiscountSetupModal = ({
                   {negativePeso(computed.totalDiscount)}
                 </span>
               </div>
+
+              {computed.isDiscountCeilingApplied ? (
+                <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 px-3 py-3 text-[11px] text-amber-600">
+                  Discount ceiling applied. Original discount was{" "}
+                  <span className="font-black">
+                    {negativePeso(computed.rawTotalDiscount)}
+                  </span>
+                  , capped at{" "}
+                  <span className="font-black">
+                    {negativePeso(discountCeilingAmount)}
+                  </span>
+                  .
+                </div>
+              ) : null}
 
               <div className="flex items-center justify-between gap-2 pb-2 border-b border-dashed border-slate-300/20">
                 <span className="text-slate-500">Total VAT Exemption</span>
@@ -1661,6 +1821,7 @@ export default function TransactionPaymentModal({
   const [discountState, setDiscountState] = useState(
     buildInitialDiscountState(),
   );
+  const [discountCeilingAmount, setDiscountCeilingAmount] = useState(0);
   const [customerCards, setCustomerCards] = useState([]);
 
   const [otherCharges, setOtherCharges] = useState([]);
@@ -1781,6 +1942,34 @@ export default function TransactionPaymentModal({
     };
 
     fetchShiftDetails();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, apiHost]);
+
+  useEffect(() => {
+    if (!isOpen || !apiHost) return;
+
+    let cancelled = false;
+
+    const fetchDiscountCeiling = async () => {
+      try {
+        const response = await fetch(`${apiHost}/api/pos_discount_ceiling.php`);
+        const result = await response.json();
+
+        if (!cancelled) {
+          setDiscountCeilingAmount(Number(result?.data?.discount_ceiling || 0));
+        }
+      } catch (error) {
+        console.error("Failed to load discount ceiling:", error);
+        if (!cancelled) {
+          setDiscountCeilingAmount(0);
+        }
+      }
+    };
+
+    fetchDiscountCeiling();
 
     return () => {
       cancelled = true;
@@ -2099,6 +2288,8 @@ export default function TransactionPaymentModal({
                   .includes("manual"),
               )
               .reduce((sum, row) => sum + Number(row.discount_amount || 0), 0),
+            manualPercent: "",
+            manualMode: "amount",
           },
         });
 
@@ -2189,10 +2380,16 @@ export default function TransactionPaymentModal({
       Math.floor(Number(discountState?.manual?.qualifiedCount || 0)),
       0,
     );
-    const manualAmount = Math.max(
+    const rawManualAmount = Math.max(
       Number(discountState?.manual?.manualAmount || 0),
       0,
     );
+    const manualPercent = Math.max(
+      Number(discountState?.manual?.manualPercent || 0),
+      0,
+    );
+    const manualMode =
+      discountState?.manual?.manualMode === "percent" ? "percent" : "amount";
 
     const totalQualifiedAllLocal =
       rawSeniorCount +
@@ -2286,10 +2483,13 @@ export default function TransactionPaymentModal({
     const soloParentDiscountAmount = soloParentProratedBase * 0.1;
     const soloParentVatExemption = soloParentProratedBase * 0.12;
 
-    const manualDiscountAmount = manualAmount;
+    const manualDiscountAmount =
+      manualMode === "percent"
+        ? discountableGross * (manualPercent / 100)
+        : rawManualAmount;
     const manualVatExemption = 0;
 
-    const discountBreakdown = [
+    const rawDiscountBreakdown = [
       {
         key: "senior",
         label: "Senior Citizen",
@@ -2329,13 +2529,17 @@ export default function TransactionPaymentModal({
         proratedBase: 0,
         discountAmount: manualDiscountAmount,
         vatExemption: manualVatExemption,
+        manualPercent,
+        manualMode,
       },
     ];
 
-    const totalDiscount = discountBreakdown.reduce(
-      (sum, entry) => sum + Number(entry.discountAmount || 0),
-      0,
-    );
+    const {
+      discountBreakdown,
+      rawTotalDiscount,
+      totalDiscount,
+      isDiscountCeilingApplied,
+    } = applyDiscountCeiling(rawDiscountBreakdown, discountCeilingAmount);
 
     const totalVatExemption = discountBreakdown.reduce(
       (sum, entry) => sum + Number(entry.vatExemption || 0),
@@ -2383,7 +2587,10 @@ export default function TransactionPaymentModal({
       totalQualifiedAll: totalQualifiedAllLocal,
       statutoryQualifiedCount,
       discountBreakdown,
+      rawTotalDiscount,
       totalDiscount,
+      discountCeilingAmount,
+      isDiscountCeilingApplied,
       totalVatExemption,
       totalAmountDue,
       otherChargesTotal,
@@ -2397,7 +2604,14 @@ export default function TransactionPaymentModal({
       shortOver,
       discountTypeSummary,
     };
-  }, [items, customerCount, discountState, otherCharges, payments]);
+  }, [
+    items,
+    customerCount,
+    discountState,
+    otherCharges,
+    payments,
+    discountCeilingAmount,
+  ]);
 
   const groupedPaymentMethodText = useMemo(() => {
     const uniqueMethods = [
@@ -2811,15 +3025,23 @@ export default function TransactionPaymentModal({
                     value={peso(computed.grossTotal)}
                     isDark={isDark}
                   />
+                <SummaryRow
+                  label="Discount"
+                  value={negativePeso(computed.totalDiscount)}
+                  isDark={isDark}
+                  valueClassName="text-red-500"
+                />
+                {computed.isDiscountCeilingApplied ? (
                   <SummaryRow
-                    label="Discount"
-                    value={negativePeso(computed.totalDiscount)}
+                    label="Original Discount"
+                    value={negativePeso(computed.rawTotalDiscount)}
                     isDark={isDark}
-                    valueClassName="text-red-500"
+                    valueClassName="text-amber-500 line-through"
                   />
-                  <SummaryRow
-                    label="VAT Exemption"
-                    value={negativePeso(computed.totalVatExemption)}
+                ) : null}
+                <SummaryRow
+                  label="VAT Exemption"
+                  value={negativePeso(computed.totalVatExemption)}
                     isDark={isDark}
                     valueClassName="text-red-500"
                   />
@@ -2988,6 +3210,7 @@ export default function TransactionPaymentModal({
         discountState={discountState}
         setDiscountState={setDiscountState}
         computed={computed}
+        discountCeilingAmount={discountCeilingAmount}
         readOnly={isPaidMode}
       />
 

@@ -22,6 +22,23 @@ function normalizeDiscountTypeKey($value)
         return "pwd";
     }
 
+    if (
+        $value === "naac" ||
+        $value === "naac discount" ||
+        $value === "national athletes and coaches" ||
+        $value === "national athletes and coaches discount"
+    ) {
+        return "naac";
+    }
+
+    if (
+        $value === "solo parent" ||
+        $value === "solo parent discount" ||
+        $value === "soloparent"
+    ) {
+        return "soloParent";
+    }
+
     if ($value === "manual" || $value === "manual discount") {
         return "manual";
     }
@@ -196,6 +213,8 @@ try {
     $discountCounts = [
         "senior" => 0,
         "pwd" => 0,
+        "naac" => 0,
+        "soloParent" => 0,
         "manual" => 0,
     ];
 
@@ -223,6 +242,8 @@ try {
         "discount_counts" => [
             "senior" => 0,
             "pwd" => 0,
+            "naac" => 0,
+            "soloParent" => 0,
             "manual" => 0,
         ],
         "discount_rows" => [],

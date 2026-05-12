@@ -97,6 +97,13 @@ function normalizeDiscountType($value)
         "senior citizen discount" => "Senior Citizen Discount",
         "pwd" => "PWD Discount",
         "pwd discount" => "PWD Discount",
+        "naac" => "NAAC Discount",
+        "naac discount" => "NAAC Discount",
+        "national athletes and coaches" => "NAAC Discount",
+        "national athletes and coaches discount" => "NAAC Discount",
+        "solo parent" => "Solo Parent Discount",
+        "solo parent discount" => "Solo Parent Discount",
+        "soloparent" => "Solo Parent Discount",
         "manual" => "Manual Discount",
         "manual discount" => "Manual Discount",
     ];
@@ -130,6 +137,76 @@ function splitAmountAcrossCount($totalAmount, $count)
     }
 
     return $rows;
+}
+
+function getDiscountCeiling(PDO $pdo): float
+{
+    $stmt = $pdo->prepare("
+        SELECT `value`
+        FROM tbl_pos_settings
+        WHERE category = :category
+          AND description = :description
+        ORDER BY ID DESC
+        LIMIT 1
+    ");
+    $stmt->execute([
+        ":category" => "Discount",
+        ":description" => "Discount Ceiling Amount",
+    ]);
+
+    $amount = (float)($stmt->fetchColumn() ?: 0);
+    return $amount > 0 ? moneyRound($amount) : 0.0;
+}
+
+function applyDiscountCeilingToBreakdown(array $breakdown, float $ceilingAmount): array
+{
+    $rawTotal = 0.0;
+    foreach ($breakdown as $entry) {
+        if (!is_array($entry)) {
+            continue;
+        }
+        $rawTotal += (float)($entry["discount_amount"] ?? 0);
+    }
+
+    $rawTotal = moneyRound($rawTotal);
+    $ceilingAmount = moneyRound($ceilingAmount);
+
+    if ($ceilingAmount <= 0 || $rawTotal <= $ceilingAmount || $rawTotal <= 0) {
+        return $breakdown;
+    }
+
+    $discountIndexes = [];
+    foreach ($breakdown as $index => $entry) {
+        if (is_array($entry) && (float)($entry["discount_amount"] ?? 0) > 0) {
+            $discountIndexes[] = $index;
+        }
+    }
+
+    $lastDiscountIndex = end($discountIndexes);
+    $assigned = 0.0;
+
+    foreach ($breakdown as $index => $entry) {
+        if (!is_array($entry)) {
+            continue;
+        }
+
+        $rowAmount = (float)($entry["discount_amount"] ?? 0);
+        if ($rowAmount <= 0) {
+            continue;
+        }
+
+        if ($index === $lastDiscountIndex) {
+            $cappedAmount = moneyRound($ceilingAmount - $assigned);
+        } else {
+            $cappedAmount = moneyRound(($rowAmount / $rawTotal) * $ceilingAmount);
+        }
+
+        $breakdown[$index]["original_discount_amount"] = moneyRound($rowAmount);
+        $breakdown[$index]["discount_amount"] = max($cappedAmount, 0);
+        $assigned = moneyRound($assigned + $cappedAmount);
+    }
+
+    return $breakdown;
 }
 
 /**
@@ -231,6 +308,16 @@ try {
 
     if ($category_code === "" || $unit_code === "") {
         throw new Exception("category_code and unit_code are required.");
+    }
+
+    $discountCeiling = getDiscountCeiling($pdo);
+    if ($discountCeiling > 0 && $discount > $discountCeiling) {
+        $discountBreakdown = applyDiscountCeilingToBreakdown($discountBreakdown, $discountCeiling);
+        $discount = $discountCeiling;
+        $vatExemptSalesVat = isset($input['VATExemptSales_VAT']) ? (float)$input['VATExemptSales_VAT'] : 0;
+        $totalAmountDue = max($totalSales - $discount - $vatExemptSalesVat + $otherCharges, 0);
+        $input['Discount'] = $discount;
+        $input['TotalAmountDue'] = $totalAmountDue;
     }
 
     $pdo->beginTransaction();
