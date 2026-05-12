@@ -12,6 +12,7 @@ import {
   FiMail,
   FiMenu,
   FiDatabase,
+  FiPercent,
   FiChevronRight,
 } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
@@ -26,6 +27,7 @@ import PosSystemLogs from "./PosSettingsModal/PosSystemLogs";
 import PosExpenses from "./PosSettingsModal/PosExpenses";
 import PosReportingModal from "./PosSettingsModal/PosReportingModal";
 import PosBackupModal from "./PosSettingsModal/PosBackupModal";
+import PosDiscountCeiling from "./PosSettingsModal/PosDiscountCeiling";
 
 const PosSettings = ({ isOpen, onClose, branchInfo }) => {
   const { theme, setTheme } = useTheme();
@@ -66,6 +68,7 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
     { id: "User Roles", icon: FiShield, route: "/userroles" },
     { id: "Registry Sales", icon: FiTrendingUp },
     { id: "Expenses & Petty", icon: FiCreditCard },
+    { id: "Discount Ceiling", icon: FiPercent },
     { id: "Email Reports", icon: FiMail },
     { id: "Data & Security", icon: FiDatabase },
     { id: "Appearance", icon: FiLayers },
@@ -116,6 +119,10 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
           getContrastText={getContrastText}
         />
       );
+    }
+
+    if (activeTab === "Discount Ceiling") {
+      return <PosDiscountCeiling isDark={isDark} accent={accentColor} />;
     }
 
     if (activeTab === "Email Reports") {
