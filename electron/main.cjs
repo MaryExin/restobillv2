@@ -2444,6 +2444,18 @@ app.whenReady().then(() => {
       const grossTotal = Number(safeComputed?.grossTotal || 0);
       const netAfterDiscount = Number(safeComputed?.netAfterDiscount || 0);
       const totalVatExemption = Number(safeComputed?.totalVatExemption || 0);
+      const otherChargesTotal = Number(safeComputed?.otherChargesTotal || 0);
+      const serviceChargeAmount = Number(
+        safeComputed?.serviceChargeAmount || 0,
+      );
+      const serviceChargePercentage = Number(
+        safeComputed?.serviceChargePercentage || 0,
+      );
+      const totalAmountDue =
+        safeComputed?.totalAmountDue !== undefined &&
+        safeComputed?.totalAmountDue !== null
+          ? Number(safeComputed.totalAmountDue || 0)
+          : netAfterDiscount + otherChargesTotal + serviceChargeAmount;
 
       const billingRows = [
         ["Trans. No.", transaction?.transaction_id || "-"],
@@ -2604,12 +2616,23 @@ app.whenReady().then(() => {
         pushLR("VAT EXEMPTION:", signedNegativePeso(totalVatExemption));
       }
 
+      if (otherChargesTotal > 0) {
+        pushLR("OTHER CHARGES:", peso(otherChargesTotal));
+      }
+
+      if (serviceChargeAmount > 0) {
+        pushLR(
+          `SERVICE CHARGE (${serviceChargePercentage}%):`,
+          peso(serviceChargeAmount),
+        );
+      }
+
       line();
 
       // AMOUNT DUE
       chunks.push(boldOn);
       chunks.push(doubleSizeOn);
-      pushLR("AMOUNT DUE:", peso(netAfterDiscount));
+      pushLR("AMOUNT DUE:", peso(totalAmountDue));
       chunks.push(normalSize);
       chunks.push(boldOff);
 

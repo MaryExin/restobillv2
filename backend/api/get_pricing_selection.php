@@ -133,7 +133,7 @@ try {
     $where[] = "T1.pricing_code = :pricing_category";
     $params[":pricing_category"] = $pricing_category;
 
-    if ($item_category !== "") {
+    if ($item_category !== "" && $search === "") {
         $where[] = "T2.item_category = :item_category";
         $params[":item_category"] = $item_category;
     }

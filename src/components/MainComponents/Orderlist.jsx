@@ -557,7 +557,14 @@ const Orderlist = ({
       selectedSalesTypeObject?.description ||
       "";
 
-    if (!categoryCode || !unitCode || !salesTypeDesc || !selectcategory) {
+    const trimmedProductSearch = productsearch.trim();
+
+    if (
+      !categoryCode ||
+      !unitCode ||
+      !salesTypeDesc ||
+      (!selectcategory && !trimmedProductSearch)
+    ) {
       setPricingData({
         sales_type_id: "",
         pricing_category: "",
@@ -582,8 +589,8 @@ const Orderlist = ({
               category_code: categoryCode,
               unit_code: unitCode,
               sales_type: salesTypeDesc,
-              item_category: selectcategory,
-              search: productsearch || "",
+              item_category: trimmedProductSearch ? "" : selectcategory,
+              search: trimmedProductSearch,
               limit: 100,
             }),
           },
@@ -716,9 +723,26 @@ const Orderlist = ({
   }, [apiHost, transactionId, tableselected, salesTypeList]);
 
   const filteredProducts = useMemo(() => {
-    return (productlist || []).filter((p) =>
-      (p.item_name || "").toLowerCase().includes(productsearch.toLowerCase()),
-    );
+    const search = productsearch.trim().toLowerCase();
+
+    if (!search) return productlist || [];
+
+    return (productlist || []).filter((p) => {
+      const searchable = [
+        p.item_name,
+        p.item_description,
+        p.item_category,
+        p.product_id,
+        p.sku,
+        p.bar_code,
+        p.unit_of_measure,
+        p.inventory_type,
+      ]
+        .map((value) => String(value || "").toLowerCase())
+        .join(" ");
+
+      return searchable.includes(search);
+    });
   }, [productsearch, productlist]);
 
   const filteredBillingData = useMemo(() => {
@@ -1214,6 +1238,21 @@ const Orderlist = ({
 
       return nextItems.filter((entry) => Number(entry.quantity || 0) > 0);
     });
+  };
+
+  const updateRecentDisplayQuantityByInput = (lineId, value, proxyItem) => {
+    if (isCartFromDB || !proxyItem || value === "") return;
+
+    const nextQuantity = Math.max(
+      0,
+      Number.isNaN(Number(value)) ? 0 : Number(value),
+    );
+    const currentQuantity = Number(proxyItem.quantity || 0);
+    const delta = nextQuantity - currentQuantity;
+
+    if (delta !== 0) {
+      updateRecentDisplayQuantity(lineId, delta, proxyItem);
+    }
   };
 
   const removeRecentDisplayItem = (lineId, proxyItem) => {
@@ -2833,7 +2872,7 @@ const Orderlist = ({
                     <CartList
                       items={recentDisplayItems}
                       updateQuantity={updateRecentDisplayQuantity}
-                      updateQuantityByInput={updateQuantityByInput}
+                      updateQuantityByInput={updateRecentDisplayQuantityByInput}
                       removeItem={requestRemoveItem}
                       readOnly={false}
                       openItemInstructionModal={openItemInstructionModal}
@@ -4131,7 +4170,7 @@ const Orderlist = ({
                   <CartList
                     items={recentDisplayItems}
                     updateQuantity={updateRecentDisplayQuantity}
-                    updateQuantityByInput={updateQuantityByInput}
+                    updateQuantityByInput={updateRecentDisplayQuantityByInput}
                     removeItem={requestRemoveItem}
                     readOnly={false}
                     openItemInstructionModal={openItemInstructionModal}
@@ -5099,9 +5138,6 @@ const CartList = ({
       </div>
     ) : (
       items.map((item, index) => {
-        const isSpecialPaluto =
-          String(item.item_category || "").toUpperCase() === "SPECIAL PALUTO";
-
         return (
           <div
             key={item.lineId || `${item.code}-${index}`}
@@ -5164,40 +5200,6 @@ const CartList = ({
                     ? ` / Original: ${item.originalQuantity}`
                     : ""}
                 </div>
-              ) : isSpecialPaluto ? (
-                <div className="flex items-center gap-2">
-                  <span
-                    className="text-xs"
-                    style={{ color: "var(--app-muted-text)" }}
-                  >
-                    Qty
-                  </span>
-                  <input
-                    type="number"
-                    min="0"
-                    value={item.quantity}
-                    onFocus={(e) => e.target.select()}
-                    onChange={(e) =>
-                      updateQuantityByInput?.(item.lineId, e.target.value)
-                    }
-                    onBlur={(e) => {
-                      const value = e.target.value.trim();
-                      if (
-                        value === "" ||
-                        Number(value) <= 0 ||
-                        Number.isNaN(Number(value))
-                      ) {
-                        updateQuantityByInput?.(item.lineId, "1");
-                      }
-                    }}
-                    className="w-20 px-3 py-2 text-sm transition-colors rounded-lg outline-none"
-                    style={{
-                      backgroundColor: "var(--app-surface-soft)",
-                      border: "1px solid var(--app-border)",
-                      color: "var(--app-text)",
-                    }}
-                  />
-                </div>
               ) : (
                 <div
                   className="flex items-center gap-2 p-1 transition-colors border rounded-lg"
@@ -5219,11 +5221,42 @@ const CartList = ({
                   </button>
 
                   <span
-                    className="min-w-[18px] px-1 text-center text-xs font-bold"
-                    style={{ color: "var(--app-text)" }}
+                    className="text-xs"
+                    style={{ color: "var(--app-muted-text)" }}
                   >
-                    {item.quantity}
+                    Qty
                   </span>
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    inputMode="decimal"
+                    value={item.quantity}
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) =>
+                      updateQuantityByInput?.(
+                        item.lineId,
+                        e.target.value,
+                        item,
+                      )
+                    }
+                    onBlur={(e) => {
+                      const value = e.target.value.trim();
+                      if (
+                        value === "" ||
+                        Number(value) <= 0 ||
+                        Number.isNaN(Number(value))
+                      ) {
+                        updateQuantityByInput?.(item.lineId, "1", item);
+                      }
+                    }}
+                    className="w-20 px-2 py-1.5 text-sm font-bold text-center transition-colors rounded-lg outline-none"
+                    style={{
+                      backgroundColor: "var(--app-surface)",
+                      border: "1px solid var(--app-border)",
+                      color: "var(--app-text)",
+                    }}
+                  />
 
                   <button
                     onClick={() => updateQuantity?.(item.lineId, 1, item)}

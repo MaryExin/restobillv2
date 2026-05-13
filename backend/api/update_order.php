@@ -218,7 +218,7 @@ try {
     foreach ($cart_items as $item) {
         $product_id = $item["product_id"] ?? '';
         $sku = $item["sku"] ?? '';
-        $sales_quantity = isset($item["sales_quantity"]) ? (int) $item["sales_quantity"] : 0;
+        $sales_quantity = isset($item["sales_quantity"]) ? round((float) $item["sales_quantity"], 4) : 0;
         $landing_cost = isset($item["landing_cost"]) ? (float) $item["landing_cost"] : 0;
         $unit_cost = isset($item["unit_cost"]) ? (float) $item["unit_cost"] : 0;
         $selling_price = isset($item["selling_price"]) ? (float) $item["selling_price"] : 0;
@@ -227,7 +227,7 @@ try {
         $detail_status = $item["order_status"] ?? '';
 
         $stmtDetails->bind_param(
-            "isssssidddsss",
+            "isssssddddsss",
             $transaction_id,
             $Category_Code,
             $Unit_Code,

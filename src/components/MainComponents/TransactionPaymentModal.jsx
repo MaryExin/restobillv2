@@ -1824,6 +1824,9 @@ export default function TransactionPaymentModal({
   const [discountCeilingAmount, setDiscountCeilingAmount] = useState(0);
   const [customerCards, setCustomerCards] = useState([]);
 
+  const [serviceChargeEnabled, setServiceChargeEnabled] = useState(false);
+  const [serviceChargePercentage, setServiceChargePercentage] = useState(0);
+
   const [otherCharges, setOtherCharges] = useState([]);
   const [payments, setPayments] = useState([]);
 
@@ -1970,6 +1973,68 @@ export default function TransactionPaymentModal({
     };
 
     fetchDiscountCeiling();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, apiHost]);
+
+  useEffect(() => {
+    if (!isOpen || !apiHost) return;
+
+    let cancelled = false;
+
+    const fetchServiceCharge = async () => {
+      try {
+        const response = await fetch(`${apiHost}/api/pos_service_charge.php`);
+        const result = await response.json();
+
+        if (!cancelled) {
+          const enabled = String(result?.data?.enabled || "False") === "True";
+          const percentage = Number(result?.data?.percentage || 0);
+          setServiceChargeEnabled(enabled);
+          setServiceChargePercentage(percentage);
+        }
+      } catch (error) {
+        console.error("Failed to load service charge settings:", error);
+        if (!cancelled) {
+          setServiceChargeEnabled(false);
+          setServiceChargePercentage(0);
+        }
+      }
+    };
+
+    fetchServiceCharge();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, apiHost]);
+
+  useEffect(() => {
+    if (!isOpen || !apiHost) return;
+
+    let cancelled = false;
+
+    const fetchServiceChargeSettings = async () => {
+      try {
+        const response = await fetch(`${apiHost}/api/pos_service_charge.php`);
+        const result = await response.json();
+
+        if (!cancelled) {
+          setServiceChargeEnabled(Boolean(result?.data?.service_charge_enabled || false));
+          setServiceChargePercentage(Number(result?.data?.service_charge_percentage || 0));
+        }
+      } catch (error) {
+        console.error("Failed to load service charge settings:", error);
+        if (!cancelled) {
+          setServiceChargeEnabled(false);
+          setServiceChargePercentage(0);
+        }
+      }
+    };
+
+    fetchServiceChargeSettings();
 
     return () => {
       cancelled = true;
@@ -2553,8 +2618,15 @@ export default function TransactionPaymentModal({
       0,
     );
 
+    // Calculate automatic service charge based on VATable Sales
+    const serviceChargeAmount = serviceChargeEnabled && serviceChargePercentage > 0
+      ? Math.round((vatableSales * (serviceChargePercentage / 100)) * 100) / 100
+      : 0;
+
+    const totalOtherCharges = otherChargesTotal + serviceChargeAmount;
+
     const totalAmountDue = Math.max(
-      grossTotal - totalDiscount - totalVatExemption + otherChargesTotal,
+      grossTotal - totalDiscount - totalVatExemption + totalOtherCharges,
       0,
     );
 
@@ -2594,6 +2666,10 @@ export default function TransactionPaymentModal({
       totalVatExemption,
       totalAmountDue,
       otherChargesTotal,
+      serviceChargeEnabled,
+      serviceChargePercentage,
+      serviceChargeAmount,
+      totalOtherCharges,
       vatableSales,
       vatableSalesVat,
       vatExemptSales: finalVatExemptSales,
@@ -2611,6 +2687,8 @@ export default function TransactionPaymentModal({
     otherCharges,
     payments,
     discountCeilingAmount,
+    serviceChargeEnabled,
+    serviceChargePercentage,
   ]);
 
   const groupedPaymentMethodText = useMemo(() => {
@@ -2701,7 +2779,7 @@ export default function TransactionPaymentModal({
 
         TotalSales: Number(computed.grossTotal || 0),
         Discount: Number(computed.totalDiscount || 0),
-        OtherCharges: Number(computed.otherChargesTotal || 0),
+        OtherCharges: Number(computed.totalOtherCharges || 0),
         TotalAmountDue: Number(computed.totalAmountDue || 0),
 
         VATableSales: Number(computed.vatableSales || 0),
@@ -2723,13 +2801,22 @@ export default function TransactionPaymentModal({
             payment_reference: row.payment_reference || "",
           })),
 
-        other_charges: otherCharges
-          .filter((row) => row.particulars && toNum(row.amount) > 0)
-          .map((row) => ({
-            particulars: row.particulars,
-            amount: Number(toNum(row.amount)),
-            reference: row.reference || "",
-          })),
+        other_charges: [
+          // Include automatic service charge if enabled
+          ...(computed.serviceChargeEnabled && computed.serviceChargeAmount > 0 ? [{
+            particulars: `Service Charge (${computed.serviceChargePercentage}%)`,
+            amount: Number(computed.serviceChargeAmount),
+            reference: "AUTO",
+          }] : []),
+          // Include manual other charges
+          ...otherCharges
+            .filter((row) => row.particulars && toNum(row.amount) > 0)
+            .map((row) => ({
+              particulars: row.particulars,
+              amount: Number(toNum(row.amount)),
+              reference: row.reference || "",
+            })),
+        ],
       };
 
       const res = await fetch(
@@ -2763,7 +2850,16 @@ export default function TransactionPaymentModal({
         items: [...items],
         computed: { ...computed },
         payments: [...payments],
-        otherCharges: [...otherCharges],
+        otherCharges: [
+          // Include automatic service charge if enabled
+          ...(computed.serviceChargeEnabled && computed.serviceChargeAmount > 0 ? [{
+            particulars: `Service Charge (${computed.serviceChargePercentage}%)`,
+            amount: computed.serviceChargeAmount,
+            reference: "AUTO",
+          }] : []),
+          // Include manual other charges
+          ...otherCharges,
+        ],
         customerCards: customerCards.slice(0, computed.totalQualifiedAll),
         isDuplicateCopy: false,
       });
@@ -2789,7 +2885,16 @@ export default function TransactionPaymentModal({
       items: [...items],
       computed: { ...computed },
       payments: [...payments],
-      otherCharges: [...otherCharges],
+      otherCharges: [
+        // Include automatic service charge if enabled
+        ...(computed.serviceChargeEnabled && computed.serviceChargeAmount > 0 ? [{
+          particulars: `Service Charge (${computed.serviceChargePercentage}%)`,
+          amount: computed.serviceChargeAmount,
+          reference: "AUTO",
+        }] : []),
+        // Include manual other charges
+        ...otherCharges,
+      ],
       customerCards: customerCards.slice(0, computed.totalQualifiedAll),
       isDuplicateCopy: true,
     };
@@ -3050,6 +3155,13 @@ export default function TransactionPaymentModal({
                     value={peso(computed.otherChargesTotal)}
                     isDark={isDark}
                   />
+                  {computed.serviceChargeAmount > 0 && (
+                    <SummaryRow
+                      label="Service Charge"
+                      value={peso(computed.serviceChargeAmount)}
+                      isDark={isDark}
+                    />
+                  )}
                   <SummaryRow
                     label="Payment Received"
                     value={peso(computed.totalPaid)}

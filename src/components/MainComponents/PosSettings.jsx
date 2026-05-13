@@ -27,7 +27,8 @@ import PosSystemLogs from "./PosSettingsModal/PosSystemLogs";
 import PosExpenses from "./PosSettingsModal/PosExpenses";
 import PosReportingModal from "./PosSettingsModal/PosReportingModal";
 import PosBackupModal from "./PosSettingsModal/PosBackupModal";
-import PosDiscountCeiling from "./PosSettingsModal/PosDiscountCeiling";
+import PosDiscountCeiling from "./PosSettingsModal/PosDiscountCeiling"
+import PosServiceCharge from "./PosSettingsModal/PosServiceCharge";
 
 const PosSettings = ({ isOpen, onClose, branchInfo }) => {
   const { theme, setTheme } = useTheme();
@@ -68,6 +69,7 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
     { id: "User Roles", icon: FiShield, route: "/userroles" },
     { id: "Registry Sales", icon: FiTrendingUp },
     { id: "Expenses & Petty", icon: FiCreditCard },
+    { id: "Service Charge", icon: FiPercent },
     { id: "Discount Ceiling", icon: FiPercent },
     { id: "Email Reports", icon: FiMail },
     { id: "Data & Security", icon: FiDatabase },
@@ -123,6 +125,10 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
 
     if (activeTab === "Discount Ceiling") {
       return <PosDiscountCeiling isDark={isDark} accent={accentColor} />;
+    }
+
+    if (activeTab === "Service Charge") {
+      return <PosServiceCharge isDark={isDark} accent={accentColor} />;
     }
 
     if (activeTab === "Email Reports") {
