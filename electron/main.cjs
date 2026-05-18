@@ -144,6 +144,23 @@ function readTextFileSafe(filePath) {
   }
 }
 
+function parsePrinterConfigMap(text) {
+  const map = {};
+  for (const line of String(text || "").split(/\r?\n/)) {
+    const idx = line.indexOf(": ");
+    if (idx > 0) {
+      const key = line.slice(0, idx).trim();
+      const val = line.slice(idx + 2).trim();
+      if (key && val) map[key] = val;
+    }
+  }
+  return map;
+}
+
+function getPrinterConfigMap() {
+  return parsePrinterConfigMap(readTextFileSafe(getPrinterFilePath()));
+}
+
 function readJsonFileSafe(filePath, fallback = {}) {
   try {
     const raw = fs.readFileSync(filePath, "utf8");
@@ -249,7 +266,9 @@ function getConfiguredPrinterTextFromFile() {
 }
 
 function getDefaultPrinterNameFromFile() {
-  return normalizeSystemPrinterName(getConfiguredPrinterTextFromFile());
+  const map = getPrinterConfigMap();
+  const raw = map.printReceipt || getConfiguredPrinterTextFromFile();
+  return normalizeSystemPrinterName(raw);
 }
 
 function mapPrinterInfo(printer) {
@@ -1574,6 +1593,13 @@ function getPrinterConnectionConfig() {
   return parsePrinterConnection(raw);
 }
 
+function getPrinterConnectionConfigFor(key) {
+  const map = getPrinterConfigMap();
+  const raw = map[key];
+  if (raw) return parsePrinterConnection(raw);
+  return getPrinterConnectionConfig();
+}
+
 function checkEscposNetworkConnection(host, port = 9100, timeout = 5000) {
   return new Promise((resolve) => {
     const client = new net.Socket();
@@ -1824,7 +1850,9 @@ function buildPrintFailureMessage(primaryResult, fallbackResults) {
 }
 
 async function writeEscposBuffer(buffer, options = {}) {
-  const config = getPrinterConnectionConfig();
+  const config = options.configKey
+    ? getPrinterConnectionConfigFor(options.configKey)
+    : getPrinterConnectionConfig();
   const fallbackResults = [];
   const primaryResult = await writeEscposBufferToConfiguredTarget(
     config,
@@ -2349,6 +2377,7 @@ app.whenReady().then(() => {
       const payload = Buffer.concat(chunks);
       return await writeEscposBuffer(payload, {
         printerName: data?.printerName,
+        configKey: "printEscpos",
       });
     } catch (error) {
       console.error("ESC/POS print error:", error);
@@ -2677,6 +2706,7 @@ app.whenReady().then(() => {
 
       return await writeEscposBuffer(payload, {
         printerName: data?.printerName,
+        configKey: "printEscposDiscount",
       });
     } catch (error) {
       console.error("ESC/POS discount print error:", error);
@@ -3143,6 +3173,7 @@ app.whenReady().then(() => {
       const payload = Buffer.concat(chunks);
       return await writeEscposBuffer(payload, {
         printerName: data?.printerName,
+        configKey: "printEscpospospaymentreceipt",
       });
     } catch (error) {
       console.error("ESC/POS POS payment print error:", error);
@@ -3543,6 +3574,7 @@ app.whenReady().then(() => {
       const finalPayload = Buffer.concat(chunks);
       return await writeEscposBuffer(finalPayload, {
         printerName: data?.printerName,
+        configKey: "printEscposXzReading",
       });
     } catch (error) {
       console.error("ESC/POS X/Z reading print error:", error);
@@ -3755,6 +3787,7 @@ app.whenReady().then(() => {
       const payload = Buffer.concat(chunks);
       return await writeEscposBuffer(payload, {
         printerName: data?.printerName,
+        configKey: "printEscposSalesPerProduct",
       });
     } catch (error) {
       console.error("ESC/POS sales per product print error:", error);
@@ -3991,6 +4024,7 @@ app.whenReady().then(() => {
       const payload = Buffer.concat(chunks);
       return await writeEscposBuffer(payload, {
         printerName: data?.printerName,
+        configKey: "printEscposBilling",
       });
     } catch (error) {
       console.error("ESC/POS billing print error:", error);
@@ -4340,6 +4374,45 @@ app.whenReady().then(() => {
         success: false,
         message: error.message || "Printer check failed",
       };
+    }
+  });
+
+  ipcMain.handle("read-printer-config", () => {
+    try {
+      return getPrinterConfigMap();
+    } catch (error) {
+      console.error("Failed to read printer config:", error);
+      return {};
+    }
+  });
+
+  ipcMain.handle("save-printer-config", (_event, payload) => {
+    try {
+      const printerPath = getPrinterFilePath();
+      const existing = getPrinterConfigMap();
+      const merged = { ...existing, ...payload };
+      const text = Object.entries(merged)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join("\n");
+      fs.writeFileSync(printerPath, text, "utf8");
+      return { success: true };
+    } catch (error) {
+      console.error("Failed to save printer config:", error);
+      return { success: false, message: error.message };
+    }
+  });
+
+  ipcMain.handle("test-printer-connection", async (_event, payload) => {
+    try {
+      const { printerName = "", printerType = "Bluetooth", content = "" } =
+        payload || {};
+      const connectionStr =
+        printerType === "Bluetooth" ? `bt:${printerName}` : printerName;
+      const config = parsePrinterConnection(connectionStr);
+      const buffer = Buffer.from(content, "binary");
+      return await writeEscposBufferToConfiguredTarget(config, buffer);
+    } catch (error) {
+      return { success: false, message: error.message || "Test print failed" };
     }
   });
 

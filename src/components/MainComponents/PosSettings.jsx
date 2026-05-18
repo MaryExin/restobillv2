@@ -14,6 +14,7 @@ import {
   FiDatabase,
   FiPercent,
   FiChevronRight,
+  FiPrinter,
 } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "../../context/ThemeContext";
@@ -29,6 +30,7 @@ import PosReportingModal from "./PosSettingsModal/PosReportingModal";
 import PosBackupModal from "./PosSettingsModal/PosBackupModal";
 import PosDiscountCeiling from "./PosSettingsModal/PosDiscountCeiling"
 import PosServiceCharge from "./PosSettingsModal/PosServiceCharge";
+import PrinterSettings from "./PosSettingsModal/PrinterSettings";
 
 const PosSettings = ({ isOpen, onClose, branchInfo }) => {
   const { theme, setTheme } = useTheme();
@@ -74,6 +76,7 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
     { id: "Email Reports", icon: FiMail },
     { id: "Data & Security", icon: FiDatabase },
     { id: "Appearance", icon: FiLayers },
+    { id: "Printer Settings", icon: FiPrinter },
   ];
 
   const handleNavClick = (nav) => {
@@ -149,6 +152,15 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
           setSelectedColorObj={setSelectedColorObj}
           adaptivePalette={adaptivePalette}
           getContrastText={getContrastText}
+        />
+      );
+    }
+
+    if (activeTab === "Printer Settings") {
+      return (
+        <PrinterSettings
+          isDark={isDark}
+          accent={accentColor}
         />
       );
     }
@@ -255,7 +267,7 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
                   {activeTab}
                 </h1>
 
-                <div className="mt-1 flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 mt-1">
                   <p
                     className={`text-sm ${
                       isDark ? "text-slate-400" : "text-slate-500"
@@ -339,7 +351,7 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
                     </h2>
 
                     <div
-                      className="w-14 h-1 mt-3 rounded-full"
+                      className="h-1 mt-3 rounded-full w-14"
                       style={{ backgroundColor: accentColor }}
                     />
                   </div>
@@ -355,7 +367,7 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
               </aside>
 
               <main className="flex flex-col flex-1 min-h-0">
-                <div className="flex-1 min-h-0 px-5 pb-5 pt-4 sm:px-8 sm:pb-8">
+                <div className="flex-1 min-h-0 px-5 pt-4 pb-5 sm:px-8 sm:pb-8">
                   <div
                     className={`h-full rounded-[28px] border overflow-hidden ${
                       isDark

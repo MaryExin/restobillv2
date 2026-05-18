@@ -20,12 +20,17 @@ contextBridge.exposeInMainWorld("electronAPI", {
   readBusinessInfo: () => ipcRenderer.invoke("read-business-info"),
   checkEscposPrinter: () => ipcRenderer.invoke("check-escpos-printer"),
   printEscPos: (data) => ipcRenderer.invoke("print-escpos", data),
-  printEscPosBilling: (data) => ipcRenderer.invoke("print-escposbilling", data), // NEW
+  printEscPosBilling: (data) => ipcRenderer.invoke("print-escposbilling", data),
   printEscposDiscount: (data) =>
     ipcRenderer.invoke("print-escposdiscount", data),
   pospaymentreceipt: (data) =>
     ipcRenderer.invoke("print-escpospospaymentreceipt", data),
+  testPrinterConnection: (payload) =>
+    ipcRenderer.invoke("test-printer-connection", payload),
   testEscpos: () => ipcRenderer.invoke("test-escpos"),
   getPrinters: () => ipcRenderer.invoke("get-printers"),
+  readPrinterConfig: () => ipcRenderer.invoke("read-printer-config"),
+  savePrinterConfig: (payload) =>
+    ipcRenderer.invoke("save-printer-config", payload),
   quitApp: () => ipcRenderer.send("close-app"),
 });
