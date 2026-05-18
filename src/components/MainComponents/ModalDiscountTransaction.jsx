@@ -1124,12 +1124,15 @@ const ModalDiscountTransaction = ({
       grossTotal - totalDiscount - totalVatExemption,
       0,
     );
-    const otherChargesTotal = Number(transaction?.OtherCharges || 0);
+    const serviceChargeBase =
+      totalDiscount > 0
+        ? Math.max(discountableBase - totalDiscount, 0)
+        : discountableBase;
     const serviceChargeAmount =
       serviceChargeEnabled && serviceChargePercentage > 0
-        ? roundMoney(vatableSales * (serviceChargePercentage / 100))
+        ? roundMoney(serviceChargeBase * (serviceChargePercentage / 100))
         : 0;
-    const totalOtherCharges = otherChargesTotal + serviceChargeAmount;
+    const totalOtherCharges = serviceChargeAmount;
     const totalAmountDue = Math.max(netAfterDiscount + totalOtherCharges, 0);
 
     const discountTypeSummary = discountBreakdown
@@ -1149,9 +1152,9 @@ const ModalDiscountTransaction = ({
       discountableItemsCount,
       netAfterDiscount,
       totalAmountDue,
-      otherChargesTotal,
       serviceChargeEnabled,
       serviceChargePercentage,
+      serviceChargeBase,
       serviceChargeAmount,
       totalOtherCharges,
       safeCustomerCount,
@@ -1779,15 +1782,6 @@ const ModalDiscountTransaction = ({
                         ₱ {peso(computed.grossTotal)}
                       </span>
                     </div>
-
-                    {computed.otherChargesTotal > 0 ? (
-                      <div className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
-                        <span className="text-slate-500">Other Charges</span>
-                        <span className="font-semibold">
-                          ₱ {peso(computed.otherChargesTotal)}
-                        </span>
-                      </div>
-                    ) : null}
 
                     {computed.serviceChargeAmount > 0 ? (
                       <div className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">

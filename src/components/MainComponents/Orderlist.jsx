@@ -1041,6 +1041,7 @@ const Orderlist = ({
       grouped[category].push(item);
     });
 
+
     return Object.entries(grouped)
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([category, items]) => ({
@@ -1120,6 +1121,8 @@ const Orderlist = ({
 
       return nextItems;
     });
+
+    setproductsearch("");
   };
 
   const restoreLoadedQuantityByCode = (
@@ -1338,6 +1341,8 @@ const Orderlist = ({
 
       return nextItems;
     });
+
+    setproductsearch("");
   };
 
   const updateQuantityByInput = (lineId, value) => {
