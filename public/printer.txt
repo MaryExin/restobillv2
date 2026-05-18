@@ -1,1 +1,7 @@
-192.168.123.100
+printReceipt: COM5
+printEscposXzReading: COM5
+printEscposSalesPerProduct: COM5
+printEscpos: COM5
+printEscposBilling: COM5
+printEscposDiscount: COM6
+printEscpospospaymentreceipt: COM5
