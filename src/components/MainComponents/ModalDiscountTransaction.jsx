@@ -570,6 +570,8 @@ const ModalDiscountTransaction = ({
     useState(false);
   const [initialLoadedSignature, setInitialLoadedSignature] = useState("");
   const [showOverrideWarning, setShowOverrideWarning] = useState(false);
+  const [serviceChargeEnabled, setServiceChargeEnabled] = useState(false);
+  const [serviceChargePercentage, setServiceChargePercentage] = useState(0);
 
   // let escposWarmedUp = false;
 
@@ -835,6 +837,40 @@ const ModalDiscountTransaction = ({
   }, [isOpen, apiHost]);
 
   useEffect(() => {
+    if (!isOpen || !apiHost) return;
+
+    let cancelled = false;
+
+    const fetchServiceChargeSettings = async () => {
+      try {
+        const response = await fetch(`${apiHost}/api/pos_service_charge.php`);
+        const result = await response.json();
+
+        if (!cancelled) {
+          setServiceChargeEnabled(
+            Boolean(result?.data?.service_charge_enabled || false),
+          );
+          setServiceChargePercentage(
+            Number(result?.data?.service_charge_percentage || 0),
+          );
+        }
+      } catch (error) {
+        console.error("Failed to load service charge settings:", error);
+        if (!cancelled) {
+          setServiceChargeEnabled(false);
+          setServiceChargePercentage(0);
+        }
+      }
+    };
+
+    fetchServiceChargeSettings();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, apiHost]);
+
+  useEffect(() => {
     if (!existingDiscountLoaded || !hadExistingDiscountBreakdown) return;
 
     const currentSignature = JSON.stringify({
@@ -1088,6 +1124,16 @@ const ModalDiscountTransaction = ({
       grossTotal - totalDiscount - totalVatExemption,
       0,
     );
+    const serviceChargeBase =
+      totalDiscount > 0
+        ? Math.max(discountableBase - totalDiscount, 0)
+        : discountableBase;
+    const serviceChargeAmount =
+      serviceChargeEnabled && serviceChargePercentage > 0
+        ? roundMoney(serviceChargeBase * (serviceChargePercentage / 100))
+        : 0;
+    const totalOtherCharges = serviceChargeAmount;
+    const totalAmountDue = Math.max(netAfterDiscount + totalOtherCharges, 0);
 
     const discountTypeSummary = discountBreakdown
       .filter(
@@ -1105,6 +1151,12 @@ const ModalDiscountTransaction = ({
       totalQuantity,
       discountableItemsCount,
       netAfterDiscount,
+      totalAmountDue,
+      serviceChargeEnabled,
+      serviceChargePercentage,
+      serviceChargeBase,
+      serviceChargeAmount,
+      totalOtherCharges,
       safeCustomerCount,
       vatableSales,
       vatableSalesVat,
@@ -1122,7 +1174,15 @@ const ModalDiscountTransaction = ({
       discountBreakdown,
       discountTypeSummary,
     };
-  }, [items, customerCount, discountState, discountCeilingAmount]);
+  }, [
+    items,
+    customerCount,
+    discountState,
+    discountCeilingAmount,
+    transaction,
+    serviceChargeEnabled,
+    serviceChargePercentage,
+  ]);
 
   const validateQualifiedCounts = (nextTotal, nextState = discountState) => {
     const totalNum = Math.max(Number(nextTotal || 0), 0);
@@ -1228,8 +1288,8 @@ const ModalDiscountTransaction = ({
 
       TotalSales: Number(computed?.grossTotal || 0),
       Discount: Number(computed?.totalDiscount || 0),
-      OtherCharges: Number(transaction?.OtherCharges || 0),
-      TotalAmountDue: Number(computed?.netAfterDiscount || 0),
+      OtherCharges: Number(computed?.totalOtherCharges || 0),
+      TotalAmountDue: Number(computed?.totalAmountDue || 0),
 
       VATableSales: Number(computed?.vatableSales || 0),
       VATableSales_VAT: Number(computed?.vatableSalesVat || 0),
@@ -1723,12 +1783,23 @@ const ModalDiscountTransaction = ({
                       </span>
                     </div>
 
+                    {computed.serviceChargeAmount > 0 ? (
+                      <div className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
+                        <span className="text-slate-500">
+                          Service Charge ({computed.serviceChargePercentage}%)
+                        </span>
+                        <span className="font-semibold">
+                          ₱ {peso(computed.serviceChargeAmount)}
+                        </span>
+                      </div>
+                    ) : null}
+
                     <div className="flex items-center justify-between gap-2 rounded-lg bg-blue-500/10 px-3 py-2.5">
                       <span className="text-sm font-black">
-                        Net After Discount
+                        Amount Due
                       </span>
                       <span className="text-base font-black text-blue-500">
-                        ₱ {peso(computed.netAfterDiscount)}
+                        ₱ {peso(computed.totalAmountDue)}
                       </span>
                     </div>
                   </div>

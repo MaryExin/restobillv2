@@ -413,6 +413,26 @@ export function BuildPrintableDiscountReceiptHtml({
                     </td>
                   </tr>
                 ) : null}
+
+                {Number(safeComputed?.otherChargesTotal || 0) > 0 ? (
+                  <tr>
+                    <td className="bold label-col">OTHER CHARGES:</td>
+                    <td className="value-col">
+                      {peso(safeComputed?.otherChargesTotal)}
+                    </td>
+                  </tr>
+                ) : null}
+
+                {Number(safeComputed?.serviceChargeAmount || 0) > 0 ? (
+                  <tr>
+                    <td className="bold label-col">
+                      SERVICE CHARGE ({safeComputed?.serviceChargePercentage || 0}%):
+                    </td>
+                    <td className="value-col">
+                      {peso(safeComputed?.serviceChargeAmount)}
+                    </td>
+                  </tr>
+                ) : null}
               </tbody>
             </table>
           </div>
@@ -425,7 +445,10 @@ export function BuildPrintableDiscountReceiptHtml({
                 <tr>
                   <td className="amount-due-label-cell">AMOUNT DUE:</td>
                   <td className="amount-due-value-cell">
-                    {peso(safeComputed?.netAfterDiscount)}
+                    {peso(
+                      safeComputed?.totalAmountDue ??
+                        safeComputed?.netAfterDiscount,
+                    )}
                   </td>
                 </tr>
               </tbody>
