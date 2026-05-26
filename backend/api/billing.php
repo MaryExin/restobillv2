@@ -84,6 +84,11 @@ $discountBreakdown = isset($input['discount_breakdown']) && is_array($input['dis
     ? $input['discount_breakdown']
     : [];
 
+$hasCustomerInfoPayload = isset($input['customer_info']) && is_array($input['customer_info']);
+$customerInfo = $hasCustomerInfoPayload
+    ? array_values($input['customer_info'])
+    : [];
+
 /* ------------------------------
     3. HELPERS
 ------------------------------ */
@@ -115,6 +120,12 @@ function normalizeDiscountType($value)
 function moneyRound($value)
 {
     return round((float)$value, 2);
+}
+
+function normalizeNullable($value)
+{
+    $value = trim((string)$value);
+    return $value === "" ? null : $value;
 }
 
 function splitAmountAcrossCount($totalAmount, $count)
@@ -500,16 +511,23 @@ try {
     $skippedDiscountRows = 0;
     $discountInsertReason = "";
 
-    $existingRowsByCustomerId = [];
-    $usedCustomerIds = [];
+    $usedRowIds = [];
 
     $stmtReadExistingDiscounts = $pdo->prepare("
-        SELECT id, customer_id, status
+        SELECT
+            id,
+            customer_id,
+            customer_name,
+            date_of_birth,
+            gender,
+            tin,
+            contact_no,
+            status
         FROM tbl_pos_transactions_discounts
         WHERE transaction_id = :transaction_id
           AND Category_Code = :category_code
           AND Unit_Code = :unit_code
-        ORDER BY customer_id ASC, id ASC
+        ORDER BY id ASC
     ");
     $stmtReadExistingDiscounts->execute([
         ':transaction_id' => $transaction_id,
@@ -518,10 +536,6 @@ try {
     ]);
 
     $existingRows = $stmtReadExistingDiscounts->fetchAll();
-
-    foreach ($existingRows as $row) {
-        $existingRowsByCustomerId[(int)$row['customer_id']] = $row;
-    }
 
     if (empty($discountBreakdown)) {
         $discountInsertReason = "discount_breakdown_empty";
@@ -581,17 +595,20 @@ try {
         $stmtUpdateDiscount = $pdo->prepare("
             UPDATE tbl_pos_transactions_discounts
             SET
+                customer_id = :new_customer_id,
                 discount_type = :discount_type,
                 discount_amount = :discount_amount,
+                customer_name = :customer_name,
+                date_of_birth = :date_of_birth,
+                gender = :gender,
+                tin = :tin,
+                contact_no = :contact_no,
                 status = 'Active',
                 usertracker = :usertracker
-            WHERE transaction_id = :transaction_id
-              AND Category_Code = :category_code
-              AND Unit_Code = :unit_code
-              AND customer_id = :customer_id
+            WHERE id = :id
         ");
 
-        $sequence = 1;
+        $rowIndex = 0;
 
         foreach ($discountBreakdown as $entry) {
             $discountType   = normalizeDiscountType($entry['discount_type'] ?? '');
@@ -611,20 +628,50 @@ try {
             }
 
             foreach ($splitAmounts as $rowAmount) {
-                $generatedCustomerId = $sequence;
-                $usedCustomerIds[] = $generatedCustomerId;
+                $existingRow = $existingRows[$rowIndex] ?? [];
+                $card = $customerInfo[$rowIndex] ?? [];
+                if (!is_array($card)) {
+                    $card = [];
+                }
 
-                if (isset($existingRowsByCustomerId[$generatedCustomerId])) {
+                $typedCustomerId = $hasCustomerInfoPayload
+                    ? trim((string)($card['customer_exclusive_id'] ?? ''))
+                    : "";
+                $generatedCustomerId = $typedCustomerId !== ""
+                    ? $typedCustomerId
+                    : (string)($existingRow['customer_id'] ?? ($rowIndex + 1));
+                $customerName = $hasCustomerInfoPayload
+                    ? trim((string)($card['customer_name'] ?? ''))
+                    : trim((string)($existingRow['customer_name'] ?? ''));
+                $dateOfBirth = $hasCustomerInfoPayload
+                    ? trim((string)($card['date_of_birth'] ?? ''))
+                    : trim((string)($existingRow['date_of_birth'] ?? ''));
+                $gender = $hasCustomerInfoPayload
+                    ? trim((string)($card['gender'] ?? ''))
+                    : trim((string)($existingRow['gender'] ?? ''));
+                $tin = $hasCustomerInfoPayload
+                    ? trim((string)($card['tin'] ?? ''))
+                    : trim((string)($existingRow['tin'] ?? ''));
+                $contactNo = $hasCustomerInfoPayload
+                    ? trim((string)($card['contact_no'] ?? ''))
+                    : trim((string)($existingRow['contact_no'] ?? ''));
+
+                if (isset($existingRows[$rowIndex])) {
+                    $existingRowId = (int)$existingRows[$rowIndex]['id'];
                     $stmtUpdateDiscount->execute([
-                        ':transaction_id'  => $transaction_id,
-                        ':category_code'   => $category_code,
-                        ':unit_code'       => $unit_code,
-                        ':customer_id'     => $generatedCustomerId,
+                        ':id'              => $existingRowId,
+                        ':new_customer_id' => $generatedCustomerId,
                         ':discount_type'   => $discountType,
                         ':discount_amount' => moneyRound($rowAmount),
+                        ':customer_name'   => normalizeNullable($customerName),
+                        ':date_of_birth'   => normalizeNullable($dateOfBirth),
+                        ':gender'          => normalizeNullable($gender),
+                        ':tin'             => normalizeNullable($tin),
+                        ':contact_no'      => normalizeNullable($contactNo),
                         ':usertracker'     => $input['cashier'] ?? 'Store Crew'
                     ]);
 
+                    $usedRowIds[] = $existingRowId;
                     $updatedDiscountRows++;
                 } else {
                     $stmtInsertDiscount->execute([
@@ -634,30 +681,31 @@ try {
                         ':customer_id'     => $generatedCustomerId,
                         ':discount_type'   => $discountType,
                         ':discount_amount' => moneyRound($rowAmount),
-                        ':customer_name'   => null,
-                        ':date_of_birth'   => null,
-                        ':gender'          => null,
-                        ':tin'             => null,
-                        ':contact_no'      => null,
+                        ':customer_name'   => normalizeNullable($customerName),
+                        ':date_of_birth'   => normalizeNullable($dateOfBirth),
+                        ':gender'          => normalizeNullable($gender),
+                        ':tin'             => normalizeNullable($tin),
+                        ':contact_no'      => normalizeNullable($contactNo),
                         ':usertracker'     => $input['cashier'] ?? 'Store Crew'
                     ]);
 
+                    $usedRowIds[] = (int)$pdo->lastInsertId();
                     $insertedDiscountRows++;
                 }
 
-                $sequence++;
+                $rowIndex++;
             }
         }
 
-        $existingCustomerIds = array_map(
-            fn($row) => (int)$row['customer_id'],
+        $existingRowIds = array_map(
+            fn($row) => (int)$row['id'],
             $existingRows
         );
 
-        $unusedCustomerIds = array_values(array_diff($existingCustomerIds, $usedCustomerIds));
+        $unusedRowIds = array_values(array_diff($existingRowIds, $usedRowIds));
 
-        if (!empty($unusedCustomerIds)) {
-            $placeholders = implode(',', array_fill(0, count($unusedCustomerIds), '?'));
+        if (!empty($unusedRowIds)) {
+            $placeholders = implode(',', array_fill(0, count($unusedRowIds), '?'));
 
             $sqlInactiveExtra = "
                 UPDATE tbl_pos_transactions_discounts
@@ -666,13 +714,13 @@ try {
                 WHERE transaction_id = ?
                   AND Category_Code = ?
                   AND Unit_Code = ?
-                  AND customer_id IN ($placeholders)
+                  AND id IN ($placeholders)
                   AND status = 'Active'
             ";
 
             $params = array_merge(
                 [$input['cashier'] ?? 'Store Crew', $transaction_id, $category_code, $unit_code],
-                $unusedCustomerIds
+                $unusedRowIds
             );
 
             $stmtInactiveExtra = $pdo->prepare($sqlInactiveExtra);

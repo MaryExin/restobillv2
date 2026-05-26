@@ -30,6 +30,7 @@ import PosReportingModal from "./PosSettingsModal/PosReportingModal";
 import PosBackupModal from "./PosSettingsModal/PosBackupModal";
 import PosDiscountCeiling from "./PosSettingsModal/PosDiscountCeiling"
 import PosServiceCharge from "./PosSettingsModal/PosServiceCharge";
+import PosCustomerInfo from "./PosSettingsModal/PosCustomerInfo";
 import PrinterSettings from "./PosSettingsModal/PrinterSettings";
 
 const PosSettings = ({ isOpen, onClose, branchInfo }) => {
@@ -73,6 +74,7 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
     { id: "Expenses & Petty", icon: FiCreditCard },
     { id: "Service Charge", icon: FiPercent },
     { id: "Discount Ceiling", icon: FiPercent },
+    { id: "Customer Info", icon: FiUsers },
     { id: "Email Reports", icon: FiMail },
     { id: "Data & Security", icon: FiDatabase },
     { id: "Appearance", icon: FiLayers },
@@ -132,6 +134,10 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
 
     if (activeTab === "Service Charge") {
       return <PosServiceCharge isDark={isDark} accent={accentColor} />;
+    }
+
+    if (activeTab === "Customer Info") {
+      return <PosCustomerInfo isDark={isDark} accent={accentColor} />;
     }
 
     if (activeTab === "Email Reports") {

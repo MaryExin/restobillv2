@@ -97,7 +97,7 @@ try {
         $body = [];
     }
 
-    $serviceChargeEnabled = normalizeBoolean($body["service_charge_enabled"] ?? false);
+    $serviceChargeEnabled = normalizeBoolean($body["service_charge_enabled"] ?? false) === "True";
     $serviceChargePercentage = normalizePercentage($body["service_charge_percentage"] ?? 0);
 
     // Update enabled setting
@@ -187,5 +187,4 @@ try {
     respond(true, "Service charge settings saved.", readServiceChargeSettings($pdo));
 } catch (Throwable $e) {
     respond(false, $e->getMessage(), null, 500);
-}</content>
-<parameter name="filePath">c:\Users\Shim\Desktop\restobillv2\backend\api\pos_service_charge.php
+}
