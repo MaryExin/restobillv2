@@ -55,7 +55,7 @@ try {
     }
 
     // 2) Read order details
-    $sqlDetails = "SELECT T1.*, item_name
+    $sqlDetails = "SELECT T1.*, T2.item_name, T2.item_category
                    FROM tbl_pos_transactions_detailed AS T1
                    LEFT JOIN tbl_inventory_products_masterlist AS T2
                    ON T1.product_id = T2.product_id

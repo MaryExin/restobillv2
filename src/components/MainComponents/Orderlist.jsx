@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import QRCode from "qrcode.react";
 import {
@@ -50,6 +50,9 @@ const Orderlist = ({
   const defaultPrinterName = useGetDefaultPrinter();
 
   const [isPrintingOnly, setIsPrintingOnly] = useState(false);
+
+  // Tracks the transaction ID after first save so retries use update_order.php instead of save_order.php
+  const internalTransactionIdRef = useRef(null);
 
   const navigate = useNavigate();
   const apiHost = useApiHost();
@@ -451,20 +454,32 @@ const Orderlist = ({
 
   const handlePrintAllElectron = async (printMode = "auto") => {
     try {
-      const printResult = await window.electronAPI.printEscPos({
-        table: tableselected,
-        items: cartSummaryItems,
-        total: totalPrice,
-        instructions,
-        transactionId,
-        printerName: printerName || defaultPrinterName || "",
-        printMode:
-          printMode === "auto"
-            ? transactionId
-              ? "additional"
-              : "new"
-            : printMode,
-      });
+      let printResult;
+
+      if (printMode === "duplicate") {
+        printResult = await window.electronAPI.printEscPosDuplicate({
+          table: tableselected,
+          items: cartSummaryItems,
+          total: totalPrice,
+          instructions,
+          transactionId,
+        });
+      } else {
+        printResult = await window.electronAPI.printEscPos({
+          table: tableselected,
+          items: cartSummaryItems,
+          total: totalPrice,
+          instructions,
+          transactionId,
+          printerName: printerName || defaultPrinterName || "",
+          printMode:
+            printMode === "auto"
+              ? transactionId
+                ? "additional"
+                : "new"
+              : printMode,
+        });
+      }
 
       console.log("ESC/POS full print result:", printResult);
 
@@ -538,6 +553,10 @@ const Orderlist = ({
 
     setOriginalLoadedItems([]);
   }, [tableselected]);
+
+  useEffect(() => {
+    internalTransactionIdRef.current = null;
+  }, [transactionId]);
 
   const selectedSalesTypeObject = useMemo(() => {
     return (
@@ -1647,7 +1666,11 @@ const Orderlist = ({
     try {
       const now = new Date();
       const formData = new FormData();
-      const txId = transactionId || Date.now();
+
+      // Use the internal ref first (set after first save), then fall back to the prop.
+      // This prevents a second save (e.g. after a print error) from creating a new transaction.
+      const currentTransactionId = internalTransactionIdRef.current ?? transactionId;
+      const txId = currentTransactionId || Date.now();
 
       const loggedUserId =
         localStorage.getItem("userId") ||
@@ -1705,7 +1728,7 @@ const Orderlist = ({
         ),
       );
 
-      const endpoint = transactionId
+      const endpoint = currentTransactionId
         ? `${apiHost}/api/update_order.php`
         : `${apiHost}/api/save_order.php`;
 
@@ -1721,10 +1744,16 @@ const Orderlist = ({
         return { ok: false };
       }
 
+      // After a successful new-order save, remember the assigned transaction ID so
+      // any subsequent save (e.g. after a print failure) updates instead of inserting.
+      if (!currentTransactionId && result.transaction_id) {
+        internalTransactionIdRef.current = result.transaction_id;
+      }
+
       return {
         ok: true,
-        txId,
-        isUpdate: !!transactionId,
+        txId: result.transaction_id || txId,
+        isUpdate: !!currentTransactionId,
         transaction_id: result.transaction_id || txId,
       };
     } catch (error) {
