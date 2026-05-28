@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld("appConfig", {
 
 contextBridge.exposeInMainWorld("electronAPI", {
   printReceipt: (payload) => ipcRenderer.invoke("print-receipt", payload),
+  printEscPosDuplicate: (data) =>
+    ipcRenderer.invoke("print-escpos-duplicate", data),
   printEscposXzReading: (payload) =>
     ipcRenderer.invoke("print-escposxzreading", payload),
   printEscposSalesPerProduct: (payload) =>
@@ -32,5 +34,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
   readPrinterConfig: () => ipcRenderer.invoke("read-printer-config"),
   savePrinterConfig: (payload) =>
     ipcRenderer.invoke("save-printer-config", payload),
+  readPrinterCategories: () => ipcRenderer.invoke("read-printer-categories"),
+  savePrinterCategories: (payload) =>
+    ipcRenderer.invoke("save-printer-categories", payload),
+  scanComPorts: () => ipcRenderer.invoke("scan-com-ports"),
+  scanLanPrinters: () => ipcRenderer.invoke("scan-lan-printers"),
   quitApp: () => ipcRenderer.send("close-app"),
 });

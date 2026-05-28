@@ -117,6 +117,21 @@ function getPrinterFilePath() {
     : path.join(__dirname, "..", "public", "printer.txt");
 }
 
+function getPrinterCategoriesFilePath() {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, "printer_categories.json")
+    : path.join(__dirname, "..", "public", "printer_categories.json");
+}
+
+function readPrinterCategories() {
+  return readJsonFileSafe(getPrinterCategoriesFilePath(), {
+    newTransaction: {
+      bluetooth: { connection: "", categories: [] },
+      lan: { connection: "", categories: [] },
+    },
+  });
+}
+
 function getBusinessInfoFilePath() {
   return app.isPackaged
     ? path.join(process.resourcesPath, "businessInfo.json")
@@ -533,44 +548,44 @@ function escposPickBusinessInfo(data = {}) {
       payloadBusinessInfo.businessName ||
       payloadBusinessInfo.Company_Name ||
       DEFAULT_BUSINESS_INFO.companyName ||
-      "CRABS N CRACK SEAFOOD HOUSE",
+      "COMPANY ABC",
 
     storeName:
       payloadBusinessInfo.storeName ||
       payloadBusinessInfo.branchName ||
       payloadBusinessInfo.Store_Name ||
       DEFAULT_BUSINESS_INFO.storeName ||
-      "AND SHAKING CRABS - GUIGUINTO",
+      "AND XYZ - STORE 01",
 
     corpName:
       payloadBusinessInfo.corpName ||
       payloadBusinessInfo.Corp_Name ||
       DEFAULT_BUSINESS_INFO.corpName ||
-      "ARU FOOD CORP.",
+      "ABC CORP.",
 
     address:
       payloadBusinessInfo.address ||
       payloadBusinessInfo.Address ||
       DEFAULT_BUSINESS_INFO.address ||
-      "PLARIDEL BYPASS ROAD TIAONG GUIGUINTO BULACAN",
+      "STORE ADDRESS",
 
     tin:
       payloadBusinessInfo.tin ||
       payloadBusinessInfo.TIN ||
       DEFAULT_BUSINESS_INFO.tin ||
-      "634-742-586-00013",
+      "000-000-000-00000",
 
     machineNumber:
       payloadBusinessInfo.machineNumber ||
       payloadBusinessInfo.MIN ||
       DEFAULT_BUSINESS_INFO.machineNumber ||
-      "N/A",
+      "0000000000",
 
     serialNumber:
       payloadBusinessInfo.serialNumber ||
       payloadBusinessInfo.SN ||
       DEFAULT_BUSINESS_INFO.serialNumber ||
-      "N/A",
+      "0000000000",
   };
 }
 
@@ -638,6 +653,8 @@ function escposBuildPaymentBreakdown(payments = []) {
 function escposGetDiscountCountLabel(entry) {
   if (entry?.key === "senior") return "Senior Citizen Discount Count:";
   if (entry?.key === "pwd") return "PWD Discount Count:";
+  if (entry?.key === "naac") return "NAAC Discount Count:";
+  if (entry?.key === "soloParent") return "Solo Parent Discount Count:";
   if (entry?.key === "manual") return "Manual Discount Count:";
   return `${entry?.label || "Discount"} Count:`;
 }
@@ -645,6 +662,8 @@ function escposGetDiscountCountLabel(entry) {
 function escposGetDiscountAmountLabel(entry) {
   if (entry?.key === "senior") return "Senior Citizen Discount Amount:";
   if (entry?.key === "pwd") return "PWD Discount Amount:";
+  if (entry?.key === "naac") return "NAAC Discount Amount:";
+  if (entry?.key === "soloParent") return "Solo Parent Discount Amount:";
   if (entry?.key === "manual") return "Manual Discount Amount:";
   return `${entry?.label || "Discount"} Amount:`;
 }
@@ -1850,9 +1869,12 @@ function buildPrintFailureMessage(primaryResult, fallbackResults) {
 }
 
 async function writeEscposBuffer(buffer, options = {}) {
-  const config = options.configKey
-    ? getPrinterConnectionConfigFor(options.configKey)
-    : getPrinterConnectionConfig();
+  const config =
+    options.config !== undefined
+      ? options.config
+      : options.configKey
+        ? getPrinterConnectionConfigFor(options.configKey)
+        : getPrinterConnectionConfig();
   const fallbackResults = [];
   const primaryResult = await writeEscposBufferToConfiguredTarget(
     config,
@@ -1986,6 +2008,161 @@ async function checkEscposConnectionWithFallback() {
     message: buildPrintFailureMessage(primaryResult, fallbackResults),
     fallbackResults,
   };
+}
+
+function buildEscposOrderReceiptBuffer({
+  table,
+  items,
+  total,
+  instructions,
+  printMode,
+  transactionId,
+  categoryLabel,
+}) {
+  const LINE_WIDTH = 42;
+  const repeat = (char, length) => String(char || "").repeat(length || 0);
+  const formatLeftRight = (left, right) => {
+    const l = String(left || "");
+    const r = String(right || "");
+    const space = LINE_WIDTH - l.length - r.length;
+    return l + " ".repeat(space > 0 ? space : 1) + r;
+  };
+  const wrapText = (text, width) => {
+    const raw = String(text || "").trim();
+    if (!raw) return [];
+    const words = raw.split(/\s+/);
+    const lines = [];
+    let current = "";
+    words.forEach((word) => {
+      const test = current ? `${current} ${word}` : word;
+      if (test.length <= width) {
+        current = test;
+      } else {
+        if (current) lines.push(current);
+        current = word;
+      }
+    });
+    if (current) lines.push(current);
+    return lines;
+  };
+  const peso = (v) =>
+    Number(v || 0).toLocaleString("en-PH", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+
+  const chunks = [];
+  const initPrinter = Buffer.from([0x1b, 0x40]);
+  const alignLeft = Buffer.from([0x1b, 0x61, 0x00]);
+  const alignCenter = Buffer.from([0x1b, 0x61, 0x01]);
+  const alignRight = Buffer.from([0x1b, 0x61, 0x02]);
+  const boldOn = Buffer.from([0x1b, 0x45, 0x01]);
+  const boldOff = Buffer.from([0x1b, 0x45, 0x00]);
+  const doubleSizeOn = Buffer.from([0x1d, 0x21, 0x11]);
+  const normalSize = Buffer.from([0x1d, 0x21, 0x00]);
+  const cutPaper = Buffer.from([0x1d, 0x56, 0x00]);
+  const nl = (count = 1) => Buffer.from("\n".repeat(count), "ascii");
+  const txt = (value) => Buffer.from(String(value || ""), "ascii");
+
+  let status = "NEW ORDER";
+  if (printMode === "duplicate") status = "DUPLICATE COPY";
+  else if (printMode === "additional") status = "ADDITIONAL ORDER";
+  else if (printMode === "new") status = "NEW ORDER";
+  else if (transactionId) status = "ADDITIONAL ORDER";
+
+  const heading = categoryLabel
+    ? `ORDER SUMMARY - ${String(categoryLabel).toUpperCase()}`
+    : "ORDER SUMMARY";
+
+  chunks.push(initPrinter);
+  chunks.push(alignCenter);
+  chunks.push(boldOn);
+  chunks.push(txt(heading));
+  chunks.push(nl());
+  chunks.push(boldOff);
+  chunks.push(normalSize);
+  chunks.push(txt(`Transaction ID: ${transactionId || "-"}`));
+  chunks.push(nl());
+  chunks.push(txt(`Table: ${table || "-"}`));
+  chunks.push(nl());
+  chunks.push(txt(new Date().toLocaleString()));
+  chunks.push(nl());
+  chunks.push(txt(repeat("-", LINE_WIDTH)));
+  chunks.push(nl());
+  chunks.push(alignLeft);
+  chunks.push(boldOn);
+  chunks.push(txt(formatLeftRight("Item", "Qty  Price")));
+  chunks.push(nl());
+  chunks.push(boldOff);
+  chunks.push(txt(repeat("-", LINE_WIDTH)));
+  chunks.push(nl());
+
+  const safeItems = Array.isArray(items) ? items : [];
+  if (safeItems.length === 0) {
+    chunks.push(alignCenter);
+    chunks.push(txt("Cart is empty"));
+    chunks.push(nl());
+  } else {
+    chunks.push(alignLeft);
+    safeItems.forEach((item) => {
+      const nameLines = wrapText(String(item?.name || "").toUpperCase(), 20);
+      const qty = String(item?.quantity || 0);
+      const lineTotal =
+        Number(item?.price || 0) * Number(item?.quantity || 0);
+      const price = `P${peso(lineTotal)}`;
+      nameLines.forEach((line, index) => {
+        if (index === 0) chunks.push(txt(formatLeftRight(line, `${qty} ${price}`)));
+        else chunks.push(txt(line));
+        chunks.push(nl());
+      });
+      if (item?.itemInstruction) {
+        wrapText(`Note: ${item.itemInstruction}`, LINE_WIDTH).forEach((l) => {
+          chunks.push(txt(l));
+          chunks.push(nl());
+        });
+      }
+    });
+  }
+
+  chunks.push(txt(repeat("-", LINE_WIDTH)));
+  chunks.push(nl());
+  chunks.push(alignRight);
+  chunks.push(boldOn);
+  chunks.push(doubleSizeOn);
+  chunks.push(txt(`TOTAL: P${peso(total)}`));
+  chunks.push(nl());
+  chunks.push(normalSize);
+  chunks.push(boldOff);
+
+  if (instructions) {
+    chunks.push(alignLeft);
+    chunks.push(txt(repeat("-", LINE_WIDTH)));
+    chunks.push(nl());
+    chunks.push(txt("INSTRUCTIONS"));
+    chunks.push(nl());
+    wrapText(instructions, LINE_WIDTH).forEach((l) => {
+      chunks.push(txt(l));
+      chunks.push(nl());
+    });
+  }
+
+  chunks.push(alignCenter);
+  chunks.push(boldOn);
+  chunks.push(doubleSizeOn);
+  wrapText(status, 16).forEach((l) => {
+    chunks.push(txt(l));
+    chunks.push(nl());
+  });
+  chunks.push(normalSize);
+  chunks.push(boldOff);
+  chunks.push(txt("Thank you for your order!"));
+  chunks.push(nl());
+  chunks.push(txt("Please present this to the counter."));
+  chunks.push(nl(3));
+  chunks.push(nl(3));
+  chunks.push(cutPaper);
+
+  return Buffer.concat(chunks);
 }
 
 app.whenReady().then(() => {
@@ -2182,208 +2359,186 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle("print-escpos", async (_event, data) => {
-    const LINE_WIDTH = 42;
-
-    const repeat = (char, length) => String(char || "").repeat(length || 0);
-
-    const formatLeftRight = (left, right) => {
-      const leftText = String(left || "");
-      const rightText = String(right || "");
-      const space = LINE_WIDTH - leftText.length - rightText.length;
-      return leftText + " ".repeat(space > 0 ? space : 1) + rightText;
-    };
-
-    const wrapText = (text, width) => {
-      const raw = String(text || "").trim();
-      if (!raw) return [];
-
-      const words = raw.split(/\s+/);
-      const lines = [];
-      let current = "";
-
-      words.forEach((word) => {
-        const testLine = current ? `${current} ${word}` : word;
-
-        if (testLine.length <= width) {
-          current = testLine;
-        } else {
-          if (current) lines.push(current);
-          current = word;
-        }
-      });
-
-      if (current) lines.push(current);
-      return lines;
-    };
-
-    const peso = (v) =>
-      Number(v || 0).toLocaleString("en-PH", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      });
-
     try {
       console.log("[ESC/POS PRINT] Payload:", data);
 
-      const chunks = [];
       const { table, items, total, instructions, printMode, transactionId } =
         data || {};
+      const safeItems = Array.isArray(items) ? items : [];
 
-      const initPrinter = Buffer.from([0x1b, 0x40]);
-      const alignLeft = Buffer.from([0x1b, 0x61, 0x00]);
-      const alignCenter = Buffer.from([0x1b, 0x61, 0x01]);
-      const alignRight = Buffer.from([0x1b, 0x61, 0x02]);
-      const boldOn = Buffer.from([0x1b, 0x45, 0x01]);
-      const boldOff = Buffer.from([0x1b, 0x45, 0x00]);
-      const doubleSizeOn = Buffer.from([0x1d, 0x21, 0x11]);
-      const normalSize = Buffer.from([0x1d, 0x21, 0x00]);
-      const cutPaper = Buffer.from([0x1d, 0x56, 0x00]);
-      const nl = (count = 1) => Buffer.from("\n".repeat(count), "ascii");
-      const txt = (value) => Buffer.from(String(value || ""), "ascii");
+      const catConfig = readPrinterCategories();
+      const btSlot  = catConfig?.newTransaction?.bluetooth || {};
+      const lanSlot = catConfig?.newTransaction?.lan       || {};
+      const usbSlot = catConfig?.newTransaction?.usb       || {};
 
-      let status = "NEW ORDER";
-      if (printMode === "duplicate") {
-        status = "DUPLICATE COPY";
-      } else if (printMode === "additional") {
-        status = "ADDITIONAL ORDER";
-      } else if (printMode === "new") {
-        status = "NEW ORDER";
-      } else if (transactionId) {
-        status = "ADDITIONAL ORDER";
-      }
+      const normCats = (slot) =>
+        new Set(
+          (Array.isArray(slot.categories) ? slot.categories : []).map((c) =>
+            String(c).toUpperCase().trim(),
+          ),
+        );
 
-      chunks.push(initPrinter);
+      const btCats  = normCats(btSlot);
+      const lanCats = normCats(lanSlot);
+      const usbCats = normCats(usbSlot);
 
-      // Header
-      chunks.push(alignCenter);
-      chunks.push(boldOn);
-      chunks.push(txt("ORDER SUMMARY"));
-      chunks.push(nl());
-      chunks.push(boldOff);
+      const hasBT  = btCats.size  > 0 && Boolean(btSlot.connection);
+      const hasLAN = lanCats.size > 0 && Boolean(lanSlot.connection);
+      const hasUSB = usbCats.size > 0 && Boolean(usbSlot.connection);
 
-      chunks.push(normalSize);
-      chunks.push(txt(`Transaction ID: ${transactionId || "-"}`));
-      chunks.push(nl());
-      chunks.push(txt(`Table: ${table || "-"}`));
-      chunks.push(nl());
-      chunks.push(txt(new Date().toLocaleString()));
-      chunks.push(nl());
-
-      chunks.push(txt(repeat("-", LINE_WIDTH)));
-      chunks.push(nl());
-
-      // Column header
-      chunks.push(alignLeft);
-      chunks.push(boldOn);
-      chunks.push(txt(formatLeftRight("Item", "Qty  Price")));
-      chunks.push(nl());
-      chunks.push(boldOff);
-
-      chunks.push(txt(repeat("-", LINE_WIDTH)));
-      chunks.push(nl());
-
-      // Items
-      if (!Array.isArray(items) || items.length === 0) {
-        chunks.push(alignCenter);
-        chunks.push(txt("Cart is empty"));
-        chunks.push(nl());
-      } else {
-        chunks.push(alignLeft);
-
-        items.forEach((item) => {
-          const nameLines = wrapText(
-            String(item?.name || "").toUpperCase(),
-            20,
-          );
-          const qty = String(item?.quantity || 0);
-          const lineTotal =
-            Number(item?.price || 0) * Number(item?.quantity || 0);
-          const price = `P${peso(lineTotal)}`;
-
-          nameLines.forEach((line, index) => {
-            if (index === 0) {
-              chunks.push(txt(formatLeftRight(line, `${qty} ${price}`)));
-            } else {
-              chunks.push(txt(line));
-            }
-            chunks.push(nl());
-          });
-
-          if (item?.itemInstruction) {
-            wrapText(`Note: ${item.itemInstruction}`, LINE_WIDTH).forEach(
-              (line) => {
-                chunks.push(txt(line));
-                chunks.push(nl());
-              },
-            );
-          }
-
-          // if (item?.code) {
-          //   chunks.push(Buffer.from([0x1b, 0x4d, 0x01]));
-          //   chunks.push(txt(String(item.code)));
-          //   chunks.push(nl());
-          //   chunks.push(Buffer.from([0x1b, 0x4d, 0x00])); // back to normal font
-          // }
+      // No category routing configured — single-printer fallback
+      if (!hasBT && !hasLAN && !hasUSB) {
+        const payload = buildEscposOrderReceiptBuffer({
+          table,
+          items,
+          total,
+          instructions,
+          printMode,
+          transactionId,
+        });
+        return await writeEscposBuffer(payload, {
+          printerName: data?.printerName,
+          configKey: "printEscpos",
         });
       }
 
-      chunks.push(txt(repeat("-", LINE_WIDTH)));
-      chunks.push(nl());
+      const getItemCat = (item) =>
+        String(item?.item_category || "").toUpperCase().trim();
 
-      // Total
-      chunks.push(alignRight);
-      chunks.push(boldOn);
-      chunks.push(doubleSizeOn);
-      chunks.push(txt(`TOTAL: P${peso(total)}`));
-      chunks.push(nl());
-      chunks.push(normalSize);
-      chunks.push(boldOff);
+      const itemTotal = (list) =>
+        list.reduce(
+          (sum, item) =>
+            sum + Number(item?.price || 0) * Number(item?.quantity || 0),
+          0,
+        );
 
-      // Instructions
-      if (instructions) {
-        chunks.push(alignLeft);
-        chunks.push(txt(repeat("-", LINE_WIDTH)));
-        chunks.push(nl());
-        chunks.push(txt("INSTRUCTIONS"));
-        chunks.push(nl());
+      const btItems  = hasBT  ? safeItems.filter((i) => btCats.has(getItemCat(i)))  : [];
+      const lanItems = hasLAN ? safeItems.filter((i) => lanCats.has(getItemCat(i))) : [];
+      const usbItems = hasUSB ? safeItems.filter((i) => usbCats.has(getItemCat(i))) : [];
+      const otherItems = safeItems.filter((i) => {
+        const cat = getItemCat(i);
+        return (
+          !(hasBT  && btCats.has(cat))  &&
+          !(hasLAN && lanCats.has(cat)) &&
+          !(hasUSB && usbCats.has(cat))
+        );
+      });
 
-        wrapText(instructions, LINE_WIDTH).forEach((line) => {
-          chunks.push(txt(line));
-          chunks.push(nl());
+      const results = [];
+
+      if (btItems.length > 0) {
+        const label = [...new Set(btItems.map(getItemCat))].join(" / ");
+        const buf = buildEscposOrderReceiptBuffer({
+          table,
+          items: btItems,
+          total: itemTotal(btItems),
+          instructions,
+          printMode,
+          transactionId,
+          categoryLabel: label,
         });
+        results.push(
+          await writeEscposBuffer(buf, {
+            config: parsePrinterConnection(btSlot.connection),
+          }),
+        );
       }
 
-      // Status
-      chunks.push(alignCenter);
-      chunks.push(boldOn);
-      chunks.push(doubleSizeOn);
+      if (lanItems.length > 0) {
+        const label = [...new Set(lanItems.map(getItemCat))].join(" / ");
+        const buf = buildEscposOrderReceiptBuffer({
+          table,
+          items: lanItems,
+          total: itemTotal(lanItems),
+          instructions,
+          printMode,
+          transactionId,
+          categoryLabel: label,
+        });
+        results.push(
+          await writeEscposBuffer(buf, {
+            config: parsePrinterConnection(lanSlot.connection),
+          }),
+        );
+      }
 
-      wrapText(status, 16).forEach((line) => {
-        chunks.push(txt(line));
-        chunks.push(nl());
-      });
+      if (usbItems.length > 0) {
+        const label = [...new Set(usbItems.map(getItemCat))].join(" / ");
+        const buf = buildEscposOrderReceiptBuffer({
+          table,
+          items: usbItems,
+          total: itemTotal(usbItems),
+          instructions,
+          printMode,
+          transactionId,
+          categoryLabel: label,
+        });
+        results.push(
+          await writeEscposBuffer(buf, {
+            config: parsePrinterConnection(usbSlot.connection),
+          }),
+        );
+      }
 
-      chunks.push(normalSize);
-      chunks.push(boldOff);
+      if (otherItems.length > 0) {
+        const buf = buildEscposOrderReceiptBuffer({
+          table,
+          items: otherItems,
+          total: itemTotal(otherItems),
+          instructions,
+          printMode,
+          transactionId,
+        });
+        results.push(
+          await writeEscposBuffer(buf, {
+            printerName: data?.printerName,
+            configKey: "printEscpos",
+          }),
+        );
+      }
 
-      // Footer
-      chunks.push(txt("Thank you for your order!"));
-      chunks.push(nl());
-      chunks.push(txt("Please present this to the counter."));
-      chunks.push(nl(3));
-      chunks.push(nl(3));
-      chunks.push(cutPaper);
+      if (results.length === 0) {
+        return { success: true, message: "No items to print." };
+      }
 
-      const payload = Buffer.concat(chunks);
-      return await writeEscposBuffer(payload, {
-        printerName: data?.printerName,
-        configKey: "printEscpos",
-      });
+      const anySuccess = results.some((r) => r?.success);
+      return {
+        success: anySuccess,
+        message: anySuccess ? "Printed successfully." : "All prints failed.",
+        results,
+      };
     } catch (error) {
       console.error("ESC/POS print error:", error);
       return {
         success: false,
         message: error?.message || "ESC/POS print failed",
+      };
+    }
+  });
+
+  ipcMain.handle("print-escpos-duplicate", async (_event, data) => {
+    try {
+      console.log("[ESC/POS DUPLICATE] Payload:", data);
+
+      const { table, items, total, instructions, transactionId } = data || {};
+
+      const payload = buildEscposOrderReceiptBuffer({
+        table,
+        items,
+        total,
+        instructions,
+        printMode: "duplicate",
+        transactionId,
+      });
+
+      return await writeEscposBuffer(payload, {
+        configKey: "printEscposDuplicate",
+      });
+    } catch (error) {
+      console.error("ESC/POS duplicate print error:", error);
+      return {
+        success: false,
+        message: error?.message || "ESC/POS duplicate print failed",
       };
     }
   });
@@ -2402,7 +2557,9 @@ app.whenReady().then(() => {
         dateFrom,
       } = data || {};
 
-      const business = escposPickBusinessInfo(data);
+      const fileDiscountBI = readJsonFileSafe(getBusinessInfoFilePath(), DEFAULT_BUSINESS_INFO);
+      const mergedDiscountBI = { ...fileDiscountBI, ...(data?.businessInfo || {}) };
+      const business = escposPickBusinessInfo({ businessInfo: mergedDiscountBI });
 
       const initPrinter = Buffer.from([0x1b, 0x40]);
       const openDrawer = Buffer.from([0x1b, 0x70, 0x00, 0x19, 0xfa]);
@@ -2696,8 +2853,29 @@ app.whenReady().then(() => {
       chunks.push(txt("Thank you"));
       chunks.push(nl());
       chunks.push(txt("Please come again."));
-      chunks.push(nl(3));
+      chunks.push(nl());
       chunks.push(boldOff);
+
+      if (mergedDiscountBI.posProviderName) {
+        chunks.push(boldOn);
+        pushWrapped(`SUPPLIER: ${mergedDiscountBI.posProviderName}`);
+        chunks.push(boldOff);
+      }
+      String(mergedDiscountBI.posProviderAddress || "")
+        .split(/\r?\n|\|/)
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .forEach((l) => pushWrapped(l));
+      if (mergedDiscountBI.posProviderTin)
+        pushWrapped(`TIN: ${mergedDiscountBI.posProviderTin}`);
+      if (mergedDiscountBI.posProviderBirAccreNo)
+        pushWrapped(`BIR ACC#: ${mergedDiscountBI.posProviderBirAccreNo}`);
+      if (mergedDiscountBI.posProviderAccreDateIssued)
+        pushWrapped(`DATE ISSUED: ${mergedDiscountBI.posProviderAccreDateIssued}`);
+      if (mergedDiscountBI.posProviderPTUNo)
+        pushWrapped(`PTU: ${mergedDiscountBI.posProviderPTUNo}`);
+      if (mergedDiscountBI.posProviderPTUDateIssued)
+        pushWrapped(`PTU DATE ISSUED: ${mergedDiscountBI.posProviderPTUDateIssued}`);
 
       chunks.push(nl(3));
       chunks.push(cutPaper);
@@ -2733,8 +2911,10 @@ app.whenReady().then(() => {
         customerCards = [],
         isDuplicateCopy = false,
         terminalConfig = {},
-        businessInfo = {},
+        businessInfo: rawPaymentBI = {},
       } = data || {};
+      const filePaymentBI = readJsonFileSafe(getBusinessInfoFilePath(), DEFAULT_BUSINESS_INFO);
+      const businessInfo = { ...filePaymentBI, ...rawPaymentBI };
 
       const safeTransaction = transaction || {};
       const safeComputed = computed || {};
@@ -2764,6 +2944,13 @@ app.whenReady().then(() => {
           )
         : [];
 
+      const naacEntry = (safeComputed?.discountBreakdown || []).find(
+        (e) => e?.key === "naac",
+      );
+      const naacInActiveBreakdown = activeBreakdown.some(
+        (e) => e?.key === "naac",
+      );
+
       const paymentBreakdown = escposBuildPaymentBreakdown(safePayments);
 
       const shouldShowDiscountSummary =
@@ -2774,7 +2961,9 @@ app.whenReady().then(() => {
             0,
         ) > 0 ||
         Number(safeComputed?.statutoryQualifiedCount || 0) > 0 ||
-        activeBreakdown.length > 0;
+        activeBreakdown.length > 0 ||
+        Number(naacEntry?.qualifiedCount || 0) > 0 ||
+        Number(naacEntry?.discountAmount || 0) > 0;
 
       const splitAddressLines = (value) =>
         String(value || "")
@@ -3003,6 +3192,11 @@ app.whenReady().then(() => {
         }
       });
 
+      // Explicit NAAC line — fallback if not captured by activeBreakdown
+      if (!naacInActiveBreakdown && Number(naacEntry?.discountAmount || 0) > 0) {
+        pushMetaRow("NAAC DISC:", escposSignedNegativePeso(naacEntry.discountAmount));
+      }
+
       if (Number(safeComputed?.totalVatExemption || 0) > 0) {
         pushMetaRow(
           "VAT EXEMPTION:",
@@ -3106,6 +3300,16 @@ app.whenReady().then(() => {
             escposPeso(entry?.discountAmount),
           );
         });
+
+        // Explicit NAAC rows — fallback if not captured by activeBreakdown
+        if (
+          !naacInActiveBreakdown &&
+          (Number(naacEntry?.qualifiedCount || 0) > 0 ||
+            Number(naacEntry?.discountAmount || 0) > 0)
+        ) {
+          pushMetaRow("NAAC Discount Count:", Number(naacEntry.qualifiedCount || 0));
+          pushMetaRow("NAAC Discount Amount:", escposPeso(naacEntry.discountAmount));
+        }
 
         pushMetaRow(
           "Discountable Gross:",
@@ -3869,7 +4073,14 @@ app.whenReady().then(() => {
       console.log("[ESC/POS BILLING] Payload:", data);
 
       const chunks = [];
-      const { transaction, detailedproduct } = data || {};
+      const { transaction, detailedproduct, businessInfo: rawBillingBI = {} } = data || {};
+      const fileBillingBI = readJsonFileSafe(getBusinessInfoFilePath(), DEFAULT_BUSINESS_INFO);
+      const bi = { ...fileBillingBI, ...rawBillingBI };
+      const splitBiLines = (v) =>
+        String(v || "")
+          .split(/\r?\n|\|/)
+          .map((l) => l.trim())
+          .filter(Boolean);
 
       const initPrinter = Buffer.from([0x1b, 0x40]);
       const alignLeft = Buffer.from([0x1b, 0x61, 0x00]);
@@ -3910,24 +4121,34 @@ app.whenReady().then(() => {
       // Header
       chunks.push(alignCenter);
       chunks.push(boldOn);
-      chunks.push(txt("CRABS N CRACK SEAFOOD HOUSE"));
+      chunks.push(txt(String(bi.companyName || "COMPANY")));
       chunks.push(nl());
-      chunks.push(txt("AND SHAKING CRABS - GUIGUINTO"));
-      chunks.push(nl());
+      if (bi.storeName) {
+        chunks.push(txt(String(bi.storeName)));
+        chunks.push(nl());
+      }
       chunks.push(boldOff);
 
-      chunks.push(txt("ARU FOOD CORP."));
-      chunks.push(nl());
-      chunks.push(txt("PLARIDEL BYPASS ROAD TIAONG GUIGUINTO"));
-      chunks.push(nl());
-      chunks.push(txt("BULACAN"));
-      chunks.push(nl());
-      chunks.push(txt("VAT REG TIN: 634-742-586-00013"));
-      chunks.push(nl());
-      chunks.push(txt("MIN: 26032413224205435"));
-      chunks.push(nl());
-      chunks.push(txt("S/N: 2510AI5508128156WL24026"));
-      chunks.push(nl());
+      if (bi.corpName) {
+        chunks.push(txt(String(bi.corpName)));
+        chunks.push(nl());
+      }
+      splitBiLines(bi.address).forEach((addrLine) => {
+        chunks.push(txt(addrLine));
+        chunks.push(nl());
+      });
+      if (bi.tin) {
+        chunks.push(txt(`VAT REG TIN: ${bi.tin}`));
+        chunks.push(nl());
+      }
+      if (bi.machineNumber) {
+        chunks.push(txt(`MIN: ${bi.machineNumber}`));
+        chunks.push(nl());
+      }
+      if (bi.serialNumber) {
+        chunks.push(txt(`S/N: ${bi.serialNumber}`));
+        chunks.push(nl());
+      }
 
       chunks.push(txt(repeat("-", LINE_WIDTH)));
       chunks.push(nl());
@@ -4017,6 +4238,39 @@ app.whenReady().then(() => {
       chunks.push(nl());
       chunks.push(txt("_______________________________"));
       chunks.push(nl(3));
+
+      // POS Provider footer
+      chunks.push(alignCenter);
+      if (bi.posProviderName) {
+        chunks.push(boldOn);
+        chunks.push(txt(`SUPPLIER: ${bi.posProviderName}`));
+        chunks.push(nl());
+        chunks.push(boldOff);
+      }
+      splitBiLines(bi.posProviderAddress).forEach((addrLine) => {
+        chunks.push(txt(addrLine));
+        chunks.push(nl());
+      });
+      if (bi.posProviderTin) {
+        chunks.push(txt(`TIN: ${bi.posProviderTin}`));
+        chunks.push(nl());
+      }
+      if (bi.posProviderBirAccreNo) {
+        chunks.push(txt(`BIR ACC#: ${bi.posProviderBirAccreNo}`));
+        chunks.push(nl());
+      }
+      if (bi.posProviderAccreDateIssued) {
+        chunks.push(txt(`DATE ISSUED: ${bi.posProviderAccreDateIssued}`));
+        chunks.push(nl());
+      }
+      if (bi.posProviderPTUNo) {
+        chunks.push(txt(`PTU: ${bi.posProviderPTUNo}`));
+        chunks.push(nl());
+      }
+      if (bi.posProviderPTUDateIssued) {
+        chunks.push(txt(`PTU DATE ISSUED: ${bi.posProviderPTUDateIssued}`));
+        chunks.push(nl());
+      }
       chunks.push(nl(3));
 
       chunks.push(cutPaper);
@@ -4377,6 +4631,32 @@ app.whenReady().then(() => {
     }
   });
 
+  ipcMain.handle("read-printer-categories", () => {
+    try {
+      return readPrinterCategories();
+    } catch (error) {
+      console.error("Failed to read printer categories:", error);
+      return {
+        newTransaction: {
+          bluetooth: { connection: "", categories: [] },
+          lan: { connection: "", categories: [] },
+        },
+      };
+    }
+  });
+
+  ipcMain.handle("save-printer-categories", (_event, payload) => {
+    try {
+      const ok = writeJsonFileSafe(getPrinterCategoriesFilePath(), payload);
+      return ok
+        ? { success: true }
+        : { success: false, message: "Failed to write printer_categories.json" };
+    } catch (error) {
+      console.error("Failed to save printer categories:", error);
+      return { success: false, message: error.message };
+    }
+  });
+
   ipcMain.handle("read-printer-config", () => {
     try {
       return getPrinterConfigMap();
@@ -4407,12 +4687,77 @@ app.whenReady().then(() => {
       const { printerName = "", printerType = "Bluetooth", content = "" } =
         payload || {};
       const connectionStr =
-        printerType === "Bluetooth" ? `bt:${printerName}` : printerName;
+        printerType === "Bluetooth" ? `bt:${printerName}` :
+        printerType === "USB"       ? `windows:${printerName}` :
+        printerName;
       const config = parsePrinterConnection(connectionStr);
       const buffer = Buffer.from(content, "binary");
       return await writeEscposBufferToConfiguredTarget(config, buffer);
     } catch (error) {
       return { success: false, message: error.message || "Test print failed" };
+    }
+  });
+
+  ipcMain.handle("scan-com-ports", async () => {
+    try {
+      const SerialPort = getSerialPort();
+      const list = await SerialPort.list();
+      return list.map((p) => p.path).filter(Boolean).sort();
+    } catch {
+      return [];
+    }
+  });
+
+  ipcMain.handle("scan-lan-printers", async () => {
+    try {
+      const ifaces = os.networkInterfaces();
+      let localIp = "";
+      for (const addrs of Object.values(ifaces)) {
+        for (const addr of addrs) {
+          if (addr.family === "IPv4" && !addr.internal) {
+            localIp = addr.address;
+            break;
+          }
+        }
+        if (localIp) break;
+      }
+      if (!localIp) return [];
+
+      const parts = localIp.split(".");
+      const subnet = `${parts[0]}.${parts[1]}.${parts[2]}`;
+      const found = [];
+
+      await Promise.all(
+        Array.from({ length: 254 }, (_, i) => {
+          const ip = `${subnet}.${i + 1}`;
+          return new Promise((resolve) => {
+            const sock = new net.Socket();
+            sock.setTimeout(300);
+            sock.on("connect", () => {
+              found.push(ip);
+              sock.destroy();
+              resolve();
+            });
+            sock.on("timeout", () => {
+              sock.destroy();
+              resolve();
+            });
+            sock.on("error", () => {
+              sock.destroy();
+              resolve();
+            });
+            sock.connect(9100, ip);
+          });
+        }),
+      );
+
+      return found.sort((a, b) => {
+        const aLast = parseInt(a.split(".")[3], 10);
+        const bLast = parseInt(b.split(".")[3], 10);
+        return aLast - bLast;
+      });
+    } catch {
+      return [];
     }
   });
 
