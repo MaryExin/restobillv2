@@ -199,7 +199,7 @@ try {
           AND Category_Code = :Category_Code
           AND Unit_Code = :Unit_Code
           AND status = 'Active'
-        ORDER BY customer_id ASC, id ASC
+        ORDER BY id ASC
     ";
 
     $stmtDiscountRows = $pdo->prepare($sqlDiscountRows);

@@ -9,6 +9,7 @@ import {
   FiPackage,
   FiEye,
   FiAlertTriangle,
+  FiTrash2,
 } from "react-icons/fi";
 import ButtonComponent from "./Common/ButtonComponent";
 import { BuildPrintableDiscountReceiptHtml } from "../../utils/BuildPrintableDiscountReceiptHtml";
@@ -143,6 +144,19 @@ const buildInitialDiscountState = () => ({
     manualPercent: "",
     manualMode: "amount",
   },
+});
+
+const emptyCustomerInfo = {
+  customer_exclusive_id: "",
+  customer_name: "",
+  date_of_birth: "",
+  gender: "",
+  tin: "",
+  contact_no: "",
+};
+
+const createEmptyCustomerCard = () => ({
+  ...emptyCustomerInfo,
 });
 
 const handleSelectAllOnFocus = (e) => {
@@ -391,6 +405,281 @@ const OrderedItemsSummaryModal = ({
 };
 
 
+const CustomerInfoModal = ({
+  isOpen,
+  onClose,
+  isDark,
+  customerCount,
+  setCustomerCount,
+  totalQualified,
+  customerCards,
+  setCustomerCards,
+  onSave,
+  isSaving = false,
+  readOnly = false,
+}) => {
+  if (!isOpen) return null;
+
+  const inputClass = isDark
+    ? "bg-slate-950 border border-slate-800 text-white placeholder:text-slate-500"
+    : "bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400";
+
+  const safeQualifiedCount = Math.max(Number(totalQualified) || 0, 0);
+
+  const updateCard = (index, field, value) => {
+    setCustomerCards((prev) =>
+      prev.map((card, i) => (i === index ? { ...card, [field]: value } : card)),
+    );
+  };
+
+  const clearCard = (index) => {
+    setCustomerCards((prev) =>
+      prev.map((card, i) => (i === index ? createEmptyCustomerCard() : card)),
+    );
+  };
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        className={`fixed inset-0 z-[100002] flex items-center justify-center p-3 backdrop-blur-md ${
+          isDark ? "bg-slate-950/80" : "bg-slate-200/70"
+        }`}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+      >
+        <motion.div
+          initial={{ scale: 0.985, opacity: 0, y: 10 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          exit={{ scale: 0.985, opacity: 0, y: 10 }}
+          transition={{ duration: 0.16 }}
+          className={`w-full max-w-[1000px] max-h-[calc(100vh-1.5rem)] overflow-auto rounded-[1rem] shadow-2xl ${
+            isDark
+              ? "border border-white/10 bg-slate-900 text-white"
+              : "border border-slate-200 bg-white text-slate-900"
+          }`}
+        >
+          <div className="p-5 md:p-6">
+            <div className="flex items-start justify-between gap-4 mb-5">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`flex h-12 w-12 items-center justify-center rounded-2xl ${
+                    isDark
+                      ? "bg-slate-800 text-slate-300"
+                      : "bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  <FiUsers size={20} />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-black">Customer Info</h2>
+                  <p className="text-xs text-slate-500">
+                    Optional details for discount rows and receipt printing.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={onClose}
+                className={`flex h-10 w-10 items-center justify-center rounded-full transition-all ${
+                  isDark
+                    ? "bg-slate-800 text-slate-400 hover:bg-red-500/20 hover:text-red-400"
+                    : "bg-slate-100 text-slate-500 hover:bg-red-100 hover:text-red-500"
+                }`}
+              >
+                <FiX size={16} />
+              </button>
+            </div>
+
+            <div
+              className={`mb-4 rounded-[24px] border p-4 ${
+                isDark
+                  ? "border-white/5 bg-white/[0.03]"
+                  : "border-slate-200 bg-slate-50"
+              }`}
+            >
+              <div className="grid gap-3 md:grid-cols-[1fr_180px]">
+                <div className="space-y-3">
+                  <div className="grid gap-2 md:grid-cols-[1.2fr_180px] md:items-center">
+                    <label className="text-sm font-black">Head Count:</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={customerCount}
+                      disabled={readOnly}
+                      onChange={(e) => setCustomerCount(e.target.value)}
+                      onFocus={handleSelectAllOnFocus}
+                      className={`h-11 rounded-2xl px-3 text-sm outline-none ${inputClass}`}
+                    />
+                  </div>
+
+                  <div className="grid gap-2 md:grid-cols-[1.2fr_180px] md:items-center">
+                    <label className="text-sm font-black">
+                      Total Discount Customer Rows:
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={safeQualifiedCount}
+                      disabled
+                      className={`h-11 rounded-2xl px-3 text-sm outline-none ${inputClass}`}
+                    />
+                  </div>
+                </div>
+
+                <div className="items-center justify-center hidden md:flex">
+                  <div
+                    className={`flex h-24 w-24 items-center justify-center rounded-full ${
+                      isDark
+                        ? "bg-blue-500/10 text-blue-400"
+                        : "bg-blue-50 text-blue-600"
+                    }`}
+                  >
+                    <FiUsers size={40} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="max-h-[55vh] space-y-4 overflow-y-auto pr-1">
+              {safeQualifiedCount === 0 ? (
+                <div
+                  className={`rounded-[24px] border p-5 text-center text-sm italic ${
+                    isDark
+                      ? "border-white/5 bg-white/[0.03] text-slate-400"
+                      : "border-slate-200 bg-slate-50 text-slate-500"
+                  }`}
+                >
+                  No discount customer cards yet.
+                </div>
+              ) : (
+                customerCards
+                  .slice(0, safeQualifiedCount)
+                  .map((customerInfo, index) => (
+                    <div
+                      key={index}
+                      className={`rounded-[24px] border p-4 ${
+                        isDark
+                          ? "border-white/5 bg-white/[0.03]"
+                          : "border-slate-200 bg-slate-50"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-3 mb-3">
+                        <div>
+                          <h3 className="text-sm font-black">
+                            Discount Customer #{index + 1}
+                          </h3>
+                          <p className="text-[11px] text-slate-500">
+                            These fields may be left blank.
+                          </p>
+                        </div>
+
+                        {!readOnly ? (
+                          <button
+                            type="button"
+                            onClick={() => clearCard(index)}
+                            className="flex items-center justify-center text-white transition bg-blue-600 h-11 w-11 rounded-2xl hover:bg-blue-500"
+                          >
+                            <FiTrash2 size={16} />
+                          </button>
+                        ) : null}
+                      </div>
+
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <input
+                          type="text"
+                          value={customerInfo.customer_exclusive_id}
+                          disabled={readOnly}
+                          onChange={(e) =>
+                            updateCard(
+                              index,
+                              "customer_exclusive_id",
+                              e.target.value,
+                            )
+                          }
+                          placeholder="Customer ID / Exclusive ID"
+                          className={`h-11 rounded-2xl px-3 text-sm outline-none ${inputClass}`}
+                        />
+
+                        <input
+                          type="text"
+                          value={customerInfo.customer_name}
+                          disabled={readOnly}
+                          onChange={(e) =>
+                            updateCard(index, "customer_name", e.target.value)
+                          }
+                          placeholder="Customer Name"
+                          className={`h-11 rounded-2xl px-3 text-sm outline-none ${inputClass}`}
+                        />
+
+                        <input
+                          type="text"
+                          value={customerInfo.date_of_birth}
+                          disabled={readOnly}
+                          onChange={(e) =>
+                            updateCard(index, "date_of_birth", e.target.value)
+                          }
+                          placeholder="Date of Birth"
+                          className={`h-11 rounded-2xl px-3 text-sm outline-none ${inputClass}`}
+                        />
+
+                        <input
+                          type="text"
+                          value={customerInfo.gender}
+                          disabled={readOnly}
+                          onChange={(e) =>
+                            updateCard(index, "gender", e.target.value)
+                          }
+                          placeholder="Gender"
+                          className={`h-11 rounded-2xl px-3 text-sm outline-none ${inputClass}`}
+                        />
+
+                        <input
+                          type="text"
+                          value={customerInfo.tin}
+                          disabled={readOnly}
+                          onChange={(e) =>
+                            updateCard(index, "tin", e.target.value)
+                          }
+                          placeholder="TIN"
+                          className={`h-11 rounded-2xl px-3 text-sm outline-none ${inputClass}`}
+                        />
+
+                        <input
+                          type="text"
+                          value={customerInfo.contact_no}
+                          disabled={readOnly}
+                          onChange={(e) =>
+                            updateCard(index, "contact_no", e.target.value)
+                          }
+                          placeholder="Contact No."
+                          className={`h-11 rounded-2xl px-3 text-sm outline-none ${inputClass}`}
+                        />
+                      </div>
+                    </div>
+                  ))
+              )}
+            </div>
+
+            <div className="flex justify-center mt-5">
+              <button
+                onClick={onSave || onClose}
+                disabled={isSaving}
+                className={`px-10 py-3 text-sm font-black text-white transition bg-blue-600 rounded-2xl hover:bg-blue-500 ${
+                  isSaving ? "cursor-not-allowed opacity-60" : ""
+                }`}
+              >
+                {isSaving ? "Saving..." : "Save Customer Info"}
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+};
+
 const DiscountEntryCard = ({
   meta,
   values,
@@ -554,10 +843,12 @@ const ModalDiscountTransaction = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
   const [customerCount, setCustomerCount] = useState(1);
+  const [customerCards, setCustomerCards] = useState([]);
   const [discountState, setDiscountState] = useState(buildInitialDiscountState);
   const [discountCeilingAmount, setDiscountCeilingAmount] = useState(0);
   const [errorMessage, setErrorMessage] = useState("");
   const [showItemsModal, setShowItemsModal] = useState(false);
+  const [showCustomerInfoModal, setShowCustomerInfoModal] = useState(false);
   const [qualifiedPrompt, setQualifiedPrompt] = useState("");
   const [latestBillingNo, setLatestBillingNo] = useState(
     billingNo || transaction?.billing_no || transaction?.billingNo || "",
@@ -572,6 +863,9 @@ const ModalDiscountTransaction = ({
   const [showOverrideWarning, setShowOverrideWarning] = useState(false);
   const [serviceChargeEnabled, setServiceChargeEnabled] = useState(false);
   const [serviceChargePercentage, setServiceChargePercentage] = useState(0);
+  const [customerInfoEnabled, setCustomerInfoEnabled] = useState(false);
+  const [isSavingCustomerInfo, setIsSavingCustomerInfo] = useState(false);
+  const [customerInfoSavedMessage, setCustomerInfoSavedMessage] = useState("");
 
   // let escposWarmedUp = false;
 
@@ -678,12 +972,15 @@ const ModalDiscountTransaction = ({
 
   const resetForm = () => {
     setCustomerCount(1);
+    setCustomerCards([]);
     setQualifiedPrompt("");
     setDiscountState(buildInitialDiscountState());
     setExistingDiscountLoaded(false);
     setHadExistingDiscountBreakdown(false);
     setInitialLoadedSignature("");
     setShowOverrideWarning(false);
+    setIsSavingCustomerInfo(false);
+    setCustomerInfoSavedMessage("");
   };
 
   useEffect(() => {
@@ -767,6 +1064,32 @@ const ModalDiscountTransaction = ({
 
         setCustomerCount(nextCustomerCount);
         setDiscountState(nextDiscountState);
+        setCustomerCards(
+          discountRows.length > 0
+            ? discountRows
+                .slice(
+                  0,
+                  Number(discountCounts.senior || 0) +
+                    Number(discountCounts.pwd || 0) +
+                    Number(discountCounts.naac || discountCounts.NAAC || 0) +
+                    Number(
+                      discountCounts.soloParent ||
+                        discountCounts.solo_parent ||
+                        discountCounts["Solo Parent"] ||
+                        0,
+                    ) +
+                    Number(discountCounts.manual || 0),
+                )
+                .map((row) => ({
+                  customer_exclusive_id: row.customer_id || "",
+                  customer_name: row.customer_name || "",
+                  date_of_birth: row.date_of_birth || "",
+                  gender: row.gender || "",
+                  tin: row.tin || "",
+                  contact_no: row.contact_no || "",
+                }))
+            : [],
+        );
 
         const hasExistingBreakdown = discountRows.length > 0;
         setExistingDiscountLoaded(true);
@@ -794,6 +1117,7 @@ const ModalDiscountTransaction = ({
         console.error(error);
         setErrorMessage("Failed to load transaction items.");
         setItems([]);
+        setCustomerCards([]);
         setExistingDiscountLoaded(false);
         setHadExistingDiscountBreakdown(false);
         setInitialLoadedSignature("");
@@ -864,6 +1188,38 @@ const ModalDiscountTransaction = ({
     };
 
     fetchServiceChargeSettings();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, apiHost]);
+
+  useEffect(() => {
+    if (!isOpen || !apiHost) return;
+
+    let cancelled = false;
+
+    const fetchCustomerInfoSettings = async () => {
+      try {
+        const response = await fetch(
+          `${apiHost}/api/pos_customer_info_settings.php`,
+        );
+        const result = await response.json();
+
+        if (!cancelled) {
+          setCustomerInfoEnabled(
+            Boolean(result?.data?.customer_info_enabled || false),
+          );
+        }
+      } catch (error) {
+        console.error("Failed to load customer info settings:", error);
+        if (!cancelled) {
+          setCustomerInfoEnabled(false);
+        }
+      }
+    };
+
+    fetchCustomerInfoSettings();
 
     return () => {
       cancelled = true;
@@ -1234,8 +1590,107 @@ const ModalDiscountTransaction = ({
   };
 
   useEffect(() => {
+    const safeQualified = Math.max(Number(computed.totalQualifiedAll) || 0, 0);
+
+    setCustomerCards((prev) => {
+      const next = [...prev];
+
+      if (next.length < safeQualified) {
+        while (next.length < safeQualified) {
+          next.push(createEmptyCustomerCard());
+        }
+      } else if (next.length > safeQualified) {
+        next.length = safeQualified;
+      }
+
+      return next;
+    });
+  }, [computed.totalQualifiedAll]);
+
+  useEffect(() => {
     validateQualifiedCounts(customerCount, discountState);
   }, [customerCount, discountState]);
+
+  const handleSaveCustomerInfo = async () => {
+    if (!apiHost || !transaction?.transaction_id || isSavingCustomerInfo) {
+      return;
+    }
+
+    if (!validateQualifiedCounts(customerCount, discountState)) {
+      setCustomerInfoSavedMessage("Please fix the discount validation first.");
+      return;
+    }
+
+    const safeCards = customerCards.slice(0, computed.totalQualifiedAll);
+    const discountBreakdownPayload = computed.discountBreakdown
+      .filter(
+        (entry) =>
+          Number(entry.qualifiedCount || 0) > 0 ||
+          Number(entry.discountAmount || 0) > 0,
+      )
+      .map((entry) => ({
+        key: entry.key,
+        discount_type: entry.label,
+        qualified_count: Number(entry.qualifiedCount || 0),
+        discount_amount: Number(entry.discountAmount || 0),
+        vat_exemption: Number(entry.vatExemption || 0),
+        prorated_base: Number(entry.proratedBase || 0),
+      }));
+
+    try {
+      setIsSavingCustomerInfo(true);
+      setCustomerInfoSavedMessage("");
+
+      const response = await fetch(`${apiHost}/api/pos_discount_customer_info.php`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          transaction_id: transaction.transaction_id,
+          category_code:
+            transaction?.Category_Code ||
+            transaction?.category_code ||
+            "Crab & Crack",
+          unit_code: transaction?.Unit_Code || transaction?.unit_code || "",
+          user_id: localStorage.getItem("user_id") || "",
+          user_name:
+            localStorage.getItem("username") || transaction?.cashier || "System",
+          cashier:
+            localStorage.getItem("username") || transaction?.cashier || "System",
+          customer_head_count: Number(customerCount || 1),
+          customer_count_for_discount: Number(computed.totalQualifiedAll || 0),
+          discount_type: computed.discountTypeSummary || "",
+          customer_info: safeCards.map((card) => ({
+            customer_exclusive_id: card.customer_exclusive_id || "",
+            customer_name: card.customer_name || "",
+            date_of_birth: card.date_of_birth || "",
+            gender: card.gender || "",
+            tin: card.tin || "",
+            contact_no: card.contact_no || "",
+          })),
+          discount_breakdown: discountBreakdownPayload,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.message || "Failed to save customer info.");
+      }
+
+      setCustomerCards(safeCards);
+      setCustomerInfoSavedMessage("Customer info saved.");
+      setShowCustomerInfoModal(false);
+      setExistingDiscountLoaded(true);
+      setHadExistingDiscountBreakdown(discountBreakdownPayload.length > 0);
+    } catch (error) {
+      console.error(error);
+      setCustomerInfoSavedMessage(error.message || "Failed to save customer info.");
+    } finally {
+      setIsSavingCustomerInfo(false);
+    }
+  };
 
   const isPrintDisabled = Boolean(qualifiedPrompt) || isPrinting;
 
@@ -1281,10 +1736,24 @@ const ModalDiscountTransaction = ({
       user_id: loggedUserId,
       user_name: loggedUserName,
 
-      customer_exclusive_id: transaction?.customer_exclusive_id || "",
+      customer_exclusive_id:
+        customerCards?.[0]?.customer_exclusive_id ||
+        transaction?.customer_exclusive_id ||
+        "",
       customer_head_count: Number(customerCount || 1),
       customer_count_for_discount: Number(computed?.totalQualifiedAll || 0),
       discount_type: computed?.discountTypeSummary || "",
+
+      customer_info: customerInfoEnabled
+        ? customerCards.slice(0, computed.totalQualifiedAll).map((card) => ({
+            customer_exclusive_id: card.customer_exclusive_id || "",
+            customer_name: card.customer_name || "",
+            date_of_birth: card.date_of_birth || "",
+            gender: card.gender || "",
+            tin: card.tin || "",
+            contact_no: card.contact_no || "",
+          }))
+        : undefined,
 
       TotalSales: Number(computed?.grossTotal || 0),
       Discount: Number(computed?.totalDiscount || 0),
@@ -1663,6 +2132,31 @@ const ModalDiscountTransaction = ({
                     <p className="mt-2 text-xs font-semibold text-red-500 min-h-[18px]">
                       {qualifiedPrompt}
                     </p>
+
+                    {customerInfoEnabled ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCustomerInfoSavedMessage("");
+                            setShowCustomerInfoModal(true);
+                          }}
+                          disabled={isPrinting || isSavingCustomerInfo}
+                          className={`mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2.5 text-xs font-bold text-white transition-all hover:bg-blue-500 ${
+                            isPrinting || isSavingCustomerInfo
+                              ? "opacity-50 cursor-not-allowed"
+                              : ""
+                          }`}
+                        >
+                          <FiUsers size={14} />
+                          Customer Info
+                        </button>
+
+                        <p className="mt-2 text-xs font-semibold text-emerald-500 min-h-[18px]">
+                          {customerInfoSavedMessage}
+                        </p>
+                      </>
+                    ) : null}
                   </div>
 
                   <div className="grid grid-cols-1 gap-3">
@@ -1863,6 +2357,20 @@ const ModalDiscountTransaction = ({
         errorMessage={errorMessage}
         computed={computed}
         isDark={isDark}
+      />
+
+      <CustomerInfoModal
+        isOpen={customerInfoEnabled && showCustomerInfoModal}
+        onClose={() => setShowCustomerInfoModal(false)}
+        isDark={isDark}
+        customerCount={customerCount}
+        setCustomerCount={setCustomerCount}
+        totalQualified={computed.totalQualifiedAll}
+        customerCards={customerCards}
+        setCustomerCards={setCustomerCards}
+        onSave={handleSaveCustomerInfo}
+        isSaving={isSavingCustomerInfo}
+        readOnly={isPrinting}
       />
     </>
   );
