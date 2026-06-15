@@ -44,7 +44,6 @@ RL-3cf94c9b0cd5c3f7ce2f045ea79f0c15,202603625430,Route,/brands,/brands,Active,PU
 RL-3f181631caeeed8ba16d13c15d70263a,202603625430,Route,/inventoryusage,/inventoryusage,Active,PUBLIC_SIGNUP,0000-00-00 00:00:00,0.00,,
 RL-417070b5f200da78473c39a0a151d748,202603625430,Route,/pettycashfund,/pettycashfund,Active,PUBLIC_SIGNUP,0000-00-00 00:00:00,0.00,,
 RL-45947e5ede2e1e59b3635e83c7b2c3ca,202603625430,Route,/daytype,/daytype,Active,PUBLIC_SIGNUP,0000-00-00 00:00:00,0.00,,
-RL-465456cscdsa,202602461836,Route,/pricesyncing,/pricesyncing,Active,2.02604E+11,0000-00-00 00:00:00,0.00,,
 RL-4783f8719c2f54eb221c0f74510552b3,202603625430,Route,/customersinfosummary,/customersinfosummary,Active,PUBLIC_SIGNUP,0000-00-00 00:00:00,0.00,,
 RL-4872105dc18b63534057bb79bf388086,202603625430,Route,/disbursements,/disbursements,Active,PUBLIC_SIGNUP,0000-00-00 00:00:00,0.00,,
 RL-4a77666f1cf6,202603625430,Route,/gsheetsbs,/gsheetsbs,Active,2.02604E+11,0000-00-00 00:00:00,0.00,,
@@ -168,4 +167,3 @@ RL-fdd827246fda8f04cc80cc64954e55d5,202603625430,Route,/autopricing,/autopricing
 RL-fe7447303acfd2d2662c9c72b6264e6a,202603625430,Route,/userroles,/userroles,Active,PUBLIC_SIGNUP,0000-00-00 00:00:00,0.00,,
 RL-fea39c164630b0786418906fab0ae99c,202603625430,Route,/build,/build,Active,PUBLIC_SIGNUP,0000-00-00 00:00:00,0.00,,
 RL-ffdd2fcd9b7a1b104a5d4930e64d6cd9,202603625430,Route,/projectsetup,/projectsetup,Active,PUBLIC_SIGNUP,0000-00-00 00:00:00,0.00,,
-RL;-456456fdsfd5,202602461836,Route,/salesrecordssyncing," /salesrecordssyncing",Active,2.02604E+11,0000-00-00 00:00:00,0.00,,

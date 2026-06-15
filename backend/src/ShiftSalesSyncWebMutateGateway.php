@@ -487,6 +487,7 @@ class ShiftSalesSyncWebMutateGateway
                 transaction_id,
                 Category_Code,
                 Unit_Code,
+                terminal_number,
                 transaction_date,
                 product_id,
                 sku,
@@ -501,6 +502,7 @@ class ShiftSalesSyncWebMutateGateway
                 :transaction_id,
                 :Category_Code,
                 :Unit_Code,
+                :terminal_number,
                 :transaction_date,
                 :product_id,
                 :sku,
@@ -527,6 +529,7 @@ class ShiftSalesSyncWebMutateGateway
             DELETE FROM tbl_pos_transactions_detailed
             WHERE Category_Code = :Category_Code
               AND Unit_Code = :Unit_Code
+              AND terminal_number = :terminal_number
               AND transaction_id = :transaction_id
         ");
         $stmt->execute($identity);
@@ -538,6 +541,7 @@ class ShiftSalesSyncWebMutateGateway
             'transaction_id' => $row['transaction_id'] ?? null,
             'Category_Code' => $row['Category_Code'] ?? null,
             'Unit_Code' => $row['Unit_Code'] ?? null,
+            'terminal_number' => $row['terminal_number'] ?? null,
             'transaction_date' => $row['transaction_date'] ?? null,
             'product_id' => $row['product_id'] ?? null,
             'sku' => $row['sku'] ?? null,
@@ -562,6 +566,7 @@ class ShiftSalesSyncWebMutateGateway
                     transaction_id = :transaction_id,
                     Category_Code = :Category_Code,
                     Unit_Code = :Unit_Code,
+                    terminal_number = :terminal_number,
                     customer_id = :customer_id,
                     discount_type = :discount_type,
                     discount_amount = :discount_amount,
@@ -585,6 +590,7 @@ class ShiftSalesSyncWebMutateGateway
                 transaction_id,
                 Category_Code,
                 Unit_Code,
+                terminal_number,
                 customer_id,
                 discount_type,
                 discount_amount,
@@ -600,6 +606,7 @@ class ShiftSalesSyncWebMutateGateway
                 :transaction_id,
                 :Category_Code,
                 :Unit_Code,
+                :terminal_number,
                 :customer_id,
                 :discount_type,
                 :discount_amount,
@@ -622,6 +629,7 @@ class ShiftSalesSyncWebMutateGateway
             'transaction_id' => $row['transaction_id'] ?? null,
             'Category_Code' => $row['Category_Code'] ?? null,
             'Unit_Code' => $row['Unit_Code'] ?? null,
+            'terminal_number' => $row['terminal_number'] ?? null,
             'customer_id' => $row['customer_id'] ?? null,
             'discount_type' => $row['discount_type'] ?? null,
             'discount_amount' => $row['discount_amount'] ?? null,
@@ -647,6 +655,7 @@ class ShiftSalesSyncWebMutateGateway
                     transaction_id = :transaction_id,
                     Category_Code = :Category_Code,
                     Unit_Code = :Unit_Code,
+                    terminal_number = :terminal_number,
                     Project_Code = :Project_Code,
                     transaction_date = :transaction_date,
                     payment_method = :payment_method,
@@ -664,6 +673,7 @@ class ShiftSalesSyncWebMutateGateway
                 transaction_id,
                 Category_Code,
                 Unit_Code,
+                terminal_number,
                 Project_Code,
                 transaction_date,
                 payment_method,
@@ -673,6 +683,7 @@ class ShiftSalesSyncWebMutateGateway
                 :transaction_id,
                 :Category_Code,
                 :Unit_Code,
+                :terminal_number,
                 :Project_Code,
                 :transaction_date,
                 :payment_method,
@@ -689,6 +700,7 @@ class ShiftSalesSyncWebMutateGateway
             'transaction_id' => $row['transaction_id'] ?? null,
             'Category_Code' => $row['Category_Code'] ?? null,
             'Unit_Code' => $row['Unit_Code'] ?? null,
+            'terminal_number' => $row['terminal_number'] ?? null,
             'Project_Code' => $row['Project_Code'] ?? null,
             'transaction_date' => $row['transaction_date'] ?? null,
             'payment_method' => $row['payment_method'] ?? null,
@@ -708,6 +720,7 @@ class ShiftSalesSyncWebMutateGateway
                     transaction_id = :transaction_id,
                     Category_Code = :Category_Code,
                     Unit_Code = :Unit_Code,
+                    terminal_number = :terminal_number,
                     Project_Code = :Project_Code,
                     transaction_date = :transaction_date,
                     particulars = :particulars,
@@ -725,6 +738,7 @@ class ShiftSalesSyncWebMutateGateway
                 transaction_id,
                 Category_Code,
                 Unit_Code,
+                terminal_number,
                 Project_Code,
                 transaction_date,
                 particulars,
@@ -734,6 +748,7 @@ class ShiftSalesSyncWebMutateGateway
                 :transaction_id,
                 :Category_Code,
                 :Unit_Code,
+                :terminal_number,
                 :Project_Code,
                 :transaction_date,
                 :particulars,
@@ -750,6 +765,7 @@ class ShiftSalesSyncWebMutateGateway
             'transaction_id' => $row['transaction_id'] ?? null,
             'Category_Code' => $row['Category_Code'] ?? null,
             'Unit_Code' => $row['Unit_Code'] ?? null,
+            'terminal_number' => $row['terminal_number'] ?? null,
             'Project_Code' => $row['Project_Code'] ?? null,
             'transaction_date' => $row['transaction_date'] ?? null,
             'particulars' => $row['particulars'] ?? null,
@@ -770,6 +786,7 @@ class ShiftSalesSyncWebMutateGateway
             FROM {$table}
             WHERE Category_Code = :Category_Code
               AND Unit_Code = :Unit_Code
+              AND terminal_number = :terminal_number
               AND transaction_id = :transaction_id
             LIMIT 1
         ");
@@ -784,15 +801,17 @@ class ShiftSalesSyncWebMutateGateway
     {
         $category = trim((string) ($row['Category_Code'] ?? ''));
         $unit = trim((string) ($row['Unit_Code'] ?? ''));
+        $terminal = trim((string) ($row['terminal_number'] ?? ''));
         $transactionId = trim((string) ($row['transaction_id'] ?? ''));
 
-        if ($category === '' || $unit === '' || $transactionId === '') {
+        if ($category === '' || $unit === '' || $terminal === '' || $transactionId === '') {
             return null;
         }
 
         return [
             'Category_Code' => $category,
             'Unit_Code' => $unit,
+            'terminal_number' => $terminal,
             'transaction_id' => $transactionId,
         ];
     }
@@ -805,6 +824,7 @@ class ShiftSalesSyncWebMutateGateway
             WHERE transaction_id = :transaction_id
               AND COALESCE(Category_Code, '') = COALESCE(:Category_Code, '')
               AND COALESCE(Unit_Code, '') = COALESCE(:Unit_Code, '')
+              AND COALESCE(terminal_number, '') = COALESCE(:terminal_number, '')
               AND COALESCE(customer_id, '') = COALESCE(:customer_id, '')
               AND COALESCE(discount_type, '') = COALESCE(:discount_type, '')
               AND COALESCE(created_at, '') = COALESCE(:created_at, '')
@@ -814,6 +834,7 @@ class ShiftSalesSyncWebMutateGateway
             'transaction_id' => $row['transaction_id'] ?? null,
             'Category_Code' => $row['Category_Code'] ?? null,
             'Unit_Code' => $row['Unit_Code'] ?? null,
+            'terminal_number' => $row['terminal_number'] ?? null,
             'customer_id' => $row['customer_id'] ?? null,
             'discount_type' => $row['discount_type'] ?? null,
             'created_at' => $row['created_at'] ?? null,
@@ -837,6 +858,7 @@ class ShiftSalesSyncWebMutateGateway
             WHERE transaction_id = :transaction_id
               AND COALESCE(Category_Code, '') = COALESCE(:Category_Code, '')
               AND COALESCE(Unit_Code, '') = COALESCE(:Unit_Code, '')
+              AND COALESCE(terminal_number, '') = COALESCE(:terminal_number, '')
               AND COALESCE(payment_method, '') = COALESCE(:payment_method, '')
               AND COALESCE(payment_amount, 0) = COALESCE(:payment_amount, 0)
               AND COALESCE(payment_reference, '') = COALESCE(:payment_reference, '')
@@ -861,6 +883,7 @@ class ShiftSalesSyncWebMutateGateway
             WHERE transaction_id = :transaction_id
               AND COALESCE(Category_Code, '') = COALESCE(:Category_Code, '')
               AND COALESCE(Unit_Code, '') = COALESCE(:Unit_Code, '')
+              AND COALESCE(terminal_number, '') = COALESCE(:terminal_number, '')
               AND COALESCE(Project_Code, '') = COALESCE(:Project_Code, '')
               AND COALESCE(transaction_date, '') = COALESCE(:transaction_date, '')
               AND COALESCE(particulars, '') = COALESCE(:particulars, '')
@@ -872,6 +895,7 @@ class ShiftSalesSyncWebMutateGateway
             'transaction_id' => $row['transaction_id'] ?? null,
             'Category_Code' => $row['Category_Code'] ?? null,
             'Unit_Code' => $row['Unit_Code'] ?? null,
+            'terminal_number' => $row['terminal_number'] ?? null,
             'Project_Code' => $row['Project_Code'] ?? null,
             'transaction_date' => $row['transaction_date'] ?? null,
             'particulars' => $row['particulars'] ?? null,
