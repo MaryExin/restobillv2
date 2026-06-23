@@ -15,6 +15,7 @@ import {
   FiPercent,
   FiChevronRight,
   FiPrinter,
+  FiGrid,
 } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "../../context/ThemeContext";
@@ -32,6 +33,7 @@ import PosDiscountCeiling from "./PosSettingsModal/PosDiscountCeiling"
 import PosServiceCharge from "./PosSettingsModal/PosServiceCharge";
 import PosCustomerInfo from "./PosSettingsModal/PosCustomerInfo";
 import PrinterSettings from "./PosSettingsModal/PrinterSettings";
+import PosTableLayout from "./PosSettingsModal/PosTableLayout";
 
 const PosSettings = ({ isOpen, onClose, branchInfo }) => {
   const { theme, setTheme } = useTheme();
@@ -75,6 +77,7 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
     { id: "Service Charge", icon: FiPercent },
     { id: "Discount Ceiling", icon: FiPercent },
     { id: "Customer Info", icon: FiUsers },
+    { id: "Table Layout", icon: FiGrid },
     { id: "Email Reports", icon: FiMail },
     { id: "Data & Security", icon: FiDatabase },
     { id: "Appearance", icon: FiLayers },
@@ -138,6 +141,10 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
 
     if (activeTab === "Customer Info") {
       return <PosCustomerInfo isDark={isDark} accent={accentColor} />;
+    }
+
+    if (activeTab === "Table Layout") {
+      return <PosTableLayout isDark={isDark} accent={accentColor} />;
     }
 
     if (activeTab === "Email Reports") {
