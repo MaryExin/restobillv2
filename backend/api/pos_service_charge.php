@@ -14,6 +14,7 @@ require __DIR__ . "/pdo.php";
 const SERVICE_CHARGE_CATEGORY = "Service";
 const SERVICE_CHARGE_ENABLED_DESCRIPTION = "Service Charge Enabled";
 const SERVICE_CHARGE_PERCENTAGE_DESCRIPTION = "Service Charge Percentage";
+const SERVICE_CHARGE_TYPE_DESCRIPTION = "Service Charge Type";
 
 function respond($success, $message, $data = null, $statusCode = 200)
 {
@@ -74,9 +75,25 @@ function readServiceChargeSettings(PDO $pdo)
     $percentageValue = (float)($percentageStmt->fetchColumn() ?: 0);
     $percentage = normalizePercentage($percentageValue);
 
+    $typeStmt = $pdo->prepare("
+        SELECT `value`
+        FROM tbl_pos_settings
+        WHERE category = :category
+          AND description = :description
+        ORDER BY ID DESC
+        LIMIT 1
+    ");
+    $typeStmt->execute([
+        ":category" => SERVICE_CHARGE_CATEGORY,
+        ":description" => SERVICE_CHARGE_TYPE_DESCRIPTION,
+    ]);
+    $typeValue = trim((string)($typeStmt->fetchColumn() ?: ""));
+    $chargeType = $typeValue !== "" ? $typeValue : "";
+
     return [
         "service_charge_enabled" => $isEnabled,
         "service_charge_percentage" => $percentage,
+        "service_charge_type" => $chargeType,
     ];
 }
 
@@ -99,6 +116,7 @@ try {
 
     $serviceChargeEnabled = normalizeBoolean($body["service_charge_enabled"] ?? false) === "True";
     $serviceChargePercentage = normalizePercentage($body["service_charge_percentage"] ?? 0);
+    $serviceChargeType = trim((string)($body["service_charge_type"] ?? ""));
 
     // Update enabled setting
     $enabledExistingStmt = $pdo->prepare("
@@ -182,6 +200,28 @@ try {
             ":description" => SERVICE_CHARGE_PERCENTAGE_DESCRIPTION,
             ":setting_value" => number_format($serviceChargePercentage, 2, ".", ""),
         ]);
+    }
+
+    // Upsert charge type
+    $typeExistingStmt = $pdo->prepare("
+        SELECT ID FROM tbl_pos_settings
+        WHERE category = :category AND description = :description
+        ORDER BY ID DESC LIMIT 1
+    ");
+    $typeExistingStmt->execute([
+        ":category" => SERVICE_CHARGE_CATEGORY,
+        ":description" => SERVICE_CHARGE_TYPE_DESCRIPTION,
+    ]);
+    $typeExistingId = $typeExistingStmt->fetchColumn();
+
+    if ($typeExistingId) {
+        $pdo->prepare("UPDATE tbl_pos_settings SET `value` = :v WHERE ID = :id")
+            ->execute([":v" => $serviceChargeType, ":id" => (int)$typeExistingId]);
+    } else {
+        $nextIdStmt = $pdo->query("SELECT COALESCE(MAX(ID), 0) + 1 FROM tbl_pos_settings");
+        $nextId = (int)$nextIdStmt->fetchColumn();
+        $pdo->prepare("INSERT INTO tbl_pos_settings (ID, category, description, `value`) VALUES (:id, :cat, :desc, :v)")
+            ->execute([":id" => $nextId, ":cat" => SERVICE_CHARGE_CATEGORY, ":desc" => SERVICE_CHARGE_TYPE_DESCRIPTION, ":v" => $serviceChargeType]);
     }
 
     respond(true, "Service charge settings saved.", readServiceChargeSettings($pdo));

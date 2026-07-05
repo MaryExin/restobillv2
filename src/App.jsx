@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, HashRouter } from "react-router-dom";
+import { useEffect } from "react";
 import HomePage from "./pages/Main/HomePage";
 import ViewOrdering from "./components/MainComponents/ViewOrdering";
 import PrintBilling from "./components/MainComponents/PrintBilling";
@@ -19,10 +20,29 @@ import UserRoles from "./components/MainComponents/PosSettingsModal/UserRoles";
 import CmpEmployeeInfo from "./components/Hris/CmpEmployeeInfo";
 import MemberQueings from "../src/pages/Admin/MemberQueings";
 import MemberProfile from "./components/Hris/MemberProfile";
+import KioskFullscreenGuard from "./components/KioskSecondScreen/KioskFullscreenGuard";
+import SecondScreenCart from "./components/KioskSecondScreen/SecondScreenCart";
+import { useKioskSecondScreen } from "./hooks/useKioskSecondScreen";
+import useApiHost from "./hooks/useApiHost";
+import useZustandLayoutMode from "./context/useZustandLayoutMode";
+
 const App = () => {
+  // Auto-launch second screen the moment the app opens, if Kiosk Mode is active.
+  useKioskSecondScreen();
+
+  // Seed layoutMode from DB on first load; enables persistence across devices/reboots.
+  const apiHost = useApiHost();
+  const { initLayoutMode } = useZustandLayoutMode();
+  useEffect(() => {
+    if (apiHost) initLayoutMode(apiHost);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiHost]);
+
   return (
     <HashRouter>
       {}
+      {/* Kiosk fullscreen enforcement — transparent, renders no UI unless gesture fallback needed */}
+      <KioskFullscreenGuard />
       <GlobalSync />
 
       <Routes>
@@ -86,6 +106,9 @@ const App = () => {
         <Route path="/" element={<PrivateRoute routename={"/pricesyncing"} />}>
           <Route path="/memberprofile/:id" element={<MemberProfile />} />
         </Route>
+
+        {/* Kiosk second-screen display — loaded in the secondary BrowserWindow */}
+        <Route path="/kiosk-display" element={<SecondScreenCart />} />
       </Routes>
 
       <GlobalThemeToggle />

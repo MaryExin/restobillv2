@@ -10,6 +10,7 @@ const OTHER_ROWS = [
   { id: "payment",        label: "Payment",           readKey: "printReceipt" },
   { id: "pos-reading",    label: "POS Reading",       readKey: "printEscposXzReading" },
   { id: "sales-per-item", label: "Sales Per Item",    readKey: "printEscposSalesPerProduct" },
+  { id: "qr-code",        label: "QR Code Print",     readKey: "printEscPosQr" },
 ];
 
 const defaultOtherPorts = () =>
@@ -38,6 +39,17 @@ const PrinterSettings = ({ isDark, accent = "#3b82f6" }) => {
 
   // Scan state: { [key]: { loading, results, open } }
   const [scanState, setScanState] = useState({});
+
+  // QR label / language settings (mirrors printer.txt qr_* keys)
+  const [qrLanguage, setQrLanguage] = useState("escpos");
+  const [qrSize, setQrSize] = useState(8);
+  const [qrLabelWidth, setQrLabelWidth] = useState(60);
+  const [qrLabelHeight, setQrLabelHeight] = useState(40);
+  const [qrGapMm, setQrGapMm] = useState(2);
+  const [qrX, setQrX] = useState(250);
+  const [qrY, setQrY] = useState(70);
+  const [qrTextX, setQrTextX] = useState(15);
+  const [qrTextY, setQrTextY] = useState(1);
 
   // ── fetch categories from backend ──────────────────────────────────
   useEffect(() => {
@@ -78,6 +90,17 @@ const PrinterSettings = ({ isDark, accent = "#3b82f6" }) => {
             });
             return next;
           });
+
+          // Hydrate QR-specific settings
+          if (data["qr_language"]) setQrLanguage(data["qr_language"]);
+          if (data["qr_size"] !== undefined) setQrSize(Number(data["qr_size"]) || 8);
+          if (data["qr_label_width_mm"] !== undefined) setQrLabelWidth(Number(data["qr_label_width_mm"]) || 60);
+          if (data["qr_label_height_mm"] !== undefined) setQrLabelHeight(Number(data["qr_label_height_mm"]) || 40);
+          if (data["qr_gap_mm"] !== undefined) setQrGapMm(Number(data["qr_gap_mm"]) || 2);
+          if (data["qr_x"] !== undefined) setQrX(Number(data["qr_x"]) || 250);
+          if (data["qr_y"] !== undefined) setQrY(Number(data["qr_y"]) || 70);
+          if (data["qr_text_x"] !== undefined) setQrTextX(Number(data["qr_text_x"]) || 15);
+          if (data["qr_text_y"] !== undefined) setQrTextY(Number(data["qr_text_y"]) || 1);
         }
       }
 
@@ -209,6 +232,20 @@ const PrinterSettings = ({ isDark, accent = "#3b82f6" }) => {
           cfg["printEscposXzReading"] = fmt(p["pos-reading"]);
         if (p["sales-per-item"].name)
           cfg["printEscposSalesPerProduct"] = fmt(p["sales-per-item"]);
+        if (p["qr-code"].name || p["qr-code"].type === "USB")
+          cfg["printEscPosQr"] = fmt(p["qr-code"]);
+
+        cfg["qr_language"] = qrLanguage;
+        cfg["qr_size"] = String(qrSize);
+        if (qrLanguage === "tspl") {
+          cfg["qr_label_width_mm"] = String(qrLabelWidth);
+          cfg["qr_label_height_mm"] = String(qrLabelHeight);
+          cfg["qr_gap_mm"] = String(qrGapMm);
+          cfg["qr_x"] = String(qrX);
+          cfg["qr_y"] = String(qrY);
+          cfg["qr_text_x"] = String(qrTextX);
+          cfg["qr_text_y"] = String(qrTextY);
+        }
 
         const res = await window.electronAPI.savePrinterConfig(cfg);
         if (!res.success) throw new Error(res.message || "Save failed");
@@ -774,6 +811,109 @@ const PrinterSettings = ({ isDark, accent = "#3b82f6" }) => {
                   })}
                 </tbody>
               </table>
+            </div>
+          </div>
+
+          {/* ── QR LABEL SETTINGS ───────────────────────────────────── */}
+          <div className={`rounded-[28px] border overflow-hidden ${th.panel}`}>
+            <div className={`px-6 py-4 border-b ${th.border} ${isDark ? "bg-white/[0.03]" : "bg-slate-50"}`}>
+              <p className={`text-[10px] font-black uppercase tracking-widest ${th.soft}`}>QR Label Settings</p>
+              <p className={`text-base font-black mt-0.5 ${th.primary}`}>Language, Size & Layout</p>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Language + Size row */}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {/* Print Language */}
+                <div className="space-y-2">
+                  <label className={`text-[10px] font-black uppercase tracking-widest ${th.soft}`}>
+                    Print Language
+                  </label>
+                  <select
+                    value={qrLanguage}
+                    onChange={(e) => setQrLanguage(e.target.value)}
+                    className={`w-full px-4 py-3 rounded-xl border text-sm font-bold outline-none cursor-pointer ${th.input}`}
+                  >
+                    <option value="escpos">ESC/POS (Thermal)</option>
+                    <option value="tspl">TSPL (Label Printer)</option>
+                  </select>
+                </div>
+
+                {/* QR Module Size */}
+                <div className="space-y-2">
+                  <label className={`text-[10px] font-black uppercase tracking-widest ${th.soft}`}>
+                    QR Module Size <span className={th.muted}>(1–16)</span>
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={16}
+                    value={qrSize}
+                    onChange={(e) => setQrSize(Number(e.target.value) || 8)}
+                    className={`w-full px-4 py-3 rounded-xl border text-sm font-bold outline-none ${th.input}`}
+                  />
+                </div>
+              </div>
+
+              {/* TSPL-only label dimensions */}
+              {qrLanguage === "tspl" && (
+                <>
+                  <div className={`border-t ${th.border}`} />
+                  <div>
+                    <p className={`text-[10px] font-black uppercase tracking-widest mb-4 ${th.soft}`}>
+                      TSPL Label Dimensions
+                    </p>
+                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                      {[
+                        { label: "Width (mm)", value: qrLabelWidth, setter: setQrLabelWidth },
+                        { label: "Height (mm)", value: qrLabelHeight, setter: setQrLabelHeight },
+                        { label: "Gap (mm)", value: qrGapMm, setter: setQrGapMm },
+                      ].map(({ label, value, setter }) => (
+                        <div key={label} className="space-y-2">
+                          <label className={`text-[10px] font-black uppercase tracking-widest ${th.soft}`}>
+                            {label}
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={value}
+                            onChange={(e) => setter(Number(e.target.value))}
+                            className={`w-full px-4 py-3 rounded-xl border text-sm font-bold outline-none ${th.input}`}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className={`border-t ${th.border}`} />
+                  <div>
+                    <p className={`text-[10px] font-black uppercase tracking-widest mb-4 ${th.soft}`}>
+                      TSPL Element Positions
+                    </p>
+                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                      {[
+                        { label: "QR X", value: qrX, setter: setQrX },
+                        { label: "QR Y", value: qrY, setter: setQrY },
+                        { label: "Text X", value: qrTextX, setter: setQrTextX },
+                        { label: "Text Y", value: qrTextY, setter: setQrTextY },
+                      ].map(({ label, value, setter }) => (
+                        <div key={label} className="space-y-2">
+                          <label className={`text-[10px] font-black uppercase tracking-widest ${th.soft}`}>
+                            {label}
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={value}
+                            onChange={(e) => setter(Number(e.target.value))}
+                            className={`w-full px-4 py-3 rounded-xl border text-sm font-bold outline-none ${th.input}`}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </>

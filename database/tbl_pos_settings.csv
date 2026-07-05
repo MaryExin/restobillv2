@@ -17,3 +17,5 @@ ID,category,description,value
 17,General,Barcode Scanning,Type C (QR Code)
 18,Discount,Discount Ceiling Amount,0.00
 19,Discount,Customer Info Enabled,False
+20,Layout,Layout Mode,resto
+21,Display,Enable Product Subcategories,False

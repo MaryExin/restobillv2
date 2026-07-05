@@ -19,6 +19,8 @@ export function BuildPosPaymentReceiptHtml({
   isDuplicateCopy = false,
   terminalConfig = {},
   businessInfo = {},
+  receiptTitle = "INVOICE",
+  voidRefundInfo = null, // { authBy, remarks } — when set, skips items/payment/VAT sections
 }) {
   const yesNoToBool = (value) =>
     String(value || "")
@@ -440,7 +442,7 @@ export function BuildPosPaymentReceiptHtml({
           <div className="divider" />
 
           <div className="section keep-together">
-            <div className="invoice-title">INVOICE</div>
+            <div className="invoice-title">{receiptTitle}</div>
 
             {isDuplicateCopy ? (
               <div className="duplicate-copy">DUPLICATE INVOICE COPY</div>
@@ -501,341 +503,534 @@ export function BuildPosPaymentReceiptHtml({
                     {safeTransaction?.cashier || "-"}
                   </td>
                 </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div className="divider" />
-
-          <div className="section">
-            <table className="item-table">
-              <thead>
-                <tr>
-                  <th className="item-col">Item</th>
-                  <th className="qty-col">Qty</th>
-                  <th className="amt-col">Amt</th>
-                </tr>
-              </thead>
-              <tbody>
-                {safeItems.map((item, index) => {
-                  const qty = Number(item.sales_quantity || 0);
-                  const price = Number(item.selling_price || 0);
-                  const lineTotal = qty * price;
-
-                  const isDiscountable = yesNoToBool(item.isDiscountable);
-                  const itemLabel = String(
-                    item.item_name || item.product_id || "-",
-                  ).toUpperCase();
-
-                  return (
-                    <tr key={item.ID || index} className="item-row">
-                      <td className="item-col">
-                        • {itemLabel}
-                        {isDiscountable ? " (D)" : ""}
-                      </td>
-                      <td className="qty-col">
-                        {qty} {item.unit_of_measure || ""}
-                      </td>
-                      <td className="amt-col">
-                        {peso(lineTotal)}
-                        {item.vatable === "Yes" ? "V" : ""}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="divider" />
-
-          <div className="section">
-            <table className="meta-table">
-              <MetaColGroup />
-              <tbody>
-                <tr>
-                  <td className="bold label-col">TOTAL SALES:</td>
-                  <td className="value-col">
-                    {peso(safeComputed?.grossTotal)}
-                  </td>
-                </tr>
-
-                {activeBreakdown.map((entry) =>
-                  Number(entry?.discountAmount || 0) > 0 ? (
-                    <tr key={entry.key}>
-                      <td className="bold label-col">
-                        {String(entry?.label || "DISCOUNT").toUpperCase()}:
-                      </td>
-                      <td className="value-col">
-                        {signedNegativePeso(entry?.discountAmount)}
-                      </td>
-                    </tr>
-                  ) : null,
-                )}
-
-                {Number(safeComputed?.totalVatExemption || 0) > 0 ? (
-                  <tr>
-                    <td className="bold label-col">VAT EXEMPTION:</td>
-                    <td className="value-col">
-                      {signedNegativePeso(safeComputed?.totalVatExemption)}
-                    </td>
-                  </tr>
-                ) : null}
-
-                {safeOtherCharges.map((charge, index) => (
-                  <tr key={`${charge.particulars}-${index}`}>
-                    <td className="bold label-col">
-                      {String(
-                        charge.particulars || "OTHER CHARGE",
-                      ).toUpperCase()}
-                      :
-                    </td>
-                    <td className="value-col">{peso(charge.amount)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="divider-tight" />
-
-          <div className="section keep-together">
-            <table className="amount-due-table">
-              <tbody>
-                <tr>
-                  <td className="amount-due-label-cell">AMOUNT DUE:</td>
-                  <td className="amount-due-value-cell">
-                    {peso(safeComputed?.totalAmountDue)}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div className="divider-tight" />
-
-          <div className="section">
-            <table className="meta-table">
-              <MetaColGroup />
-              <tbody>
-                {paymentBreakdown.length > 0 ? (
+                {voidRefundInfo?.actionLabel ? (
                   <>
                     <tr>
-                      <td className="bold label-col">PAYMENT:</td>
-                      <td className="value-col"></td>
+                      <td className="bold label-col">{voidRefundInfo.actionLabel} Date:</td>
+                      <td className="value-col">{voidRefundInfo.actionDate || "-"}</td>
                     </tr>
-
-                    {paymentBreakdown.map((payment, index) => (
-                      <tr key={`${payment.method}-${index}`}>
-                        <td className="label-col">
-                          {index === paymentBreakdown.length - 1
-                            ? `(${payment.method}):`
-                            : `${payment.method}:`}
-                        </td>
-                        <td className="value-col">{peso(payment.amount)}</td>
-                      </tr>
-                    ))}
-
                     <tr>
-                      <td className="bold label-col">TOTAL PAYMENT:</td>
-                      <td className="value-col">
-                        {peso(safeComputed?.totalPaid)}
-                      </td>
+                      <td className="bold label-col">{voidRefundInfo.actionLabel} Time:</td>
+                      <td className="value-col">{voidRefundInfo.actionTime || "-"}</td>
                     </tr>
                   </>
-                ) : (
-                  <tr>
-                    <td className="bold label-col">
-                      PAYMENT ({paymentLabel}):
-                    </td>
-                    <td className="value-col">
-                      {peso(safeComputed?.totalPaid)}
-                    </td>
-                  </tr>
-                )}
-                <tr>
-                  <td className="bold label-col">CHANGE:</td>
-                  <td className="value-col">
-                    {peso(safeComputed?.changeAmount)}
-                  </td>
-                </tr>
+                ) : null}
               </tbody>
             </table>
           </div>
 
-          <div className="divider-tight" />
+          <div className="divider" />
 
-          <div className="section">
-            <table className="meta-table">
-              <MetaColGroup />
-              <tbody>
-                <tr>
-                  <td className="bold label-col">VATABLE SALES:</td>
-                  <td className="value-col">
-                    {peso(safeComputed?.vatableSales)}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="bold label-col">VAT AMOUNT:</td>
-                  <td className="value-col">
-                    {peso(safeComputed?.vatableSalesVat)}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="bold label-col">VAT EXEMPT SALES:</td>
-                  <td className="value-col">
-                    {peso(safeComputed?.vatExemptSales)}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="bold label-col">VAT EXEMPTION:</td>
-                  <td className="value-col">
-                    {peso(safeComputed?.totalVatExemption)}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="bold label-col">ZERO RATED SALES:</td>
-                  <td className="value-col">
-                    {peso(safeComputed?.vatZeroRatedSales)}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {shouldShowDiscountSummary ? (
+          {voidRefundInfo ? (
+            /* ── VOID / REFUND layout ── */
             <>
-              <div className="divider" />
-              <div className="section">
-                <table className="meta-table">
-                  <MetaColGroup />
+              {shouldShowDiscountSummary ? (
+                <>
+                  <div className="section">
+                    <table className="meta-table">
+                      <MetaColGroup />
+                      <tbody>
+                        <tr>
+                          <td className="bold label-col">TOTAL SALES:</td>
+                          <td className="value-col">
+                            {peso(safeComputed?.grossTotal)}
+                          </td>
+                        </tr>
+
+                        {activeBreakdown.map((entry) =>
+                          Number(entry?.discountAmount || 0) > 0 ? (
+                            <tr key={entry.key}>
+                              <td className="bold label-col">
+                                {String(entry?.label || "DISCOUNT").toUpperCase()}:
+                              </td>
+                              <td className="value-col">
+                                {signedNegativePeso(entry?.discountAmount)}
+                              </td>
+                            </tr>
+                          ) : null,
+                        )}
+
+                        {Number(safeComputed?.totalVatExemption || 0) > 0 ? (
+                          <tr>
+                            <td className="bold label-col">VAT EXEMPTION:</td>
+                            <td className="value-col">
+                              {signedNegativePeso(safeComputed?.totalVatExemption)}
+                            </td>
+                          </tr>
+                        ) : null}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="divider-tight" />
+                </>
+              ) : null}
+
+              <div className="section keep-together">
+                <table className="amount-due-table">
                   <tbody>
                     <tr>
-                      <td className="bold label-col">Total Customers:</td>
-                      <td className="value-col">
-                        {Number(safeComputed?.safeCustomerCount || 0)}
-                      </td>
-                    </tr>
-
-                    <tr>
-                      <td className="bold label-col">Total Qualified:</td>
-                      <td className="value-col">
-                        {Number(
-                          safeComputed?.totalQualifiedCount ||
-                            safeComputed?.totalQualifiedAll ||
-                            0,
-                        )}
-                      </td>
-                    </tr>
-
-                    {activeBreakdown.map((entry) => (
-                      <React.Fragment key={`summary-${entry.key}`}>
-                        <tr>
-                          <td className="bold label-col">
-                            {getDiscountCountLabel(entry)}
-                          </td>
-                          <td className="value-col">
-                            {Number(entry?.qualifiedCount || 0)}
-                          </td>
-                        </tr>
-
-                        <tr>
-                          <td className="bold label-col">
-                            {getDiscountAmountLabel(entry)}
-                          </td>
-                          <td className="value-col">
-                            {peso(entry?.discountAmount)}
-                          </td>
-                        </tr>
-                      </React.Fragment>
-                    ))}
-
-                    <tr>
-                      <td className="bold label-col">Discountable Gross:</td>
-                      <td className="value-col">
-                        {peso(safeComputed?.discountableGross)}
-                      </td>
-                    </tr>
-
-                    <tr>
-                      <td className="bold label-col">Discountable Base:</td>
-                      <td className="value-col">
-                        {peso(safeComputed?.discountableBase)}
+                      <td className="amount-due-label-cell">AMOUNT DUE:</td>
+                      <td className="amount-due-value-cell">
+                        {peso(safeComputed?.totalAmountDue)}
                       </td>
                     </tr>
                   </tbody>
                 </table>
               </div>
-            </>
-          ) : null}
 
-          {safeCustomerCards.length > 0 ? (
-            <>
-              <div className="divider" />
+              <div className="divider-tight" />
 
-              <div className="section keep-together">
-                <div className="customer-section-title">
-                  DISCOUNT CUSTOMER DETAILS
-                </div>
-              </div>
+              {shouldShowDiscountSummary ? (
+                <>
+                  <div className="section">
+                    <table className="meta-table">
+                      <MetaColGroup />
+                      <tbody>
+                        <tr>
+                          <td className="bold label-col">VATABLE SALES:</td>
+                          <td className="value-col">
+                            {peso(safeComputed?.vatableSales)}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="bold label-col">VAT AMOUNT:</td>
+                          <td className="value-col">
+                            {peso(safeComputed?.vatableSalesVat)}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="bold label-col">VAT EXEMPT SALES:</td>
+                          <td className="value-col">
+                            {peso(safeComputed?.vatExemptSales)}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="bold label-col">VAT EXEMPTION:</td>
+                          <td className="value-col">
+                            {peso(safeComputed?.totalVatExemption)}
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="bold label-col">ZERO RATED SALES:</td>
+                          <td className="value-col">
+                            {peso(safeComputed?.vatZeroRatedSales)}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="divider" />
+
+                  <div className="section">
+                    <table className="meta-table">
+                      <MetaColGroup />
+                      <tbody>
+                        <tr>
+                          <td className="bold label-col">Total Customers:</td>
+                          <td className="value-col">
+                            {Number(safeComputed?.safeCustomerCount || 0)}
+                          </td>
+                        </tr>
+
+                        <tr>
+                          <td className="bold label-col">Total Qualified:</td>
+                          <td className="value-col">
+                            {Number(
+                              safeComputed?.totalQualifiedCount ||
+                                safeComputed?.totalQualifiedAll ||
+                                0,
+                            )}
+                          </td>
+                        </tr>
+
+                        {activeBreakdown.map((entry) => (
+                          <React.Fragment key={`void-refund-summary-${entry.key}`}>
+                            <tr>
+                              <td className="bold label-col">
+                                {getDiscountCountLabel(entry)}
+                              </td>
+                              <td className="value-col">
+                                {Number(entry?.qualifiedCount || 0)}
+                              </td>
+                            </tr>
+
+                            <tr>
+                              <td className="bold label-col">
+                                {getDiscountAmountLabel(entry)}
+                              </td>
+                              <td className="value-col">
+                                {peso(entry?.discountAmount)}
+                              </td>
+                            </tr>
+                          </React.Fragment>
+                        ))}
+
+                        <tr>
+                          <td className="bold label-col">Discountable Gross:</td>
+                          <td className="value-col">
+                            {peso(safeComputed?.discountableGross)}
+                          </td>
+                        </tr>
+
+                        <tr>
+                          <td className="bold label-col">Discountable Base:</td>
+                          <td className="value-col">
+                            {peso(safeComputed?.discountableBase)}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="divider-tight" />
+                </>
+              ) : null}
 
               <div className="section">
-                {safeCustomerCards.map((card, index) => (
-                  <table
-                    key={index}
-                    className="meta-table"
-                    style={{ marginBottom: "6px" }}
-                  >
-                    <MetaColGroup />
-                    <tbody>
-                      <tr>
-                        <td className="label-col bold">Name:</td>
-                        <td className="value-col">
-                          {card.customer_name || ""}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="label-col bold">ID:</td>
-                        <td className="value-col">
-                          {card.customer_exclusive_id || ""}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="label-col bold">Signature:</td>
-                        <td className="value-col"></td>
-                      </tr>
-                    </tbody>
-                  </table>
-                ))}
+                <table className="meta-table">
+                  <MetaColGroup />
+                  <tbody>
+                    <tr>
+                      <td className="bold label-col">Auth By:</td>
+                      <td className="value-col">{voidRefundInfo.authBy || "-"}</td>
+                    </tr>
+                    <tr>
+                      <td className="bold label-col">Remarks:</td>
+                      <td className="value-col"></td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div
+                  style={{
+                    fontSize: "calc(9.6px * var(--s))",
+                    borderLeft: "2px solid #000",
+                    paddingLeft: "5px",
+                    marginTop: "3px",
+                    wordWrap: "break-word",
+                    whiteSpace: "pre-wrap",
+                    paddingRight: "calc(12px * var(--s))",
+                  }}
+                >
+                  {voidRefundInfo.remarks || "NO REMARKS"}
+                </div>
               </div>
             </>
-          ) : null}
+          ) : (
+            /* ── INVOICE layout ── */
+            <>
+              <div className="section">
+                <table className="item-table">
+                  <thead>
+                    <tr>
+                      <th className="item-col">Item</th>
+                      <th className="qty-col">Qty</th>
+                      <th className="amt-col">Amt</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {safeItems.map((item, index) => {
+                      const qty = Number(item.sales_quantity || 0);
+                      const price = Number(item.selling_price || 0);
+                      const lineTotal = qty * price;
+
+                      const isDiscountable = yesNoToBool(item.isDiscountable);
+                      const itemLabel = String(
+                        item.item_name || item.product_id || "-",
+                      ).toUpperCase();
+
+                      return (
+                        <tr key={item.ID || index} className="item-row">
+                          <td className="item-col">
+                            • {itemLabel}
+                            {isDiscountable ? " (D)" : ""}
+                          </td>
+                          <td className="qty-col">
+                            {qty} {item.unit_of_measure || ""}
+                          </td>
+                          <td className="amt-col">
+                            {peso(lineTotal)}
+                            {item.vatable === "Yes" ? "V" : ""}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="divider" />
+
+              <div className="section">
+                <table className="meta-table">
+                  <MetaColGroup />
+                  <tbody>
+                    <tr>
+                      <td className="bold label-col">TOTAL SALES:</td>
+                      <td className="value-col">
+                        {peso(safeComputed?.grossTotal)}
+                      </td>
+                    </tr>
+
+                    {activeBreakdown.map((entry) =>
+                      Number(entry?.discountAmount || 0) > 0 ? (
+                        <tr key={entry.key}>
+                          <td className="bold label-col">
+                            {String(entry?.label || "DISCOUNT").toUpperCase()}:
+                          </td>
+                          <td className="value-col">
+                            {signedNegativePeso(entry?.discountAmount)}
+                          </td>
+                        </tr>
+                      ) : null,
+                    )}
+
+                    {Number(safeComputed?.totalVatExemption || 0) > 0 ? (
+                      <tr>
+                        <td className="bold label-col">VAT EXEMPTION:</td>
+                        <td className="value-col">
+                          {signedNegativePeso(safeComputed?.totalVatExemption)}
+                        </td>
+                      </tr>
+                    ) : null}
+
+                    {safeOtherCharges.map((charge, index) => (
+                      <tr key={`${charge.particulars}-${index}`}>
+                        <td className="bold label-col">
+                          {String(
+                            charge.particulars || "OTHER CHARGE",
+                          ).toUpperCase()}
+                          :
+                        </td>
+                        <td className="value-col">{peso(charge.amount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="divider-tight" />
+
+              <div className="section keep-together">
+                <table className="amount-due-table">
+                  <tbody>
+                    <tr>
+                      <td className="amount-due-label-cell">AMOUNT DUE:</td>
+                      <td className="amount-due-value-cell">
+                        {peso(safeComputed?.totalAmountDue)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="divider-tight" />
+
+              <div className="section">
+                <table className="meta-table">
+                  <MetaColGroup />
+                  <tbody>
+                    {paymentBreakdown.length > 0 ? (
+                      <>
+                        <tr>
+                          <td className="bold label-col">PAYMENT:</td>
+                          <td className="value-col"></td>
+                        </tr>
+
+                        {paymentBreakdown.map((payment, index) => (
+                          <tr key={`${payment.method}-${index}`}>
+                            <td className="label-col">
+                              {index === paymentBreakdown.length - 1
+                                ? `(${payment.method}):`
+                                : `${payment.method}:`}
+                            </td>
+                            <td className="value-col">{peso(payment.amount)}</td>
+                          </tr>
+                        ))}
+
+                        <tr>
+                          <td className="bold label-col">TOTAL PAYMENT:</td>
+                          <td className="value-col">
+                            {peso(safeComputed?.totalPaid)}
+                          </td>
+                        </tr>
+                      </>
+                    ) : (
+                      <tr>
+                        <td className="bold label-col">
+                          PAYMENT ({paymentLabel}):
+                        </td>
+                        <td className="value-col">
+                          {peso(safeComputed?.totalPaid)}
+                        </td>
+                      </tr>
+                    )}
+                    <tr>
+                      <td className="bold label-col">CHANGE:</td>
+                      <td className="value-col">
+                        {peso(safeComputed?.changeAmount)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="divider-tight" />
+
+              <div className="section">
+                <table className="meta-table">
+                  <MetaColGroup />
+                  <tbody>
+                    <tr>
+                      <td className="bold label-col">VATABLE SALES:</td>
+                      <td className="value-col">
+                        {peso(safeComputed?.vatableSales)}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="bold label-col">VAT AMOUNT:</td>
+                      <td className="value-col">
+                        {peso(safeComputed?.vatableSalesVat)}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="bold label-col">VAT EXEMPT SALES:</td>
+                      <td className="value-col">
+                        {peso(safeComputed?.vatExemptSales)}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="bold label-col">VAT EXEMPTION:</td>
+                      <td className="value-col">
+                        {peso(safeComputed?.totalVatExemption)}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="bold label-col">ZERO RATED SALES:</td>
+                      <td className="value-col">
+                        {peso(safeComputed?.vatZeroRatedSales)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {shouldShowDiscountSummary ? (
+                <>
+                  <div className="divider" />
+                  <div className="section">
+                    <table className="meta-table">
+                      <MetaColGroup />
+                      <tbody>
+                        <tr>
+                          <td className="bold label-col">Total Customers:</td>
+                          <td className="value-col">
+                            {Number(safeComputed?.safeCustomerCount || 0)}
+                          </td>
+                        </tr>
+
+                        <tr>
+                          <td className="bold label-col">Total Qualified:</td>
+                          <td className="value-col">
+                            {Number(
+                              safeComputed?.totalQualifiedCount ||
+                                safeComputed?.totalQualifiedAll ||
+                                0,
+                            )}
+                          </td>
+                        </tr>
+
+                        {activeBreakdown.map((entry) => (
+                          <React.Fragment key={`summary-${entry.key}`}>
+                            <tr>
+                              <td className="bold label-col">
+                                {getDiscountCountLabel(entry)}
+                              </td>
+                              <td className="value-col">
+                                {Number(entry?.qualifiedCount || 0)}
+                              </td>
+                            </tr>
+
+                            <tr>
+                              <td className="bold label-col">
+                                {getDiscountAmountLabel(entry)}
+                              </td>
+                              <td className="value-col">
+                                {peso(entry?.discountAmount)}
+                              </td>
+                            </tr>
+                          </React.Fragment>
+                        ))}
+
+                        <tr>
+                          <td className="bold label-col">Discountable Gross:</td>
+                          <td className="value-col">
+                            {peso(safeComputed?.discountableGross)}
+                          </td>
+                        </tr>
+
+                        <tr>
+                          <td className="bold label-col">Discountable Base:</td>
+                          <td className="value-col">
+                            {peso(safeComputed?.discountableBase)}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : null}
+
+              {safeCustomerCards.length > 0 ? (
+                <>
+                  <div className="divider" />
+
+                  <div className="section keep-together">
+                    <div className="customer-section-title">
+                      DISCOUNT CUSTOMER DETAILS
+                    </div>
+                  </div>
+
+                  <div className="section">
+                    {safeCustomerCards.map((card, index) => (
+                      <table
+                        key={index}
+                        className="meta-table"
+                        style={{ marginBottom: "6px" }}
+                      >
+                        <MetaColGroup />
+                        <tbody>
+                          <tr>
+                            <td className="label-col bold">Name:</td>
+                            <td className="value-col">
+                              {card.customer_name || ""}
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="label-col bold">ID:</td>
+                            <td className="value-col">
+                              {card.customer_exclusive_id || ""}
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="label-col bold">Signature:</td>
+                            <td className="value-col"></td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    ))}
+                  </div>
+                </>
+              ) : null}
+            </>
+          )}
 
           <div className="divider" />
 
           <div className="section keep-together thanks">
             <div className="bold">Thank you</div>
             <div className="bold">Please come again.</div>
-          </div>
-
-          <div className="section keep-together supplier-block">
-            {posProviderName ? (
-              <div className="bold">SUPPLIER: {posProviderName}</div>
-            ) : null}
-            {posProviderAddress.map((line, index) => (
-              <div key={`supplier-${index}`}>{line}</div>
-            ))}
-            {posProviderTin ? <div>TIN: {posProviderTin}</div> : null}
-            {posProviderBirAccreNo ? (
-              <div>BIR ACC#: {posProviderBirAccreNo}</div>
-            ) : null}
-            {posProviderAccreDateIssued ? (
-              <div>DATE ISSUED: {posProviderAccreDateIssued}</div>
-            ) : null}
-            {posProviderPTUNo ? <div>PTU: {posProviderPTUNo}</div> : null}
-            {posProviderPTUDateIssued ? (
-              <div>PTU DATE ISSUED: {posProviderPTUDateIssued}</div>
-            ) : null}
           </div>
         </div>
       </body>

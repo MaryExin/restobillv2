@@ -10,6 +10,8 @@ import {
   FiEye,
   FiAlertTriangle,
   FiTrash2,
+  FiCheck,
+  FiShoppingCart,
 } from "react-icons/fi";
 import ButtonComponent from "./Common/ButtonComponent";
 import { BuildPrintableDiscountReceiptHtml } from "../../utils/BuildPrintableDiscountReceiptHtml";
@@ -690,6 +692,7 @@ const DiscountEntryCard = ({
   onChangeManualAmount,
   onChangeManualPercent,
   manualBaseAmount = 0,
+  discountMode = "PerCustomer",
 }) => {
   const accentClass =
     meta.color === "emerald"
@@ -711,8 +714,12 @@ const DiscountEntryCard = ({
             {meta.needsAmount
               ? "Enter a direct amount or percentage."
               : meta.key === "soloParent"
-                ? "10% statutory discount per qualified share."
-                : "20% statutory discount per qualified share."}
+                ? discountMode === "PerProduct"
+                  ? "10% of per-person share (selected items ÷ total customers)."
+                  : "10% statutory discount per qualified share."
+                : discountMode === "PerProduct"
+                  ? "20% of per-person share (selected items ÷ total customers)."
+                  : "20% statutory discount per qualified share."}
           </p>
         </div>
         <div
@@ -814,8 +821,8 @@ const DiscountEntryCard = ({
             </p>
             <p className="mt-1 font-semibold">
               {meta.key === "soloParent"
-                ? "10% of prorated base"
-                : "20% of prorated base"}
+                ? discountMode === "PerProduct" ? "10% of per-person share (selected items)" : "10% of prorated base"
+                : discountMode === "PerProduct" ? "20% of per-person share (selected items)" : "20% of prorated base"}
             </p>
           </div>
         )}
@@ -862,7 +869,13 @@ const ModalDiscountTransaction = ({
   const [initialLoadedSignature, setInitialLoadedSignature] = useState("");
   const [showOverrideWarning, setShowOverrideWarning] = useState(false);
   const [serviceChargeEnabled, setServiceChargeEnabled] = useState(false);
-  const [serviceChargePercentage, setServiceChargePercentage] = useState(0);
+  const [serviceCharges, setServiceCharges] = useState([]);
+  // per-transaction toggle: chargeId → boolean (true = include this transaction)
+  const [chargeToggles, setChargeToggles] = useState({});
+  const [discountMode, setDiscountMode] = useState("PerCustomer");
+  const [discountSharingMode, setDiscountSharingMode] = useState("shared");
+  // Per Product: object { [String(item.ID)]: number } — how many units per item are discounted
+  const [selectedProductIds, setSelectedProductIds] = useState({});
   const [customerInfoEnabled, setCustomerInfoEnabled] = useState(false);
   const [isSavingCustomerInfo, setIsSavingCustomerInfo] = useState(false);
   const [customerInfoSavedMessage, setCustomerInfoSavedMessage] = useState("");
@@ -1019,6 +1032,15 @@ const ModalDiscountTransaction = ({
 
         setItems(nextItems);
 
+        // Initialize all discountable items at full qty for Per Product mode
+        const initSelected = {};
+        nextItems.forEach((item) => {
+          if (yesNoToBool(item.isDiscountable)) {
+            initSelected[String(item.ID)] = Number(item.sales_quantity || 0);
+          }
+        });
+        setSelectedProductIds(initSelected);
+
         const nextCustomerCount = Math.max(
           Number(
             txn.customer_head_count || transaction?.customer_head_count || 1,
@@ -1167,22 +1189,33 @@ const ModalDiscountTransaction = ({
 
     const fetchServiceChargeSettings = async () => {
       try {
-        const response = await fetch(`${apiHost}/api/pos_service_charge.php`);
-        const result = await response.json();
+        const [scRes, listRes, modeRes] = await Promise.all([
+          fetch(`${apiHost}/api/pos_service_charge.php`),
+          fetch(`${apiHost}/api/pos_manage_other_charges.php`),
+          fetch(`${apiHost}/api/pos_discount_mode.php`),
+        ]);
+        const scResult   = await scRes.json();
+        const listResult = await listRes.json();
+        const modeResult = await modeRes.json();
 
         if (!cancelled) {
-          setServiceChargeEnabled(
-            Boolean(result?.data?.service_charge_enabled || false),
-          );
-          setServiceChargePercentage(
-            Number(result?.data?.service_charge_percentage || 0),
-          );
+          setServiceChargeEnabled(Boolean(scResult?.data?.service_charge_enabled || false));
+          const loadedCharges = Array.isArray(listResult?.charges) ? listResult.charges : [];
+          setServiceCharges(loadedCharges);
+          // initialise per-transaction toggles: all charges default OFF, cashier picks which to turn on
+          const toggleInit = {};
+          loadedCharges.forEach((c) => {
+            toggleInit[Number(c.ID)] = false;
+          });
+          setChargeToggles(toggleInit);
+          setDiscountMode(modeResult?.data?.discount_mode === "PerProduct" ? "PerProduct" : "PerCustomer");
         }
       } catch (error) {
         console.error("Failed to load service charge settings:", error);
         if (!cancelled) {
           setServiceChargeEnabled(false);
-          setServiceChargePercentage(0);
+          setServiceCharges([]);
+          setDiscountMode("PerCustomer");
         }
       }
     };
@@ -1272,6 +1305,7 @@ const ModalDiscountTransaction = ({
   ]);
 
   const computed = useMemo(() => {
+    const isPerProduct = discountMode === "PerProduct";
     const safeCustomerCount = Math.max(Number(customerCount) || 1, 1);
 
     const rawSeniorCount = Math.max(
@@ -1325,6 +1359,8 @@ const ModalDiscountTransaction = ({
 
     let discountableGross = 0;
     let discountableBase = 0;
+    let selectedDiscountableGross = 0;
+    let selectedDiscountableBase = 0;
     let rawVatableGross = 0;
     let vatableSales = 0;
     let vatableSalesVat = 0;
@@ -1337,14 +1373,35 @@ const ModalDiscountTransaction = ({
       const qty = Number(item.sales_quantity || 0);
       const price = Number(item.selling_price || 0);
       const lineTotal = qty * price;
+      const itemKey = String(item.ID || "");
+      // Per Product: discountQty = how many units are discounted (0..qty)
+      const discountQty = isPerProduct
+        ? Math.min(Math.max(Number(selectedProductIds[itemKey] ?? qty), 0), qty)
+        : qty;
+      const discountLineTotal = price * discountQty;
+      const nonDiscountLineTotal = lineTotal - discountLineTotal;
 
       if (isDiscountable) {
         discountableGross += lineTotal;
         discountableBase += isVatable ? lineTotal / 1.12 : lineTotal;
 
+        if (discountQty > 0) {
+          selectedDiscountableGross += discountLineTotal;
+          selectedDiscountableBase += isVatable ? discountLineTotal / 1.12 : discountLineTotal;
+        }
+
         if (isVatable) {
-          vatExemptSales += lineTotal * statutoryQualifiedRatio;
-          rawVatableGross += lineTotal * notQualifiedRatio;
+          if (isPerProduct) {
+            if (discountQty > 0) {
+              vatExemptSales += discountLineTotal * statutoryQualifiedRatio;
+              rawVatableGross += nonDiscountLineTotal + discountLineTotal * notQualifiedRatio;
+            } else {
+              rawVatableGross += lineTotal;
+            }
+          } else {
+            vatExemptSales += lineTotal * statutoryQualifiedRatio;
+            rawVatableGross += lineTotal * notQualifiedRatio;
+          }
         } else {
           vatExemptSales += lineTotal;
         }
@@ -1360,25 +1417,23 @@ const ModalDiscountTransaction = ({
     vatableSales = rawVatableGross / 1.12;
     vatableSalesVat = vatableSales * 0.12;
 
-    const seniorProratedBase =
-      safeCustomerCount > 0
-        ? discountableBase * (rawSeniorCount / safeCustomerCount)
-        : 0;
+    // Per Product: restrict the base to selected items, then prorate by qualified/total.
+    // Per Customer: use all discountable items, prorated by qualified/total.
+    // Formula in both modes: base × (qualifiedCount / totalCustomers)
+    // "base" = selectedDiscountableBase (Per Product) or discountableBase (Per Customer)
+    const discountBase = isPerProduct ? selectedDiscountableBase : discountableBase;
 
-    const pwdProratedBase =
-      safeCustomerCount > 0
-        ? discountableBase * (rawPwdCount / safeCustomerCount)
-        : 0;
+    // Solo: each qualified person gets the full base (no division by total customers)
+    // Shared: standard proration — base × (qualifiedCount / totalCustomers)
+    const prorate = (count) =>
+      discountSharingMode === "solo"
+        ? discountBase * count
+        : safeCustomerCount > 0 ? discountBase * (count / safeCustomerCount) : 0;
 
-    const naacProratedBase =
-      safeCustomerCount > 0
-        ? discountableBase * (rawNaacCount / safeCustomerCount)
-        : 0;
-
-    const soloParentProratedBase =
-      safeCustomerCount > 0
-        ? discountableBase * (rawSoloParentCount / safeCustomerCount)
-        : 0;
+    const seniorProratedBase = prorate(rawSeniorCount);
+    const pwdProratedBase = prorate(rawPwdCount);
+    const naacProratedBase = prorate(rawNaacCount);
+    const soloParentProratedBase = prorate(rawSoloParentCount);
 
     const seniorDiscountAmount = seniorProratedBase * 0.2;
     const seniorVatExemption = seniorProratedBase * 0.12;
@@ -1480,15 +1535,30 @@ const ModalDiscountTransaction = ({
       grossTotal - totalDiscount - totalVatExemption,
       0,
     );
-    const serviceChargeBase =
-      totalDiscount > 0
-        ? Math.max(discountableBase - totalDiscount, 0)
-        : discountableBase;
-    const serviceChargeAmount =
-      serviceChargeEnabled && serviceChargePercentage > 0
-        ? roundMoney(serviceChargeBase * (serviceChargePercentage / 100))
-        : 0;
-    const totalOtherCharges = serviceChargeAmount;
+    const netOfVat = netAfterDiscount / 1.12;
+    const serviceChargeBase = netOfVat;
+
+    const appliedCharges = serviceChargeEnabled
+      ? (Array.isArray(serviceCharges) ? serviceCharges : [])
+          .filter((c) => Boolean(c.is_enabled) && chargeToggles[Number(c.ID)] !== false)
+          .map((c) => {
+            const rate = Number(c.amount || 0);
+            const computed =
+              c.rate_type === "Fixed"
+                ? roundMoney(rate)
+                : roundMoney(serviceChargeBase * (rate / 100));
+            return {
+              id:            Number(c.ID),
+              particulars:   String(c.particulars || ""),
+              rate_type:     String(c.rate_type || "Percentage"),
+              rate,
+              computedAmount: computed,
+            };
+          })
+          .filter((c) => c.computedAmount > 0)
+      : [];
+
+    const totalOtherCharges = appliedCharges.reduce((s, c) => s + c.computedAmount, 0);
     const totalAmountDue = Math.max(netAfterDiscount + totalOtherCharges, 0);
 
     const discountTypeSummary = discountBreakdown
@@ -1503,15 +1573,17 @@ const ModalDiscountTransaction = ({
     return {
       discountableGross,
       discountableBase,
+      selectedDiscountableGross,
+      selectedDiscountableBase,
       grossTotal,
       totalQuantity,
       discountableItemsCount,
       netAfterDiscount,
+      netOfVat,
       totalAmountDue,
       serviceChargeEnabled,
-      serviceChargePercentage,
+      appliedCharges,
       serviceChargeBase,
-      serviceChargeAmount,
       totalOtherCharges,
       safeCustomerCount,
       vatableSales,
@@ -1529,6 +1601,7 @@ const ModalDiscountTransaction = ({
       statutoryQualifiedRatio,
       discountBreakdown,
       discountTypeSummary,
+      discountMode,
     };
   }, [
     items,
@@ -1537,7 +1610,11 @@ const ModalDiscountTransaction = ({
     discountCeilingAmount,
     transaction,
     serviceChargeEnabled,
-    serviceChargePercentage,
+    serviceCharges,
+    chargeToggles,
+    discountMode,
+    discountSharingMode,
+    selectedProductIds,
   ]);
 
   const validateQualifiedCounts = (nextTotal, nextState = discountState) => {
@@ -1920,6 +1997,82 @@ const ModalDiscountTransaction = ({
       if (!result?.success) {
         throw new Error(result?.message || "Print failed.");
       }
+
+      // Always sync AUTO charges after billing — this deletes any stale charges from a
+      // prior billing print even when all charges are now OFF, preventing the payment
+      // modal from inflating Amount Due with leftover DB rows.
+      try {
+        const activeCharges = Array.isArray(computed?.appliedCharges)
+          ? computed.appliedCharges
+              .filter((c) => Number(c.computedAmount || 0) > 0)
+              .map((c) => ({ particulars: c.particulars, amount: c.computedAmount }))
+          : [];
+        await fetch(`${apiHost}/api/pos_save_transaction_charges.php`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            transaction_id: transaction?.transaction_id || "",
+            Category_Code: transaction?.Category_Code || "",
+            Unit_Code: transaction?.Unit_Code || "",
+            charges: activeCharges,
+          }),
+        });
+      } catch (e) {
+        console.warn("Failed to save billing charges:", e);
+      }
+
+      // Save per-product discount selection when mode is Per Product
+      if (discountMode === "PerProduct") {
+        try {
+          const activeDiscountTypes = computed.discountBreakdown.filter(
+            (entry) => Number(entry.qualifiedCount || 0) > 0 || Number(entry.discountAmount || 0) > 0,
+          );
+          const totalBase = computed.selectedDiscountableBase || 0;
+          const rows = [];
+
+          items.forEach((item) => {
+            if (!yesNoToBool(item.isDiscountable)) return;
+            const qty    = Number(item.sales_quantity || 0);
+            const price  = Number(item.selling_price || 0);
+            const itemKey = String(item.ID || "");
+            const discQty = Math.min(Math.max(Number(selectedProductIds[itemKey] ?? qty), 0), qty);
+            if (discQty === 0) return;
+
+            const isVatable = yesNoToBool(item.vatable);
+            const discLineTotal = price * discQty;
+            const itemBase = isVatable ? discLineTotal / 1.12 : discLineTotal;
+            const itemRatio = totalBase > 0 ? itemBase / totalBase : 0;
+
+            activeDiscountTypes.forEach((entry) => {
+              rows.push({
+                product_id:        itemKey,
+                item_name:         String(item.item_name || item.product_id || ""),
+                customer_id:       "",
+                discount_type:     String(entry.shortLabel || entry.label || ""),
+                discount_sharing:  discountSharingMode,
+                total_customers:   computed.safeCustomerCount,
+                qualified_customers: Number(entry.qualifiedCount || 0),
+                discount_amount:   Number((entry.discountAmount || 0) * itemRatio),
+                vat_exempt_amount: Number((entry.vatExemption || 0) * itemRatio),
+              });
+            });
+          });
+
+          await fetch(`${apiHost}/api/pos_save_discount_per_product.php`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              transaction_id:   transaction?.transaction_id || "",
+              transaction_date: transaction?.transaction_date || "",
+              category_code:    transaction?.Category_Code || "",
+              unit_code:        transaction?.Unit_Code || "",
+              rows,
+            }),
+          });
+        } catch (e) {
+          console.warn("Failed to save per-product discount data:", e);
+        }
+      }
     } catch (error) {
       console.error(error);
       alert(error.message || "Failed to print billing.");
@@ -2078,6 +2231,15 @@ const ModalDiscountTransaction = ({
                   <div className="mb-3 flex items-center gap-2">
                     <FiFileText size={14} className="text-slate-500" />
                     <h3 className="text-sm font-black">Discount Setup</h3>
+                    <span
+                      className="ml-auto rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider"
+                      style={{
+                        backgroundColor: discountMode === "PerProduct" ? "rgba(234,179,8,0.15)" : "rgba(99,102,241,0.15)",
+                        color: discountMode === "PerProduct" ? "#ca8a04" : "#6366f1",
+                      }}
+                    >
+                      {discountMode === "PerProduct" ? "Per Product" : "Per Customer"}
+                    </span>
                   </div>
 
                   <div
@@ -2129,6 +2291,44 @@ const ModalDiscountTransaction = ({
                       </div>
                     </div>
 
+                    {/* Solo / Shared toggle — Per Product mode only */}
+                    {discountMode === "PerProduct" && <div className="mt-3">
+                      <label className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
+                        Discount Sharing
+                      </label>
+                      <div className={`flex overflow-hidden rounded-lg border text-[10px] font-black uppercase tracking-[0.14em] ${isDark ? "border-white/10" : "border-slate-200"}`}>
+                        <button
+                          type="button"
+                          disabled={isPrinting}
+                          onClick={() => setDiscountSharingMode("solo")}
+                          className={`flex-1 py-2 transition-colors ${
+                            discountSharingMode === "solo"
+                              ? "bg-emerald-500 text-white"
+                              : isDark ? "bg-slate-900 text-slate-400 hover:text-slate-200" : "bg-white text-slate-400 hover:text-slate-700"
+                          }`}
+                        >
+                          Solo
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isPrinting}
+                          onClick={() => setDiscountSharingMode("shared")}
+                          className={`flex-1 py-2 transition-colors ${
+                            discountSharingMode === "shared"
+                              ? "bg-blue-500 text-white"
+                              : isDark ? "bg-slate-900 text-slate-400 hover:text-slate-200" : "bg-white text-slate-400 hover:text-slate-700"
+                          }`}
+                        >
+                          Shared
+                        </button>
+                      </div>
+                      <p className={`mt-1 text-[9px] ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+                        {discountSharingMode === "solo"
+                          ? "Each qualified person gets the full discount on the entire discountable amount."
+                          : "Discount is prorated — each person's share = total ÷ head count."}
+                      </p>
+                    </div>}
+
                     <p className="mt-2 text-xs font-semibold text-red-500 min-h-[18px]">
                       {qualifiedPrompt}
                     </p>
@@ -2159,6 +2359,179 @@ const ModalDiscountTransaction = ({
                     ) : null}
                   </div>
 
+                  {discountMode === "PerProduct" && (() => {
+                    const discountableItems = items.filter((item) =>
+                      yesNoToBool(item.isDiscountable),
+                    );
+                    const allSelected = discountableItems.every((item) => {
+                      const k = String(item.ID);
+                      const q = Number(item.sales_quantity || 0);
+                      return Number(selectedProductIds[k] ?? q) >= q;
+                    });
+                    const noneSelected = discountableItems.every(
+                      (item) => Number(selectedProductIds[String(item.ID)] ?? 0) === 0,
+                    );
+                    return (
+                      <div className={`rounded-[0.95rem] p-3 mb-3 ${innerCardClass}`}>
+                        <div className="mb-2 flex items-center gap-2">
+                          <FiShoppingCart size={14} className="text-slate-500" />
+                          <h3 className="text-sm font-black">Products for Discount</h3>
+                          <div className="ml-auto flex gap-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const next = {};
+                                discountableItems.forEach((item) => {
+                                  next[String(item.ID)] = Number(item.sales_quantity || 0);
+                                });
+                                setSelectedProductIds((prev) => ({ ...prev, ...next }));
+                              }}
+                              className={`rounded-lg px-2 py-1 text-[9px] font-black uppercase tracking-wider transition-colors ${
+                                allSelected
+                                  ? "opacity-40 cursor-default"
+                                  : isDark
+                                    ? "bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25"
+                                    : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                              }`}
+                              disabled={allSelected}
+                            >
+                              All
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const next = {};
+                                discountableItems.forEach((item) => {
+                                  next[String(item.ID)] = 0;
+                                });
+                                setSelectedProductIds((prev) => ({ ...prev, ...next }));
+                              }}
+                              className={`rounded-lg px-2 py-1 text-[9px] font-black uppercase tracking-wider transition-colors ${
+                                noneSelected
+                                  ? "opacity-40 cursor-default"
+                                  : isDark
+                                    ? "bg-rose-500/15 text-rose-400 hover:bg-rose-500/25"
+                                    : "bg-rose-50 text-rose-600 hover:bg-rose-100"
+                              }`}
+                              disabled={noneSelected}
+                            >
+                              None
+                            </button>
+                          </div>
+                        </div>
+
+                        {discountableItems.length === 0 ? (
+                          <p className="text-xs text-slate-500 py-2">No discountable items in this transaction.</p>
+                        ) : (
+                          <div className="space-y-1 max-h-48 overflow-y-auto">
+                            {discountableItems.map((item) => {
+                              const itemKey = String(item.ID);
+                              const maxQty = Number(item.sales_quantity || 0);
+                              const price = Number(item.selling_price || 0);
+                              const discQty = Math.min(Math.max(Number(selectedProductIds[itemKey] ?? maxQty), 0), maxQty);
+                              const isOn = discQty > 0;
+                              const discLineTotal = price * discQty;
+                              return (
+                                <div
+                                  key={itemKey}
+                                  className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs transition-colors ${
+                                    isOn
+                                      ? isDark
+                                        ? "bg-emerald-500/10"
+                                        : "bg-emerald-50"
+                                      : isDark
+                                        ? "bg-slate-900/40 opacity-50"
+                                        : "bg-slate-100 opacity-50"
+                                  }`}
+                                >
+                                  {/* Checkbox toggle */}
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setSelectedProductIds((prev) => ({
+                                        ...prev,
+                                        [itemKey]: isOn ? 0 : maxQty,
+                                      }))
+                                    }
+                                    className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border transition-colors ${
+                                      isOn
+                                        ? "border-emerald-500 bg-emerald-500"
+                                        : isDark
+                                          ? "border-slate-600 bg-transparent"
+                                          : "border-slate-300 bg-white"
+                                    }`}
+                                  >
+                                    {isOn && <FiCheck size={10} className="text-white" />}
+                                  </button>
+
+                                  {/* Item name */}
+                                  <span className={`flex-1 font-semibold truncate ${isOn ? "" : "line-through"}`}>
+                                    {item.item_name || item.product_id || `Item #${itemKey}`}
+                                  </span>
+
+                                  {/* Qty stepper (only when maxQty >= 2) */}
+                                  {maxQty >= 2 ? (
+                                    <div className="flex items-center gap-1 flex-shrink-0">
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setSelectedProductIds((prev) => ({
+                                            ...prev,
+                                            [itemKey]: Math.max(discQty - 1, 0),
+                                          }))
+                                        }
+                                        disabled={discQty === 0}
+                                        className={`flex h-5 w-5 items-center justify-center rounded font-black text-[11px] disabled:opacity-30 transition-colors ${
+                                          isDark ? "bg-slate-700 hover:bg-slate-600" : "bg-slate-200 hover:bg-slate-300"
+                                        }`}
+                                      >
+                                        −
+                                      </button>
+                                      <span className={`w-8 text-center font-black tabular-nums text-[11px] ${isOn ? "text-emerald-600" : "text-slate-400"}`}>
+                                        {discQty}/{maxQty}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setSelectedProductIds((prev) => ({
+                                            ...prev,
+                                            [itemKey]: Math.min(discQty + 1, maxQty),
+                                          }))
+                                        }
+                                        disabled={discQty === maxQty}
+                                        className={`flex h-5 w-5 items-center justify-center rounded font-black text-[11px] disabled:opacity-30 transition-colors ${
+                                          isDark ? "bg-slate-700 hover:bg-slate-600" : "bg-slate-200 hover:bg-slate-300"
+                                        }`}
+                                      >
+                                        +
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <span className={`flex-shrink-0 font-bold ${isOn ? "text-emerald-600" : "text-slate-400"}`}>
+                                      ×{maxQty}
+                                    </span>
+                                  )}
+
+                                  {/* Line total based on discounted qty */}
+                                  <span className={`flex-shrink-0 font-bold tabular-nums w-16 text-right ${isOn ? "" : "text-slate-400"}`}>
+                                    ₱{peso(discLineTotal)}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        <div className={`mt-2 flex items-center justify-between rounded-lg px-2.5 py-1.5 text-[11px] font-black ${
+                          isDark ? "bg-slate-900/60" : "bg-white border border-slate-200"
+                        }`}>
+                          <span className="text-slate-500">Selected Total</span>
+                          <span>₱{peso(computed.selectedDiscountableGross)}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   <div className="grid grid-cols-1 gap-3">
                     {DISCOUNT_META.map((meta) => (
                       <DiscountEntryCard
@@ -2174,6 +2547,7 @@ const ModalDiscountTransaction = ({
                         onChangeManualAmount={handleChangeManualAmount}
                         onChangeManualPercent={handleChangeManualPercent}
                         manualBaseAmount={computed.discountableGross}
+                        discountMode={discountMode}
                       />
                     ))}
                   </div>
@@ -2183,20 +2557,29 @@ const ModalDiscountTransaction = ({
                   <div className="mb-2 flex items-center gap-2">
                     <FiTag size={14} className="text-slate-500" />
                     <h3 className="text-sm font-black">Computation Summary</h3>
+                    <span
+                      className="ml-auto rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider"
+                      style={{
+                        backgroundColor: computed.discountMode === "PerProduct" ? "rgba(234,179,8,0.15)" : "rgba(99,102,241,0.15)",
+                        color: computed.discountMode === "PerProduct" ? "#ca8a04" : "#6366f1",
+                      }}
+                    >
+                      {computed.discountMode === "PerProduct" ? "Per Product" : "Per Customer"}
+                    </span>
                   </div>
 
                   <div className="space-y-2 text-[13px]">
                     <div className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
                       <span className="text-slate-500">Disc. Gross</span>
                       <span className="font-semibold">
-                        ₱ {peso(computed.discountableGross)}
+                        ₱ {peso(computed.discountMode === "PerProduct" ? computed.selectedDiscountableGross : computed.discountableGross)}
                       </span>
                     </div>
 
                     <div className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
                       <span className="text-slate-500">Disc. Base</span>
                       <span className="font-semibold">
-                        ₱ {peso(computed.discountableBase)}
+                        ₱ {peso(computed.discountMode === "PerProduct" ? computed.selectedDiscountableBase : computed.discountableBase)}
                       </span>
                     </div>
 
@@ -2277,16 +2660,47 @@ const ModalDiscountTransaction = ({
                       </span>
                     </div>
 
-                    {computed.serviceChargeAmount > 0 ? (
-                      <div className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
-                        <span className="text-slate-500">
-                          Service Charge ({computed.serviceChargePercentage}%)
-                        </span>
-                        <span className="font-semibold">
-                          ₱ {peso(computed.serviceChargeAmount)}
-                        </span>
-                      </div>
-                    ) : null}
+                    <div className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
+                      <span className="text-slate-500">Net of VAT</span>
+                      <span className="font-semibold">
+                        ₱ {peso(computed.netOfVat)}
+                      </span>
+                    </div>
+
+                    {serviceChargeEnabled && serviceCharges
+                      .filter((c) => Boolean(c.is_enabled))
+                      .map((c) => {
+                        const id      = Number(c.ID);
+                        const isOn    = chargeToggles[id] !== false;
+                        const applied = computed.appliedCharges?.find((a) => a.id === id);
+                        return (
+                          <div key={id} className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setChargeToggles((prev) => ({ ...prev, [id]: !isOn }))
+                                }
+                                className={`flex-shrink-0 rounded-md px-2 py-0.5 text-[10px] font-black uppercase tracking-wide transition ${
+                                  isOn
+                                    ? "bg-emerald-500/15 text-emerald-500"
+                                    : "bg-slate-200/60 text-slate-400 dark:bg-slate-700/60"
+                                }`}
+                              >
+                                {isOn ? "ON" : "OFF"}
+                              </button>
+                              <span className={isOn ? "text-slate-500" : "text-slate-400 line-through"}>
+                                {c.particulars}
+                                {c.rate_type === "Percentage" ? ` (${Number(c.amount)}%)` : ""}
+                              </span>
+                            </div>
+                            <span className={`font-semibold ${isOn ? "" : "text-slate-400"}`}>
+                              ₱ {peso(isOn && applied ? applied.computedAmount : 0)}
+                            </span>
+                          </div>
+                        );
+                      })
+                    }
 
                     <div className="flex items-center justify-between gap-2 rounded-lg bg-blue-500/10 px-3 py-2.5">
                       <span className="text-sm font-black">

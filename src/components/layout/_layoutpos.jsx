@@ -30,6 +30,7 @@ import PosQuickActionTile from "../MainComponents/Common/PosQuickActionTile";
 import useZustandLoginCred from "../../context/useZustandLoginCred";
 import useApiHost from "../../hooks/useApiHost";
 import { useTheme } from "../../context/ThemeContext";
+import useZustandLayoutMode from "../../context/useZustandLayoutMode";
 
 const POS_HOME_BG = "./pos-home-bg.png";
 const HEADER_HEIGHT = 96;
@@ -89,6 +90,7 @@ const LayoutPos = ({ children }) => {
   const location = useLocation();
   const apiHost = useApiHost();
   const { theme, isDark, themeSettings } = useTheme();
+  const { layoutMode } = useZustandLayoutMode();
 
   const brandPrimary = isDark
     ? themeSettings?.Dark_Primary || "#2563eb"
@@ -303,16 +305,25 @@ const LayoutPos = ({ children }) => {
         icon={<FaReceipt className="text-[28px] sm:text-[30px]" />}
         color="orange"
         disabled={isClosed}
-        onClick={() => !isClosed && navigate("/ordering")}
+        onClick={() => {
+          if (isClosed) return;
+          if (layoutMode === "Kiosk") {
+            navigate("/ordering", { state: { kioskAutoOpen: true } });
+          } else {
+            navigate("/ordering");
+          }
+        }}
       />
 
-      <PosQuickActionTile
-        label="Billing"
-        icon={<FaReceipt className="text-[28px] sm:text-[30px]" />}
-        color="violet"
-        disabled={isClosed}
-        onClick={() => !isClosed && navigate("/printbilling")}
-      />
+      {layoutMode !== "Kiosk" && (
+        <PosQuickActionTile
+          label="Billing"
+          icon={<FaReceipt className="text-[28px] sm:text-[30px]" />}
+          color="violet"
+          disabled={isClosed}
+          onClick={() => !isClosed && navigate("/printbilling")}
+        />
+      )}
 
       <PosQuickActionTile
         label="Payment"

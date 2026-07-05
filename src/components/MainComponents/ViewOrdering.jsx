@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
+import useZustandLayoutMode from "../../context/useZustandLayoutMode";
 import Orderlist from "./Orderlist";
 import {
   FaSearch,
@@ -65,9 +66,13 @@ const getContrastText = (hex, fallback = "#ffffff") => {
   return brightness > 155 ? "#0f172a" : "#ffffff";
 };
 
+const KIOSK_DEFAULT_TABLE = "Table 01";
+
 const ViewOrdering = () => {
   const { themeSettings } = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { layoutMode } = useZustandLayoutMode();
   const apiHost = useApiHost();
 
   const [viewMode, setViewMode] = useState("card");
@@ -251,6 +256,24 @@ const ViewOrdering = () => {
     setTransactionId(txId || "");
     setshoworderlist(true);
   };
+
+  // Kiosk Mode: skip table selection and open ordering screen immediately.
+  useEffect(() => {
+    if (layoutMode !== "Kiosk") return;
+
+    if (location.state?.kioskEdit) {
+      const { kioskTransactionId, kioskTableName } = location.state;
+      openOrderList(
+        kioskTableName || KIOSK_DEFAULT_TABLE,
+        kioskTransactionId || "",
+      );
+      navigate(location.pathname, { replace: true, state: {} });
+    } else if (location.state?.kioskAutoOpen) {
+      openOrderList(KIOSK_DEFAULT_TABLE, "");
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleTableSelect = (table) => {
     const tableValue = table.table_number;

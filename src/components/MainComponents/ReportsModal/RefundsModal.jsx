@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { FaSyncAlt, FaTimes, FaSearch, FaHistory, FaCalendarAlt, FaPrint, FaFileExcel } from "react-icons/fa";
-import { useTheme } from "../../../context/ThemeContext"; 
-import * as XLSX from 'xlsx'; // Siguraduhing installed: npm install xlsx
+import { useTheme } from "../../../context/ThemeContext";
+import * as XLSX from 'xlsx';
+import useApiHost from "../../../hooks/useApiHost";
 
 const RefundsModal = ({ isOpen, onClose }) => {
-  const { theme } = useTheme(); 
+  const { theme } = useTheme();
   const darkMode = theme === "dark";
-
+  const apiHost = useApiHost();
   const today = new Date().toISOString().split('T')[0];
 
   const [loading, setLoading] = useState(false);
@@ -14,6 +15,25 @@ const RefundsModal = ({ isOpen, onClose }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFrom, setDateFrom] = useState(today);
   const [dateTo, setDateTo] = useState(today);
+  const [printEnabled, setPrintEnabled] = useState(false);
+  const [businessInfo, setBusinessInfo] = useState({});
+
+  // Load print setting and business info
+  useEffect(() => {
+    if (!apiHost) return;
+    fetch(`${apiHost}/api/pos_print_settings.php`)
+      .then(r => r.json())
+      .then(json => { if (json?.success) setPrintEnabled(Boolean(json.data?.print_refund_enabled)); })
+      .catch(() => {});
+
+    if (window.electronAPI?.readBusinessInfo) {
+      window.electronAPI.readBusinessInfo()
+        .then(info => { if (info) setBusinessInfo(info); })
+        .catch(() => {});
+    } else {
+      fetch("/businessInfo.json").then(r => r.json()).then(setBusinessInfo).catch(() => {});
+    }
+  }, [apiHost]);
 
   const fetchData = useCallback(async () => {
     if (!isOpen) return;
@@ -45,125 +65,111 @@ const RefundsModal = ({ isOpen, onClose }) => {
     XLSX.writeFile(wb, `Refund_Report_${dateFrom}_to_${dateTo}.xlsx`);
   };
 
-  const filteredData = data.filter(item => 
+  const filteredData = data.filter(item =>
     Object.values(item).some(val => String(val || "").toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   if (!isOpen) return null;
 
+  const companyName = businessInfo?.companyName || "";
+  const storeName   = businessInfo?.storeName   || "";
+  const address     = businessInfo?.address     || "";
+  const tin         = businessInfo?.tin         || "";
+  const minNo       = businessInfo?.machineNumber || "";
+
   return (
     <div className={`fixed inset-0 z-[100000] flex items-center justify-center p-4 backdrop-blur-sm ${darkMode ? "bg-black/70" : "bg-slate-900/40"}`}>
-      
-      {/* 70mm Thermal Print Styles */}
-      <style>
-        {`
-          @media print {
-            @page { size: 70mm auto; margin: 0 !important; }
-            body { margin: 0 !important; padding: 0 !important; width: 70mm; background-color: white; }
-            body * { visibility: hidden; }
-            #print-area-refund, #print-area-refund * { 
-              visibility: visible; 
-              color: black !important; 
-              font-family: 'Courier New', monospace; 
-              font-weight: 900 !important; 
-            }
-            #print-area-refund { 
-              position: absolute; left: 0; top: 0; width: 68mm; padding: 2mm 1mm; margin: 0; 
-            }
-            .print-header { text-align: center; border-bottom: 2pt solid black; margin-bottom: 8px; padding-bottom: 5px; }
-            .print-row { border-bottom: 1pt dashed black; padding: 5px 0; width: 100%; }
-            .print-main-info { display: flex; width: 100%; font-size: 10px; }
-            .print-remarks { 
-              display: block; width: 100%; font-size: 9px; margin-top: 3px; 
-              padding-left: 5px; border-left: 2pt solid black; word-wrap: break-word; 
-            }
-            .no-print { display: none !important; }
-            .screen-table { display: none !important; }
+
+      <style>{`
+        @media print {
+          @page { size: 80mm auto; margin: 0 !important; }
+          body { margin: 0 !important; padding: 0 !important; width: 80mm; background-color: white; }
+          body * { visibility: hidden; }
+          #refund-print-area, #refund-print-area * {
+            visibility: visible;
+            color: black !important;
+            font-family: Arial, Helvetica, sans-serif;
           }
-        `}
-      </style>
+          #refund-print-area {
+            position: absolute; left: 0; top: 0;
+            width: 78mm; padding: 4mm 2mm; margin: 0;
+          }
+          .rp-header  { text-align: center; padding-bottom: 6px; margin-bottom: 6px; border-bottom: 1pt solid black; }
+          .rp-company { font-size: 13px; font-weight: 900; }
+          .rp-store   { font-size: 11px; font-weight: 700; }
+          .rp-address { font-size: 9px; }
+          .rp-title   { text-align: center; font-size: 12px; font-weight: 900; margin: 6px 0 4px; }
+          .rp-period  { text-align: center; font-size: 9px; margin-bottom: 6px; }
+          .rp-col-head { display: flex; font-size: 9px; font-weight: 900; border-bottom: 1pt solid black; padding-bottom: 3px; margin-bottom: 3px; }
+          .rp-row     { border-bottom: 1pt dashed black; padding: 4px 0; }
+          .rp-main    { display: flex; font-size: 9px; }
+          .rp-remarks { font-size: 8px; margin-top: 2px; padding-left: 4px; border-left: 2pt solid black; word-wrap: break-word; }
+          .rp-total   { font-size: 10px; font-weight: 900; margin-top: 6px; text-align: right; }
+          .no-print   { display: none !important; }
+        }
+      `}</style>
 
       <div className={`relative flex h-[92vh] w-full max-w-[98%] flex-col overflow-hidden rounded-3xl shadow-2xl ${darkMode ? "bg-[#111827] border border-white/10" : "bg-white border border-slate-200"}`}>
-        
-        {/* Header Section */}
+
+        {/* Header */}
         <div className={`px-8 py-5 flex items-center justify-between shrink-0 shadow-lg relative z-20 no-print ${darkMode ? "bg-[#1f2937]" : "bg-cyan-50"}`}>
           <div className="flex items-center gap-6">
             <div className={`p-4 rounded-full ${darkMode ? "bg-cyan-900/50 text-cyan-300" : "bg-cyan-100 text-cyan-600"}`}>
-                <FaHistory size={22} />
+              <FaHistory size={22} />
             </div>
             <div className="flex flex-col">
-                <h2 className={`text-3xl tracking-tighter uppercase font-bold ${darkMode ? "text-white" : "text-slate-950"}`}>Refund Transactions</h2>
-                <p className={`text-sm ${darkMode ? "text-slate-400" : "text-slate-500"}`}>System Logs</p>
+              <h2 className={`text-3xl tracking-tighter uppercase font-bold ${darkMode ? "text-white" : "text-slate-950"}`}>Refund Transactions</h2>
+              <p className={`text-sm ${darkMode ? "text-slate-400" : "text-slate-500"}`}>System Logs</p>
             </div>
             <div className="relative ml-4">
               <FaSearch className={`absolute left-4 top-1/2 -translate-y-1/2 text-[10px] ${darkMode ? "text-slate-500" : "text-slate-400"}`} />
-              <input 
-                type="text" 
-                placeholder="Search..." 
-                value={searchTerm} 
+              <input
+                type="text"
+                placeholder="Search..."
+                value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className={`border rounded-full py-2.5 pl-11 pr-6 text-xs outline-none w-64 transition-all ${darkMode ? "bg-[#0f172a] border-white/10 text-white" : "bg-white border-slate-200 text-slate-800"}`}
               />
             </div>
           </div>
-          
+
           <div className="flex items-center gap-3">
             <div className={`flex items-center rounded-xl px-4 py-2.5 gap-3 border ${darkMode ? "bg-[#111827] border-white/10" : "bg-white border-slate-200"}`}>
               <FaCalendarAlt className={darkMode ? "text-slate-500" : "text-slate-400"} />
               <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className={`bg-transparent text-xs outline-none font-mono ${darkMode ? "text-white [color-scheme:dark]" : "text-slate-800"}`} />
-              <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className={`bg-transparent text-xs outline-none font-mono ${darkMode ? "text-white [color-scheme:dark]" : "text-slate-800"}`} />
+              <input type="date" value={dateTo}   onChange={(e) => setDateTo(e.target.value)}   className={`bg-transparent text-xs outline-none font-mono ${darkMode ? "text-white [color-scheme:dark]" : "text-slate-800"}`} />
             </div>
 
-            <button onClick={exportToExcel} className="flex items-center gap-2 px-5 py-4 font-bold text-white shadow-lg bg-emerald-600 hover:bg-emerald-700 rounded-xl active:scale-95">
-              <FaFileExcel size={18} /> <span className="text-xs uppercase">Excel</span>
+            <button onClick={exportToExcel} className="flex items-center gap-2 px-5 py-3 font-bold text-white shadow-lg bg-emerald-600 hover:bg-emerald-700 rounded-xl active:scale-95">
+              <FaFileExcel size={16} /> <span className="text-xs uppercase">Excel</span>
             </button>
 
-            <button onClick={handlePrint} className="flex items-center gap-2 px-5 py-4 font-bold text-white bg-blue-600 shadow-lg hover:bg-blue-700 rounded-xl active:scale-95">
-              <FaPrint size={18} /> <span className="text-xs uppercase">Print 70mm</span>
-            </button>
+            {/* Print button: only show when enabled in settings */}
+            {printEnabled && (
+              <button onClick={handlePrint} className="flex items-center gap-2 px-5 py-3 font-bold text-white bg-blue-600 shadow-lg hover:bg-blue-700 rounded-xl active:scale-95">
+                <FaPrint size={16} /> <span className="text-xs uppercase">Print</span>
+              </button>
+            )}
 
-            <button onClick={fetchData} className="p-4 rounded-xl bg-slate-500/10 text-slate-500"><FaSyncAlt className={loading ? "animate-spin" : ""} /></button>
-            <button onClick={onClose} className="p-4 text-white rounded-xl bg-rose-500"><FaTimes /></button>
+            <button onClick={fetchData} className="p-4 rounded-xl bg-slate-500/10 text-slate-500">
+              <FaSyncAlt className={loading ? "animate-spin" : ""} />
+            </button>
+            <button onClick={onClose} className="p-4 text-white rounded-xl bg-rose-500">
+              <FaTimes />
+            </button>
           </div>
         </div>
 
-        <div id="print-area-refund" className="flex-1 p-6 overflow-auto scrollbar-thin">
-          
-          {/* PRINT ONLY CONTENT */}
-          <div className="hidden print:block print-header">
-            <h3>REFUND REPORT</h3>
-            <p>{dateFrom} to {dateTo}</p>
-          </div>
-
-          <div className="hidden print:block">
-            <div className="flex font-black text-[9px] mb-1 border-b-2 border-black pb-1">
-                <span style={{width: '35%'}}>DATE</span>
-                <span style={{width: '35%'}}>CASHIER</span>
-                <span style={{width: '30%'}}>AUTH</span>
-            </div>
-            {filteredData.map((row, i) => (
-              <div key={i} className="print-row">
-                <div className="print-main-info">
-                  <span style={{width: '35%'}}>{row.report_date}</span>
-                  <span style={{width: '35%'}}>{row.cashier}</span>
-                  <span style={{width: '30%'}}>{row.auth_id}</span>
-                </div>
-                <div className="print-remarks">
-                  RMKS: {row.remarks || "NO REMARKS"}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* SCREEN VIEW TABLE */}
-          <table className="w-full text-left border-separate table-fixed screen-table no-print">
+        {/* Screen table */}
+        <div className="flex-1 p-6 overflow-auto scrollbar-thin">
+          <table className="w-full text-left border-separate table-fixed">
             <thead className="sticky top-0 z-10">
               <tr className={`text-[10px] uppercase font-bold tracking-widest ${darkMode ? "text-slate-400" : "text-slate-600"}`}>
                 <th className="w-1/5 p-5 border-b">Refund Date</th>
                 <th className="w-1/6 p-5 border-b">Invoice No</th>
                 <th className="w-1/6 p-5 text-center border-b">Cashier</th>
                 <th className="w-1/6 p-5 border-b">Total Due</th>
-                <th className="w-1/6 p-5 text-center border-b">Auth ID</th>
+                <th className="w-1/6 p-5 text-center border-b">Refund #</th>
                 <th className="w-1/4 p-5 border-b">Remarks</th>
               </tr>
             </thead>
@@ -173,7 +179,7 @@ const RefundsModal = ({ isOpen, onClose }) => {
                   <td className="p-5 font-mono">{row.report_date}</td>
                   <td className="p-5">{row.invoice_no}</td>
                   <td className="p-5 text-center uppercase">{row.cashier}</td>
-                  <td className="p-5 font-bold">₱{Number(row.TotalAmountDue).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                  <td className="p-5 font-bold">₱{Number(row.TotalAmountDue).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                   <td className="p-5 text-center">{row.auth_id}</td>
                   <td className="p-5 italic opacity-70">{row.remarks || "No remarks"}</td>
                 </tr>
@@ -183,6 +189,39 @@ const RefundsModal = ({ isOpen, onClose }) => {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* 80mm print area — billing-style layout, no footer */}
+      <div id="refund-print-area" style={{ display: "none" }}>
+        <div className="rp-header">
+          {companyName && <div className="rp-company">{companyName}</div>}
+          {storeName   && <div className="rp-store">{storeName}</div>}
+          {address     && <div className="rp-address">{address}</div>}
+          {tin         && <div className="rp-address">VAT REG TIN: {tin}</div>}
+          {minNo       && <div className="rp-address">MIN: {minNo}</div>}
+        </div>
+
+        <div className="rp-title">REFUND REPORT</div>
+        <div className="rp-period">PERIOD: {dateFrom} — {dateTo}</div>
+
+        <div className="rp-col-head">
+          <span style={{ width: "50%" }}>DATE</span>
+          <span style={{ width: "50%" }}>CASHIER</span>
+        </div>
+
+        {filteredData.map((row, i) => (
+          <div key={i} className="rp-row">
+            <div className="rp-main">
+              <span style={{ width: "50%" }}>{row.report_date}</span>
+              <span style={{ width: "50%" }}>{row.cashier}</span>
+            </div>
+            <div className="rp-remarks">REFUND #: {row.auth_id || "-"} | INV#: {row.invoice_no || "-"}</div>
+            <div className="rp-remarks">AMT: ₱{Number(row.TotalAmountDue || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+            <div className="rp-remarks">RMKS: {row.remarks || "NO REMARKS"}</div>
+          </div>
+        ))}
+
+        <div className="rp-total">TOTAL RECORDS: {filteredData.length}</div>
       </div>
     </div>
   );

@@ -12,6 +12,7 @@ import {
   FaCheckCircle,
   FaExclamationTriangle,
   FaThLarge,
+  FaPercent,
 } from "react-icons/fa";
 import { useTheme } from "../../context/ThemeContext";
 import useApiHost from "../../hooks/useApiHost";
@@ -32,6 +33,7 @@ const ProductList = () => {
   const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("ALL");
+  const [enablePictures, setEnablePictures] = useState(false);
 
   // MODAL STATES
   const [showConfirm, setShowConfirm] = useState(false);
@@ -76,6 +78,18 @@ const ProductList = () => {
       fetchProducts();
     }
   }, [isAuthenticated, fetchProducts]);
+
+  useEffect(() => {
+    if (!apiHost) return;
+    let cancelled = false;
+    fetch(`${apiHost}/api/pos_pictures_settings.php`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled && data.success) setEnablePictures(Boolean(data.data?.enable_pictures));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [apiHost]);
 
   const triggerBulkConfirm = (status) => {
     if (selectedCategory === "ALL") return;
@@ -146,6 +160,30 @@ const ProductList = () => {
       if (result.status !== "success") setProducts(previousState);
     } catch (error) {
       console.error("Toggle status error:", error);
+      setProducts(previousState);
+    }
+  };
+
+  const toggleDiscountable = async (pid) => {
+    const product = products.find((p) => p.product_id === pid);
+    if (!product) return;
+    const newVal = product.isDiscountable === "Yes" ? "No" : "Yes";
+
+    const previousState = [...products];
+    setProducts((prev) =>
+      prev.map((p) => (p.product_id === pid ? { ...p, isDiscountable: newVal } : p)),
+    );
+
+    try {
+      const response = await fetch(`${apiHost}/api/update_product_discountable.php`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ product_id: pid, isDiscountable: newVal }),
+      });
+      const result = await response.json();
+      if (result.status !== "success") setProducts(previousState);
+    } catch (error) {
+      console.error("Toggle discountable error:", error);
       setProducts(previousState);
     }
   };
@@ -221,7 +259,7 @@ const ProductList = () => {
               Restricted Access
             </h2>
             <p className="text-[10px] font-bold text-blue-600 uppercase tracking-[0.2em] mb-8">
-              CNC - STA MARIA PRODUCT LIST
+              
             </p>
             <form onSubmit={handlePasswordSubmit} className="w-full space-y-4">
               <div className="relative">
@@ -382,7 +420,7 @@ const ProductList = () => {
                   PRODUCT LIST
                 </h1>
                 <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">
-                  CNC - STA MARIA
+                  
                 </p>
               </div>
             </div>
@@ -546,23 +584,25 @@ const ProductList = () => {
                       {isActive ? "Active" : "Inactive"}
                     </div>
 
-                    <div
-                      className={`w-full aspect-square rounded-[28px] flex items-center justify-center mb-6 overflow-hidden border-2 transition-all duration-500 group-hover:scale-[1.03] ${
-                        isActive
-                          ? isDark
-                            ? "bg-slate-800 border-white/10"
-                            : "bg-slate-50 border-blue-500/10"
-                          : "bg-slate-200 border-slate-300"
-                      }`}
-                    >
-                      <ProductImage
-                      src={`${apiHost}/item_pictures/${item.item_name}.jpg`}
-                      alt={item.item_name}
-                      className="object-cover w-full h-full"
-                      wrapperClassName="w-full h-full overflow-hidden rounded-[26px]"
-                      fallbackSrc={`${apiHost}/item_pictures/default.jpg`}
-                    />
-                    </div>
+                    {enablePictures && (
+                      <div
+                        className={`w-full aspect-square rounded-[28px] flex items-center justify-center mb-6 overflow-hidden border-2 transition-all duration-500 group-hover:scale-[1.03] ${
+                          isActive
+                            ? isDark
+                              ? "bg-slate-800 border-white/10"
+                              : "bg-slate-50 border-blue-500/10"
+                            : "bg-slate-200 border-slate-300"
+                        }`}
+                      >
+                        <ProductImage
+                          src={`${apiHost}/item_pictures/${item.item_name}.jpg`}
+                          alt={item.item_name}
+                          className="object-cover w-full h-full"
+                          wrapperClassName="w-full h-full overflow-hidden rounded-[26px]"
+                          fallbackSrc={`${apiHost}/item_pictures/default.jpg`}
+                        />
+                      </div>
+                    )}
 
                     <div className="px-1">
                       <h3
@@ -572,11 +612,53 @@ const ProductList = () => {
                       >
                         {item.item_name}
                       </h3>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em] flex items-center gap-2 mb-6">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em] flex items-center gap-2 mb-4">
                         <FaTag className="text-blue-500" size={10} />
                         {item.unit_of_measure}
                       </p>
-                      <div className="flex items-center justify-between pt-5 border-t-2 border-slate-100/10">
+
+                      {/* Discountable toggle row */}
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-1.5">
+                          <FaPercent
+                            size={9}
+                            className={
+                              item.isDiscountable === "Yes"
+                                ? "text-amber-500"
+                                : "text-slate-400"
+                            }
+                          />
+                          <span
+                            className={`text-[9px] font-black uppercase tracking-widest ${
+                              item.isDiscountable === "Yes"
+                                ? isDark ? "text-amber-400" : "text-amber-600"
+                                : "text-slate-400"
+                            }`}
+                          >
+                            {item.isDiscountable === "Yes" ? "Discountable" : "No Discount"}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => toggleDiscountable(item.product_id)}
+                          className={`relative w-12 h-6 rounded-full transition-all duration-300 flex items-center p-1 border-2 ${
+                            item.isDiscountable === "Yes"
+                              ? "bg-amber-500 border-amber-400 shadow-lg shadow-amber-500/30"
+                              : isDark
+                                ? "bg-slate-700 border-slate-600 shadow-inner"
+                                : "bg-slate-300 border-slate-400 shadow-inner"
+                          }`}
+                        >
+                          <div
+                            className={`w-3 h-3 bg-white rounded-full shadow-md transform transition-transform duration-300 ${
+                              item.isDiscountable === "Yes"
+                                ? "translate-x-6"
+                                : "translate-x-0"
+                            }`}
+                          />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-4 border-t-2 border-slate-100/10">
                         <p
                           className={`text-xl font-black tracking-tighter ${
                             isActive ? "text-blue-600" : "text-slate-400"

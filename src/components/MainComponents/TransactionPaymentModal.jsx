@@ -9,6 +9,8 @@ import {
   FiPlus,
   FiTrash2,
   FiPrinter,
+  FiShoppingCart,
+  FiCheck,
 } from "react-icons/fi";
 import { FaMoneyBill } from "react-icons/fa";
 import ButtonComponent from "./Common/ButtonComponent";
@@ -141,10 +143,7 @@ const createEmptyOtherChargeRow = () => ({
 });
 
 const isAutoServiceChargeRow = (row) => {
-  const reference = String(row?.reference || "").trim().toUpperCase();
-  const particulars = String(row?.particulars || "").trim().toUpperCase();
-
-  return reference === "AUTO" && particulars.startsWith("SERVICE CHARGE");
+  return String(row?.reference || "").trim().toUpperCase() === "AUTO";
 };
 
 const emptyCustomerInfo = {
@@ -886,10 +885,48 @@ const DiscountSetupModal = ({
   computed,
   discountCeilingAmount = 0,
   readOnly = false,
+  discountMode = "PerCustomer",
+  discountSharingMode = "shared",
+  setDiscountSharingMode,
+  selectedProductIds = {},
+  setSelectedProductIds,
+  items = [],
 }) => {
   const inputClass = isDark
     ? "bg-slate-950 border border-slate-800 text-white placeholder:text-slate-500"
     : "bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400";
+
+  const isPerProduct = discountMode === "PerProduct";
+  const discountableItems = items.filter((item) => yesNoToBool(item.isDiscountable));
+
+  const toggleProduct = (id, maxQty) => {
+    if (readOnly || !setSelectedProductIds) return;
+    setSelectedProductIds((prev) => ({
+      ...prev,
+      [String(id)]: Number(prev[String(id)] ?? maxQty) > 0 ? 0 : maxQty,
+    }));
+  };
+  const selectAllProducts = () => {
+    if (readOnly || !setSelectedProductIds) return;
+    const next = {};
+    discountableItems.forEach((item) => {
+      next[String(item.ID || item.id || item.databaseID || "")] = Number(item.sales_quantity || 0);
+    });
+    setSelectedProductIds(next);
+  };
+  const selectNoneProducts = () => {
+    if (readOnly || !setSelectedProductIds) return;
+    const next = {};
+    discountableItems.forEach((item) => {
+      next[String(item.ID || item.id || item.databaseID || "")] = 0;
+    });
+    setSelectedProductIds(next);
+  };
+  const setProductDiscountQty = (id, qty, maxQty) => {
+    if (readOnly || !setSelectedProductIds) return;
+    const bounded = Math.min(Math.max(Number(qty) || 0, 0), maxQty);
+    setSelectedProductIds((prev) => ({ ...prev, [String(id)]: bounded }));
+  };
 
   const handleCountChange = (key, value) => {
     setDiscountState((prev) => ({
@@ -997,6 +1034,18 @@ const DiscountSetupModal = ({
               Multi-discount breakdown
             </p>
           </div>
+          <div className="ml-auto">
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${
+                isPerProduct
+                  ? "bg-violet-500/15 text-violet-500"
+                  : "bg-blue-500/15 text-blue-500"
+              }`}
+            >
+              {isPerProduct ? <FiShoppingCart size={11} /> : <FiUsers size={11} />}
+              {isPerProduct ? "Per Product" : "Per Customer"}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -1008,20 +1057,76 @@ const DiscountSetupModal = ({
               <h3 className="text-sm font-black">Customer Count</h3>
             </div>
 
-            <div className="mb-4">
-              <label className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
-                Total Customers
-              </label>
-              <input
-                type="number"
-                min="1"
-                value={customerCount}
-                disabled={readOnly}
-                onChange={(e) => setCustomerCount(e.target.value)}
-                onFocus={handleSelectAllOnFocus}
-                className={`w-full rounded-2xl px-3 py-3 text-sm outline-none ${inputClass}`}
-              />
+            {/* Total Customers + Total Qualified — 2-col grid matching billing layout */}
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 mb-3">
+              <div>
+                <label className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
+                  Total Customers
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={customerCount}
+                  disabled={readOnly}
+                  onChange={(e) => setCustomerCount(e.target.value)}
+                  onFocus={handleSelectAllOnFocus}
+                  className={`w-full rounded-lg px-3 py-2 text-sm outline-none ${inputClass}`}
+                />
+              </div>
+
+              <div
+                className={`rounded-lg px-3 py-2 ${
+                  isDark
+                    ? "bg-slate-900/60 border border-white/5 text-slate-300"
+                    : "bg-slate-50 border border-slate-200 text-slate-600"
+                }`}
+              >
+                <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
+                  Total Qualified
+                </p>
+                <p className="mt-1 text-lg font-black">
+                  {computed.totalQualifiedAll}
+                </p>
+              </div>
             </div>
+
+            {/* Solo / Shared toggle — Per Product mode only */}
+            {isPerProduct && <div className="mb-4">
+              <label className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
+                Discount Sharing
+              </label>
+              <div className={`flex overflow-hidden rounded-lg border text-[10px] font-black uppercase tracking-[0.14em] ${isDark ? "border-white/10" : "border-slate-200"}`}>
+                <button
+                  type="button"
+                  disabled={readOnly}
+                  onClick={() => setDiscountSharingMode?.("solo")}
+                  className={`flex-1 py-2 transition-colors ${
+                    discountSharingMode === "solo"
+                      ? "bg-emerald-500 text-white"
+                      : isDark ? "bg-slate-900 text-slate-400 hover:text-slate-200" : "bg-white text-slate-400 hover:text-slate-700"
+                  }`}
+                >
+                  Solo
+                </button>
+                <button
+                  type="button"
+                  disabled={readOnly}
+                  onClick={() => setDiscountSharingMode?.("shared")}
+                  className={`flex-1 py-2 transition-colors ${
+                    discountSharingMode === "shared"
+                      ? "bg-blue-500 text-white"
+                      : isDark ? "bg-slate-900 text-slate-400 hover:text-slate-200" : "bg-white text-slate-400 hover:text-slate-700"
+                  }`}
+                >
+                  Shared
+                </button>
+              </div>
+              <p className={`mt-1 text-[9px] ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+                {discountSharingMode === "solo"
+                  ? "Each qualified person gets the full discount on the entire discountable amount."
+                  : "Discount is prorated — each person's share = total ÷ head count."}
+              </p>
+            </div>}
 
             <div className="grid grid-cols-1 gap-3">
               {cards.map((card) => (
@@ -1163,18 +1268,141 @@ const DiscountSetupModal = ({
               <h3 className="text-sm font-black">Computation Summary</h3>
             </div>
 
+            {isPerProduct && discountableItems.length > 0 && (
+              <div
+                className={`mb-4 rounded-[20px] border p-4 ${
+                  isDark
+                    ? "border-violet-500/20 bg-violet-500/5"
+                    : "border-violet-200 bg-violet-50"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <div className="flex items-center gap-2">
+                    <FiShoppingCart size={13} className="text-violet-500" />
+                    <span className="text-[11px] font-black uppercase tracking-[0.14em] text-violet-500">
+                      Selected Items for Discount
+                    </span>
+                  </div>
+                  {!readOnly && (
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={selectAllProducts}
+                        className="text-[10px] font-black text-violet-500 hover:underline"
+                      >
+                        All
+                      </button>
+                      <span className="text-slate-400">·</span>
+                      <button
+                        type="button"
+                        onClick={selectNoneProducts}
+                        className="text-[10px] font-black text-slate-400 hover:underline"
+                      >
+                        None
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                  {discountableItems.map((item) => {
+                    const id = String(item.ID || item.id || item.databaseID || "");
+                    const maxQty = Number(item.sales_quantity || 0);
+                    const price = Number(item.selling_price || 0);
+                    const discQty = Math.min(Math.max(Number(selectedProductIds[id] ?? maxQty), 0), maxQty);
+                    const checked = discQty > 0;
+                    const discLineTotal = price * discQty;
+                    return (
+                      <div
+                        key={id}
+                        className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-[11px] transition ${
+                          checked
+                            ? isDark
+                              ? "bg-violet-500/15 text-white"
+                              : "bg-violet-100 text-slate-900"
+                            : isDark
+                            ? "bg-slate-800/60 text-slate-500"
+                            : "bg-white text-slate-400 border border-slate-200"
+                        }`}
+                      >
+                        {/* Checkbox toggle */}
+                        <button
+                          type="button"
+                          disabled={readOnly}
+                          onClick={() => toggleProduct(id, maxQty)}
+                          className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full transition-colors ${
+                            checked ? "bg-violet-500" : isDark ? "bg-slate-700" : "bg-slate-200"
+                          }`}
+                        >
+                          {checked && <FiCheck size={9} className="text-white" />}
+                        </button>
+
+                        {/* Item name */}
+                        <span className="flex-1 font-semibold">
+                          {item.item_name || item.product_id || id}
+                        </span>
+
+                        {/* Qty stepper (only when maxQty >= 2) */}
+                        {maxQty >= 2 ? (
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <button
+                              type="button"
+                              disabled={readOnly || discQty === 0}
+                              onClick={() => setProductDiscountQty(id, discQty - 1, maxQty)}
+                              className={`flex h-4 w-4 items-center justify-center rounded font-black text-[11px] disabled:opacity-30 transition-colors ${
+                                isDark ? "bg-slate-700 hover:bg-slate-600" : "bg-slate-200 hover:bg-slate-300"
+                              }`}
+                            >
+                              −
+                            </button>
+                            <span className={`w-8 text-center font-black tabular-nums text-[10px] ${checked ? "text-violet-500" : ""}`}>
+                              {discQty}/{maxQty}
+                            </span>
+                            <button
+                              type="button"
+                              disabled={readOnly || discQty === maxQty}
+                              onClick={() => setProductDiscountQty(id, discQty + 1, maxQty)}
+                              className={`flex h-4 w-4 items-center justify-center rounded font-black text-[11px] disabled:opacity-30 transition-colors ${
+                                isDark ? "bg-slate-700 hover:bg-slate-600" : "bg-slate-200 hover:bg-slate-300"
+                              }`}
+                            >
+                              +
+                            </button>
+                          </div>
+                        ) : null}
+
+                        {/* Price based on discounted qty */}
+                        <span className={`font-black flex-shrink-0 ${checked ? "text-violet-500" : ""}`}>
+                          {peso(discLineTotal)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div
+                  className={`mt-3 flex items-center justify-between rounded-xl px-3 py-2 text-[11px] ${
+                    isDark ? "bg-slate-800 text-slate-300" : "bg-white text-slate-700 border border-slate-200"
+                  }`}
+                >
+                  <span className="font-semibold text-slate-500">Selected Total</span>
+                  <span className="font-black text-violet-500">
+                    {peso(computed.selectedDiscountableGross)}
+                  </span>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2 text-[13px]">
               <div className="flex items-center justify-between gap-2 pb-2 border-b border-dashed border-slate-300/20">
                 <span className="text-slate-500">Discountable Gross</span>
                 <span className="font-semibold">
-                  {peso(computed.discountableGross)}
+                  {peso(isPerProduct ? computed.selectedDiscountableGross : computed.discountableGross)}
                 </span>
               </div>
 
               <div className="flex items-center justify-between gap-2 pb-2 border-b border-dashed border-slate-300/20">
-                <span className="text-slate-500">Discountable Base</span>
+                <span className="text-slate-500">Discountable Base (VAT-ex)</span>
                 <span className="font-semibold">
-                  {peso(computed.discountableBase)}
+                  {peso(isPerProduct ? computed.selectedDiscountableBase : computed.discountableBase)}
                 </span>
               </div>
 
@@ -1279,6 +1507,9 @@ const InputPaymentsModal = ({
   setPayments,
   onAddPaymentMethod,
   readOnly = false,
+  modeOfPayments = [],
+  onShowQR = null,
+  qrActive = false,
 }) => {
   const [activePaymentIndex, setActivePaymentIndex] = useState(0);
 
@@ -1329,6 +1560,12 @@ const InputPaymentsModal = ({
   );
 
   const remaining = Math.max(toNumLocal(totalAmountDue) - totalPaid, 0);
+
+  const hasRefsMissing = payments.some((row) => {
+    const mopEntry = modeOfPayments.find((m) => m.mop === row.payment_method);
+    if (Number(mopEntry?.reference_On_Off ?? 0) !== 1) return false;
+    return !String(row.payment_reference ?? "").trim();
+  });
 
   const activePaymentMethod =
     payments.length > 0 &&
@@ -1532,16 +1769,35 @@ const InputPaymentsModal = ({
                   <div className="flex items-center justify-between gap-3 mb-2">
                     <p className="text-sm font-bold text-slate-500">Payments</p>
 
-                    {!readOnly ? (
-                      <button
-                        type="button"
-                        onClick={handleAddPaymentMethod}
-                        className="inline-flex items-center gap-2 px-4 py-3 text-xs font-bold text-white transition bg-blue-600 rounded-2xl hover:bg-blue-500"
-                      >
-                        <FiPlus size={14} />
-                        Add Payment Method
-                      </button>
-                    ) : null}
+                    <div className="flex items-center gap-2">
+                      {onShowQR && !readOnly && payments.length > 0 && payments[0]?.payment_method ? (
+                        <button
+                          type="button"
+                          onClick={() => onShowQR(payments[activePaymentIndex]?.payment_method || payments[0]?.payment_method)}
+                          className={`inline-flex items-center gap-1.5 px-3 py-2.5 text-xs font-bold transition rounded-xl ${
+                            qrActive
+                              ? "bg-emerald-500 text-white shadow-sm"
+                              : "bg-cyan-100 text-cyan-700 hover:bg-cyan-200"
+                          }`}
+                        >
+                          <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                          </svg>
+                          {qrActive ? "QR On ✓" : "Show QR"}
+                        </button>
+                      ) : null}
+
+                      {!readOnly ? (
+                        <button
+                          type="button"
+                          onClick={handleAddPaymentMethod}
+                          className="inline-flex items-center gap-2 px-4 py-3 text-xs font-bold text-white transition bg-blue-600 rounded-2xl hover:bg-blue-500"
+                        >
+                          <FiPlus size={14} />
+                          Add Payment Method
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
 
                   <div className="space-y-4">
@@ -1651,25 +1907,53 @@ const InputPaymentsModal = ({
                                 </div>
 
                                 <div>
-                                  <label className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
-                                    Reference
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={row.payment_reference ?? ""}
-                                    disabled={readOnly}
-                                    onChange={(e) =>
-                                      updateRow(
-                                        index,
-                                        "payment_reference",
-                                        e.target.value,
-                                      )
-                                    }
-                                    onFocus={() => setActivePaymentIndex(index)}
-                                    onClick={(e) => e.stopPropagation()}
-                                    placeholder="Reference"
-                                    className={`h-12 w-full rounded-2xl px-4 text-sm outline-none ${inputClass}`}
-                                  />
+                                  {(() => {
+                                    const mopEntry = modeOfPayments.find(
+                                      (m) => m.mop === row.payment_method,
+                                    );
+                                    const refRequired =
+                                      Number(mopEntry?.reference_On_Off ?? 0) === 1;
+                                    const refMissing =
+                                      refRequired &&
+                                      !String(row.payment_reference ?? "").trim();
+                                    return (
+                                      <>
+                                        <label className={`mb-1.5 flex items-center gap-1 text-[10px] font-black uppercase tracking-[0.16em] ${refMissing ? "text-red-500" : "text-slate-500"}`}>
+                                          Reference
+                                          {refRequired && (
+                                            <span className="text-red-500">*</span>
+                                          )}
+                                        </label>
+                                        <input
+                                          type="text"
+                                          value={row.payment_reference ?? ""}
+                                          disabled={readOnly}
+                                          onChange={(e) =>
+                                            updateRow(
+                                              index,
+                                              "payment_reference",
+                                              e.target.value,
+                                            )
+                                          }
+                                          onFocus={() => setActivePaymentIndex(index)}
+                                          onClick={(e) => e.stopPropagation()}
+                                          placeholder={refRequired ? "Required" : "Reference"}
+                                          className={`h-12 w-full rounded-2xl px-4 text-sm outline-none ${
+                                            refMissing
+                                              ? isDark
+                                                ? "bg-red-950/40 border-2 border-red-500/60 text-white placeholder:text-red-400"
+                                                : "bg-red-50 border-2 border-red-400 text-slate-900 placeholder:text-red-400"
+                                              : inputClass
+                                          }`}
+                                        />
+                                        {refMissing && (
+                                          <p className="mt-1 text-[10px] font-bold text-red-500">
+                                            Reference number required
+                                          </p>
+                                        )}
+                                      </>
+                                    );
+                                  })()}
                                 </div>
                               </div>
                             </div>
@@ -1770,26 +2054,33 @@ const InputPaymentsModal = ({
                         </button>
                       ))}
 
-                      <button
-                        type="button"
-                        disabled={readOnly || payments.length === 0}
-                        onMouseDown={(e) => {
-                          e.preventDefault();
+                      <div className="col-span-2 space-y-2">
+                        {remaining <= 0 && hasRefsMissing && (
+                          <p className="rounded-xl bg-red-500/10 px-3 py-2 text-center text-[11px] font-bold text-red-500">
+                            Fill in all required reference numbers to continue.
+                          </p>
+                        )}
+                        <button
+                          type="button"
+                          disabled={readOnly || payments.length === 0 || (remaining <= 0 && hasRefsMissing)}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
 
-                          if (remaining > 0) {
-                            setExactAmountForActiveRow();
-                          } else {
-                            onClose();
-                          }
-                        }}
-                        className={`col-span-2 rounded-2xl px-8 py-5 text-lg font-black tracking-wide text-white shadow-lg transition disabled:opacity-50 ${
-                          remaining > 0
-                            ? "bg-emerald-500 hover:bg-emerald-700"
-                            : "bg-blue-600 hover:bg-blue-700"
-                        }`}
-                      >
-                        {remaining > 0 ? "Exact" : "Continue"}
-                      </button>
+                            if (remaining > 0) {
+                              setExactAmountForActiveRow();
+                            } else {
+                              onClose();
+                            }
+                          }}
+                          className={`w-full rounded-2xl px-8 py-5 text-lg font-black tracking-wide text-white shadow-lg transition disabled:opacity-50 ${
+                            remaining > 0
+                              ? "bg-emerald-500 hover:bg-emerald-700"
+                              : "bg-blue-600 hover:bg-blue-700"
+                          }`}
+                        >
+                          {remaining > 0 ? "Exact" : "Continue"}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1799,6 +2090,79 @@ const InputPaymentsModal = ({
         </motion.div>
       )}
     </AnimatePresence>
+  );
+};
+
+const CustomerExclusiveModal = ({
+  isOpen,
+  onClose,
+  isDark,
+  value,
+  onChange,
+  readOnly = false,
+}) => {
+  const inputClass = isDark
+    ? "bg-slate-950 border border-slate-800 text-white placeholder:text-slate-500"
+    : "bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400";
+
+  return (
+    <ModalShell
+      isOpen={isOpen}
+      onClose={onClose}
+      isDark={isDark}
+      maxWidth="max-w-[560px]"
+      zIndex="z-[100002]"
+    >
+      <div className="p-5 md:p-6">
+        <div className="mb-5 flex items-start gap-3">
+          <div
+            className={`flex h-12 w-12 items-center justify-center rounded-2xl ${
+              isDark
+                ? "bg-slate-800 text-slate-300"
+                : "bg-slate-100 text-slate-600"
+            }`}
+          >
+            <FiFileText size={20} />
+          </div>
+          <div>
+            <h2 className="text-2xl font-black">Customer Exclusive</h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Input the QR ID or exclusive customer ID for B1T1 item validation.
+            </p>
+          </div>
+        </div>
+
+        <div
+          className={`rounded-[24px] border p-4 ${
+            isDark
+              ? "border-white/5 bg-white/[0.03]"
+              : "border-slate-200 bg-slate-50"
+          }`}
+        >
+          <label className="mb-2 block text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
+            Exclusive ID / QR ID
+          </label>
+          <input
+            type="text"
+            value={value}
+            disabled={readOnly}
+            onChange={(e) => onChange(e.target.value)}
+            onFocus={handleSelectAllOnFocus}
+            placeholder="Scan or enter exclusive ID"
+            className={`h-12 w-full rounded-2xl px-4 text-sm outline-none ${inputClass}`}
+          />
+        </div>
+
+        <div className="mt-5 flex justify-center">
+          <button
+            onClick={onClose}
+            className="px-10 py-3 text-sm font-black text-white transition bg-blue-600 rounded-2xl hover:bg-blue-500"
+          >
+            Continue
+          </button>
+        </div>
+      </div>
+    </ModalShell>
   );
 };
 
@@ -1812,6 +2176,7 @@ export default function TransactionPaymentModal({
   chargeOptions,
   onSaved,
   mode = "pending",
+  onShowQR = null,
 }) {
   const defaultPrinterName = useGetDefaultPrinter();
   const { businessInfo, isBusInfoLoading } = useBusinessInfo();
@@ -1831,11 +2196,39 @@ export default function TransactionPaymentModal({
   const [discountCeilingAmount, setDiscountCeilingAmount] = useState(0);
   const [customerCards, setCustomerCards] = useState([]);
 
+  // Amounts saved by billing.php via tbl_pos_transactions_discounts (one row per qualified person).
+  // Used so the payment modal shows the exact amounts computed during Print Billing.
+  const [billingStoredDiscounts, setBillingStoredDiscounts] = useState(null);
+  const [billingCounts, setBillingCounts] = useState(null);
+
+  const [discountMode, setDiscountMode] = useState("PerCustomer");
+  const [discountSharingMode, setDiscountSharingMode] = useState("shared");
+  const [selectedProductIds, setSelectedProductIds] = useState({});
+
   const [serviceChargeEnabled, setServiceChargeEnabled] = useState(false);
   const [serviceChargePercentage, setServiceChargePercentage] = useState(0);
 
   const [otherCharges, setOtherCharges] = useState([]);
   const [payments, setPayments] = useState([]);
+
+  // "Show QR" toggle state for Kiosk second-screen
+  const [qrActive, setQrActive] = useState(false);
+
+  // When modal closes, revert second screen and reset toggle
+  useEffect(() => {
+    if (!isOpen && onShowQR) {
+      onShowQR(null);
+      setQrActive(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  // If QR is active and payment method changes, auto-update the displayed QR
+  useEffect(() => {
+    if (!qrActive || !onShowQR) return;
+    onShowQR(payments[0]?.payment_method || null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [payments[0]?.payment_method]);
 
   const [showOtherChargesModal, setShowOtherChargesModal] = useState(false);
   const [showCustomerInfoModal, setShowCustomerInfoModal] = useState(false);
@@ -1844,6 +2237,7 @@ export default function TransactionPaymentModal({
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [showConfirmSaveModal, setShowConfirmSaveModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showCustomerExclusiveModal, setShowCustomerExclusiveModal] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -1865,6 +2259,22 @@ export default function TransactionPaymentModal({
           particulars: String(row.particulars || "").trim(),
           amount: Number(toNum(row.amount)),
           reference: String(row.reference || "").trim(),
+        })),
+    [otherCharges],
+  );
+
+  const autoBillingCharges = useMemo(
+    () =>
+      otherCharges
+        .filter(
+          (row) =>
+            isAutoServiceChargeRow(row) &&
+            String(row.particulars || "").trim() &&
+            toNum(row.amount) > 0,
+        )
+        .map((row) => ({
+          particulars: String(row.particulars || "").trim(),
+          amount: Number(toNum(row.amount)),
         })),
     [otherCharges],
   );
@@ -2065,6 +2475,39 @@ export default function TransactionPaymentModal({
     };
   }, [isOpen, apiHost]);
 
+  useEffect(() => {
+    if (!isOpen || !apiHost) return;
+    let cancelled = false;
+    const fetchDiscountMode = async () => {
+      try {
+        const res = await fetch(`${apiHost}/api/pos_discount_mode.php`);
+        const result = await res.json();
+        if (!cancelled) {
+          setDiscountMode(
+            result?.data?.discount_mode === "PerProduct"
+              ? "PerProduct"
+              : "PerCustomer",
+          );
+        }
+      } catch {
+        if (!cancelled) setDiscountMode("PerCustomer");
+      }
+    };
+    fetchDiscountMode();
+    return () => { cancelled = true; };
+  }, [isOpen, apiHost]);
+
+  useEffect(() => {
+    if (!items.length || discountMode !== "PerProduct") return;
+    const init = {};
+    items.forEach((item) => {
+      if (yesNoToBool(item.isDiscountable)) {
+        init[String(item.ID || item.id || item.databaseID || "")] = Number(item.sales_quantity || 0);
+      }
+    });
+    setSelectedProductIds(init);
+  }, [items, discountMode]);
+
   const terminalConfig = useMemo(() => {
     const terminal = shiftDetails?.terminal || {};
 
@@ -2222,6 +2665,10 @@ export default function TransactionPaymentModal({
       setReceiptSnapshot(null);
       setOtherCharges([]);
       setPayments([]);
+      setBillingStoredDiscounts(null);
+      setBillingCounts(null);
+      setDiscountSharingMode("shared");
+      setSelectedProductIds({});
 
       try {
         const res = await fetch(
@@ -2382,6 +2829,27 @@ export default function TransactionPaymentModal({
           },
         });
 
+        // Compute per-type totals from the rows saved during Print Billing so the
+        // payment amounts match the billing receipt without recomputing from items.
+        const billingAmountsByType = { senior: 0, pwd: 0, naac: 0, soloParent: 0 };
+        const billingCountsByType = {
+          senior: Number(discountCounts.senior || 0),
+          pwd: Number(discountCounts.pwd || 0),
+          naac: Number(discountCounts.naac || 0),
+          soloParent: Number(discountCounts.soloParent || 0),
+        };
+        discountRows.forEach((row) => {
+          const t = String(row.discount_type || "").toLowerCase().trim();
+          let k = "";
+          if (t === "senior" || t === "senior citizen" || t === "senior citizen discount") k = "senior";
+          else if (t === "pwd" || t === "pwd discount") k = "pwd";
+          else if (t === "naac" || t === "naac discount" || t.startsWith("national athletes")) k = "naac";
+          else if (t.includes("solo parent") || t === "soloparent") k = "soloParent";
+          if (k) billingAmountsByType[k] += Number(row.discount_amount || 0);
+        });
+        setBillingStoredDiscounts(billingAmountsByType);
+        setBillingCounts(billingCountsByType);
+
         setCustomerCards(
           discountRows.length > 0
             ? discountRows
@@ -2499,8 +2967,12 @@ export default function TransactionPaymentModal({
     const notQualifiedRatio =
       safeCustomerCount > 0 ? 1 - statutoryQualifiedRatio : 0;
 
+    const isPerProduct = discountMode === "PerProduct";
+
     let discountableGross = 0;
     let discountableBase = 0;
+    let selectedDiscountableGross = 0;
+    let selectedDiscountableBase = 0;
     let rawVatableGross = 0;
     let vatableSales = 0;
     let vatableSalesVat = 0;
@@ -2516,6 +2988,12 @@ export default function TransactionPaymentModal({
       const lineTotal = qty * price;
       const isDiscountable = yesNoToBool(item.isDiscountable);
       const isVatable = yesNoToBool(item.vatable);
+      const itemKey = String(item.ID || item.id || item.databaseID || "");
+      const discountQty = isPerProduct
+        ? Math.min(Math.max(Number(selectedProductIds[itemKey] ?? qty), 0), qty)
+        : qty;
+      const discountLineTotal = price * discountQty;
+      const nonDiscountLineTotal = lineTotal - discountLineTotal;
 
       grossTotal += lineTotal;
       totalQuantity += qty;
@@ -2524,9 +3002,23 @@ export default function TransactionPaymentModal({
         discountableGross += lineTotal;
         discountableBase += isVatable ? lineTotal / 1.12 : lineTotal;
 
+        if (discountQty > 0) {
+          selectedDiscountableGross += discountLineTotal;
+          selectedDiscountableBase += isVatable ? discountLineTotal / 1.12 : discountLineTotal;
+        }
+
         if (isVatable) {
-          vatExemptSales += lineTotal * statutoryQualifiedRatio;
-          rawVatableGross += lineTotal * notQualifiedRatio;
+          if (isPerProduct) {
+            if (discountQty > 0) {
+              vatExemptSales += discountLineTotal * statutoryQualifiedRatio;
+              rawVatableGross += nonDiscountLineTotal + discountLineTotal * notQualifiedRatio;
+            } else {
+              rawVatableGross += lineTotal;
+            }
+          } else {
+            vatExemptSales += lineTotal * statutoryQualifiedRatio;
+            rawVatableGross += lineTotal * notQualifiedRatio;
+          }
         } else {
           vatExemptSales += lineTotal;
         }
@@ -2542,35 +3034,78 @@ export default function TransactionPaymentModal({
     vatableSales = rawVatableGross / 1.12;
     vatableSalesVat = vatableSales * 0.12;
 
-    const seniorProratedBase =
-      safeCustomerCount > 0
-        ? discountableBase * (rawSeniorCount / safeCustomerCount)
-        : 0;
+    const discountBase = isPerProduct
+      ? selectedDiscountableBase
+      : discountableBase;
 
-    const pwdProratedBase =
-      safeCustomerCount > 0
-        ? discountableBase * (rawPwdCount / safeCustomerCount)
-        : 0;
-    const naacProratedBase =
-      safeCustomerCount > 0
-        ? discountableBase * (rawNaacCount / safeCustomerCount)
-        : 0;
+    // Solo: each qualified person gets the full base (no division by total customers)
+    // Shared: standard proration — base × (qualifiedCount / totalCustomers)
+    const prorate = (count) =>
+      discountSharingMode === "solo"
+        ? discountBase * count
+        : safeCustomerCount > 0 ? discountBase * (count / safeCustomerCount) : 0;
 
-    const soloParentProratedBase =
-      safeCustomerCount > 0
-        ? discountableBase * (rawSoloParentCount / safeCustomerCount)
-        : 0;
-    const seniorDiscountAmount = seniorProratedBase * 0.2;
-    const seniorVatExemption = seniorProratedBase * 0.12;
+    const seniorProratedBase = prorate(rawSeniorCount);
+    const pwdProratedBase = prorate(rawPwdCount);
+    const naacProratedBase = prorate(rawNaacCount);
+    const soloParentProratedBase = prorate(rawSoloParentCount);
+    // Use amounts saved during Print Billing when the qualified counts still match
+    // what billing used. When counts are changed manually in the payment modal,
+    // the stored amounts no longer correspond so we fall back to recomputing.
+    const useStoredSenior =
+      billingStoredDiscounts !== null &&
+      billingCounts !== null &&
+      rawSeniorCount > 0 &&
+      rawSeniorCount === billingCounts.senior &&
+      billingStoredDiscounts.senior > 0;
+    const useStoredPwd =
+      billingStoredDiscounts !== null &&
+      billingCounts !== null &&
+      rawPwdCount > 0 &&
+      rawPwdCount === billingCounts.pwd &&
+      billingStoredDiscounts.pwd > 0;
+    const useStoredNaac =
+      billingStoredDiscounts !== null &&
+      billingCounts !== null &&
+      rawNaacCount > 0 &&
+      rawNaacCount === billingCounts.naac &&
+      billingStoredDiscounts.naac > 0;
+    const useStoredSoloParent =
+      billingStoredDiscounts !== null &&
+      billingCounts !== null &&
+      rawSoloParentCount > 0 &&
+      rawSoloParentCount === billingCounts.soloParent &&
+      billingStoredDiscounts.soloParent > 0;
 
-    const pwdDiscountAmount = pwdProratedBase * 0.2;
-    const pwdVatExemption = pwdProratedBase * 0.12;
+    // Senior/PWD/NAAC: discount = base × 0.20, vatEx = base × 0.12 → vatEx = discount × 0.6
+    // Solo Parent: discount = base × 0.10, vatEx = base × 0.12 → vatEx = discount × 1.2
+    const seniorDiscountAmount = useStoredSenior
+      ? billingStoredDiscounts.senior
+      : seniorProratedBase * 0.2;
+    const seniorVatExemption = useStoredSenior
+      ? billingStoredDiscounts.senior * 0.6
+      : seniorProratedBase * 0.12;
 
-    const naacDiscountAmount = naacProratedBase * 0.2;
-    const naacVatExemption = naacProratedBase * 0.12;
+    const pwdDiscountAmount = useStoredPwd
+      ? billingStoredDiscounts.pwd
+      : pwdProratedBase * 0.2;
+    const pwdVatExemption = useStoredPwd
+      ? billingStoredDiscounts.pwd * 0.6
+      : pwdProratedBase * 0.12;
 
-    const soloParentDiscountAmount = soloParentProratedBase * 0.1;
-    const soloParentVatExemption = soloParentProratedBase * 0.12;
+    const naacDiscountAmount = useStoredNaac
+      ? billingStoredDiscounts.naac
+      : naacProratedBase * 0.2;
+    const naacVatExemption = useStoredNaac
+      ? billingStoredDiscounts.naac * 0.6
+      : naacProratedBase * 0.12;
+
+    const soloParentDiscountAmount = useStoredSoloParent
+      ? billingStoredDiscounts.soloParent
+      : soloParentProratedBase * 0.1;
+    const soloParentVatExemption = useStoredSoloParent
+      ? billingStoredDiscounts.soloParent * 1.2
+      : soloParentProratedBase * 0.12;
 
     const manualDiscountAmount =
       manualMode === "percent"
@@ -2637,21 +3172,20 @@ export default function TransactionPaymentModal({
 
     const finalVatExemptSales = Math.max(vatExemptSales - totalVatExemption, 0);
 
-    const serviceChargeBase =
-      totalDiscount > 0
-        ? Math.max(discountableBase - totalDiscount, 0)
-        : discountableBase;
-    const serviceChargeAmount =
-      serviceChargeEnabled && serviceChargePercentage > 0
-        ? roundMoney(serviceChargeBase * (serviceChargePercentage / 100))
-        : 0;
+    const serviceChargeBase = grossTotal;
+    const serviceChargeAmount = 0;
+
+    const autoBillingChargesAmount = autoBillingCharges.reduce(
+      (sum, row) => sum + row.amount,
+      0,
+    );
 
     const manualOtherChargesAmount = validManualOtherCharges.reduce(
       (sum, row) => sum + toNum(row.amount),
       0,
     );
 
-    const totalOtherCharges = serviceChargeAmount + manualOtherChargesAmount;
+    const totalOtherCharges = autoBillingChargesAmount + manualOtherChargesAmount;
 
     const totalAmountDue = Math.max(
       grossTotal - totalDiscount - totalVatExemption + totalOtherCharges,
@@ -2680,6 +3214,9 @@ export default function TransactionPaymentModal({
       totalQuantity,
       discountableGross,
       discountableBase,
+      selectedDiscountableGross,
+      selectedDiscountableBase,
+      isPerProduct,
       discountableItemsCount: items.filter((item) =>
         yesNoToBool(item.isDiscountable),
       ).length,
@@ -2697,6 +3234,8 @@ export default function TransactionPaymentModal({
       serviceChargePercentage,
       serviceChargeBase,
       serviceChargeAmount,
+      autoBillingCharges,
+      autoBillingChargesAmount,
       manualOtherChargesAmount,
       totalOtherCharges,
       vatableSales,
@@ -2718,6 +3257,12 @@ export default function TransactionPaymentModal({
     serviceChargeEnabled,
     serviceChargePercentage,
     validManualOtherCharges,
+    autoBillingCharges,
+    billingStoredDiscounts,
+    billingCounts,
+    discountMode,
+    discountSharingMode,
+    selectedProductIds,
   ]);
 
   const groupedPaymentMethodText = useMemo(() => {
@@ -2739,6 +3284,13 @@ export default function TransactionPaymentModal({
 
     if (computed.totalPaid < computed.totalAmountDue) return false;
 
+    const allRefsProvided = payments.every((row) => {
+      const mopEntry = modeOfPayments.find((m) => m.mop === row.payment_method);
+      if (Number(mopEntry?.reference_On_Off ?? 0) !== 1) return true;
+      return String(row.payment_reference ?? "").trim().length > 0;
+    });
+    if (!allRefsProvided) return false;
+
     return true;
   }, [
     items,
@@ -2746,6 +3298,7 @@ export default function TransactionPaymentModal({
     computed.totalPaid,
     computed.totalAmountDue,
     isPaidMode,
+    modeOfPayments,
   ]);
 
   const addPaymentMethod = (method) => {
@@ -2760,11 +3313,50 @@ export default function TransactionPaymentModal({
     setShowInputPaymentsModal(true);
   };
 
+  // ── Customer Exclusive (B1T1) ──────────────────────────────────────
+  const hasB1T1LoadItem = useMemo(
+    () => items.some((item) => Boolean(item?.is_b1t1_load)),
+    [items],
+  );
+
+  const hasB1T1ExclusivePayment = useMemo(
+    () =>
+      payments.some((row) => {
+        const method = String(row?.payment_method || "").trim().toLowerCase();
+        return method === "b1t1balance" || method === "b1t1diamonds";
+      }),
+    [payments],
+  );
+
+  const shouldShowCustomerExclusive = hasB1T1LoadItem || hasB1T1ExclusivePayment;
+
+  const customerExclusiveValue = String(
+    customerCards?.[0]?.customer_exclusive_id || "",
+  );
+
+  const setCustomerExclusiveValue = (value) => {
+    setCustomerCards((prev) => {
+      const next = Array.isArray(prev) ? [...prev] : [];
+      if (next.length === 0) next.push(createEmptyCustomerCard());
+      next[0] = { ...createEmptyCustomerCard(), ...next[0], customer_exclusive_id: value };
+      return next;
+    });
+  };
+
   const handleSavePayment = async () => {
     if (!canSave || !transaction?.transaction_id) return;
 
     setIsSubmitting(true);
     setErrorMessage("");
+
+    if (shouldShowCustomerExclusive && customerExclusiveValue.trim() === "") {
+      setErrorMessage(
+        "Customer Exclusive ID is required for B1T1 LOAD, B1T1Balance, or B1T1Diamonds payment.",
+      );
+      setShowConfirmSaveModal(false);
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
       const payload = {
@@ -2833,11 +3425,7 @@ export default function TransactionPaymentModal({
         other_charges: [
           ...validManualOtherCharges,
           // Include automatic service charge if enabled
-          ...(computed.serviceChargeEnabled && computed.serviceChargeAmount > 0 ? [{
-            particulars: `Service Charge (${computed.serviceChargePercentage}%)`,
-            amount: Number(computed.serviceChargeAmount),
-            reference: "AUTO",
-          }] : []),
+          ...autoBillingCharges,
         ],
       };
 
@@ -2874,12 +3462,7 @@ export default function TransactionPaymentModal({
         payments: [...payments],
         otherCharges: [
           ...validManualOtherCharges,
-          // Include automatic service charge if enabled
-          ...(computed.serviceChargeEnabled && computed.serviceChargeAmount > 0 ? [{
-            particulars: `Service Charge (${computed.serviceChargePercentage}%)`,
-            amount: computed.serviceChargeAmount,
-            reference: "AUTO",
-          }] : []),
+          ...autoBillingCharges,
         ],
         customerCards: customerCards.slice(0, computed.totalQualifiedAll),
         isDuplicateCopy: false,
@@ -2908,12 +3491,7 @@ export default function TransactionPaymentModal({
       payments: [...payments],
       otherCharges: [
         ...validManualOtherCharges,
-        // Include automatic service charge if enabled
-        ...(computed.serviceChargeEnabled && computed.serviceChargeAmount > 0 ? [{
-          particulars: `Service Charge (${computed.serviceChargePercentage}%)`,
-          amount: computed.serviceChargeAmount,
-          reference: "AUTO",
-        }] : []),
+        ...autoBillingCharges,
       ],
       customerCards: customerCards.slice(0, computed.totalQualifiedAll),
       isDuplicateCopy: true,
@@ -3035,6 +3613,16 @@ export default function TransactionPaymentModal({
                     }
                     active={payments.length > 0}
                   />
+                  {shouldShowCustomerExclusive && (
+                    <ActionTile
+                      isDark={isDark}
+                      icon={<FiFileText size={16} />}
+                      title="Customer Exclusive"
+                      subtitle="Input B1T1 ID"
+                      onClick={() => setShowCustomerExclusiveModal(true)}
+                      active={customerExclusiveValue.trim() !== ""}
+                    />
+                  )}
                 </div>
               </SectionCard>
 
@@ -3170,13 +3758,15 @@ export default function TransactionPaymentModal({
                     isDark={isDark}
                     valueClassName="text-red-500"
                   />
-                  {computed.serviceChargeAmount > 0 && (
-                    <SummaryRow
-                      label="Service Charge"
-                      value={peso(computed.serviceChargeAmount)}
-                      isDark={isDark}
-                    />
-                  )}
+                  {Array.isArray(computed.autoBillingCharges) &&
+                    computed.autoBillingCharges.map((c, i) => (
+                      <SummaryRow
+                        key={i}
+                        label={c.particulars}
+                        value={peso(c.amount)}
+                        isDark={isDark}
+                      />
+                    ))}
                   {computed.manualOtherChargesAmount > 0 && (
                     <SummaryRow
                       label="Other Charges"
@@ -3320,7 +3910,7 @@ export default function TransactionPaymentModal({
         isOpen={showPaymentMethodsModal}
         onClose={() => setShowPaymentMethodsModal(false)}
         isDark={isDark}
-        methods={modeOfPayments}
+        methods={modeOfPayments.filter((m) => Number(m.MOP_On_Off ?? 1) !== 0)}
         onPick={addPaymentMethod}
       />
 
@@ -3333,6 +3923,22 @@ export default function TransactionPaymentModal({
         setPayments={setPayments}
         onAddPaymentMethod={() => setShowPaymentMethodsModal(true)}
         readOnly={isPaidMode}
+        modeOfPayments={modeOfPayments}
+        onShowQR={onShowQR ? (method) => {
+          if (qrActive) {
+            setQrActive(false);
+            onShowQR(null, null);
+          } else {
+            setQrActive(true);
+            const secondScreenItems = items.map((item) => ({
+              name: item.item_name || item.product_id || "",
+              quantity: Number(item.sales_quantity || 0),
+              price: Number(item.selling_price || 0),
+            }));
+            onShowQR(method || null, secondScreenItems);
+          }
+        } : null}
+        qrActive={qrActive}
       />
 
       <DiscountSetupModal
@@ -3345,6 +3951,21 @@ export default function TransactionPaymentModal({
         setDiscountState={setDiscountState}
         computed={computed}
         discountCeilingAmount={discountCeilingAmount}
+        readOnly={isPaidMode}
+        discountMode={discountMode}
+        discountSharingMode={discountSharingMode}
+        setDiscountSharingMode={setDiscountSharingMode}
+        selectedProductIds={selectedProductIds}
+        setSelectedProductIds={setSelectedProductIds}
+        items={items}
+      />
+
+      <CustomerExclusiveModal
+        isOpen={showCustomerExclusiveModal}
+        onClose={() => setShowCustomerExclusiveModal(false)}
+        isDark={isDark}
+        value={customerExclusiveValue}
+        onChange={setCustomerExclusiveValue}
         readOnly={isPaidMode}
       />
 

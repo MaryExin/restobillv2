@@ -18,6 +18,8 @@ import {
   FaReceipt,
   FaCheckCircle,
   FaEdit,
+  FaLayerGroup,
+  FaChevronRight,
 } from "react-icons/fa";
 import { IoMdClose } from "react-icons/io";
 import { IoQrCode } from "react-icons/io5";
@@ -27,6 +29,7 @@ import {
   FiClock,
   FiCheckCircle,
   FiPercent,
+  FiEdit2,
 } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import useApiHost from "../../hooks/useApiHost";
@@ -40,6 +43,8 @@ import {
   BuildOrderReceiptHtml,
 } from "../../utils/BuildOrderlistPrintHtml";
 import useGetDefaultPrinter from "../../hooks/useGetDefaultPrinter";
+import useZustandLayoutMode from "../../context/useZustandLayoutMode";
+import KioskRightPanel from "./KioskRightPanel";
 
 const Orderlist = ({
   tableselected,
@@ -48,46 +53,66 @@ const Orderlist = ({
   transactionId,
 }) => {
   const defaultPrinterName = useGetDefaultPrinter();
+  const { layoutMode } = useZustandLayoutMode();
+
+  // Kiosk Mode: editable table/session label, initialized from prop or "Table 01".
+  const [kioskTableName, setKioskTableName] = useState(
+    tableselected || "Table 01",
+  );
+  const [isEditingTableName, setIsEditingTableName] = useState(false);
 
   const [isPrintingOnly, setIsPrintingOnly] = useState(false);
 
   // Tracks the transaction ID after first save so retries use update_order.php instead of save_order.php
   const internalTransactionIdRef = useRef(null);
+  // Flags the next updateCart push as a manual clear (suppresses success animation on second screen)
+  const isClearRef = useRef(false);
 
   const navigate = useNavigate();
   const apiHost = useApiHost();
   const { isDark } = useTheme();
 
-  // --- New Logic for Database-driven Item Pictures ---
   const [enableItemPictures, setEnableItemPictures] = useState(false);
 
   useEffect(() => {
     if (!apiHost) return;
-
-    const fetchImageSettings = async () => {
-      try {
-        // Calls your new PHP API using config.php and tbl_pos_settings
-        const response = await fetch(`${apiHost}/api/get_item_pictures.php`);
-        const data = await response.json();
-        
-        if (data.status === "success") {
-          setEnableItemPictures(data.enableItemPictures);
+    let cancelled = false;
+    fetch(`${apiHost}/api/pos_pictures_settings.php`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled && data.success) {
+          setEnableItemPictures(Boolean(data.data?.enable_pictures));
         }
-      } catch (error) {
-        console.error("Failed to sync image settings:", error);
-        // Defaults to False (text-only) if the database cannot be reached
-        setEnableItemPictures(false); 
-      }
-    };
-
-    fetchImageSettings();
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
   }, [apiHost]);
-  // --- End of New Logic ---
+
+  const [enableSubcategories, setEnableSubcategories] = useState(false);
+
+  useEffect(() => {
+    if (!apiHost) return;
+    let cancelled = false;
+    fetch(`${apiHost}/api/pos_product_subcategories_settings.php`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled && data.success) {
+          setEnableSubcategories(Boolean(data.data?.enable_subcategories));
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [apiHost]);
 
   const [productsearch, setproductsearch] = useState("");
   const [categorylist, setcategorylist] = useState([]);
   const [selectcategory, setselectcategory] = useState("");
+  const [selectedSubcategory, setSelectedSubcategory] = useState("");
   const [productlist, setproductlist] = useState([]);
+
+  useEffect(() => {
+    setSelectedSubcategory("");
+  }, [selectcategory]);
   const [showDeleteItemModal, setShowDeleteItemModal] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
   const [summaryCart, setSummaryCart] = useState(false);
@@ -626,6 +651,7 @@ const Orderlist = ({
                 selling_price: Number(item.selling_price || 0),
                 sku: item.sku || "",
                 item_category: item.item_category || "",
+                subcategory_item_category: item.subcategory_item_category || "",
                 isDiscountable: item.isDiscountable || "",
                 vatable: item.vatable || "",
                 unit_cost: Number(item.unit_cost || 0),
@@ -741,28 +767,108 @@ const Orderlist = ({
       });
   }, [apiHost, transactionId, tableselected, salesTypeList]);
 
+  // A product belongs to a subcategory folder if either field is populated.
+  const getItemSubcategory = (item) =>
+    String(item?.subcategory_item_category || item?.parent_group || "").trim();
+
+  // Splits a flat product list into Tier 1 "folder" pseudo-items (one per
+  // subcategory, holding its variants) and Tier 2 standalone product items.
+  // Folders are surfaced first so the grid reads folders-then-items.
+  const groupProductsForMenuGrid = (products = []) => {
+    const folderMap = new Map();
+    const standaloneItems = [];
+
+    products.forEach((item) => {
+      const subcategory = getItemSubcategory(item);
+
+      if (!subcategory) {
+        standaloneItems.push(item);
+        return;
+      }
+
+      if (!folderMap.has(subcategory)) {
+        folderMap.set(subcategory, []);
+      }
+      folderMap.get(subcategory).push(item);
+    });
+
+    const folderCards = Array.from(folderMap.entries()).map(
+      ([subcategory, items]) => {
+        const prices = items.map((i) => Number(i.selling_price || 0));
+
+        return {
+          _isFolder: true,
+          subcategory_item_category: subcategory,
+          item_name: subcategory,
+          item_category: items[0]?.item_category || "",
+          itemsInGroup: items,
+          variantCount: items.length,
+          minPrice: prices.length ? Math.min(...prices) : 0,
+        };
+      },
+    );
+
+    return [...folderCards, ...standaloneItems];
+  };
+
+  const availableSubcategories = useMemo(() => {
+    if (!enableSubcategories) return [];
+    const seen = new Set();
+    const list = [];
+    (productlist || []).forEach((p) => {
+      const sub = getItemSubcategory(p);
+      if (sub && !seen.has(sub)) {
+        seen.add(sub);
+        list.push(sub);
+      }
+    });
+    return list;
+  }, [productlist, enableSubcategories]);
+
+  // Tier 1 + Tier 2 view for the top-level (not drilled-in, not searching) grid.
+  const menuDisplayItems = useMemo(() => {
+    if (!enableSubcategories) return productlist || [];
+    return groupProductsForMenuGrid(productlist || []);
+  }, [productlist, enableSubcategories]);
+
   const filteredProducts = useMemo(() => {
     const search = productsearch.trim().toLowerCase();
 
-    if (!search) return productlist || [];
+    if (search) {
+      return (productlist || []).filter((p) => {
+        const searchable = [
+          p.item_name,
+          p.item_description,
+          p.item_category,
+          p.product_id,
+          p.sku,
+          p.bar_code,
+          p.unit_of_measure,
+          p.inventory_type,
+        ]
+          .map((value) => String(value || "").toLowerCase())
+          .join(" ");
 
-    return (productlist || []).filter((p) => {
-      const searchable = [
-        p.item_name,
-        p.item_description,
-        p.item_category,
-        p.product_id,
-        p.sku,
-        p.bar_code,
-        p.unit_of_measure,
-        p.inventory_type,
-      ]
-        .map((value) => String(value || "").toLowerCase())
-        .join(" ");
+        return searchable.includes(search);
+      });
+    }
 
-      return searchable.includes(search);
-    });
-  }, [productsearch, productlist]);
+    // Drill-down view: only this subcategory's variants (Tier 1 -> Tier 2 click-through).
+    if (enableSubcategories && selectedSubcategory) {
+      return (productlist || []).filter(
+        (p) => getItemSubcategory(p) === selectedSubcategory,
+      );
+    }
+
+    // Top-level view: subcategory folder cards + standalone items.
+    return menuDisplayItems;
+  }, [
+    productsearch,
+    productlist,
+    enableSubcategories,
+    selectedSubcategory,
+    menuDisplayItems,
+  ]);
 
   const filteredBillingData = useMemo(() => {
     return (billingData || []).filter((item) =>
@@ -1367,10 +1473,14 @@ const Orderlist = ({
   const updateQuantityByInput = (lineId, value) => {
     if (isCartFromDB) return;
 
+    const canEdit = (i) =>
+      i.lineId === lineId &&
+      (layoutMode === "Kiosk" || i.isLoadedFromDB !== true);
+
     setproductcart((prev) => ({
       ...prev,
       items: prev.items.map((i) =>
-        i.lineId === lineId && i.isLoadedFromDB !== true
+        canEdit(i)
           ? {
               ...i,
               quantity:
@@ -1388,7 +1498,7 @@ const Orderlist = ({
     setcartforqr((prev) => ({
       ...prev,
       items: prev.items.map((i) =>
-        i.lineId === lineId && i.isLoadedFromDB !== true
+        canEdit(i)
           ? {
               ...i,
               quantity:
@@ -1407,11 +1517,15 @@ const Orderlist = ({
   const updateQuantity = (lineId, delta) => {
     if (isCartFromDB) return;
 
+    const canEdit = (i) =>
+      i.lineId === lineId &&
+      (layoutMode === "Kiosk" || i.isLoadedFromDB !== true);
+
     setproductcart((prev) => ({
       ...prev,
       items: prev.items
         .map((i) =>
-          i.lineId === lineId && i.isLoadedFromDB !== true
+          canEdit(i)
             ? {
                 ...i,
                 quantity: Math.max(1, Number(i.quantity || 1) + delta),
@@ -1425,7 +1539,7 @@ const Orderlist = ({
       ...prev,
       items: prev.items
         .map((i) =>
-          i.lineId === lineId && i.isLoadedFromDB !== true
+          canEdit(i)
             ? {
                 ...i,
                 quantity: Math.max(1, Number(i.quantity || 1) + delta),
@@ -1452,6 +1566,7 @@ const Orderlist = ({
 
   const clearCart = () => {
     if (isCartFromDB) return;
+    isClearRef.current = true;
 
     setproductcart({
       customer: tableselected || "",
@@ -1695,7 +1810,10 @@ const Orderlist = ({
         localStorage.getItem("posTerminalNumber"),
       );
       formData.append("order_slip_no", txId);
-      formData.append("table_number", tableselected);
+      formData.append(
+        "table_number",
+        layoutMode === "Kiosk" ? kioskTableName : tableselected,
+      );
       formData.append("order_type", orderTypeName);
       formData.append("customer_head_count", 1);
       formData.append("discount_type", "");
@@ -1764,6 +1882,185 @@ const Orderlist = ({
   };
 
   const [isConfirmingTransaction, setIsConfirmingTransaction] = useState(false);
+  const [isKioskCharging, setIsKioskCharging] = useState(false);
+  const [isLoadingAppToPos, setIsLoadingAppToPos] = useState(false);
+
+  const handleKioskPrintQR = async () => {
+    if (!window.electronAPI?.printEscPosQr) {
+      alert("QR printing is not available in this environment.");
+      return;
+    }
+
+    const items = cartSummaryItems;
+    if (!items || items.length === 0) {
+      alert("Cart is empty. Add items before printing QR codes.");
+      return;
+    }
+
+    const tableRef =
+      layoutMode === "Kiosk" ? kioskTableName : tableselected;
+    const txRef = transactionId || `TXN-${Date.now()}`;
+
+    let globalItemIndex = 0;
+    const qrItems = [];
+
+    items.forEach((item) => {
+      const qty = Math.max(1, Number(item.quantity || 1));
+      for (let copyIndex = 1; copyIndex <= qty; copyIndex++) {
+        globalItemIndex += 1;
+        qrItems.push({
+          name: item.name || item.code || "ITEM",
+          originalName: item.name || item.code || "ITEM",
+          code: item.code || "",
+          price: Number(item.price || 0),
+          qrValue: `ITEM:${item.code}|TABLE:${tableRef}|TX:${txRef}|NO:${globalItemIndex}`,
+          qrCopyPerItem: qty,
+          qrItemNumber: globalItemIndex,
+          qrCopyNumber: copyIndex,
+        });
+      }
+    });
+
+    try {
+      const result = await window.electronAPI.printEscPosQr({
+        items: qrItems,
+        table: tableRef,
+        transactionId: txRef,
+      });
+
+      if (!result?.success) {
+        alert(result?.message || "QR print failed.");
+      }
+    } catch (error) {
+      console.error("ESC/POS QR print error:", error);
+      alert(error?.message || "QR print failed.");
+    }
+  };
+
+  const handleKioskAppToPos = async () => {
+    if (!apiHost || isLoadingAppToPos) return;
+
+    const categoryCode =
+      newtransaction?.business_info?.Category_Code ||
+      localStorage.getItem("posBusinessCategoryCode") ||
+      "";
+    const unitCode =
+      newtransaction?.business_info?.Unit_Code ||
+      localStorage.getItem("posBusinessUnitCode") ||
+      "";
+    const pricingCode =
+      pricingData?.pricing_category ||
+      localStorage.getItem("posPricingCode") ||
+      "";
+
+    if (!categoryCode || !unitCode || !pricingCode) {
+      alert("Missing category code, unit code, or pricing code.");
+      return;
+    }
+
+    try {
+      setIsLoadingAppToPos(true);
+
+      const params = new URLSearchParams({
+        categoryCode,
+        unitCode,
+        pricingCode,
+        branchCode: unitCode,
+      });
+
+      const response = await fetch(
+        `${apiHost}/api/read_pos_app_orders_auto.php?${params.toString()}`,
+        { method: "GET", headers: { Accept: "application/json" } },
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.message || "Failed to load app orders.");
+      }
+
+      const cartItems = Array.isArray(result?.data?.cart_items)
+        ? result.data.cart_items
+        : [];
+
+      if (cartItems.length === 0) {
+        alert(result?.message || "No app orders found.");
+        return;
+      }
+
+      const customerName = String(
+        result?.data?.customer ||
+          productcart.customer ||
+          kioskTableName ||
+          tableselected ||
+          "CASHIER",
+      ).trim();
+
+      // Merge incoming items into the cart
+      syncCartState((items) => {
+        const next = [...items];
+        cartItems.forEach((incoming) => {
+          const existingIndex = next.findIndex(
+            (item) =>
+              String(item.code) === String(incoming.code) &&
+              item.isLoadedFromDB !== true,
+          );
+          if (existingIndex >= 0) {
+            next[existingIndex] = {
+              ...next[existingIndex],
+              quantity:
+                Number(next[existingIndex].quantity || 0) +
+                Number(incoming.quantity || 0),
+            };
+          } else {
+            next.push({
+              lineId: makeLineId("app"),
+              code: String(incoming.code || ""),
+              name: String(incoming.name || incoming.code || ""),
+              price: Number(incoming.price || 0),
+              quantity: Number(incoming.quantity || 0),
+              isDiscountable: incoming.isDiscountable || "",
+              itemInstruction: incoming.itemInstruction || "",
+              vatable: incoming.vatable || "Yes",
+              item_category: incoming.item_category || "",
+              isLoadedFromDB: false,
+            });
+          }
+        });
+        return next;
+      });
+
+      // Update customer/table name if the server returned one
+      if (customerName) {
+        setproductcart((prev) => ({ ...prev, customer: customerName }));
+      }
+
+      alert("App orders added to cart.");
+    } catch (error) {
+      console.error("App to POS error:", error);
+      alert(error?.message || "Failed to load app orders.");
+    } finally {
+      setIsLoadingAppToPos(false);
+    }
+  };
+
+  const handleKioskPrintOrderSummary = async () => {
+    await handlePrintAllElectron("auto");
+  };
+
+  const handleKioskCharge = async () => {
+    if (isKioskCharging) return;
+    setIsKioskCharging(true);
+    try {
+      const result = await saveOrderToServer();
+      if (!result.ok) return;
+      const txId = result.transaction_id || result.txId;
+      setshoworderlist(false);
+      navigate("/payments", { state: { autoSelectTxId: String(txId) } });
+    } finally {
+      setIsKioskCharging(false);
+    }
+  };
 
   const confirmTransactionAndPrint = async () => {
     if (isConfirmingTransaction) return;
@@ -1878,6 +2175,25 @@ const Orderlist = ({
     (sum, i) => sum + Number(i.price || 0) * Number(i.quantity || 0),
     0,
   );
+
+  // Push live cart to the customer-facing second screen (Kiosk mode only)
+  useEffect(() => {
+    if (layoutMode !== "Kiosk" || !window.kioskAPI?.updateCart) return;
+    const isClear = isClearRef.current;
+    isClearRef.current = false;
+    window.kioskAPI.updateCart({
+      phase: "transaction",
+      isClear,
+      tableName: kioskTableName,
+      items: cartSummaryItems.map((item) => ({
+        name: item.name,
+        quantity: Number(item.quantity || 0),
+        price: Number(item.price || 0),
+      })),
+      totalItems,
+      totalPrice,
+    });
+  }, [layoutMode, cartSummaryItems, totalItems, totalPrice, kioskTableName]);
 
   const additionalTotalItems = additionalCartItems.reduce(
     (sum, i) => sum + Number(i.quantity || 0),
@@ -2485,20 +2801,64 @@ const Orderlist = ({
               <div className="flex items-center justify-between gap-4">
                 {/* Left Side: Table Info */}
                 <div>
-                  <h2
-                    className={`text-xl font-bold ${
-                      isDark ? "text-white" : "text-slate-900"
-                    }`}
-                  >
-                    <span
-                      className="text-blue-500"
-                      style={{
-                        color: "var(--app-accent)",
-                      }}
+                  {layoutMode === "Kiosk" ? (
+                    /* ── Kiosk: inline-editable table name ── */
+                    <div className="flex items-center gap-1.5">
+                      {isEditingTableName ? (
+                        <input
+                          autoFocus
+                          type="text"
+                          value={kioskTableName}
+                          onChange={(e) => setKioskTableName(e.target.value)}
+                          onBlur={() => {
+                            if (!kioskTableName.trim()) setKioskTableName("Table 01");
+                            setIsEditingTableName(false);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === "Escape") {
+                              if (!kioskTableName.trim()) setKioskTableName("Table 01");
+                              setIsEditingTableName(false);
+                            }
+                          }}
+                          className="text-xl font-bold w-36 rounded-lg px-2 py-0.5 outline-none"
+                          style={{
+                            color: "var(--app-accent)",
+                            background: "var(--app-surface)",
+                            border: "1px solid var(--app-accent)",
+                          }}
+                        />
+                      ) : (
+                        <button
+                          onClick={() => setIsEditingTableName(true)}
+                          className="group flex items-center gap-1.5"
+                          title="Click to edit table name"
+                        >
+                          <h2
+                            className="text-xl font-bold"
+                            style={{ color: "var(--app-accent)" }}
+                          >
+                            {kioskTableName}
+                          </h2>
+                          <FiEdit2
+                            size={13}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity"
+                            style={{ color: "var(--app-accent)" }}
+                          />
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    /* ── Restaurant: static table display ── */
+                    <h2
+                      className={`text-xl font-bold ${
+                        isDark ? "text-white" : "text-slate-900"
+                      }`}
                     >
-                      {tableselected || "Select Table"}
-                    </span>
-                  </h2>
+                      <span style={{ color: "var(--app-accent)" }}>
+                        {tableselected || "Select Table"}
+                      </span>
+                    </h2>
+                  )}
                   <p
                     className={`text-xs uppercase tracking-widest ${
                       isDark ? "text-slate-400" : "text-slate-500"
@@ -2509,7 +2869,7 @@ const Orderlist = ({
                 </div>
 
                 {/* Right Side: Transfer Table Action */}
-                {transactionId && loadedCartItems.length > 0 && (
+                {transactionId && loadedCartItems.length > 0 && layoutMode !== "Kiosk" && (
                   <button
                     type="button"
                     onClick={openTransferModal}
@@ -2543,7 +2903,7 @@ const Orderlist = ({
             </div>
 
             <div className="flex items-center gap-2">
-              {transactionId && (
+              {transactionId && layoutMode !== "Kiosk" && (
                 <button
                   onClick={openBillingModal}
                   className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-gray-100 rounded-xl "
@@ -2557,7 +2917,21 @@ const Orderlist = ({
               )}
 
               <button
-                onClick={() => setshoworderlist(false)}
+                onClick={() => {
+                  setshoworderlist(false);
+                  if (layoutMode === "Kiosk") {
+                    if (window.kioskAPI?.updateCart) {
+                      window.kioskAPI.updateCart({
+                        phase: "transaction",
+                        isClear: true,
+                        items: [],
+                        totalItems: 0,
+                        totalPrice: 0,
+                      }).catch(() => {});
+                    }
+                    navigate("/poscorehomescreen");
+                  }
+                }}
                 className={`rounded-full p-2 transition-colors ${
                   isDark
                     ? "text-slate-400 hover:bg-white/10"
@@ -2581,6 +2955,7 @@ const Orderlist = ({
                   : "border-r border-slate-200 bg-white"
               }`}
             >
+              {layoutMode !== "Kiosk" && (
               <div className="px-4 pt-4 mb-2">
                 <label
                   className={`mb-2 block px-1 text-[10px] font-bold uppercase tracking-[0.2em] ${
@@ -2642,6 +3017,7 @@ const Orderlist = ({
                   )}
                 </div>
               </div>
+              )}
 
               <div className="flex flex-col h-full p-4">
                 <h3
@@ -2689,6 +3065,49 @@ const Orderlist = ({
                 isDark ? "bg-slate-900/20" : "bg-slate-50"
               }`}
             >
+              {/* ── Kiosk: Service Type pill selector above category tabs ── */}
+              {layoutMode === "Kiosk" && salesTypeList.length > 0 && (
+                <div
+                  className="flex items-center gap-2 px-4 pt-3 pb-1 shrink-0 overflow-x-auto no-scrollbar"
+                >
+                  <span
+                    className="text-[10px] font-bold uppercase tracking-widest shrink-0"
+                    style={{ color: "var(--app-muted-text)" }}
+                  >
+                    Order Type:
+                  </span>
+                  {salesTypeList.map((item) => {
+                    const isActive =
+                      String(item.sales_type_id) === String(selectedSalesType);
+                    return (
+                      <button
+                        key={item.sales_type_id}
+                        onClick={() =>
+                          setSelectedSalesType(String(item.sales_type_id))
+                        }
+                        className="shrink-0 px-3 py-1 rounded-full text-[11px] font-bold transition-all"
+                        style={
+                          isActive
+                            ? {
+                                background:
+                                  "linear-gradient(180deg, var(--app-accent) 0%, var(--app-accent-secondary) 100%)",
+                                color: "#fff",
+                                boxShadow: "0 4px 12px var(--app-accent-glow)",
+                              }
+                            : {
+                                border: "1px solid var(--app-border)",
+                                color: "var(--app-muted-text)",
+                                background: "var(--app-surface)",
+                              }
+                        }
+                      >
+                        {item.sales_type || item.description}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
               <div className="p-4 shrink-0">
                 <div className="relative">
                   <FaSearch
@@ -2710,101 +3129,203 @@ const Orderlist = ({
                 </div>
               </div>
 
-<div className="flex-1 min-h-0 overflow-hidden"> 
+              {enableSubcategories && availableSubcategories.length > 0 && !productsearch.trim() && (
+                <div className="flex items-center gap-2 px-4 pb-3 shrink-0 overflow-x-auto no-scrollbar">
+                  {selectedSubcategory && (
+                    <button
+                      onClick={() => setSelectedSubcategory("")}
+                      className="shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold transition-all border"
+                      style={{
+                        borderColor: "var(--app-border)",
+                        color: "var(--app-text)",
+                        background: "var(--app-surface)",
+                      }}
+                    >
+                      <FaArrowLeft size={9} />
+                      Back
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setSelectedSubcategory("")}
+                    className="shrink-0 px-3 py-1 rounded-full text-[11px] font-bold transition-all"
+                    style={
+                      !selectedSubcategory
+                        ? {
+                            background:
+                              "linear-gradient(180deg, var(--app-accent) 0%, var(--app-accent-secondary) 100%)",
+                            color: "#fff",
+                            boxShadow: "0 4px 12px var(--app-accent-glow)",
+                          }
+                        : {
+                            border: "1px solid var(--app-border)",
+                            color: "var(--app-muted-text)",
+                            background: "var(--app-surface)",
+                          }
+                    }
+                  >
+                    All
+                  </button>
+                  {availableSubcategories.map((sub) => (
+                    <button
+                      key={sub}
+                      onClick={() => setSelectedSubcategory(sub)}
+                      className="shrink-0 px-3 py-1 rounded-full text-[11px] font-bold transition-all"
+                      style={
+                        selectedSubcategory === sub
+                          ? {
+                              background:
+                                "linear-gradient(180deg, var(--app-accent) 0%, var(--app-accent-secondary) 100%)",
+                              color: "#fff",
+                              boxShadow: "0 4px 12px var(--app-accent-glow)",
+                            }
+                          : {
+                              border: "1px solid var(--app-border)",
+                              color: "var(--app-muted-text)",
+                              background: "var(--app-surface)",
+                            }
+                      }
+                    >
+                      {sub}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+<div className="flex-1 min-h-0 overflow-hidden">
   <div className="h-full p-6 pt-2 overflow-y-auto no-scrollbar">
     <div className="grid grid-cols-2 gap-6 p-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4">
       {filteredProducts && filteredProducts.map((p, i) => (
         <motion.button
-          key={p.item_code || i}
+          key={p._isFolder ? `folder-${p.subcategory_item_category}` : (p.item_code || p.product_id || i)}
           whileHover={{ y: -8, scale: 1.02, rotate: 0.5 }}
           whileTap={{ scale: 0.95 }}
-          onClick={() => addToCart(p)}
+          onClick={() =>
+            p._isFolder
+              ? setSelectedSubcategory(p.subcategory_item_category)
+              : addToCart(p)
+          }
           className="group relative flex w-full flex-col overflow-hidden rounded-[2.5rem] border transition-all duration-500 shadow-lg hover:shadow-2xl"
           style={{
             borderColor: isDark ? "rgba(255,255,255,0.1)" : "var(--app-border)",
             backgroundColor: isDark ? "rgba(30, 41, 59, 0.5)" : "var(--app-surface)",
             backdropFilter: "blur(12px)",
-            minWidth: "140px" 
+            minWidth: "140px"
           }}
         >
-          {/* SAFE +1 POP-UP */}
-          <motion.div 
-            className="absolute inset-0 flex items-center justify-center pointer-events-none z-[100] opacity-0"
-            initial={false}
-            whileTap={{ 
-              opacity: [0, 1, 0], 
-              y: [0, -100], 
-              scale: [0.5, 1.5, 1],
-              transition: { duration: 0.6, ease: "easeOut" } 
-            }}
-          >
-            <span className="text-3xl italic font-black drop-shadow-lg" style={{ color: "var(--app-accent)" }}>
-              +1
-            </span>
-          </motion.div>
-
           {/* THEME-BASED GLOW BORDER */}
           <div className="absolute inset-0 transition-opacity duration-500 opacity-0 pointer-events-none group-hover:opacity-100">
-            <div 
-              className="absolute inset-0 animate-pulse opacity-10" 
+            <div
+              className="absolute inset-0 animate-pulse opacity-10"
               style={{ background: "var(--app-accent)" }}
             />
           </div>
 
-          {/* 1. SQUARE IMAGE SECTION */}
-          {enableItemPictures && (
-            <div className="relative flex items-center justify-center w-full overflow-hidden aspect-square shrink-0 bg-slate-800/10">
-              <img
-                src={`${apiHost}/item_pictures/${p.item_name}.jpg`}
-                alt={p.item_name}
-                className="object-cover w-full h-full transition-transform duration-700 group-hover:scale-125"
-                onError={(e) => {
-                  /* DITO ANG SOLUSYON: 
-                    Magdagdag ng timestamp (?t=) para ma-bypass ang cache sa production/app mode.
-                  */
-                  e.target.src = `${apiHost}/item_pictures/default.jpg?t=${Date.now()}`;
-                  e.target.onerror = null; 
-                }}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60" />
-              
-              <div className="absolute top-3 left-3 px-2 py-1 rounded-lg bg-black/40 backdrop-blur-md border border-white/10 text-[8px] font-black text-white uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all">
-                {p.item_category || 'Hot Item'}
+          {p._isFolder ? (
+            /* TIER 1: SUBCATEGORY FOLDER CARD */
+            <div className="relative z-10 flex flex-col items-center justify-center flex-1 gap-3 p-6 text-center min-h-[168px]">
+              <div
+                className="flex items-center justify-center w-14 h-14 rounded-2xl"
+                style={{ backgroundColor: "var(--app-accent)", opacity: 0.85 }}
+              >
+                <FaLayerGroup size={22} color="#fff" />
               </div>
-            </div>
-          )}
 
-          {/* 2. PREMIUM INFO SECTION */}
-          <div className="relative z-10 flex flex-col justify-between flex-1 p-4 pb-6 text-left">
-            <div className="flex-1 min-h-[32px]">
-              <h4 
-                className="line-clamp-2 break-words text-[12px] font-black leading-tight mb-1 uppercase tracking-tight transition-colors duration-300"
+              <h4
+                className="line-clamp-2 break-words text-[13px] font-black leading-tight uppercase tracking-tight"
                 style={{ color: "var(--app-text)" }}
               >
                 {p.item_name}
               </h4>
-            </div>
 
-            <div className="flex items-end justify-between mt-2 shrink-0">
-               <div className="flex items-center justify-center w-6 h-6 transition-all rounded-full opacity-0 group-hover:opacity-100"
-                    style={{ backgroundColor: "var(--app-accent)", opacity: 0.1 }}>
-                  <FaPlus size={8} style={{ color: "var(--app-accent)" }} />
-               </div>
+              <p
+                className="text-[9px] font-bold uppercase tracking-widest"
+                style={{ color: "var(--app-muted-text)" }}
+              >
+                {p.variantCount} option{p.variantCount === 1 ? "" : "s"}
+              </p>
 
-              <div className="text-right">
-                <p className="mb-0 text-[7px] font-black uppercase tracking-[0.2em]"
-                   style={{ color: "var(--app-muted-text)" }}>
-                  Price
-                </p>
-                <p className="text-[18px] font-black leading-none"
-                   style={{ color: "var(--app-accent)" }}>
-                  ₱{Number(p.selling_price || 0).toLocaleString()}
-                </p>
+              <div
+                className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black"
+                style={{ backgroundColor: "var(--app-accent)", color: "#fff" }}
+              >
+                From ₱{Number(p.minPrice || 0).toLocaleString()}
+                <FaChevronRight size={8} />
               </div>
             </div>
-          </div>
-          
-          <div className="absolute bottom-0 left-0 w-0 h-1 transition-all duration-500 group-hover:w-full" 
+          ) : (
+            <>
+              {/* SAFE +1 POP-UP */}
+              <motion.div
+                className="absolute inset-0 flex items-center justify-center pointer-events-none z-[100] opacity-0"
+                initial={false}
+                whileTap={{
+                  opacity: [0, 1, 0],
+                  y: [0, -100],
+                  scale: [0.5, 1.5, 1],
+                  transition: { duration: 0.6, ease: "easeOut" }
+                }}
+              >
+                <span className="text-3xl italic font-black drop-shadow-lg" style={{ color: "var(--app-accent)" }}>
+                  +1
+                </span>
+              </motion.div>
+
+              {/* 1. SQUARE IMAGE SECTION */}
+              {enableItemPictures && (
+                <div className="relative flex items-center justify-center w-full overflow-hidden aspect-square shrink-0 bg-slate-800/10">
+                  <img
+                    src={`${apiHost}/item_pictures/${p.item_name}.jpg`}
+                    alt={p.item_name}
+                    className="object-cover w-full h-full transition-transform duration-700 group-hover:scale-125"
+                    onError={(e) => {
+                      /* DITO ANG SOLUSYON:
+                        Magdagdag ng timestamp (?t=) para ma-bypass ang cache sa production/app mode.
+                      */
+                      e.target.src = `${apiHost}/item_pictures/default.jpg?t=${Date.now()}`;
+                      e.target.onerror = null;
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60" />
+
+                  <div className="absolute top-3 left-3 px-2 py-1 rounded-lg bg-black/40 backdrop-blur-md border border-white/10 text-[8px] font-black text-white uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all">
+                    {p.item_category || 'Hot Item'}
+                  </div>
+                </div>
+              )}
+
+              {/* 2. PREMIUM INFO SECTION */}
+              <div className="relative z-10 flex flex-col justify-between flex-1 p-4 pb-6 text-left">
+                <div className="flex-1 min-h-[32px]">
+                  <h4
+                    className="line-clamp-2 break-words text-[12px] font-black leading-tight mb-1 uppercase tracking-tight transition-colors duration-300"
+                    style={{ color: "var(--app-text)" }}
+                  >
+                    {p.item_name}
+                  </h4>
+                </div>
+
+                <div className="flex items-end justify-between mt-2 shrink-0">
+                   <div className="flex items-center justify-center w-6 h-6 transition-all rounded-full opacity-0 group-hover:opacity-100"
+                        style={{ backgroundColor: "var(--app-accent)", opacity: 0.1 }}>
+                      <FaPlus size={8} style={{ color: "var(--app-accent)" }} />
+                   </div>
+
+                  <div className="text-right">
+                    <p className="mb-0 text-[7px] font-black uppercase tracking-[0.2em]"
+                       style={{ color: "var(--app-muted-text)" }}>
+                      Price
+                    </p>
+                    <p className="text-[18px] font-black leading-none"
+                       style={{ color: "var(--app-accent)" }}>
+                      ₱{Number(p.selling_price || 0).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          <div className="absolute bottom-0 left-0 w-0 h-1 transition-all duration-500 group-hover:w-full"
                style={{ backgroundColor: "var(--app-accent)" }} />
         </motion.button>
       ))}
@@ -2813,6 +3334,27 @@ const Orderlist = ({
 </div>
             </main>
 
+            {layoutMode === "Kiosk" ? (
+              <KioskRightPanel
+                customerName={kioskTableName}
+                transactionId={transactionId}
+                cartItems={cartSummaryItems}
+                totalItems={totalItems}
+                totalPrice={totalPrice}
+                isDark={isDark}
+                onClearCart={requestClearCart}
+                onCharge={handleKioskCharge}
+                onViewSummary={() => setSummaryCart(true)}
+                isCharging={isKioskCharging}
+                updateQuantity={updateQuantity}
+                updateQuantityByInput={updateQuantityByInput}
+                removeItem={removeItem}
+                openItemInstructionModal={openItemInstructionModal}
+                onPrintQR={handleKioskPrintQR}
+                onAppToPos={handleKioskAppToPos}
+                onPrintOrderSummary={handleKioskPrintOrderSummary}
+              />
+            ) : (
             <aside
               className="relative flex-col hidden min-h-0 overflow-hidden transition-colors w-80 lg:flex"
               style={{
@@ -4130,6 +4672,7 @@ const Orderlist = ({
                 )}
               </AnimatePresence>
             </aside>
+            )}
           </div>
 
           <div
@@ -4409,12 +4952,14 @@ const Orderlist = ({
 
         {/* ACTION BUTTONS */}
         <div className="flex flex-col gap-3 p-8 pt-0">
-          <button
-            onClick={handleGenerateQR}
-            className="w-full py-5 font-black text-white text-lg transition-all bg-blue-600 shadow-xl rounded-[1.5rem] hover:bg-blue-500 shadow-blue-600/30 active:scale-95 uppercase tracking-widest"
-          >
-            CONFIRM ORDER
-          </button>
+          {layoutMode !== "Kiosk" && (
+            <button
+              onClick={handleGenerateQR}
+              className="w-full py-5 font-black text-white text-lg transition-all bg-blue-600 shadow-xl rounded-[1.5rem] hover:bg-blue-500 shadow-blue-600/30 active:scale-95 uppercase tracking-widest"
+            >
+              CONFIRM ORDER
+            </button>
+          )}
           <button
             onClick={() => setSummaryCart(false)}
             className={`w-full py-2 text-[10px] font-black uppercase tracking-[0.3em] transition-all ${

@@ -423,16 +423,17 @@ export function BuildPrintableDiscountReceiptHtml({
                   </tr>
                 ) : null}
 
-                {Number(safeComputed?.serviceChargeAmount || 0) > 0 ? (
-                  <tr>
-                    <td className="bold label-col">
-                      SERVICE CHARGE ({safeComputed?.serviceChargePercentage || 0}%):
-                    </td>
-                    <td className="value-col">
-                      {peso(safeComputed?.serviceChargeAmount)}
-                    </td>
-                  </tr>
-                ) : null}
+                {Array.isArray(safeComputed?.appliedCharges) && safeComputed.appliedCharges.map((c) =>
+                  Number(c.computedAmount || 0) > 0 ? (
+                    <tr key={c.id}>
+                      <td className="bold label-col">
+                        {String(c.particulars || "CHARGE").toUpperCase()}
+                        {c.rate_type === "Percentage" ? ` (${c.rate}%)` : ""}:
+                      </td>
+                      <td className="value-col">{peso(c.computedAmount)}</td>
+                    </tr>
+                  ) : null
+                )}
               </tbody>
             </table>
           </div>

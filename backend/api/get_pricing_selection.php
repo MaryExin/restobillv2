@@ -158,6 +158,7 @@ try {
                         T2.unit_code,
                         T2.inventory_type,
                         T2.item_category,
+                        T2.subcategory_item_category,
                         T2.item_name,
                         T2.item_description,
                         T2.unit_of_measure,

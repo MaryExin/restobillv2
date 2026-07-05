@@ -11,6 +11,7 @@ import {
   FiX,
   FiSearch,
   FiEye,
+  FiEdit2,
   FiTag,
   FiCreditCard,
   FiRefreshCw,
@@ -20,15 +21,18 @@ import {
   FiEyeOff,
   FiChevronDown,
 } from "react-icons/fi";
+import useZustandLayoutMode from "../../context/useZustandLayoutMode";
 import { FaMoneyBill, FaArrowLeft } from "react-icons/fa";
 import { useTheme } from "../../context/ThemeContext";
 import useApiHost from "../../hooks/useApiHost";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import TransactionPaymentModal from "./TransactionPaymentModal";
 import ModalSuccessNavToSelf from "../Modals/ModalSuccessNavToSelf";
 import ButtonComponent from "./Common/ButtonComponent";
 import ModalYesNoReusable from "../Modals/ModalYesNoReusable";
 import { MdWarning } from "react-icons/md";
+
+const KIOSK_DEFAULT_TABLE = "Table 01";
 
 const peso = (value) =>
   `₱ ${Number(value || 0).toLocaleString("en-PH", {
@@ -56,6 +60,173 @@ const safeReadJson = async (response, label) => {
     console.error(`${label} invalid JSON:`, text);
     throw new Error(`${label} returned invalid JSON.`);
   }
+};
+
+const yesNoToBool = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase() === "yes";
+
+const VOID_REFUND_DISCOUNT_META = {
+  senior: { label: "Senior Citizen", rate: 0.2, statutory: true },
+  pwd: { label: "PWD", rate: 0.2, statutory: true },
+  naac: { label: "NAAC", rate: 0.2, statutory: true },
+  soloParent: { label: "Solo Parent", rate: 0.1, statutory: true },
+  manual: { label: "Manual Discount", rate: 0, statutory: false },
+};
+
+const normalizeVoidRefundDiscountKey = (value) => {
+  const normalized = String(value || "").trim().toLowerCase();
+
+  if (
+    normalized === "senior" ||
+    normalized === "senior citizen" ||
+    normalized === "senior citizen discount"
+  ) {
+    return "senior";
+  }
+
+  if (normalized === "pwd" || normalized === "pwd discount") return "pwd";
+
+  if (
+    normalized === "naac" ||
+    normalized === "naac discount" ||
+    normalized === "national athletes and coaches" ||
+    normalized === "national athletes and coaches discount"
+  ) {
+    return "naac";
+  }
+
+  if (
+    normalized === "solo parent" ||
+    normalized === "solo parent discount" ||
+    normalized === "soloparent"
+  ) {
+    return "soloParent";
+  }
+
+  if (normalized === "manual" || normalized === "manual discount") {
+    return "manual";
+  }
+
+  return "";
+};
+
+const buildVoidRefundDiscountComputed = (
+  row,
+  detailItems = [],
+  discountRows = [],
+) => {
+  const safeItems = Array.isArray(detailItems) ? detailItems : [];
+  const safeDiscountRows = Array.isArray(discountRows) ? discountRows : [];
+
+  const grossTotalFromItems = safeItems.reduce((sum, item) => {
+    const qty = Number(item?.sales_quantity || 0);
+    const price = Number(item?.selling_price || 0);
+    return sum + qty * price;
+  }, 0);
+
+  let discountableGross = 0;
+  let discountableBase = 0;
+
+  safeItems.forEach((item) => {
+    const qty = Number(item?.sales_quantity || 0);
+    const price = Number(item?.selling_price || 0);
+    const lineTotal = qty * price;
+
+    if (!yesNoToBool(item?.isDiscountable)) return;
+
+    discountableGross += lineTotal;
+    discountableBase += yesNoToBool(item?.vatable)
+      ? lineTotal / 1.12
+      : lineTotal;
+  });
+
+  const rowsByType = Object.keys(VOID_REFUND_DISCOUNT_META).reduce(
+    (acc, key) => {
+      acc[key] = { qualifiedCount: 0, discountAmount: 0 };
+      return acc;
+    },
+    {},
+  );
+
+  safeDiscountRows.forEach((entry) => {
+    const key = normalizeVoidRefundDiscountKey(entry?.discount_type);
+    if (!key) return;
+
+    rowsByType[key].qualifiedCount += 1;
+    rowsByType[key].discountAmount += Number(entry?.discount_amount || 0);
+  });
+
+  const totalVatExemption = Number(row?.VATExemptSales_VAT || 0);
+  const statutoryDiscountTotal = Object.entries(rowsByType).reduce(
+    (sum, [key, value]) =>
+      VOID_REFUND_DISCOUNT_META[key]?.statutory
+        ? sum + Number(value.discountAmount || 0)
+        : sum,
+    0,
+  );
+
+  const discountBreakdown = Object.entries(VOID_REFUND_DISCOUNT_META).map(
+    ([key, meta]) => {
+      const rowTotals = rowsByType[key] || {};
+      const discountAmount = Number(rowTotals.discountAmount || 0);
+      const qualifiedCount = Number(rowTotals.qualifiedCount || 0);
+      const vatExemption =
+        meta.statutory && statutoryDiscountTotal > 0
+          ? (totalVatExemption * discountAmount) / statutoryDiscountTotal
+          : 0;
+
+      return {
+        key,
+        label: meta.label,
+        qualifiedCount,
+        proratedBase: meta.rate > 0 ? discountAmount / meta.rate : 0,
+        discountAmount,
+        vatExemption,
+      };
+    },
+  );
+
+  const totalDiscount = discountBreakdown.reduce(
+    (sum, entry) => sum + Number(entry.discountAmount || 0),
+    0,
+  );
+  const totalQualifiedAll = discountBreakdown.reduce(
+    (sum, entry) => sum + Number(entry.qualifiedCount || 0),
+    0,
+  );
+  const statutoryQualifiedCount = discountBreakdown.reduce(
+    (sum, entry) =>
+      VOID_REFUND_DISCOUNT_META[entry.key]?.statutory
+        ? sum + Number(entry.qualifiedCount || 0)
+        : sum,
+    0,
+  );
+
+  return {
+    grossTotal: Number(row?.TotalSales || grossTotalFromItems || 0),
+    totalDiscount: Number(row?.Discount || totalDiscount || 0),
+    rawTotalDiscount: totalDiscount,
+    totalAmountDue: Number(row?.TotalAmountDue || row?.payment_amount || 0),
+    totalPaid: Number(row?.payment_amount || 0),
+    paymentAmount: Number(row?.payment_amount || 0),
+    paymentMethod: String(row?.payment_method || "Cash"),
+    changeAmount: Number(row?.change_amount || 0),
+    vatableSales: Number(row?.VATableSales || 0),
+    vatableSalesVat: Number(row?.VATableSales_VAT || 0),
+    vatExemptSales: Number(row?.VATExemptSales || 0),
+    totalVatExemption,
+    vatExemptSalesVat: totalVatExemption,
+    vatZeroRatedSales: Number(row?.VATZeroRatedSales || 0),
+    safeCustomerCount: Number(row?.customer_head_count || 1),
+    totalQualifiedAll,
+    totalQualifiedCount: totalQualifiedAll,
+    statutoryQualifiedCount,
+    discountBreakdown,
+    discountableGross,
+    discountableBase,
+  };
 };
 
 const InlineFailureModal = ({
@@ -113,7 +284,9 @@ const InlineFailureModal = ({
 };
 
 const TABLE_COLUMN_TEMPLATE = "210px 200px 120px 140px 180px 170px 170px 190px";
+const TABLE_COLUMN_TEMPLATE_KIOSK = "280px 200px 120px 140px 180px 170px 170px 190px";
 const TABLE_MIN_WIDTH = 1380;
+const TABLE_MIN_WIDTH_KIOSK = 1450;
 const ROW_HEIGHT = 76;
 const LIST_HEIGHT = 560;
 
@@ -364,7 +537,7 @@ function SummaryPanel({ isDark, viewMode, summary }) {
   );
 }
 
-function HeaderRow({ isDark, mode }) {
+function HeaderRow({ isDark, mode, isKiosk }) {
   const headers = [
     "Actions",
     "Transaction ID",
@@ -383,7 +556,7 @@ function HeaderRow({ isDark, mode }) {
           ? "border-white/5 bg-slate-950/70 text-slate-300"
           : "border-slate-200 bg-slate-50 text-slate-700"
       }`}
-      style={{ gridTemplateColumns: TABLE_COLUMN_TEMPLATE }}
+      style={{ gridTemplateColumns: isKiosk ? TABLE_COLUMN_TEMPLATE_KIOSK : TABLE_COLUMN_TEMPLATE }}
     >
       {headers.map((header) => (
         <div
@@ -673,6 +846,8 @@ function TransactionRow({ index, style, data }) {
   const onOpen = data.onOpen;
   const onVoid = data.onVoid;
   const onRefund = data.onRefund;
+  const onEdit = data.onEdit;
+  const isKiosk = data.isKiosk;
   const mode = data.mode;
 
   const remarksText =
@@ -717,27 +892,52 @@ function TransactionRow({ index, style, data }) {
             ? "border-white/5 hover:bg-white/[0.03]"
             : "border-slate-100 hover:bg-slate-50"
         }`}
-        style={{ gridTemplateColumns: TABLE_COLUMN_TEMPLATE }}
+        style={{ gridTemplateColumns: isKiosk ? TABLE_COLUMN_TEMPLATE_KIOSK : TABLE_COLUMN_TEMPLATE }}
       >
         <div className="flex items-center gap-2 px-5 py-4">
-          <button
-            type="button"
-            onClick={() => onOpen(row)}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white transition hover:bg-blue-500"
-            title={viewTitle}
-          >
-            {mode === "paid" ? <FiPrinter size={17} /> : <FiEye size={17} />}
-          </button>
-
-          {mode === "pending" ? (
+          {isKiosk ? (
             <button
               type="button"
-              onClick={() => onVoid(row)}
-              className="inline-flex h-11 items-center justify-center rounded-2xl bg-red-600 px-4 text-sm font-bold text-gray-100 transition hover:bg-red-500"
-              title="Void Transaction"
+              onClick={() => onOpen(row)}
+              className="inline-flex h-11 items-center justify-center gap-1.5 rounded-2xl bg-blue-600 px-4 text-sm font-bold text-white transition hover:bg-blue-500"
+              title={viewTitle}
             >
-              Void
+              {mode === "paid" ? <FiPrinter size={14} /> : <FiEye size={14} />}
+              {mode === "paid" ? "Print" : mode === "pending" ? "Open" : "View"}
             </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onOpen(row)}
+              className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white transition hover:bg-blue-500"
+              title={viewTitle}
+            >
+              {mode === "paid" ? <FiPrinter size={17} /> : <FiEye size={17} />}
+            </button>
+          )}
+
+          {mode === "pending" ? (
+            <>
+              <button
+                type="button"
+                onClick={() => onVoid(row)}
+                className="inline-flex h-11 items-center justify-center rounded-2xl bg-red-600 px-4 text-sm font-bold text-gray-100 transition hover:bg-red-500"
+                title="Void Transaction"
+              >
+                Void
+              </button>
+              {isKiosk && (
+                <button
+                  type="button"
+                  onClick={() => onEdit(row)}
+                  className="inline-flex h-11 items-center justify-center gap-1.5 rounded-2xl bg-amber-500 px-4 text-sm font-bold text-white transition hover:bg-amber-400"
+                  title="Edit Order"
+                >
+                  <FiEdit2 size={14} />
+                  Edit
+                </button>
+              )}
+            </>
           ) : mode === "paid" ? (
             <button
               type="button"
@@ -818,7 +1018,22 @@ export default function PosPayment() {
       : themeContext?.theme === "dark";
 
   const navigate = useNavigate();
+  const location = useLocation();
+  const { layoutMode } = useZustandLayoutMode();
   const remarksInputRef = useRef(null);
+
+  // Push payment-phase state to the Kiosk second screen when the payment modal is open
+  const handleSecondScreenPaymentPhase = useCallback((method, txItems = []) => {
+    if (layoutMode !== "Kiosk" || !window.kioskAPI?.updateCart) return;
+    const payload = {
+      phase: method ? "payment" : "transaction",
+      paymentMethod: method ? String(method).toUpperCase() : null,
+    };
+    if (method && Array.isArray(txItems) && txItems.length > 0) {
+      payload.items = txItems;
+    }
+    window.kioskAPI.updateCart(payload).catch(() => {});
+  }, [layoutMode]);
 
   const [viewMode, setViewMode] = useState("pending");
   const [pendingTransactions, setPendingTransactions] = useState([]);
@@ -995,6 +1210,139 @@ export default function PosPayment() {
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
+
+  // Auto-open the transaction that was just saved from Kiosk Mode.
+  // Orderlist navigates here with { state: { autoSelectTxId: "..." } }.
+  useEffect(() => {
+    const autoId = location.state?.autoSelectTxId;
+    if (!autoId || !pendingTransactions.length) return;
+    const match = pendingTransactions.find(
+      (tx) => String(tx.transaction_id) === String(autoId),
+    );
+    if (match) {
+      setSelectedTransaction(match);
+      setIsPaymentModalOpen(true);
+    }
+  }, [pendingTransactions, location.state?.autoSelectTxId]);
+
+  const printVoidRefundSlip = useCallback(
+    async ({ type, row, remarks, adminName }) => {
+      if (!window.electronAPI?.printEscPosVoidRefund) {
+        console.warn("[PRINT] window.electronAPI.printEscPosVoidRefund not available");
+        return;
+      }
+
+      // Always fetch the latest setting from DB at print time.
+      let shouldPrint = false;
+      try {
+        const settingsRes = await fetch(`${apiHost}/api/pos_print_settings.php`);
+        const settingsJson = await settingsRes.json();
+        if (settingsJson?.success) {
+          shouldPrint =
+            type === "void"
+              ? Boolean(settingsJson.data?.print_void_enabled)
+              : Boolean(settingsJson.data?.print_refund_enabled);
+        }
+      } catch (e) {
+        console.error("[PRINT] Could not fetch print settings:", e);
+        return;
+      }
+
+      console.log(`[PRINT] type=${type} shouldPrint=${shouldPrint}`);
+      if (!shouldPrint) return;
+
+      // Fetch invoice detail rows so the void/refund print can mirror the
+      // original discounted invoice breakdown.
+      let items = [];
+      let discountRows = [];
+      try {
+        const detailUrl = new URL(
+          `${apiHost}/api/pos_payment_read_transaction_details.php`,
+        );
+        detailUrl.searchParams.set("transaction_id", row?.transaction_id || "");
+        if (row?.Category_Code) {
+          detailUrl.searchParams.set("category_code", row.Category_Code);
+        }
+        if (row?.Unit_Code) {
+          detailUrl.searchParams.set("unit_code", row.Unit_Code);
+        }
+
+        const detailsRes = await fetch(detailUrl.toString());
+        const detailsJson = await detailsRes.json();
+        if (detailsJson?.success) {
+          if (Array.isArray(detailsJson.items)) {
+            items = detailsJson.items;
+          }
+          if (Array.isArray(detailsJson.discount_rows)) {
+            discountRows = detailsJson.discount_rows;
+          }
+        }
+      } catch (_) {}
+
+      if (items.length === 0) {
+        try {
+          const itemsRes = await fetch(
+            `${apiHost}/api/get_transaction_items.php?id=${encodeURIComponent(row?.transaction_id || "")}`,
+          );
+          const itemsJson = await itemsRes.json();
+          if (itemsJson?.success && Array.isArray(itemsJson.data)) {
+            items = itemsJson.data;
+          }
+        } catch (_) {}
+      }
+
+      const computed = buildVoidRefundDiscountComputed(row, items, discountRows);
+
+      if (!computed.discountBreakdown.some((entry) => Number(entry.discountAmount || 0) > 0)) {
+        const fallbackDiscount = Number(row?.Discount || 0);
+        const fallbackQualified = Number(row?.customer_count_for_discount || 0);
+        if (fallbackDiscount > 0 || fallbackQualified > 0) {
+          computed.discountBreakdown = computed.discountBreakdown.map((entry) =>
+            entry.key === "manual"
+              ? {
+                  ...entry,
+                  qualifiedCount: fallbackQualified,
+                  discountAmount: fallbackDiscount,
+                }
+              : entry,
+          );
+          computed.totalQualifiedAll = fallbackQualified;
+          computed.totalQualifiedCount = fallbackQualified;
+        }
+      }
+
+      const now = new Date();
+
+      try {
+        await window.electronAPI.printEscPosVoidRefund({
+          type,
+          items,
+          transaction: {
+            transaction_id:   row?.transaction_id   || "-",
+            invoice_no:       row?.invoice_no        || "-",
+            transaction_date: row?.transaction_date  || "-",
+            transaction_time: row?.transaction_time  || "-",
+            terminal_number:  row?.terminal_number   || "-",
+            order_type:       row?.order_type        || "-",
+            table_number:     row?.table_number      || "-",
+            cashier:          row?.cashier           || "-",
+            void_id:          row?.void_id            || "",
+            refund_id:        row?.refund_id          || "",
+          },
+          computed,
+          voidRefundInfo: {
+            authBy:      adminName || "-",
+            remarks:     remarks   || "NO REMARKS",
+            actionDate:  now.toLocaleDateString("en-PH"),
+            actionTime:  now.toLocaleTimeString("en-PH"),
+          },
+        });
+      } catch (err) {
+        console.error("[PRINT] Failed to print void/refund slip:", err);
+      }
+    },
+    [apiHost],
+  );
 
   const fetchShiftAdmins = useCallback(async () => {
     if (!apiHost) {
@@ -1224,15 +1572,35 @@ export default function PosPayment() {
         return;
       }
 
+      const capturedActionType = actionType;
+      const capturedRemarks    = trimmedRemarks;
+      const capturedAdminName  = String(
+        selectedAdmin?.name || selectedAdmin?.username || selectedAdmin?.email || "",
+      ).trim();
+      // Merge the server-generated void/refund number into the row for printing
+      const capturedRow = {
+        ...activeRow,
+        ...(capturedActionType === "void"
+          ? { void_id:   result.void_id   ?? activeRow?.void_id   ?? "" }
+          : { refund_id: result.refund_id ?? activeRow?.refund_id ?? "" }),
+      };
+
       closeActionModal();
       await fetchAll();
 
+      printVoidRefundSlip({
+        type: capturedActionType,
+        row: capturedRow,
+        remarks: capturedRemarks,
+        adminName: capturedAdminName,
+      });
+
       setSuccessHeader(
-        actionType === "refund" ? "Refund Successful" : "Void Successful",
+        capturedActionType === "refund" ? "Refund Successful" : "Void Successful",
       );
       setSuccessMessage(
         result?.message ||
-          (actionType === "refund"
+          (capturedActionType === "refund"
             ? "Transaction refunded successfully."
             : "Transaction voided successfully."),
       );
@@ -1266,6 +1634,7 @@ export default function PosPayment() {
     adminAccounts,
     closeActionModal,
     fetchAll,
+    printVoidRefundSlip,
   ]);
 
   const sourceTransactions = useMemo(() => {
@@ -1328,14 +1697,24 @@ export default function PosPayment() {
       rows: filteredTransactions,
       isDark,
       mode: viewMode,
+      isKiosk: layoutMode === "Kiosk",
       onOpen: (row) => {
         setSelectedTransaction(row);
         setIsPaymentModalOpen(true);
       },
       onVoid: openVoidModal,
       onRefund: openRefundModal,
+      onEdit: (row) => {
+        navigate("/ordering", {
+          state: {
+            kioskEdit: true,
+            kioskTransactionId: String(row.transaction_id),
+            kioskTableName: row.table_number || KIOSK_DEFAULT_TABLE,
+          },
+        });
+      },
     }),
-    [filteredTransactions, isDark, viewMode, openVoidModal, openRefundModal],
+    [filteredTransactions, isDark, viewMode, layoutMode, openVoidModal, openRefundModal, navigate],
   );
 
   const isPaymentReadOnly = viewMode === "voided" || viewMode === "refunded";
@@ -1530,13 +1909,13 @@ export default function PosPayment() {
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <div style={{ minWidth: TABLE_MIN_WIDTH }}>
-                      <HeaderRow isDark={isDark} mode={viewMode} />
+                    <div style={{ minWidth: layoutMode === "Kiosk" ? TABLE_MIN_WIDTH_KIOSK : TABLE_MIN_WIDTH }}>
+                      <HeaderRow isDark={isDark} mode={viewMode} isKiosk={layoutMode === "Kiosk"} />
                       <List
                         height={LIST_HEIGHT}
                         itemCount={filteredTransactions.length}
                         itemSize={ROW_HEIGHT}
-                        width={TABLE_MIN_WIDTH}
+                        width={layoutMode === "Kiosk" ? TABLE_MIN_WIDTH_KIOSK : TABLE_MIN_WIDTH}
                         itemData={listData}
                         overscanCount={8}
                         outerElementType={ListOuter}
@@ -1574,7 +1953,19 @@ export default function PosPayment() {
         chargeOptions={chargeOptions}
         mode={viewMode}
         readOnly={isPaymentReadOnly}
-        onSaved={fetchAll}
+        onSaved={() => {
+          fetchAll();
+          if (layoutMode === "Kiosk" && window.kioskAPI?.updateCart) {
+            window.kioskAPI.updateCart({
+              phase: "transaction",
+              isClear: true,
+              items: [],
+              totalItems: 0,
+              totalPrice: 0,
+            }).catch(() => {});
+          }
+        }}
+        onShowQR={handleSecondScreenPaymentPhase}
       />
 
       <ActionRemarksModal

@@ -15,7 +15,8 @@ import {
   FaSyncAlt,
   FaTimes,
   FaCode,
-  FaTag, // New icon for Price Change
+  FaCalendarAlt,
+  FaTable,
 } from "react-icons/fa";
 import { useTheme } from "../../context/ThemeContext";
 import useApiHost from "../../hooks/useApiHost";
@@ -34,6 +35,8 @@ import LogsModal from "../MainComponents/ReportsModal/LogsModal";
 import ModalXml from "../Modals/ModalXml";
 import ZReadingView from "../MainComponents/ReportsModal/ZReadingView";
 import PricingDashboard from "../MainComponents/ReportsModal/PricingDashboard";
+import MonthlySalesModal from "../MainComponents/ReportsModal/MonthlySalesModal";
+import SalesPerItemPerDateModal from "../MainComponents/ReportsModal/SalesPerItemPerDateModal";
 
 const MenuCard = ({
   icon: Icon,
@@ -236,10 +239,16 @@ const PosReports = ({
       action: () => setActiveModal("xml"),
     },
     {
-      label: "Pricing Management",
-      icon: FaTag,
-      color: "#10b981",
-      action: () => setActiveModal("priceChange"),
+      label: "Monthly Sales",
+      icon: FaCalendarAlt,
+      color: "#9333ea",
+      action: () => setActiveModal("monthlySales"),
+    },
+    {
+      label: "Sales Per Item Per Date",
+      icon: FaTable,
+      color: "#0d9488",
+      action: () => setActiveModal("salesPerItemPerDate"),
     },
   ];
 
@@ -380,6 +389,14 @@ const PosReports = ({
       />
       <PricingDashboard
         isOpen={activeModal === "priceChange"}
+        onClose={() => setActiveModal(null)}
+      />
+      <MonthlySalesModal
+        isOpen={activeModal === "monthlySales"}
+        onClose={() => setActiveModal(null)}
+      />
+      <SalesPerItemPerDateModal
+        isOpen={activeModal === "salesPerItemPerDate"}
         onClose={() => setActiveModal(null)}
       />
 
