@@ -51,6 +51,7 @@ const Orderlist = ({
   setshoworderlist,
   dateSelected,
   transactionId,
+  onOrderSaved,
 }) => {
   const defaultPrinterName = useGetDefaultPrinter();
   const { layoutMode } = useZustandLayoutMode();
@@ -2076,6 +2077,11 @@ const Orderlist = ({
       const result = await saveOrderToServer();
       if (!result.ok) return;
 
+      onOrderSaved?.({
+        table_number: tableselected,
+        transaction_id: result.transaction_id || result.txId,
+      });
+
       setShowConfirmModal(false);
       setShowqrModal(false);
 
@@ -2134,6 +2140,11 @@ const Orderlist = ({
 
     const result = await saveOrderToServer();
     if (!result?.ok) return;
+
+    onOrderSaved?.({
+      table_number: tableselected,
+      transaction_id: result.transaction_id || result.txId,
+    });
 
     setSaveSuccessMessage(
       result.isUpdate
@@ -2677,6 +2688,10 @@ const Orderlist = ({
 
         setShowTransferConfirmModal(false);
         setShowTransferModal(false);
+        onOrderSaved?.({
+          table_number: destinationTableName,
+          transaction_id: destinationTxId,
+        });
         setSaveSuccessMessage(
           `Selected products transferred from ${tableselected} to ${destinationTableName}.`,
         );
@@ -2743,6 +2758,10 @@ const Orderlist = ({
 
       setShowTransferConfirmModal(false);
       setShowTransferModal(false);
+      onOrderSaved?.({
+        table_number: finalTableValue,
+        transaction_id: transactionId,
+      });
 
       setSaveSuccessMessage(
         transferMode === "merge"

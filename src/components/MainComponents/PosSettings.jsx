@@ -15,11 +15,15 @@ import {
   FiPercent,
   FiChevronRight,
   FiPrinter,
+<<<<<<< HEAD
   FiImage,
   FiTag,
   FiMonitor,
   FiLock,
   FiSlash,
+=======
+  FiGrid,
+>>>>>>> master
 } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "../../context/ThemeContext";
@@ -38,6 +42,7 @@ import PosDiscountMode from "./PosSettingsModal/PosDiscountMode";
 import PosServiceCharge from "./PosSettingsModal/PosServiceCharge";
 import PosCustomerInfo from "./PosSettingsModal/PosCustomerInfo";
 import PrinterSettings from "./PosSettingsModal/PrinterSettings";
+<<<<<<< HEAD
 import PosPrintSettings from "./PosSettingsModal/PosPrintSettings";
 import PosModeOfPayment from "./PosSettingsModal/PosModeOfPayment";
 import PosPictureSettings from "./PosSettingsModal/PosPictureSettings";
@@ -48,6 +53,9 @@ import PosSecondScreen from "./PosSettingsModal/PosSecondScreen";
 
 const MASTER_PASS    = "LESI_POSPASS@2023";
 const PROTECTED_TABS = new Set(["Mode of Payment", "Discount Mode", "Layout Mode"]);
+=======
+import PosTableLayout from "./PosSettingsModal/PosTableLayout";
+>>>>>>> master
 
 const PosSettings = ({ isOpen, onClose, branchInfo }) => {
   const { theme, setTheme } = useTheme();
@@ -99,6 +107,7 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
     { id: "Discount Ceiling", icon: FiPercent },
     { id: "Discount Mode", icon: FiPercent },
     { id: "Customer Info", icon: FiUsers },
+    { id: "Table Layout", icon: FiGrid },
     { id: "Email Reports", icon: FiMail },
     { id: "Data & Security", icon: FiDatabase },
     { id: "Appearance", icon: FiLayers },
@@ -191,6 +200,10 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
 
     if (activeTab === "Customer Info") {
       return <PosCustomerInfo isDark={isDark} accent={accentColor} />;
+    }
+
+    if (activeTab === "Table Layout") {
+      return <PosTableLayout isDark={isDark} accent={accentColor} />;
     }
 
     if (activeTab === "Email Reports") {

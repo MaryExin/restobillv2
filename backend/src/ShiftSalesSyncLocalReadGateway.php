@@ -5,6 +5,7 @@ declare(strict_types=1);
 class ShiftSalesSyncLocalReadGateway
 {
     private PDO $conn;
+    private array $columnCache = [];
 
     public function __construct(Database $database)
     {
@@ -50,6 +51,7 @@ class ShiftSalesSyncLocalReadGateway
                     $txnRefs = $this->getOfflineTransactionRefsForShift(
                         $categoryCode,
                         $unitCode,
+                        $terminal,
                         $opening,
                         $closing
                     );
@@ -160,14 +162,16 @@ class ShiftSalesSyncLocalReadGateway
     private function getOfflineTransactionRefsForShift(
         string $categoryCode,
         string $unitCode,
+        string $terminalNumber,
         string $openingDateTime,
         string $closingDateTime
     ): array {
         $sql = "
-            SELECT transaction_id, Category_Code, Unit_Code
+            SELECT transaction_id, Category_Code, Unit_Code, terminal_number
             FROM tbl_pos_transactions
             WHERE Category_Code = :category_code
               AND Unit_Code = :unit_code
+              AND terminal_number = :terminal_number
               AND COALESCE(
                     STR_TO_DATE(CONCAT(transaction_date, ' ', transaction_time), '%c/%e/%Y %h:%i %p'),
                     STR_TO_DATE(CONCAT(transaction_date, ' ', transaction_time), '%c/%e/%Y %H:%i'),
@@ -196,6 +200,7 @@ class ShiftSalesSyncLocalReadGateway
         $stmt->execute([
             'category_code' => $categoryCode,
             'unit_code' => $unitCode,
+            'terminal_number' => $terminalNumber,
             'opening_datetime_1' => $openingDateTime,
             'opening_datetime_2' => $openingDateTime,
             'opening_datetime_3' => $openingDateTime,
@@ -211,12 +216,14 @@ class ShiftSalesSyncLocalReadGateway
             $transactionId = trim((string) ($row['transaction_id'] ?? ''));
             $category = trim((string) ($row['Category_Code'] ?? ''));
             $unit = trim((string) ($row['Unit_Code'] ?? ''));
+            $terminal = trim((string) ($row['terminal_number'] ?? ''));
 
-            if ($transactionId !== '' && $category !== '' && $unit !== '') {
+            if ($transactionId !== '' && $category !== '' && $unit !== '' && $terminal !== '') {
                 $refs[] = [
                     'transaction_id' => $transactionId,
                     'Category_Code' => $category,
                     'Unit_Code' => $unit,
+                    'terminal_number' => $terminal,
                 ];
             }
         }
@@ -227,6 +234,13 @@ class ShiftSalesSyncLocalReadGateway
     private function getChildCountsByTransactionRefs(array $transactionRefs): array
     {
         $scope = $this->buildScopedTransactionWhere($transactionRefs);
+        $transactionScope = $this->buildScopedTransactionWhere(
+            $transactionRefs,
+            'Category_Code',
+            'Unit_Code',
+            'transaction_id',
+            'terminal_number'
+        );
 
         if ($scope['where'] === '') {
             return [
@@ -240,17 +254,14 @@ class ShiftSalesSyncLocalReadGateway
 
         return [
             'transactions' => $this->countRows(
-                "SELECT COUNT(*) FROM tbl_pos_transactions WHERE {$scope['where']}",
-                $scope['values']
+                "SELECT COUNT(*) FROM tbl_pos_transactions WHERE {$transactionScope['where']}",
+                $transactionScope['values']
             ),
             'detailed' => $this->countRows(
                 "SELECT COUNT(*) FROM tbl_pos_transactions_detailed WHERE {$scope['where']}",
                 $scope['values']
             ),
-            'discounts' => $this->countRows(
-                "SELECT COUNT(*) FROM tbl_pos_transactions_discounts WHERE {$scope['where']}",
-                $scope['values']
-            ),
+            'discounts' => $this->countDiscountRows($transactionRefs),
             'payments' => $this->countRows(
                 "SELECT COUNT(*) FROM tbl_pos_transactions_payments WHERE {$scope['where']}",
                 $scope['values']
@@ -266,7 +277,8 @@ class ShiftSalesSyncLocalReadGateway
         array $transactionRefs,
         string $categoryColumn = 'Category_Code',
         string $unitColumn = 'Unit_Code',
-        string $transactionColumn = 'transaction_id'
+        string $transactionColumn = 'transaction_id',
+        ?string $terminalColumn = null
     ): array {
         $clauses = [];
         $values = [];
@@ -276,23 +288,98 @@ class ShiftSalesSyncLocalReadGateway
             $category = trim((string) ($ref['Category_Code'] ?? ''));
             $unit = trim((string) ($ref['Unit_Code'] ?? ''));
             $transactionId = trim((string) ($ref['transaction_id'] ?? ''));
+            $terminal = trim((string) ($ref['terminal_number'] ?? ''));
             $key = $category . '||' . $unit . '||' . $transactionId;
 
-            if ($category === '' || $unit === '' || $transactionId === '' || isset($seen[$key])) {
+            if ($terminalColumn !== null) {
+                $key .= '||' . $terminal;
+            }
+
+            if (
+                $category === ''
+                || $unit === ''
+                || $transactionId === ''
+                || ($terminalColumn !== null && $terminal === '')
+                || isset($seen[$key])
+            ) {
                 continue;
             }
 
             $seen[$key] = true;
-            $clauses[] = "({$categoryColumn} = ? AND {$unitColumn} = ? AND {$transactionColumn} = ?)";
+            $clause = "({$categoryColumn} = ? AND {$unitColumn} = ? AND {$transactionColumn} = ?";
             $values[] = $category;
             $values[] = $unit;
             $values[] = $transactionId;
+
+            if ($terminalColumn !== null) {
+                $clause .= " AND {$terminalColumn} = ?";
+                $values[] = $terminal;
+            }
+
+            $clauses[] = $clause . ")";
         }
 
         return [
             'where' => count($clauses) > 0 ? '(' . implode(' OR ', $clauses) . ')' : '',
             'values' => $values,
         ];
+    }
+
+    private function countDiscountRows(array $transactionRefs): int
+    {
+        if ($this->tableHasColumns('tbl_pos_transactions_discounts', ['Category_Code', 'Unit_Code'])) {
+            $scope = $this->buildScopedTransactionWhere($transactionRefs);
+            if ($scope['where'] === '') {
+                return 0;
+            }
+
+            return $this->countRows(
+                "SELECT COUNT(*) FROM tbl_pos_transactions_discounts WHERE {$scope['where']}",
+                $scope['values']
+            );
+        }
+
+        $scope = $this->buildScopedTransactionWhere(
+            $transactionRefs,
+            't.Category_Code',
+            't.Unit_Code',
+            't.transaction_id',
+            't.terminal_number'
+        );
+        if ($scope['where'] === '') {
+            return 0;
+        }
+
+        return $this->countRows(
+            "
+                SELECT COUNT(*)
+                FROM tbl_pos_transactions_discounts d
+                INNER JOIN tbl_pos_transactions t
+                  ON t.transaction_id = d.transaction_id
+                WHERE {$scope['where']}
+            ",
+            $scope['values']
+        );
+    }
+
+    private function tableHasColumns(string $table, array $columns): bool
+    {
+        if (!array_key_exists($table, $this->columnCache)) {
+            $stmt = $this->conn->query("SHOW COLUMNS FROM {$table}");
+            $this->columnCache[$table] = array_map(
+                static fn(array $row): string => (string) ($row['Field'] ?? ''),
+                $stmt->fetchAll(PDO::FETCH_ASSOC)
+            );
+        }
+
+        $available = array_flip($this->columnCache[$table]);
+        foreach ($columns as $column) {
+            if (!isset($available[$column])) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function countRows(string $sql, array $values): int
