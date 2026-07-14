@@ -15,15 +15,14 @@ import {
   FiPercent,
   FiChevronRight,
   FiPrinter,
-<<<<<<< HEAD
   FiImage,
   FiTag,
   FiMonitor,
   FiLock,
   FiSlash,
-=======
   FiGrid,
->>>>>>> master
+  FiAward,
+  FiList,
 } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "../../context/ThemeContext";
@@ -42,7 +41,6 @@ import PosDiscountMode from "./PosSettingsModal/PosDiscountMode";
 import PosServiceCharge from "./PosSettingsModal/PosServiceCharge";
 import PosCustomerInfo from "./PosSettingsModal/PosCustomerInfo";
 import PrinterSettings from "./PosSettingsModal/PrinterSettings";
-<<<<<<< HEAD
 import PosPrintSettings from "./PosSettingsModal/PosPrintSettings";
 import PosModeOfPayment from "./PosSettingsModal/PosModeOfPayment";
 import PosPictureSettings from "./PosSettingsModal/PosPictureSettings";
@@ -50,12 +48,15 @@ import PosProductSubcategories from "./PosSettingsModal/PosProductSubcategories"
 import PosPricingDashboard from "./PosSettingsModal/PosPricingDashboard";
 import PosLayoutMode from "./PosSettingsModal/PosLayoutMode";
 import PosSecondScreen from "./PosSettingsModal/PosSecondScreen";
+import PosTableLayout from "./PosSettingsModal/PosTableLayout";
+import PosLoyaltyConfig from "./PosSettingsModal/PosLoyaltyConfig";
+import PosSalesTypeOrder from "./PosSettingsModal/PosSalesTypeOrder";
 
 const MASTER_PASS    = "LESI_POSPASS@2023";
 const PROTECTED_TABS = new Set(["Mode of Payment", "Discount Mode", "Layout Mode"]);
-=======
-import PosTableLayout from "./PosSettingsModal/PosTableLayout";
->>>>>>> master
+// LightemAdmin is a trusted POS account -- skip the password gate on
+// protected settings tabs entirely for this user.
+const UNGATED_USERNAME = "lightemadmin";
 
 const PosSettings = ({ isOpen, onClose, branchInfo }) => {
   const { theme, setTheme } = useTheme();
@@ -108,6 +109,8 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
     { id: "Discount Mode", icon: FiPercent },
     { id: "Customer Info", icon: FiUsers },
     { id: "Table Layout", icon: FiGrid },
+    { id: "Sales Type Order", icon: FiList },
+    { id: "Loyalty Configuration", icon: FiAward },
     { id: "Email Reports", icon: FiMail },
     { id: "Data & Security", icon: FiDatabase },
     { id: "Appearance", icon: FiLayers },
@@ -120,6 +123,10 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
     { id: "Second Screen", icon: FiMonitor },
   ];
 
+  const isUngatedUser =
+    String(localStorage.getItem("username") || "").trim().toLowerCase() ===
+    UNGATED_USERNAME;
+
   const handleNavClick = (nav) => {
     if (nav.route) {
       onClose?.();
@@ -128,7 +135,7 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
       return;
     }
 
-    if (PROTECTED_TABS.has(nav.id)) {
+    if (PROTECTED_TABS.has(nav.id) && !isUngatedUser) {
       setPendingTab(nav.id);
       setGatePass("");
       setGateError(false);
@@ -204,6 +211,14 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
 
     if (activeTab === "Table Layout") {
       return <PosTableLayout isDark={isDark} accent={accentColor} />;
+    }
+
+    if (activeTab === "Sales Type Order") {
+      return <PosSalesTypeOrder isDark={isDark} accent={accentColor} />;
+    }
+
+    if (activeTab === "Loyalty Configuration") {
+      return <PosLoyaltyConfig isDark={isDark} accent={accentColor} />;
     }
 
     if (activeTab === "Email Reports") {

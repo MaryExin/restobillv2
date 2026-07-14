@@ -6,18 +6,18 @@ const normalizeHost = (s) =>
     .trim()
     .replace(/\/+$/, "");
 
-export default function useApiHost() {
-  const [apiHost, setApiHost] = useState("");
+export default function useWebApiHost() {
+  const [webApiHost, setWebApiHost] = useState("");
 
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
       try {
-        // ✅ EXE: read editable resources/ip.txt via Electron preload
-        if (window.appConfig?.getApiHost) {
-          const host = await window.appConfig.getApiHost();
-          if (!cancelled) setApiHost(normalizeHost(host));
+        // ✅ EXE: read editable resources/ip.txt (WEB line) via Electron preload
+        if (window.appConfig?.getWebApiHost) {
+          const host = await window.appConfig.getWebApiHost();
+          if (!cancelled) setWebApiHost(normalizeHost(host));
           return;
         }
 
@@ -25,11 +25,9 @@ export default function useApiHost() {
         const res = await fetch("./ip.txt", { cache: "no-store" });
         const txt = await res.text();
         const map = parseIpConfigText(txt);
-        if (!cancelled) setApiHost(normalizeHost(map.LOCAL || txt));
+        if (!cancelled) setWebApiHost(normalizeHost(map.WEB));
       } catch (e) {
-        // No fallback (you asked “just from ip.txt”)
-        // But at least keep it empty so you can detect and show message.
-        if (!cancelled) setApiHost("");
+        if (!cancelled) setWebApiHost("");
       }
     })();
 
@@ -38,5 +36,5 @@ export default function useApiHost() {
     };
   }, []);
 
-  return apiHost;
+  return webApiHost;
 }

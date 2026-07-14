@@ -26,6 +26,8 @@ import { useNavigate } from "react-router-dom";
 import { useTheme } from "../../context/ThemeContext";
 import useCustomQuery from "../../hooks/useCustomQuery";
 import { useCustomSecuredMutation } from "../../hooks/useCustomSecuredMutation";
+import useApiHost from "../../hooks/useApiHost";
+import useWebApiHost from "../../hooks/useWebApiHost";
 
 import ModalYesNoReusable from "../Modals/ModalYesNoReusable";
 import ModalSuccessNavToSelf from "../Modals/ModalSuccessNavToSelf";
@@ -575,9 +577,11 @@ const SyncOfflineSalesToWeb = () => {
   const [showhidesuccess, setshowhidesuccess] = useState(false);
   const [returnmessage, setReturnmessage] = useState({ message: "" });
 
+  const apiHost = useApiHost();
+  const webApiHost = useWebApiHost();
+
   const localReadUrl =
-    import.meta.env.VITE_LOCALAPIENDPOINT +
-    import.meta.env.VITE_SHIFT_SYNC_LOCAL_READ_ENDPOINT;
+    apiHost + import.meta.env.VITE_SHIFT_SYNC_LOCAL_READ_ENDPOINT;
 
   const {
     data: localReadData,
@@ -586,19 +590,20 @@ const SyncOfflineSalesToWeb = () => {
   } = useCustomQuery(localReadUrl, ["shift-sync-local-read"]);
 
   const { mutate: localExportMutate } = useCustomSecuredMutation(
-    import.meta.env.VITE_LOCALAPIENDPOINT +
-      import.meta.env.VITE_SHIFT_SYNC_LOCAL_EXPORT_ENDPOINT,
+    apiHost + import.meta.env.VITE_SHIFT_SYNC_LOCAL_EXPORT_ENDPOINT,
+  );
+
+  const { mutate: localMarkSyncedMutate } = useCustomSecuredMutation(
+    apiHost + import.meta.env.VITE_SHIFT_SYNC_LOCAL_MARK_SYNCED_ENDPOINT,
   );
 
   const { mutate: webStatusMutate, data: webStatusData } =
     useCustomSecuredMutation(
-      import.meta.env.VITE_WEBAPIENDPOINT +
-        import.meta.env.VITE_SHIFT_SYNC_WEB_STATUS_ENDPOINT,
+      webApiHost + import.meta.env.VITE_SHIFT_SYNC_WEB_STATUS_ENDPOINT,
     );
 
   const { mutate: webUploadMutate } = useCustomSecuredMutation(
-    import.meta.env.VITE_WEBAPIENDPOINT +
-      import.meta.env.VITE_SHIFT_SYNC_WEB_MUTATE_ENDPOINT,
+    webApiHost + import.meta.env.VITE_SHIFT_SYNC_WEB_MUTATE_ENDPOINT,
   );
 
   const targetBusunitName =
@@ -850,6 +855,23 @@ const SyncOfflineSalesToWeb = () => {
         onSuccess: (exportData) => {
           webUploadMutate(exportData, {
             onSuccess: async (uploadData) => {
+              const syncedShiftRefs = selectedRows.map((row) => ({
+                unit_code: row.unit_code,
+                shift_id: row.shift_id,
+                terminal_number: row.terminal_number,
+                opening_datetime: row.opening_datetime,
+              }));
+
+              await new Promise((resolve) => {
+                localMarkSyncedMutate(
+                  { shifts: syncedShiftRefs },
+                  {
+                    onSuccess: resolve,
+                    onError: resolve,
+                  },
+                );
+              });
+
               await runFullRefresh();
 
               const latestSyncedKeys = new Set(

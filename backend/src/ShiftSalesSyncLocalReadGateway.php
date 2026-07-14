@@ -139,6 +139,7 @@ class ShiftSalesSyncLocalReadGateway
             SELECT *
             FROM tbl_pos_shifting_records
             WHERE Unit_Code = :unit_code
+              AND (Remarks IS NULL OR TRIM(Remarks) <> 'Synced')
             ORDER BY
                 COALESCE(
                     STR_TO_DATE(Closing_DateTime, '%c/%e/%Y %H:%i'),

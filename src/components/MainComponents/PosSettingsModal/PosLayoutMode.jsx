@@ -1,5 +1,5 @@
 import React from "react";
-import { FiMonitor, FiShoppingCart, FiLayers } from "react-icons/fi";
+import { FiMonitor, FiShoppingCart, FiShoppingBag } from "react-icons/fi";
 import useZustandLayoutMode from "../../../context/useZustandLayoutMode";
 
 const MODES = [
@@ -12,10 +12,10 @@ const MODES = [
   },
   {
     id: "Restaurant Version 2",
-    icon: FiLayers,
-    label: "Restaurant Version 2",
+    icon: FiShoppingBag,
+    label: "Retail POS",
     description:
-      "Alternate restaurant layout. Same dine-in, table-service experience as Restaurant mode.",
+      "Standard layout optimized for retail, groceries, and boutique shops. Features barcode-focused scanning and quick checkout workflow.",
   },
   {
     id: "Kiosk",

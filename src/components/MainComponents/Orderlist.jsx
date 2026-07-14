@@ -45,6 +45,23 @@ import {
 import useGetDefaultPrinter from "../../hooks/useGetDefaultPrinter";
 import useZustandLayoutMode from "../../context/useZustandLayoutMode";
 import KioskRightPanel from "./KioskRightPanel";
+import RetailEmptyState from "./PosRetailComponents/RetailEmptyState";
+
+const mapPricingProduct = (item, index) => ({
+  id: item.product_id || `${item.sku || "ITEM"}-${index}`,
+  product_id: item.product_id || "",
+  item_name: item.item_name || "NO NAME",
+  selling_price: Number(item.selling_price || 0),
+  sku: item.sku || "",
+  item_category: item.item_category || "",
+  subcategory_item_category: item.subcategory_item_category || "",
+  isDiscountable: item.isDiscountable || "",
+  vatable: item.vatable || "",
+  unit_cost: Number(item.unit_cost || 0),
+  unit_of_measure: item.unit_of_measure || "",
+  inventory_type: item.inventory_type || "",
+  raw: item,
+});
 
 const Orderlist = ({
   tableselected,
@@ -55,6 +72,8 @@ const Orderlist = ({
 }) => {
   const defaultPrinterName = useGetDefaultPrinter();
   const { layoutMode } = useZustandLayoutMode();
+  // "Restaurant Version 2" is the stored id behind the "Retail POS" layout option.
+  const isRetailPosMode = layoutMode === "Restaurant Version 2";
 
   // Kiosk Mode: editable table/session label, initialized from prop or "Table 01".
   const [kioskTableName, setKioskTableName] = useState(
@@ -68,6 +87,8 @@ const Orderlist = ({
   const internalTransactionIdRef = useRef(null);
   // Flags the next updateCart push as a manual clear (suppresses success animation on second screen)
   const isClearRef = useRef(false);
+  // Retail POS: keeps the scan/SKU box focused so a barcode scanner always has somewhere to type into
+  const searchInputRef = useRef(null);
 
   const navigate = useNavigate();
   const apiHost = useApiHost();
@@ -165,7 +186,10 @@ const Orderlist = ({
   const [printers, setPrinters] = useState([]);
 
   const userId = localStorage.getItem("user_id") || "0";
-  const userName = localStorage.getItem("Cashier") || "Store Crew";
+  const userName =
+    localStorage.getItem("username") ||
+    localStorage.getItem("Cashier") ||
+    "Store Crew";
   const email = localStorage.getItem("email") || "Store Crew";
   const unit_code = localStorage.getItem("posBusinessUnitCode") || "";
   const category_code = localStorage.getItem("posBusinessCategoryCode") || "";
@@ -645,21 +669,7 @@ const Orderlist = ({
 
         if (result?.status === "success") {
           const mappedProducts = Array.isArray(result.products)
-            ? result.products.map((item, index) => ({
-                id: item.product_id || `${item.sku || "ITEM"}-${index}`,
-                product_id: item.product_id || "",
-                item_name: item.item_name || "NO NAME",
-                selling_price: Number(item.selling_price || 0),
-                sku: item.sku || "",
-                item_category: item.item_category || "",
-                subcategory_item_category: item.subcategory_item_category || "",
-                isDiscountable: item.isDiscountable || "",
-                vatable: item.vatable || "",
-                unit_cost: Number(item.unit_cost || 0),
-                unit_of_measure: item.unit_of_measure || "",
-                inventory_type: item.inventory_type || "",
-                raw: item,
-              }))
+            ? result.products.map(mapPricingProduct)
             : [];
 
           setPricingData({
@@ -699,6 +709,88 @@ const Orderlist = ({
     selectedSalesTypeObject?.description,
     selectcategory,
     productsearch,
+  ]);
+
+  // Re-price cart items already added this session when the sales type
+  // changes mid-order (e.g. DINE IN -> GRAB), since each sales type can map
+  // to a different pricing category. Items already loaded from a saved
+  // transaction keep their original recorded price.
+  const salesTypeRepriceRef = useRef(selectedSalesTypeObject?.sales_type_id);
+
+  useEffect(() => {
+    const nextSalesTypeId = selectedSalesTypeObject?.sales_type_id;
+    const prevSalesTypeId = salesTypeRepriceRef.current;
+    salesTypeRepriceRef.current = nextSalesTypeId;
+
+    if (!nextSalesTypeId || nextSalesTypeId === prevSalesTypeId) return;
+
+    const categoryCode = newtransaction?.business_info?.Category_Code || "";
+    const unitCode = newtransaction?.business_info?.Unit_Code || "";
+    const salesTypeDesc =
+      selectedSalesTypeObject?.sales_type ||
+      selectedSalesTypeObject?.description ||
+      "";
+
+    if (!apiHost || !categoryCode || !unitCode || !salesTypeDesc) return;
+
+    const editableCodes = Array.from(
+      new Set(
+        (productcart.items || [])
+          .filter((item) => item.isLoadedFromDB !== true && item.code)
+          .map((item) => item.code),
+      ),
+    );
+
+    if (editableCodes.length === 0) return;
+
+    const repriceCart = async () => {
+      try {
+        const response = await fetch(
+          `${apiHost}/api/get_pricing_selection.php`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              category_code: categoryCode,
+              unit_code: unitCode,
+              sales_type: salesTypeDesc,
+              codes: editableCodes,
+            }),
+          },
+        );
+
+        const result = await response.json();
+        if (result?.status !== "success") return;
+
+        const priceByCode = new Map(
+          (result.products || []).map((p) => [
+            p.product_id,
+            Number(p.selling_price || 0),
+          ]),
+        );
+
+        if (priceByCode.size === 0) return;
+
+        syncCartState((items) =>
+          items.map((item) =>
+            item.isLoadedFromDB !== true && priceByCode.has(item.code)
+              ? { ...item, price: priceByCode.get(item.code) }
+              : item,
+          ),
+        );
+      } catch (error) {
+        console.error("Failed to re-price cart for new sales type:", error);
+      }
+    };
+
+    repriceCart();
+  }, [
+    apiHost,
+    newtransaction?.business_info?.Category_Code,
+    newtransaction?.business_info?.Unit_Code,
+    selectedSalesTypeObject?.sales_type_id,
+    selectedSalesTypeObject?.sales_type,
+    selectedSalesTypeObject?.description,
   ]);
 
   useEffect(() => {
@@ -812,6 +904,8 @@ const Orderlist = ({
     return [...folderCards, ...standaloneItems];
   };
 
+  // Subcategory folder splitting is driven solely by the "Show Product
+  // Subcategories" setting — it applies in every layout mode, not just Retail POS.
   const availableSubcategories = useMemo(() => {
     if (!enableSubcategories) return [];
     const seen = new Set();
@@ -831,6 +925,13 @@ const Orderlist = ({
     if (!enableSubcategories) return productlist || [];
     return groupProductsForMenuGrid(productlist || []);
   }, [productlist, enableSubcategories]);
+
+  // Drop a stale drill-down selection if the setting gets disabled.
+  useEffect(() => {
+    if (!enableSubcategories && selectedSubcategory) {
+      setSelectedSubcategory("");
+    }
+  }, [enableSubcategories, selectedSubcategory]);
 
   const filteredProducts = useMemo(() => {
     const search = productsearch.trim().toLowerCase();
@@ -861,7 +962,8 @@ const Orderlist = ({
       );
     }
 
-    // Top-level view: subcategory folder cards + standalone items.
+    // Top-level view: subcategory folder cards + standalone items when enabled;
+    // menuDisplayItems is already the flat productlist when the setting is off.
     return menuDisplayItems;
   }, [
     productsearch,
@@ -1469,6 +1571,67 @@ const Orderlist = ({
     });
 
     setproductsearch("");
+  };
+
+  const handleScanSubmit = async (scannedValue) => {
+    const scannedCode = String(scannedValue || "").trim();
+    if (!scannedCode) return;
+
+    const normalizedCode = scannedCode.toLowerCase();
+    const existingMatch = (productlist || []).find(
+      (p) => String(p.sku || "").trim().toLowerCase() === normalizedCode,
+    );
+
+    if (existingMatch) {
+      addToCart(existingMatch);
+      return;
+    }
+
+    const categoryCode = newtransaction?.business_info?.Category_Code || "";
+    const unitCode = newtransaction?.business_info?.Unit_Code || "";
+    const salesTypeDesc =
+      selectedSalesTypeObject?.sales_type ||
+      selectedSalesTypeObject?.description ||
+      "";
+
+    if (!apiHost || !categoryCode || !unitCode || !salesTypeDesc) {
+      alert("Select a service type before scanning items.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${apiHost}/api/get_pricing_selection.php`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          category_code: categoryCode,
+          unit_code: unitCode,
+          sales_type: salesTypeDesc,
+          item_category: "",
+          search: scannedCode,
+          limit: 20,
+        }),
+      });
+
+      const result = await response.json();
+      const products = Array.isArray(result?.products)
+        ? result.products.map(mapPricingProduct)
+        : [];
+
+      const scannedMatch = products.find(
+        (p) => String(p.sku || "").trim().toLowerCase() === normalizedCode,
+      );
+
+      if (scannedMatch) {
+        addToCart(scannedMatch);
+      } else {
+        alert(`No item found for scanned code: ${scannedCode}`);
+        setproductsearch("");
+      }
+    } catch (error) {
+      console.error("Failed to look up scanned item:", error);
+      alert("Failed to look up scanned item.");
+    }
   };
 
   const updateQuantityByInput = (lineId, value) => {
@@ -2187,6 +2350,30 @@ const Orderlist = ({
     0,
   );
 
+  // F12 = "Proceed to Payment" shortcut, matching the retail cart button label.
+  // Same behavior as Kiosk mode: auto-save the order, then jump to /payments.
+  useEffect(() => {
+    if (!isRetailPosMode) return undefined;
+
+    const handleKeyDown = (e) => {
+      if (e.key !== "F12") return;
+      e.preventDefault();
+      if (totalItems === 0 || summaryCart || isKioskCharging) return;
+      handleKioskCharge();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isRetailPosMode, totalItems, summaryCart, isKioskCharging]);
+
+  // Retail POS: land straight in the scan box on open so the register is
+  // always ready for the next barcode without an extra click.
+  useEffect(() => {
+    if (isRetailPosMode) {
+      searchInputRef.current?.focus();
+    }
+  }, [isRetailPosMode]);
+
   // Push live cart to the customer-facing second screen (Kiosk mode only)
   useEffect(() => {
     if (layoutMode !== "Kiosk" || !window.kioskAPI?.updateCart) return;
@@ -2782,20 +2969,91 @@ const Orderlist = ({
     }
   };
 
+  // Retail POS: the scanned cart list renders in the roomy center column
+  // (below the search bar) instead of the narrow right sidebar, so cashiers
+  // have more space to review/adjust items while scanning.
+  const cartItemsListNode = (
+    <>
+      {visibleAdditionalCartItems.length > 0 && (
+        <div
+          className="p-4 pt-2 border-t"
+          style={{ borderColor: "var(--app-border)" }}
+        >
+          <h4 className="mb-3 text-xs font-bold tracking-widest uppercase text-emerald-500">
+            New Items
+          </h4>
+          <CartList
+            items={visibleAdditionalCartItems}
+            updateQuantity={updateQuantity}
+            updateQuantityByInput={updateQuantityByInput}
+            removeItem={requestRemoveItem}
+            readOnly={false}
+            openItemInstructionModal={openItemInstructionModal}
+          />
+        </div>
+      )}
+
+      {loadedCartItems.length > 0 && (
+        <div className="p-4 pb-2">
+          <h4
+            className="mb-3 text-xs font-bold tracking-widest uppercase"
+            style={{ color: "var(--app-muted-text)" }}
+          >
+            Recent Orders
+          </h4>
+          <CartList
+            items={recentDisplayItems}
+            updateQuantity={updateRecentDisplayQuantity}
+            updateQuantityByInput={updateRecentDisplayQuantityByInput}
+            removeItem={requestRemoveItem}
+            readOnly={false}
+            openItemInstructionModal={openItemInstructionModal}
+            showInstructionButton={false}
+          />
+        </div>
+      )}
+
+      {loadedCartItems.length === 0 &&
+        visibleAdditionalCartItems.length === 0 && (
+          <CartList
+            items={[]}
+            updateQuantity={updateQuantity}
+            updateQuantityByInput={updateQuantityByInput}
+            removeItem={removeItem}
+            readOnly={false}
+            openItemInstructionModal={openItemInstructionModal}
+            emptyStateText={
+              isRetailPosMode ? "No items scanned yet." : undefined
+            }
+          />
+        )}
+    </>
+  );
+
   return (
     <>
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className={`fixed inset-0 z-[100] flex items-center justify-center p-0 backdrop-blur-xl sm:p-4 ${
-          isDark ? "bg-slate-950/80" : "bg-slate-200/70"
+        className={`fixed inset-0 z-[100] flex items-center justify-center ${
+          isRetailPosMode
+            ? ""
+            : `p-0 backdrop-blur-xl sm:p-4 ${
+                isDark ? "bg-slate-950/80" : "bg-slate-200/70"
+              }`
         }`}
       >
         <div
-          className={`flex h-full w-full max-w-7xl flex-col overflow-hidden shadow-2xl transition-colors sm:rounded-3xl ${
-            isDark
-              ? "border border-white/10 bg-slate-900/50"
-              : "border border-slate-200 bg-white"
+          className={`flex h-full w-full flex-col overflow-hidden transition-colors ${
+            isRetailPosMode
+              ? isDark
+                ? "bg-slate-900"
+                : "bg-white"
+              : `max-w-7xl shadow-2xl sm:rounded-3xl ${
+                  isDark
+                    ? "border border-white/10 bg-slate-900/50"
+                    : "border border-slate-200 bg-white"
+                }`
           }`}
         >
           <div
@@ -2806,6 +3064,7 @@ const Orderlist = ({
             }`}
           >
             <div className="flex items-center gap-4">
+              {!isRetailPosMode && (
               <button
                 onClick={() => setShowMobileCats(!showMobileCats)}
                 className={`rounded-xl p-3 transition-colors md:hidden ${
@@ -2816,6 +3075,7 @@ const Orderlist = ({
               >
                 <FaFilter />
               </button>
+              )}
 
               <div className="flex items-center justify-between gap-4">
                 {/* Left Side: Table Info */}
@@ -2949,6 +3209,8 @@ const Orderlist = ({
                       }).catch(() => {});
                     }
                     navigate("/poscorehomescreen");
+                  } else if (isRetailPosMode) {
+                    navigate("/poscorehomescreen");
                   }
                 }}
                 className={`rounded-full p-2 transition-colors ${
@@ -2963,6 +3225,7 @@ const Orderlist = ({
           </div>
 
           <div className="relative flex flex-1 min-h-0">
+            {!isRetailPosMode && (
             <aside
               className={`no-scrollbar absolute z-20 h-full min-h-0 w-64 overflow-auto transition-transform duration-300 md:relative ${
                 showMobileCats
@@ -3038,6 +3301,7 @@ const Orderlist = ({
               </div>
               )}
 
+              {!isRetailPosMode && (
               <div className="flex flex-col h-full p-4">
                 <h3
                   className={`mb-4 px-2 text-[10px] font-bold uppercase tracking-widest ${
@@ -3077,7 +3341,9 @@ const Orderlist = ({
                   ))}
                 </div>
               </div>
+              )}
             </aside>
+            )}
 
             <main
               className={`flex min-h-0 min-w-0 flex-1 flex-col transition-colors ${
@@ -3131,19 +3397,73 @@ const Orderlist = ({
                 <div className="relative">
                   <FaSearch
                     className={`absolute left-4 top-1/2 -translate-y-1/2 ${
-                      isDark ? "text-slate-500" : "text-slate-400"
+                      isRetailPosMode
+                        ? ""
+                        : isDark ? "text-slate-500" : "text-slate-400"
                     }`}
+                    style={isRetailPosMode ? { color: "var(--app-accent)" } : undefined}
                   />
                   <input
+                    ref={searchInputRef}
                     type="text"
-                    placeholder="Search delicious food..."
+                    autoFocus={isRetailPosMode}
+                    placeholder={
+                      isRetailPosMode
+                        ? "Scan Item Barcode or Type SKU..."
+                        : "Search delicious food..."
+                    }
                     value={productsearch}
                     onChange={(e) => setproductsearch(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (isRetailPosMode && e.key === "Enter") {
+                        e.preventDefault();
+                        handleScanSubmit(productsearch);
+                      }
+                    }}
+                    onBlur={(e) => {
+                      if (!isRetailPosMode) return;
+
+                      // Don't steal focus from real form fields (quantity boxes,
+                      // the service type dropdown, modal inputs, etc.)
+                      const nextTarget = e.relatedTarget;
+                      const isFormField =
+                        nextTarget &&
+                        ["INPUT", "TEXTAREA", "SELECT"].includes(
+                          nextTarget.tagName,
+                        );
+
+                      if (
+                        isFormField ||
+                        showDiscountModal ||
+                        selectedInstructionItem ||
+                        summaryCart ||
+                        showTransferModal ||
+                        showTransferConfirmModal
+                      ) {
+                        return;
+                      }
+
+                      window.setTimeout(() => {
+                        searchInputRef.current?.focus();
+                      }, 0);
+                    }}
                     className={`w-full rounded-2xl border py-3 pl-12 pr-4 outline-none transition-colors ${
+                      isRetailPosMode
+                        ? "border-2 font-semibold"
+                        : "border"
+                    } ${
                       isDark
                         ? "border-slate-700 bg-slate-800/40 text-white focus:border-blue-500/50"
                         : "border-slate-300 bg-white text-slate-900 focus:border-blue-400"
                     }`}
+                    style={
+                      isRetailPosMode
+                        ? {
+                            borderColor: "var(--app-accent)",
+                            boxShadow: "0 8px 24px var(--app-accent-glow)",
+                          }
+                        : undefined
+                    }
                   />
                 </div>
               </div>
@@ -3210,6 +3530,18 @@ const Orderlist = ({
                 </div>
               )}
 
+{isRetailPosMode &&
+totalItems === 0 &&
+!productsearch.trim() &&
+!selectedSubcategory ? (
+  <RetailEmptyState />
+) : isRetailPosMode && !productsearch.trim() && !selectedSubcategory ? (
+  // Retail POS: show the scanned cart here, below the search bar, instead of
+  // the narrow right sidebar — more room to review items while scanning.
+  <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
+    {cartItemsListNode}
+  </div>
+) : (
 <div className="flex-1 min-h-0 overflow-hidden">
   <div className="h-full p-6 pt-2 overflow-y-auto no-scrollbar">
     <div className="grid grid-cols-2 gap-6 p-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4">
@@ -3351,6 +3683,7 @@ const Orderlist = ({
     </div>
   </div>
 </div>
+)}
             </main>
 
             {layoutMode === "Kiosk" ? (
@@ -3388,8 +3721,25 @@ const Orderlist = ({
                   color: "var(--app-text)",
                 }}
               >
-                <FaShoppingCart style={{ color: "var(--app-accent)" }} /> Cart
-                Summary
+                {isRetailPosMode ? (
+                  <>
+                    <FaShoppingCart style={{ color: "var(--app-accent)" }} />
+                    Order #{transactionId || "—"}
+                    {totalItems === 0 && (
+                      <span
+                        className="text-xs font-bold"
+                        style={{ color: "var(--app-accent)" }}
+                      >
+                        (New Transaction)
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <FaShoppingCart style={{ color: "var(--app-accent)" }} /> Cart
+                    Summary
+                  </>
+                )}
                 {isCartFromDB && (
                   <span className="ml-auto rounded-full border border-green-500/20 bg-green-500/10 px-2 py-1 text-[10px] text-green-400">
                     Loaded Order
@@ -3397,19 +3747,126 @@ const Orderlist = ({
                 )}
               </div>
 
+              {isRetailPosMode && (
+                <div className="px-4 pt-4">
+                  <label
+                    className={`mb-2 block px-1 text-[10px] font-bold uppercase tracking-[0.2em] ${
+                      isDark ? "text-slate-500" : "text-slate-400"
+                    }`}
+                  >
+                    Service Type
+                  </label>
+
+                  <div className="relative group">
+                    <select
+                      value={selectedSalesType}
+                      onChange={(e) => setSelectedSalesType(e.target.value)}
+                      className={`w-full cursor-pointer appearance-none rounded-2xl py-3.5 pl-5 pr-12 text-sm font-semibold outline-none transition-all duration-300 ${
+                        isDark
+                          ? "border border-slate-700 bg-slate-800/40 text-white focus:border-blue-500/50 focus:bg-slate-800/60"
+                          : "border border-slate-200 bg-white text-slate-900 shadow-sm focus:border-blue-400 focus:shadow-md"
+                      }`}
+                    >
+                      <option value="" disabled>
+                        Choose Sales Type...
+                      </option>
+                      {salesTypeList.map((item) => (
+                        <option
+                          key={item.sales_type_id}
+                          value={String(item.sales_type_id)}
+                          className={
+                            isDark
+                              ? "bg-slate-900 text-white"
+                              : "bg-white text-slate-900"
+                          }
+                        >
+                          {item.sales_type || item.description}
+                        </option>
+                      ))}
+                    </select>
+
+                    <div className="absolute transition-transform -translate-y-1/2 pointer-events-none right-4 top-1/2 group-focus-within:rotate-180">
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 12 12"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                        className={isDark ? "text-slate-500" : "text-slate-400"}
+                      >
+                        <path
+                          d="M2.5 4.5L6 8L9.5 4.5"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </div>
+
+                    {isDark && (
+                      <div className="pointer-events-none absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-blue-500/20 to-cyan-500/20 opacity-0 blur transition duration-500 group-hover:opacity-100" />
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {isRetailPosMode && (
+                <div
+                  className="mx-4 mt-4 rounded-2xl border p-3 text-xs space-y-1.5"
+                  style={{
+                    borderColor: "var(--app-border)",
+                    background: "var(--app-surface)",
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <span style={{ color: "var(--app-muted-text)" }}>Sub Total</span>
+                    <span style={{ color: "var(--app-text)" }}>₱{totalPrice.toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span style={{ color: "var(--app-muted-text)" }}>Discounts</span>
+                    <span style={{ color: "var(--app-text)" }}>---</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span style={{ color: "var(--app-muted-text)" }}>Tax</span>
+                    <span style={{ color: "var(--app-text)" }}>---</span>
+                  </div>
+                  <div
+                    className="flex items-center justify-between pt-1.5 mt-1 border-t font-bold"
+                    style={{ borderColor: "var(--app-border)" }}
+                  >
+                    <span style={{ color: "var(--app-text)" }}>Total</span>
+                    <span style={{ color: "var(--app-accent)" }}>₱{totalPrice.toLocaleString()}</span>
+                  </div>
+                </div>
+              )}
+
               <button
-                onClick={() => setSummaryCart(true)}
-                className="flex items-center justify-center gap-2 px-4 py-3 mx-4 mt-4 text-sm font-semibold text-gray-100 rounded-2xl"
+                onClick={() =>
+                  isRetailPosMode ? handleKioskCharge() : setSummaryCart(true)
+                }
+                disabled={
+                  isRetailPosMode
+                    ? totalItems === 0 || isKioskCharging
+                    : false
+                }
+                className="flex items-center justify-center gap-2 px-4 py-3 mx-4 mt-4 text-sm font-semibold text-gray-100 rounded-2xl disabled:opacity-50"
                 style={{
                   background:
                     "linear-gradient(180deg, var(--app-accent) 0%, var(--app-accent-secondary) 100%)",
                   boxShadow: "0 12px 28px var(--app-accent-glow)",
                 }}
               >
-                <FaReceipt /> View Full Summary
+                <FaReceipt />
+                {isRetailPosMode
+                  ? isKioskCharging
+                    ? "Processing..."
+                    : "Proceed to Payment (F12)"
+                  : "View Full Summary"}
               </button>
 
               <div className="absolute right-4 top-[10px] z-20 flex flex-row items-center gap-2">
+                {!isRetailPosMode && (
                 <button
                   onClick={() => setShowDesktopCartActions((prev) => !prev)}
                   className="inline-flex items-center justify-center h-10 px-4 text-sm font-semibold text-gray-100 transition rounded-xl"
@@ -3421,6 +3878,7 @@ const Orderlist = ({
                 >
                   Save
                 </button>
+                )}
 
                 {canPrintOnly && (
                   <ButtonComponent
@@ -3436,58 +3894,13 @@ const Orderlist = ({
                 )}
               </div>
 
-              <div className="flex-1 min-h-0 pr-2 overflow-y-auto">
-                {visibleAdditionalCartItems.length > 0 && (
-                  <div
-                    className="p-4 pt-2 border-t"
-                    style={{ borderColor: "var(--app-border)" }}
-                  >
-                    <h4 className="mb-3 text-xs font-bold tracking-widest uppercase text-emerald-500">
-                      New Items
-                    </h4>
-                    <CartList
-                      items={visibleAdditionalCartItems}
-                      updateQuantity={updateQuantity}
-                      updateQuantityByInput={updateQuantityByInput}
-                      removeItem={requestRemoveItem}
-                      readOnly={false}
-                      openItemInstructionModal={openItemInstructionModal}
-                    />
-                  </div>
-                )}
-
-                {loadedCartItems.length > 0 && (
-                  <div className="p-4 pb-2">
-                    <h4
-                      className="mb-3 text-xs font-bold tracking-widest uppercase"
-                      style={{ color: "var(--app-muted-text)" }}
-                    >
-                      Recent Orders
-                    </h4>
-                    <CartList
-                      items={recentDisplayItems}
-                      updateQuantity={updateRecentDisplayQuantity}
-                      updateQuantityByInput={updateRecentDisplayQuantityByInput}
-                      removeItem={requestRemoveItem}
-                      readOnly={false}
-                      openItemInstructionModal={openItemInstructionModal}
-                      showInstructionButton={false}
-                    />
-                  </div>
-                )}
-
-                {loadedCartItems.length === 0 &&
-                  visibleAdditionalCartItems.length === 0 && (
-                    <CartList
-                      items={[]}
-                      updateQuantity={updateQuantity}
-                      updateQuantityByInput={updateQuantityByInput}
-                      removeItem={removeItem}
-                      readOnly={false}
-                      openItemInstructionModal={openItemInstructionModal}
-                    />
-                  )}
-              </div>
+              {/* Retail POS: cart list now renders in the center column below
+                  the search bar (more room while scanning) instead of here. */}
+              {!isRetailPosMode && (
+                <div className="flex-1 min-h-0 pr-2 overflow-y-auto">
+                  {cartItemsListNode}
+                </div>
+              )}
 
               <AnimatePresence>
                 {showDeleteItemModal && (
@@ -5722,6 +6135,7 @@ const CartList = ({
   extraClassName = "",
   openItemInstructionModal,
   showInstructionButton = true,
+  emptyStateText = "Your cart is feeling empty",
 }) => (
   <div className={`flex-1 space-y-3 overflow-y-auto p-4 ${extraClassName}`}>
     {items.length === 0 ? (
@@ -5731,7 +6145,7 @@ const CartList = ({
           style={{ color: "var(--app-muted-text)" }}
         />
         <p className="font-medium" style={{ color: "var(--app-muted-text)" }}>
-          Your cart is feeling empty
+          {emptyStateText}
         </p>
       </div>
     ) : (

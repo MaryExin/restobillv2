@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { FiUsers, FiSave, FiLoader, FiShoppingCart } from "react-icons/fi";
 import useApiHost from "../../../hooks/useApiHost";
+import PosDiscountTypeSettings from "./PosDiscountTypeSettings";
 
 const MODES = [
   {
@@ -198,6 +199,8 @@ const PosDiscountMode = ({ isDark, accent = "#3b82f6" }) => {
       {isLoading && (
         <p className={`text-center text-sm ${theme.textSoft}`}>Loading…</p>
       )}
+
+      <PosDiscountTypeSettings isDark={isDark} accent={accent} />
     </div>
   );
 };

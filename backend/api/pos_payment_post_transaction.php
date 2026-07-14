@@ -83,6 +83,25 @@ function getDiscountCeiling(PDO $pdo): float
     return $amount > 0 ? moneyRound($amount) : 0.0;
 }
 
+function getLoyaltyEarningRuleAmount(PDO $pdo): float
+{
+    $stmt = $pdo->prepare("
+        SELECT `value`
+        FROM tbl_pos_settings
+        WHERE category = :category
+          AND description = :description
+        ORDER BY ID DESC
+        LIMIT 1
+    ");
+    $stmt->execute([
+        ":category" => "Loyalty",
+        ":description" => "Loyalty Earning Rule (PHP per Point)",
+    ]);
+
+    $amount = (float)($stmt->fetchColumn() ?: 0);
+    return $amount > 0 ? moneyRound($amount) : 100.00;
+}
+
 function applyDiscountCeilingToBreakdown(array $breakdown, float $ceilingAmount): array
 {
     $rawTotal = 0.0;
@@ -277,6 +296,10 @@ try {
     $payments = is_array($body["payments"] ?? null) ? $body["payments"] : [];
     $other_charges = is_array($body["other_charges"] ?? null) ? $body["other_charges"] : [];
 
+    $loyalty_member_id = (int)($body["loyalty_member_id"] ?? 0);
+    $loyalty_points_redeemed = (int)($body["loyalty_points_redeemed"] ?? 0);
+    $loyalty_discount_amount = (float)($body["loyalty_discount_amount"] ?? 0);
+
     $discountCeiling = getDiscountCeiling($pdo);
     if ($discountCeiling > 0 && $Discount > $discountCeiling) {
         $discount_breakdown = applyDiscountCeilingToBreakdown($discount_breakdown, $discountCeiling);
@@ -443,6 +466,7 @@ try {
             payment_method = :payment_method,
             change_amount = :change_amount,
             short_over = :short_over,
+            cashier = :cashier,
             remarks = 'Paid',
             status = 'Active',
             date_recorded = NOW()
@@ -471,6 +495,7 @@ try {
         ":payment_method" => $payment_method,
         ":change_amount" => $change_amount,
         ":short_over" => $short_over,
+        ":cashier" => $cashier,
         ":transaction_id" => $transaction_id,
         ":Category_Code" => $Category_Code,
         ":Unit_Code" => $Unit_Code,
@@ -873,6 +898,102 @@ try {
             $stmtInactive = $pdo->prepare($sqlInactive);
             $stmtInactive->execute($params);
         }
+    }
+
+    /* ----------------------------------------
+       loyalty points: redeem + earn, applied together as one net delta
+       - redeemed points are whole numbers (cashier-entered); earned points
+         are fractional (TotalAmountDue / earning rule, kept to 2 decimals,
+         not floored) -- both are applied in a single balance update so the
+         resulting balance is exact, e.g. 100 - 20 + 1.40 = 81.40
+       - logged to tbl_pos_loyalty_discounts, kept separate from
+         tbl_pos_transactions_discounts (statutory discounts)
+    ---------------------------------------- */
+    if ($loyalty_member_id > 0) {
+        $memberStmt = $pdo->prepare("
+            SELECT id, customer_name, phone_number, loyalty_points
+            FROM lkp_loyalty_cs_name
+            WHERE id = :id
+            FOR UPDATE
+        ");
+        $memberStmt->execute([":id" => $loyalty_member_id]);
+        $member = $memberStmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$member) {
+            throw new Exception("Loyalty member not found.");
+        }
+
+        $currentBalance = (float)$member["loyalty_points"];
+        if ($loyalty_points_redeemed > $currentBalance) {
+            throw new Exception("Loyalty points redeemed exceed the member's current balance.");
+        }
+
+        $loyaltyEarningRuleAmount = getLoyaltyEarningRuleAmount($pdo);
+        $loyaltyPointsEarned = $loyaltyEarningRuleAmount > 0
+            ? moneyRound($TotalAmountDue / $loyaltyEarningRuleAmount)
+            : 0.0;
+
+        $netPointsChange = moneyRound($loyaltyPointsEarned - $loyalty_points_redeemed);
+
+        if ($netPointsChange !== 0.0) {
+            $adjustPointsStmt = $pdo->prepare("
+                UPDATE lkp_loyalty_cs_name
+                SET loyalty_points = loyalty_points + :delta
+                WHERE id = :id
+            ");
+            $adjustPointsStmt->execute([
+                ":delta" => $netPointsChange,
+                ":id" => $loyalty_member_id,
+            ]);
+        }
+
+        $insertLoyaltyDiscountStmt = $pdo->prepare("
+            INSERT INTO tbl_pos_loyalty_discounts (
+                transaction_id,
+                Category_Code,
+                Unit_Code,
+                Project_Code,
+                transaction_date,
+                loyalty_member_id,
+                customer_name,
+                phone_number,
+                points_redeemed,
+                points_earned,
+                discount_amount,
+                status,
+                usertracker,
+                created_at
+            ) VALUES (
+                :transaction_id,
+                :Category_Code,
+                :Unit_Code,
+                :Project_Code,
+                :transaction_date,
+                :loyalty_member_id,
+                :customer_name,
+                :phone_number,
+                :points_redeemed,
+                :points_earned,
+                :discount_amount,
+                'Active',
+                :usertracker,
+                NOW()
+            )
+        ");
+        $insertLoyaltyDiscountStmt->execute([
+            ":transaction_id" => $transaction_id,
+            ":Category_Code" => $Category_Code,
+            ":Unit_Code" => $Unit_Code,
+            ":Project_Code" => $Project_Code,
+            ":transaction_date" => $transaction_date,
+            ":loyalty_member_id" => $loyalty_member_id,
+            ":customer_name" => $member["customer_name"],
+            ":phone_number" => $member["phone_number"],
+            ":points_redeemed" => $loyalty_points_redeemed,
+            ":points_earned" => $loyaltyPointsEarned,
+            ":discount_amount" => moneyRound($loyalty_discount_amount),
+            ":usertracker" => $cashier,
+        ]);
     }
 
     $stmtFinal = $pdo->prepare("

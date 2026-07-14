@@ -46,6 +46,20 @@ $item_category   = trim($input["item_category"] ?? "");
 $search          = trim($input["search"] ?? "");
 $limit           = (int)($input["limit"] ?? 50);
 
+// Optional: look up pricing for a specific set of product codes (e.g. to
+// re-price items already sitting in the cart when the sales type changes),
+// bypassing the item_category/search filters below.
+$codes = [];
+if (isset($input["codes"]) && is_array($input["codes"])) {
+    foreach ($input["codes"] as $code) {
+        $code = trim((string)$code);
+        if ($code !== "") {
+            $codes[] = $code;
+        }
+    }
+    $codes = array_values(array_unique($codes));
+}
+
 if ($limit <= 0) {
     $limit = 50;
 }
@@ -133,12 +147,21 @@ try {
     $where[] = "T1.pricing_code = :pricing_category";
     $params[":pricing_category"] = $pricing_category;
 
-    if ($item_category !== "" && $search === "") {
+    if (!empty($codes)) {
+        $codePlaceholders = [];
+        foreach ($codes as $i => $code) {
+            $placeholder = ":code_{$i}";
+            $codePlaceholders[] = $placeholder;
+            $params[$placeholder] = $code;
+        }
+        $where[] = "T1.inv_code IN (" . implode(", ", $codePlaceholders) . ")";
+        $limit = count($codes);
+    } elseif ($item_category !== "" && $search === "") {
         $where[] = "T2.item_category = :item_category";
         $params[":item_category"] = $item_category;
     }
 
-    if ($search !== "") {
+    if (empty($codes) && $search !== "") {
         $where[] = "(
             T2.item_name LIKE :search
             OR T2.item_description LIKE :search

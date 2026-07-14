@@ -1023,7 +1023,7 @@ export default function PosPayment() {
   const remarksInputRef = useRef(null);
 
   // Push payment-phase state to the Kiosk second screen when the payment modal is open
-  const handleSecondScreenPaymentPhase = useCallback((method, txItems = []) => {
+  const handleSecondScreenPaymentPhase = useCallback((method, txItems = [], summary = null) => {
     if (layoutMode !== "Kiosk" || !window.kioskAPI?.updateCart) return;
     const payload = {
       phase: method ? "payment" : "transaction",
@@ -1031,6 +1031,9 @@ export default function PosPayment() {
     };
     if (method && Array.isArray(txItems) && txItems.length > 0) {
       payload.items = txItems;
+    }
+    if (method && summary) {
+      payload.paymentSummary = summary;
     }
     window.kioskAPI.updateCart(payload).catch(() => {});
   }, [layoutMode]);
@@ -1481,7 +1484,10 @@ export default function PosPayment() {
       localStorage.getItem("id") ||
       "";
 
-    const userName = localStorage.getItem("Cashier") || "Store Crew";
+    const userName =
+      localStorage.getItem("username") ||
+      localStorage.getItem("Cashier") ||
+      "Store Crew";
 
     const selectedAdmin = adminAccounts.find(
       (admin) =>

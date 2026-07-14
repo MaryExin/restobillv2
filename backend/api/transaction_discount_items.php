@@ -218,11 +218,27 @@ try {
         "manual" => 0,
     ];
 
+    // Generic bucket, by exact discount_type label, so custom (non-statutory)
+    // discount lines added via the Discount Types picker also survive reopening
+    // a saved-but-unpaid order -- discount_counts above only understands the
+    // 5 original hardcoded types.
+    $discountCountsByLabel = [];
+
     foreach ($discountRows as $row) {
         $key = normalizeDiscountTypeKey($row["discount_type"] ?? "");
         if ($key !== "") {
             $discountCounts[$key]++;
         }
+
+        $label = trim((string)($row["discount_type"] ?? ""));
+        if ($label === "") {
+            continue;
+        }
+        if (!isset($discountCountsByLabel[$label])) {
+            $discountCountsByLabel[$label] = ["count" => 0, "amount" => 0.0];
+        }
+        $discountCountsByLabel[$label]["count"]++;
+        $discountCountsByLabel[$label]["amount"] += (float)($row["discount_amount"] ?? 0);
     }
 
     echo json_encode([
@@ -230,6 +246,7 @@ try {
         "message" => "Discount items fetched successfully.",
         "transaction_summary" => $transactionSummary,
         "discount_counts" => $discountCounts,
+        "discount_counts_by_label" => $discountCountsByLabel,
         "discount_rows" => $discountRows,
         "items" => $rows,
     ]);
@@ -246,6 +263,7 @@ try {
             "soloParent" => 0,
             "manual" => 0,
         ],
+        "discount_counts_by_label" => [],
         "discount_rows" => [],
         "items" => [],
     ]);

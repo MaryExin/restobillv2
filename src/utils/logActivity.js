@@ -16,6 +16,7 @@
 
 import useZustandLoginCred from "../context/useZustandLoginCred";
 import useZustandIMSBusunitCode from "../context/useZustandIMSBusunitCode";
+import { parseIpConfigText } from "./parseIpConfig";
 
 // ── Activity type constants (type_of_activity column) ────────────────────────
 export const LOG = Object.freeze({
@@ -40,7 +41,9 @@ async function resolveApiHost() {
       return String(host || "").trim().replace(/\/+$/, "");
     }
     const res = await fetch("./ip.txt", { cache: "no-store" });
-    return (await res.text()).trim().replace(/\/+$/, "");
+    const txt = await res.text();
+    const map = parseIpConfigText(txt);
+    return (map.LOCAL || txt).trim().replace(/\/+$/, "");
   } catch {
     return "http://localhost";
   }

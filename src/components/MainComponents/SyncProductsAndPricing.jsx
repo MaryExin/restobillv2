@@ -25,6 +25,8 @@ import { useNavigate } from "react-router-dom";
 import { useTheme } from "../../context/ThemeContext";
 import useCustomQuery from "../../hooks/useCustomQuery";
 import { useCustomSecuredMutation } from "../../hooks/useCustomSecuredMutation";
+import useApiHost from "../../hooks/useApiHost";
+import useWebApiHost from "../../hooks/useWebApiHost";
 
 import ProductImage from "../Common/ProductImage";
 import ModalYesNoReusable from "../Modals/ModalYesNoReusable";
@@ -748,28 +750,25 @@ const SyncProductsAndPricing = () => {
     return params.toString();
   }, [selectedPricingCodes]);
 
-  const imageBaseUrl =
-    import.meta.env.VITE_WEBAPIENDPOINT + import.meta.env.VITE_PRODUCT_IMAGES;
+  const apiHost = useApiHost();
+  const webApiHost = useWebApiHost();
+
+  const imageBaseUrl = webApiHost + import.meta.env.VITE_PRODUCT_IMAGES;
 
   const localReadUrl = useMemo(() => {
-    const base =
-      import.meta.env.VITE_LOCALAPIENDPOINT +
-      import.meta.env.VITE_PRODUCT_SYNC_LOCAL_READ_ENDPOINT;
+    const base = apiHost + import.meta.env.VITE_PRODUCT_SYNC_LOCAL_READ_ENDPOINT;
 
     return pricingQueryString ? `${base}?${pricingQueryString}` : base;
-  }, [pricingQueryString]);
+  }, [apiHost, pricingQueryString]);
 
   const webReadUrl =
-    import.meta.env.VITE_WEBAPIENDPOINT +
-    import.meta.env.VITE_PRODUCT_SYNC_WEB_READ_ENDPOINT;
+    webApiHost + import.meta.env.VITE_PRODUCT_SYNC_WEB_READ_ENDPOINT;
 
   const webExportUrl =
-    import.meta.env.VITE_WEBAPIENDPOINT +
-    import.meta.env.VITE_PRODUCT_SYNC_WEB_EXPORT_ENDPOINT;
+    webApiHost + import.meta.env.VITE_PRODUCT_SYNC_WEB_EXPORT_ENDPOINT;
 
   const localMutateUrl =
-    import.meta.env.VITE_LOCALAPIENDPOINT +
-    import.meta.env.VITE_PRODUCT_SYNC_LOCAL_MUTATE_ENDPOINT;
+    apiHost + import.meta.env.VITE_PRODUCT_SYNC_LOCAL_MUTATE_ENDPOINT;
 
   const {
     data: localReadData,

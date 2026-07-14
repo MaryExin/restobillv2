@@ -46,7 +46,7 @@ const useZustandLayoutMode = create((set, get) => ({
     if (!apiHost || get().isLoaded) return;
     set({ _apiHost: apiHost });
     try {
-      const res = await fetch(`${apiHost}/pos_layout_mode.php`, { cache: "no-store" });
+      const res = await fetch(`${apiHost}/api/pos_layout_mode.php`, { cache: "no-store" });
       if (!res.ok) { set({ isLoaded: true }); return; }
       const json = await res.json();
       const mode =
@@ -70,7 +70,7 @@ const useZustandLayoutMode = create((set, get) => ({
     broadcastLayoutModeChanged(mode);
     const apiHost = get()._apiHost;
     if (apiHost) {
-      fetch(`${apiHost}/pos_layout_mode.php`, {
+      fetch(`${apiHost}/api/pos_layout_mode.php`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

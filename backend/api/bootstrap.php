@@ -1,11 +1,21 @@
 <?php
 
-require dirname(__DIR__) . "/vendor/autoload.php";
+$backendDir = dirname(__DIR__);
+$autoloadPath = $backendDir . "/vendor/autoload.php";
 
-set_error_handler("ErrorHandler::handleError");
-set_exception_handler("ErrorHandler::handleException");
+if (file_exists($autoloadPath)) {
+    require $autoloadPath;
+}
 
-$dotenv = Dotenv\Dotenv::createImmutable(dirname(__DIR__));
-$dotenv->load();
+require_once $backendDir . "/src/ErrorHandler.php";
+
+set_error_handler([ErrorHandler::class, "handleError"]);
+set_exception_handler([ErrorHandler::class, "handleException"]);
+
+$dotenvClass = "Dotenv\\Dotenv";
+if (class_exists($dotenvClass)) {
+    $dotenv = $dotenvClass::createImmutable($backendDir);
+    $dotenv->load();
+}
 
 header("Content-type: application/json; charset=UTF-8");

@@ -24,6 +24,8 @@ import useCustomQuery from "../../hooks/useCustomQuery";
 import useZustandLoginCred from "../../context/useZustandLoginCred";
 import useZustandAPIEndpoint from "../../context/useZustandAPIEndpoint";
 import useZustandCompanyCode from "../../context/useZustandCompanyCode";
+import useApiHost from "../../hooks/useApiHost";
+import useWebApiHost from "../../hooks/useWebApiHost";
 
 import ModalYesNoReusable from "../Modals/ModalYesNoReusable";
 import ModalUpdateTask from "../Modals/ModalUpdateTask";
@@ -69,14 +71,16 @@ const CmpMemberProfile = () => {
   const { endpoint } = useZustandAPIEndpoint();
   const { companyGlobalCode, setGlobalCompanyCode } = useZustandCompanyCode();
   const { userId, roles } = useZustandLoginCred();
+  const localApiHost = useApiHost();
+  const webApiHost = useWebApiHost();
 
   // ✅ SAFE API HOST RESOLVER
   const apiHost = useMemo(() => {
     const candidates = [
       localStorage.getItem("apiendpoint"),
       endpoint,
-      import.meta.env.VITE_LOCALAPIENDPOINT,
-      import.meta.env.VITE_WEBAPIENDPOINT,
+      localApiHost,
+      webApiHost,
     ];
 
     const validBase = candidates.find((value) => {
@@ -91,7 +95,7 @@ const CmpMemberProfile = () => {
     });
 
     return String(validBase || "").replace(/\/+$/, "");
-  }, [endpoint]);
+  }, [endpoint, localApiHost, webApiHost]);
 
   // ✅ SAFE URL BUILDER
   const buildApiUrl = useMemo(() => {

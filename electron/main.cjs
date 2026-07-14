@@ -183,6 +183,10 @@ function getPrinterConfigMap() {
   return parsePrinterConfigMap(readTextFileSafe(getPrinterFilePath()));
 }
 
+function getIpConfigMap() {
+  return parsePrinterConfigMap(readTextFileSafe(getIpFilePath()));
+}
+
 function readJsonFileSafe(filePath, fallback = {}) {
   try {
     const raw = fs.readFileSync(filePath, "utf8");
@@ -4776,9 +4780,19 @@ app.whenReady().then(() => {
     try {
       const ipPath = getIpFilePath();
       console.log("Reading ip.txt from:", ipPath);
-      return readTextFileSafe(ipPath);
+      const map = getIpConfigMap();
+      return map.LOCAL || readTextFileSafe(ipPath);
     } catch (error) {
       console.error("Failed to read ip.txt:", error);
+      return "";
+    }
+  });
+
+  ipcMain.handle("get-web-api-host", () => {
+    try {
+      return getIpConfigMap().WEB || "";
+    } catch (error) {
+      console.error("Failed to read WEB endpoint from ip.txt:", error);
       return "";
     }
   });

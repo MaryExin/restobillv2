@@ -107,7 +107,54 @@ const CartPanel = ({ groupedItems, totalItems, totalPrice, count }) => {
   );
 };
 
-const QRPanel = ({ paymentMethod, serverOrigin }) => {
+const SummaryLine = ({ label, value, danger = false }) => (
+  <div className="flex items-center justify-between gap-3 text-[11px]">
+    <span className="font-bold uppercase tracking-wide text-slate-500">{label}</span>
+    <span className={`font-black text-right ${danger ? "text-red-500" : "text-slate-800"}`}>
+      {value}
+    </span>
+  </div>
+);
+
+const PaymentSummaryCard = ({ summary }) => {
+  if (!summary) return null;
+
+  return (
+    <div className="w-full max-w-xs rounded-[1.5rem] bg-white shadow-xl ring-1 ring-slate-200 px-5 py-4">
+      <p className="text-[9px] font-black uppercase tracking-[0.25em] text-slate-400 mb-3">
+        Payment Summary
+      </p>
+
+      <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 mb-3">
+        <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">
+          Total Amount Due
+        </p>
+        <p className="text-xl font-black text-emerald-600">
+          {formatPeso(summary.totalAmountDue)}
+        </p>
+      </div>
+
+      <div className="space-y-1.5">
+        <SummaryLine label="Total Sales" value={formatPeso(summary.totalSales)} />
+        <SummaryLine label="Discount" value={`- ${formatPeso(summary.discount)}`} danger />
+        <SummaryLine label="VAT Exemption" value={`- ${formatPeso(summary.vatExemption)}`} danger />
+        <SummaryLine label="Payment Received" value={formatPeso(summary.paymentReceived)} />
+        <SummaryLine label="Change" value={formatPeso(summary.change)} />
+      </div>
+
+      <div className="mt-3 pt-3 border-t border-slate-100 space-y-1.5">
+        <SummaryLine label="Discount Type" value={summary.discountType || "No Discount"} />
+        <SummaryLine
+          label="Qualified Customers"
+          value={`${summary.qualifiedCustomers ?? 0}/${summary.totalCustomers ?? 0}`}
+        />
+        <SummaryLine label="Payment Method" value={summary.paymentMethod || "—"} />
+      </div>
+    </div>
+  );
+};
+
+const QRPanel = ({ paymentMethod, serverOrigin, summary }) => {
   const normalized = paymentMethod
     ? String(paymentMethod).toUpperCase().replace(/\s+/g, "_")
     : null;
@@ -131,7 +178,7 @@ const QRPanel = ({ paymentMethod, serverOrigin }) => {
   };
 
   return (
-    <div className="w-1/2 h-full bg-slate-50 flex flex-col items-center justify-center gap-5 px-8 py-6">
+    <div className="w-1/2 h-full bg-slate-50 flex flex-col items-center gap-4 px-8 py-6 overflow-y-auto">
       <p className="text-[10px] font-black uppercase tracking-[0.35em] text-slate-400">
         {paymentMethod || "Payment"} · Scan to Pay
       </p>
@@ -142,12 +189,12 @@ const QRPanel = ({ paymentMethod, serverOrigin }) => {
             src={src}
             alt={`${paymentMethod} QR`}
             draggable={false}
-            className="w-64 h-64 object-contain select-none"
+            className="w-56 h-56 object-contain select-none"
             onError={onError}
           />
         </div>
       ) : (
-        <div className="w-64 h-64 rounded-[2rem] border-2 border-dashed border-slate-300 flex items-center justify-center">
+        <div className="w-56 h-56 rounded-[2rem] border-2 border-dashed border-slate-300 flex items-center justify-center">
           <p className="text-[10px] uppercase tracking-widest text-slate-300 text-center leading-relaxed px-6">
             Place<br />{normalized || "METHOD"}_QR.png<br />in htdocs/pos_second_screen/
           </p>
@@ -162,6 +209,8 @@ const QRPanel = ({ paymentMethod, serverOrigin }) => {
           QR Code
         </p>
       </div>
+
+      <PaymentSummaryCard summary={summary} />
     </div>
   );
 };
@@ -232,6 +281,7 @@ const SecondScreenCart = () => {
   const [ipcCart, setIpcCart] = useState(null);
   const [screenPhase, setScreenPhase] = useState("idle"); // "idle" | "transaction" | "payment"
   const [activePaymentMethod, setActivePaymentMethod] = useState(null);
+  const [paymentSummary, setPaymentSummary] = useState(null);
 
   // Force fullscreen on mount (Electron already sets it; browser API is the fallback)
   useEffect(() => {
@@ -254,6 +304,9 @@ const SecondScreenCart = () => {
       if (data?.phase === "payment") {
         setScreenPhase("payment");
         setActivePaymentMethod(data?.paymentMethod || null);
+        if (data?.paymentSummary) {
+          setPaymentSummary(data.paymentSummary);
+        }
         // If items were sent with the QR payload, update the cart panel too
         if (Array.isArray(data?.items) && data.items.length > 0) {
           setIpcCart((prev) => ({ ...(prev || {}), items: data.items }));
@@ -264,6 +317,7 @@ const SecondScreenCart = () => {
         const hasItems = Array.isArray(data?.items) && data.items.length > 0;
         setScreenPhase(hasItems ? "transaction" : "idle");
         setActivePaymentMethod(null);
+        setPaymentSummary(null);
       }
     };
     window.kioskAPI.onCartUpdate(handler);
@@ -459,7 +513,11 @@ const SecondScreenCart = () => {
           totalPrice={totalPrice}
           count={safeItems.length}
         />
-        <QRPanel paymentMethod={activePaymentMethod} serverOrigin={serverOrigin} />
+        <QRPanel
+          paymentMethod={activePaymentMethod}
+          serverOrigin={serverOrigin}
+          summary={paymentSummary}
+        />
       </div>
       <BottomBar tickerText={tickerText} currentTime={currentTime} />
       <GlobalStyles />
