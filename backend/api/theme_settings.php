@@ -127,12 +127,13 @@ function saveUploadedImage($file, $folderName = "theme")
         throw new Exception("Failed to save uploaded image.");
     }
 
-    return "/uploads/" . $folderName . "/" . $fileName;
+    // Inalis ang leading slash para iwas sa double slash sa frontend construction
+    return "uploads/" . $folderName . "/" . $fileName;
 }
 
 try {
     $pdo = new PDO(
-        "mysql:host={$config['host']};dbname={$config['db']};charset=utf8mb4",
+        "mysql:host={$config['host']};dbname={$config['db']};charset={$config['charset']}",
         $config["user"],
         $config["pass"],
         [
@@ -243,44 +244,26 @@ try {
         $inputDashboardBackgroundUrl = nullableValue($input, "Dashboard_Background_Url");
         $status = valueOrDefault($input, "Status", "Active");
 
-        $stmtCheck = $pdo->prepare("
-            SELECT
-                ID,
-                Setting_Key,
-                Theme_Name,
-                Light_Primary,
-                Light_Secondary,
-                Light_Background,
-                Light_Surface,
-                Light_Text,
-                Dark_Primary,
-                Dark_Secondary,
-                Dark_Background,
-                Dark_Surface,
-                Dark_Text,
-                Logo_Url,
-                Login_Background_Url,
-                Dashboard_Background_Url,
-                Status,
-                Created_At,
-                Updated_At
-            FROM tbl_theme_settings
-            WHERE Setting_Key = :setting_key
-            LIMIT 1
-        ");
+        $stmtCheck = $pdo->prepare("SELECT * FROM tbl_theme_settings WHERE Setting_Key = :setting_key LIMIT 1");
         $stmtCheck->bindValue(":setting_key", $settingKey, PDO::PARAM_STR);
         $stmtCheck->execute();
-
         $existing = $stmtCheck->fetch();
 
         $currentLogoUrl = $existing["Logo_Url"] ?? null;
         $currentLoginBackgroundUrl = $existing["Login_Background_Url"] ?? null;
         $currentDashboardBackgroundUrl = $existing["Dashboard_Background_Url"] ?? null;
 
+        // Handle File Uploads
         $uploadedLogoPath = saveUploadedImage($_FILES["logo_file"] ?? null, "theme");
         $uploadedLoginBackgroundPath = saveUploadedImage($_FILES["login_background_file"] ?? null, "theme");
         $uploadedDashboardBackgroundPath = saveUploadedImage($_FILES["dashboard_background_file"] ?? null, "theme");
 
+        /**
+         * Logic:
+         * 1. Kung may bagong file na in-upload, gamitin ang bagong path.
+         * 2. Kung wala, pero may pinasang URL (string) mula sa frontend, gamitin iyon.
+         * 3. Kung wala talaga, gamitin ang current value sa database.
+         */
         $logoUrl = $uploadedLogoPath !== null
             ? $uploadedLogoPath
             : ($inputLogoUrl !== null ? $inputLogoUrl : $currentLogoUrl);

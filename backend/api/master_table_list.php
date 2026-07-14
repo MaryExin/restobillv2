@@ -24,42 +24,27 @@ if ($conn->connect_error) {
 
 $conn->set_charset("utf8mb4");
 
-$includeAll = isset($_GET["includeAll"]) &&
-    filter_var($_GET["includeAll"], FILTER_VALIDATE_BOOLEAN);
-
-if ($includeAll) {
-    $sql = "
-        SELECT
-            T1.ID,
-            T1.table_name,
-            T1.status,
-            T1.transaction_reference
-        FROM tbl_pos_tables T1
-        ORDER BY T1.table_name ASC
-    ";
-} else {
-    $sql = "
-        SELECT
-            T1.ID,
-            T1.table_name
-        FROM tbl_pos_tables T1
-        WHERE NOT EXISTS (
-            SELECT 1
-            FROM tbl_pos_transactions T2
-            WHERE T2.status = 'Active'
-              AND T2.remarks IN ('Pending for Payment', 'Billed')
-              AND T2.table_number IS NOT NULL
-              AND T2.table_number <> ''
-              AND (
-                    T2.table_number = T1.table_name
-                    OR T2.table_number LIKE CONCAT(T1.table_name, ' & %')
-                    OR T2.table_number LIKE CONCAT('% & ', T1.table_name)
-                    OR T2.table_number LIKE CONCAT('% & ', T1.table_name, ' & %')
-              )
-        )
-        ORDER BY T1.table_name ASC
-    ";
-}
+$sql = "
+    SELECT 
+        T1.ID,
+        T1.table_name
+    FROM tbl_pos_tables T1
+    WHERE NOT EXISTS (
+        SELECT 1
+        FROM tbl_pos_transactions T2
+        WHERE T2.status = 'Active'
+          AND T2.remarks IN ('Pending for Payment', 'Billed')
+          AND T2.table_number IS NOT NULL
+          AND T2.table_number <> ''
+          AND (
+                T2.table_number = T1.table_name
+                OR T2.table_number LIKE CONCAT(T1.table_name, ' & %')
+                OR T2.table_number LIKE CONCAT('% & ', T1.table_name)
+                OR T2.table_number LIKE CONCAT('% & ', T1.table_name, ' & %')
+          )
+    )
+    ORDER BY T1.table_name ASC
+";
 
 $result = $conn->query($sql);
 

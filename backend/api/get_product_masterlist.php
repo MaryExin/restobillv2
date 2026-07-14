@@ -21,7 +21,7 @@ if ($conn->connect_error) {
 ob_clean();
 
 $query = "SELECT product_id, item_category, item_name, unit_of_measure, selling_price, Status, isDiscountable
-          FROM tbl_inventory_products_masterlist where status = 'Active'
+          FROM tbl_inventory_products_masterlist
           ORDER BY item_category ASC, item_name ASC";
 
 $result = $conn->query($query);

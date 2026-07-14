@@ -52,8 +52,7 @@ class ShiftSalesSyncLocalReadGateway
                         $categoryCode,
                         $unitCode,
                         $terminal,
-                        $opening,
-                        $closing
+                        $opening
                     );
                     $counts = $this->getChildCountsByTransactionRefs($txnRefs);
                 }
@@ -139,7 +138,6 @@ class ShiftSalesSyncLocalReadGateway
             SELECT *
             FROM tbl_pos_shifting_records
             WHERE Unit_Code = :unit_code
-              AND (Remarks IS NULL OR TRIM(Remarks) <> 'Synced')
             ORDER BY
                 COALESCE(
                     STR_TO_DATE(Closing_DateTime, '%c/%e/%Y %H:%i'),
@@ -164,8 +162,7 @@ class ShiftSalesSyncLocalReadGateway
         string $categoryCode,
         string $unitCode,
         string $terminalNumber,
-        string $openingDateTime,
-        string $closingDateTime
+        string $openingDateTime
     ): array {
         $sql = "
             SELECT transaction_id, Category_Code, Unit_Code, terminal_number
@@ -174,26 +171,14 @@ class ShiftSalesSyncLocalReadGateway
               AND Unit_Code = :unit_code
               AND terminal_number = :terminal_number
               AND COALESCE(
-                    STR_TO_DATE(CONCAT(transaction_date, ' ', transaction_time), '%c/%e/%Y %h:%i %p'),
-                    STR_TO_DATE(CONCAT(transaction_date, ' ', transaction_time), '%c/%e/%Y %H:%i'),
-                    STR_TO_DATE(date_recorded, '%c/%e/%Y %h:%i %p'),
-                    STR_TO_DATE(date_recorded, '%c/%e/%Y %H:%i'),
-                    STR_TO_DATE(date_recorded, '%Y-%m-%d %H:%i:%s'),
-                    STR_TO_DATE(date_recorded, '%Y-%m-%d %H:%i')
-                  ) BETWEEN
-                  COALESCE(
+                    STR_TO_DATE(transaction_date, '%c/%e/%Y'),
+                    STR_TO_DATE(transaction_date, '%Y-%m-%d')
+                  ) = DATE(COALESCE(
                     STR_TO_DATE(:opening_datetime_1, '%c/%e/%Y %h:%i %p'),
                     STR_TO_DATE(:opening_datetime_2, '%c/%e/%Y %H:%i'),
                     STR_TO_DATE(:opening_datetime_3, '%Y-%m-%d %H:%i:%s'),
                     STR_TO_DATE(:opening_datetime_4, '%Y-%m-%d %H:%i')
-                  )
-                  AND
-                  COALESCE(
-                    STR_TO_DATE(:closing_datetime_1, '%c/%e/%Y %h:%i %p'),
-                    STR_TO_DATE(:closing_datetime_2, '%c/%e/%Y %H:%i'),
-                    STR_TO_DATE(:closing_datetime_3, '%Y-%m-%d %H:%i:%s'),
-                    STR_TO_DATE(:closing_datetime_4, '%Y-%m-%d %H:%i')
-                  )
+                  ))
             ORDER BY ID ASC
         ";
 
@@ -206,10 +191,6 @@ class ShiftSalesSyncLocalReadGateway
             'opening_datetime_2' => $openingDateTime,
             'opening_datetime_3' => $openingDateTime,
             'opening_datetime_4' => $openingDateTime,
-            'closing_datetime_1' => $closingDateTime,
-            'closing_datetime_2' => $closingDateTime,
-            'closing_datetime_3' => $closingDateTime,
-            'closing_datetime_4' => $closingDateTime,
         ]);
 
         $refs = [];
