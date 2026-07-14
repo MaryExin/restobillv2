@@ -58,7 +58,7 @@ if ($targetId) {
     exit;
 }
 
-// --- ORIGINAL SUMMARY LOGIC ---
+// --- ORIGINAL SUMMARY LOGIC WITH FIXED PAYMENT CALCULATION ---
 if ($viewType === 'TABLE') {
     $sql = "SELECT table_number AS name, 'Dining Area' AS subtitle, COUNT(*) AS transaction_count, IFNULL(SUM(TotalAmountDue), 0) AS total_amount
             FROM tbl_pos_transactions WHERE status = 'Active' AND DATE(transaction_date) BETWEEN :start AND :end
@@ -68,9 +68,19 @@ if ($viewType === 'TABLE') {
             FROM tbl_pos_transactions WHERE status = 'Active' AND DATE(transaction_date) BETWEEN :start AND :end
             GROUP BY cashier HAVING total_amount > 0 ORDER BY total_amount DESC";
 } else {
-    $sql = "SELECT payment_method AS name, 'Payment Channel' AS subtitle, COUNT(*) AS transaction_count, IFNULL(SUM(TotalAmountDue), 0) AS total_amount
-            FROM tbl_pos_transactions WHERE status = 'Active' AND DATE(transaction_date) BETWEEN :start AND :end
-            GROUP BY payment_method HAVING total_amount > 0 ORDER BY total_amount DESC";
+    // DITO INAPPLY ANG INNER JOIN AT PAG-BAWAS NG CHANGE AMOUNT SA CASH
+    $sql = "SELECT b.payment_method AS name, 
+                   'Payment Channel' AS subtitle, 
+                   COUNT(DISTINCT a.transaction_id) AS transaction_count, 
+                   IFNULL(SUM(CASE WHEN b.payment_method = 'Cash' THEN (b.payment_amount - a.change_amount) ELSE b.payment_amount END), 0) AS total_amount
+            FROM tbl_pos_transactions a
+            INNER JOIN tbl_pos_transactions_payments b 
+               ON a.transaction_id = b.transaction_id
+            WHERE a.status = 'Active' 
+              AND DATE(a.transaction_date) BETWEEN :start AND :end
+            GROUP BY b.payment_method 
+            HAVING total_amount > 0 
+            ORDER BY total_amount DESC";
 }
 
 try {
@@ -87,5 +97,7 @@ try {
         ];
     }
     echo json_encode($finalData);
-} catch (PDOException $e) { echo json_encode(["error" => $e->getMessage()]); }
+} catch (PDOException $e) { 
+    echo json_encode(["error" => $e->getMessage()]); 
+}
 ?>

@@ -39,7 +39,7 @@ if ($selectedAdminId === "" || $adminPassword === "") {
 try {
     // ── Validate admin password ────────────────────────────────────────────────
     $adminStmt = $pdo->prepare("
-        SELECT uuid, password, User_Password
+        SELECT uuid, password, password
         FROM tbl_users_global_assignment
         WHERE (uuid = :id OR email = :id2)
           AND deletestatus = 'Active'
