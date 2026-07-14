@@ -227,6 +227,33 @@ $stmt->execute([":datefrom" => $datefrom, ":dateto" => $dateto]);
 $perProductRows = $stmt->fetchAll();
 
 /* ---------------------------
+   Sales Per Item Per Date (TABLE range)
+   Same columns as Sales Per Product but broken down per transaction_date,
+   not aggregated across the full date range.
+---------------------------- */
+$sqlPerItemPerDate = "
+  SELECT
+    d.transaction_date AS Date,
+    d.product_id AS Code,
+    COALESCE(m.item_name, d.product_id) AS `Product Name`,
+    COALESCE(m.inventory_type, 'PRODUCT') AS `Item Type`,
+    SUM(d.sales_quantity) AS `Total Qty Sold`,
+    SUM(d.sales_quantity * d.selling_price) AS `Gross Sales`
+  FROM tbl_pos_transactions_detailed d
+  INNER JOIN tbl_pos_transactions t
+    ON t.transaction_id = d.transaction_id
+  LEFT JOIN tbl_inventory_products_masterlist m
+    ON m.product_id = d.product_id
+  WHERE d.transaction_date BETWEEN :datefrom AND :dateto
+    AND $statusSql
+  GROUP BY d.transaction_date, d.product_id, m.item_name, m.inventory_type
+  ORDER BY d.transaction_date ASC, `Product Name` ASC
+";
+$stmt = $pdo->prepare($sqlPerItemPerDate);
+$stmt->execute([":datefrom" => $datefrom, ":dateto" => $dateto]);
+$perItemPerDateRows = $stmt->fetchAll();
+
+/* ---------------------------
    Hourly Sales (Per Product)
    ✅ 12-hour transaction_time supported
 ---------------------------- */
@@ -276,6 +303,81 @@ foreach ($hppRaw as $r) {
 $hourlyPerProductRows = array_values($hppMap);
 
 /* ---------------------------
+   Monthly Sales Summary
+---------------------------- */
+$sqlMonthly = "
+  SELECT
+    DATE_FORMAT(t.transaction_date, '%M %Y') AS `Period`,
+
+    SUM(CASE WHEN $statusSql THEN t.TotalSales ELSE 0 END) AS `Gross Sales`,
+
+    SUM(CASE WHEN $statusSql AND t.discount_type LIKE '%Senior%' THEN t.Discount ELSE 0 END) AS `SRC Disc.`,
+    SUM(CASE WHEN $statusSql AND t.discount_type LIKE '%PWD%' THEN t.Discount ELSE 0 END) AS `PWD Disc.`,
+    SUM(CASE WHEN $statusSql AND (t.discount_type LIKE '%NAAC%' OR t.discount_type LIKE '%NACC%') THEN t.Discount ELSE 0 END) AS `NAAC Disc.`,
+    SUM(CASE WHEN $statusSql AND t.discount_type LIKE '%Solo%' THEN t.Discount ELSE 0 END) AS `Solo Parent Disc.`,
+
+    SUM(CASE
+      WHEN $statusSql
+       AND t.Discount > 0
+       AND t.discount_type NOT LIKE '%Senior%'
+       AND t.discount_type NOT LIKE '%PWD%'
+       AND t.discount_type NOT LIKE '%NAAC%'
+       AND t.discount_type NOT LIKE '%NACC%'
+       AND t.discount_type NOT LIKE '%Solo%'
+       AND t.discount_type NOT LIKE '%No Discount%'
+      THEN t.Discount ELSE 0 END
+    ) AS `Other Disc.`,
+
+    SUM(CASE WHEN $statusSql AND t.payment_method = 'Cash'
+      THEN (t.payment_amount - IFNULL(t.change_amount,0))
+      ELSE 0 END) AS `Cash Payment`,
+
+    SUM(CASE WHEN $statusSql AND t.payment_method LIKE '%Cheque%'
+      THEN t.payment_amount ELSE 0 END) AS `Cheque Payment`,
+
+    SUM(CASE WHEN $statusSql AND (t.payment_method LIKE '%Card%' OR t.payment_method LIKE '%BDO%')
+      THEN t.payment_amount ELSE 0 END) AS `Card Payment`,
+
+    SUM(CASE WHEN $statusSql AND t.payment_method LIKE '%GCash%'
+      THEN t.payment_amount ELSE 0 END) AS `GCash Payment`,
+
+    SUM(CASE WHEN $statusSql AND (t.payment_method LIKE '%PayMaya%' OR t.payment_method LIKE '%Maya%')
+      THEN t.payment_amount ELSE 0 END) AS `Maya Payment`,
+
+    SUM(CASE WHEN $statusSql AND (
+        t.payment_method LIKE '%,%'
+        OR (
+          t.payment_method NOT LIKE '%Cash%'
+          AND t.payment_method NOT LIKE '%Cheque%'
+          AND t.payment_method NOT LIKE '%Card%'
+          AND t.payment_method NOT LIKE '%BDO%'
+          AND t.payment_method NOT LIKE '%GCash%'
+          AND t.payment_method NOT LIKE '%PayMaya%'
+          AND t.payment_method NOT LIKE '%Maya%'
+        )
+      )
+      THEN t.payment_amount ELSE 0 END) AS `Other Payment`,
+
+    SUM(CASE WHEN $statusSql THEN t.VATableSales ELSE 0 END) AS `VATable Sales`,
+    SUM(CASE WHEN $statusSql THEN t.VATableSales_VAT ELSE 0 END) AS `VAT Amount`,
+    SUM(CASE WHEN $statusSql THEN t.VATExemptSales ELSE 0 END) AS `VAT Exempt Sales`,
+    SUM(CASE WHEN $statusSql THEN t.VATExemptSales_VAT ELSE 0 END) AS `VAT Exemption`,
+
+    SUM(CASE WHEN $statusSql THEN t.TotalAmountDue ELSE 0 END) AS `Net Sales`
+
+  FROM tbl_pos_transactions t
+  WHERE t.transaction_date BETWEEN :datefrom AND :dateto
+  GROUP BY DATE_FORMAT(t.transaction_date, '%Y-%m')
+  ORDER BY t.transaction_date ASC
+";
+$stmt = $pdo->prepare($sqlMonthly);
+$stmt->execute([
+  ":datefrom" => $datefrom, 
+  ":dateto"   => $dateto
+]);
+$monthlySalesRows = $stmt->fetchAll();
+
+/* ---------------------------
    Response
 ---------------------------- */
 echo json_encode([
@@ -292,5 +394,7 @@ echo json_encode([
   "dailyGraph" => $dailyGraphRows,
   "hourlySales" => $hourlyRows,
   "salesPerProduct" => $perProductRows,
+  "salesPerItemPerDate" => $perItemPerDateRows,
   "hourlySalesPerProduct" => $hourlyPerProductRows,
+  "monthlySales" => $monthlySalesRows,
 ]);

@@ -277,6 +277,40 @@ try {
     $discountRows = $stmtDiscountRows->fetchAll(PDO::FETCH_ASSOC);
 
     /* ---------------------------------------
+       4b. LOYALTY POINTS REDEMPTION (if any)
+    --------------------------------------- */
+    $sqlLoyaltyDiscount = "
+        SELECT
+            id,
+            transaction_id,
+            Category_Code,
+            Unit_Code,
+            loyalty_member_id,
+            customer_name,
+            phone_number,
+            points_redeemed,
+            points_earned,
+            discount_amount,
+            status,
+            created_at
+        FROM tbl_pos_loyalty_discounts
+        WHERE transaction_id = :transaction_id
+          AND Category_Code = :Category_Code
+          AND Unit_Code = :Unit_Code
+          AND status = 'Active'
+        ORDER BY id DESC
+        LIMIT 1
+    ";
+
+    $stmtLoyaltyDiscount = $pdo->prepare($sqlLoyaltyDiscount);
+    $stmtLoyaltyDiscount->execute([
+        ":transaction_id" => $transaction_id,
+        ":Category_Code" => $categoryCode,
+        ":Unit_Code" => $unitCode,
+    ]);
+    $loyaltyDiscount = $stmtLoyaltyDiscount->fetch(PDO::FETCH_ASSOC) ?: null;
+
+    /* ---------------------------------------
        5. GROUPED DISCOUNT COUNTS
     --------------------------------------- */
     $discountCounts = [
@@ -287,11 +321,27 @@ try {
         "manual" => 0,
     ];
 
+    // Generic bucket, by exact discount_type label, so custom (non-statutory)
+    // discount lines added via the Discount Types picker also reload
+    // correctly here -- $discountCounts above only understands the 5
+    // original hardcoded types.
+    $discountCountsByLabel = [];
+
     foreach ($discountRows as $row) {
         $key = normalizeDiscountTypeKey($row["discount_type"] ?? "");
         if ($key !== "") {
             $discountCounts[$key]++;
         }
+
+        $label = trim((string)($row["discount_type"] ?? ""));
+        if ($label === "") {
+            continue;
+        }
+        if (!isset($discountCountsByLabel[$label])) {
+            $discountCountsByLabel[$label] = ["count" => 0, "amount" => 0.0];
+        }
+        $discountCountsByLabel[$label]["count"]++;
+        $discountCountsByLabel[$label]["amount"] += (float)($row["discount_amount"] ?? 0);
     }
 
     echo json_encode([
@@ -299,10 +349,12 @@ try {
         "message" => "Transaction details fetched successfully.",
         "transaction_summary" => $transactionSummary,
         "discount_counts" => $discountCounts,
+        "discount_counts_by_label" => $discountCountsByLabel,
         "items" => $items,
         "payments" => $payments,
         "other_charges" => $otherCharges,
         "discount_rows" => $discountRows,
+        "loyalty_discount" => $loyaltyDiscount,
     ]);
 } catch (Throwable $e) {
     http_response_code(500);
@@ -317,9 +369,11 @@ try {
             "soloParent" => 0,
             "manual" => 0,
         ],
+        "discount_counts_by_label" => [],
         "items" => [],
         "payments" => [],
         "other_charges" => [],
         "discount_rows" => [],
+        "loyalty_discount" => null,
     ]);
 }

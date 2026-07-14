@@ -3,6 +3,7 @@ import { LinearProgress } from "@mui/material";
 import { useQueryClient } from "@tanstack/react-query";
 import useCustomQuery from "../../hooks/useCustomQuery";
 import { useSecuredMutation } from "../../hooks/useSecuredMutation";
+import useWebApiHost from "../../hooks/useWebApiHost";
 import ModalYesNoReusable from "../Modals/ModalYesNoReusable";
 import ModalSuccessNavToSelf from "../Modals/ModalSuccessNavToSelf";
 import {
@@ -159,9 +160,10 @@ const CmpUserRolesSetup = ({ mode = "assign", onOpenRead }) => {
   }, []);
 
   // separate web base, only for endpoints that must come from web
+  const rawWebApiHost = useWebApiHost();
   const webApiHost = useMemo(() => {
-    return cleanBase(import.meta.env.VITE_WEBAPIENDPOINT, "");
-  }, []);
+    return cleanBase(rawWebApiHost, "");
+  }, [rawWebApiHost]);
 
   const companycode = useMemo(
     () => localStorage.getItem("companycode") || "",

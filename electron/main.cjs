@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, protocol, session } = require("electron");
+const { app, BrowserWindow, ipcMain, protocol, session, screen } = require("electron");
 
 const { spawn } = require("child_process");
 const net = require("net");
@@ -44,6 +44,7 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 let win = null;
+let secondScreenWin = null;
 
 const DEFAULT_BUSINESS_INFO = {
   companyName: "",
@@ -90,6 +91,8 @@ function createWindow() {
     },
   });
 
+  win.maximize();
+
   if (!app.isPackaged) {
     win.loadURL(DEV_SERVER_URL);
   } else {
@@ -101,6 +104,10 @@ function createWindow() {
   }
 
   win.on("closed", () => {
+    if (secondScreenWin && !secondScreenWin.isDestroyed()) {
+      secondScreenWin.close();
+    }
+    secondScreenWin = null;
     win = null;
   });
 }
@@ -174,6 +181,10 @@ function parsePrinterConfigMap(text) {
 
 function getPrinterConfigMap() {
   return parsePrinterConfigMap(readTextFileSafe(getPrinterFilePath()));
+}
+
+function getIpConfigMap() {
+  return parsePrinterConfigMap(readTextFileSafe(getIpFilePath()));
 }
 
 function readJsonFileSafe(filePath, fallback = {}) {
@@ -2045,17 +2056,11 @@ function buildEscposOrderReceiptBuffer({
     if (current) lines.push(current);
     return lines;
   };
-  const peso = (v) =>
-    Number(v || 0).toLocaleString("en-PH", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
 
   const chunks = [];
   const initPrinter = Buffer.from([0x1b, 0x40]);
   const alignLeft = Buffer.from([0x1b, 0x61, 0x00]);
   const alignCenter = Buffer.from([0x1b, 0x61, 0x01]);
-  const alignRight = Buffer.from([0x1b, 0x61, 0x02]);
   const boldOn = Buffer.from([0x1b, 0x45, 0x01]);
   const boldOff = Buffer.from([0x1b, 0x45, 0x00]);
   const doubleSizeOn = Buffer.from([0x1d, 0x21, 0x11]);
@@ -2074,6 +2079,7 @@ function buildEscposOrderReceiptBuffer({
     ? `ORDER SUMMARY - ${String(categoryLabel).toUpperCase()}`
     : "ORDER SUMMARY";
 
+  // Header
   chunks.push(initPrinter);
   chunks.push(alignCenter);
   chunks.push(boldOn);
@@ -2089,61 +2095,94 @@ function buildEscposOrderReceiptBuffer({
   chunks.push(nl());
   chunks.push(txt(repeat("-", LINE_WIDTH)));
   chunks.push(nl());
-  chunks.push(alignLeft);
-  chunks.push(boldOn);
-  chunks.push(txt(formatLeftRight("Item", "Qty  Price")));
-  chunks.push(nl());
-  chunks.push(boldOff);
-  chunks.push(txt(repeat("-", LINE_WIDTH)));
-  chunks.push(nl());
 
+  // Group items by category
   const safeItems = Array.isArray(items) ? items : [];
+
   if (safeItems.length === 0) {
     chunks.push(alignCenter);
     chunks.push(txt("Cart is empty"));
     chunks.push(nl());
   } else {
-    chunks.push(alignLeft);
+    // Build category groups (preserve insertion order, sort categories)
+    const grouped = {};
     safeItems.forEach((item) => {
-      const nameLines = wrapText(String(item?.name || "").toUpperCase(), 20);
-      const qty = String(item?.quantity || 0);
-      const lineTotal =
-        Number(item?.price || 0) * Number(item?.quantity || 0);
-      const price = `P${peso(lineTotal)}`;
-      nameLines.forEach((line, index) => {
-        if (index === 0) chunks.push(txt(formatLeftRight(line, `${qty} ${price}`)));
-        else chunks.push(txt(line));
-        chunks.push(nl());
+      const cat = String(item?.item_category || "").trim().toUpperCase() || "OTHERS";
+      if (!grouped[cat]) grouped[cat] = [];
+      grouped[cat].push(item);
+    });
+
+    const sortedGroups = Object.entries(grouped).sort((a, b) =>
+      a[0].localeCompare(b[0]),
+    );
+
+    sortedGroups.forEach(([cat, catItems], groupIndex) => {
+      // Category header: -- BEVERAGES --
+      chunks.push(alignCenter);
+      chunks.push(boldOn);
+      chunks.push(txt(`-- ${cat} --`));
+      chunks.push(nl());
+      chunks.push(boldOff);
+      chunks.push(alignLeft);
+
+      catItems.forEach((item) => {
+        const qty = `${String(item?.quantity || 0)}X`;
+        const noteText = item?.itemInstruction ? ` ** ${item.itemInstruction}` : "";
+        const rightPart = qty + noteText;
+        const nameWidth = LINE_WIDTH - rightPart.length - 1;
+
+        if (nameWidth >= 8) {
+          // Note fits inline: ITEM NAME            2X ** note
+          const nameLines = wrapText(String(item?.name || "").toUpperCase(), nameWidth);
+          nameLines.forEach((line, index) => {
+            if (index === 0) {
+              chunks.push(txt(formatLeftRight(line, rightPart)));
+            } else {
+              chunks.push(txt(line));
+            }
+            chunks.push(nl());
+          });
+        } else {
+          // Note too long — name+qty on first line, note on next
+          const fallbackNameWidth = LINE_WIDTH - qty.length - 1;
+          const nameLines = wrapText(String(item?.name || "").toUpperCase(), fallbackNameWidth);
+          nameLines.forEach((line, index) => {
+            if (index === 0) {
+              chunks.push(txt(formatLeftRight(line, qty)));
+            } else {
+              chunks.push(txt(line));
+            }
+            chunks.push(nl());
+          });
+          if (noteText) {
+            wrapText(noteText.trim(), LINE_WIDTH - 2).forEach((l) => {
+              chunks.push(txt(`  ${l}`));
+              chunks.push(nl());
+            });
+          }
+        }
       });
-      if (item?.itemInstruction) {
-        wrapText(`Note: ${item.itemInstruction}`, LINE_WIDTH).forEach((l) => {
-          chunks.push(txt(l));
-          chunks.push(nl());
-        });
+
+      // Blank line between categories (except after the last one)
+      if (groupIndex < sortedGroups.length - 1) {
+        chunks.push(nl());
       }
     });
   }
 
   chunks.push(txt(repeat("-", LINE_WIDTH)));
   chunks.push(nl());
-  chunks.push(alignRight);
-  chunks.push(boldOn);
-  chunks.push(doubleSizeOn);
-  chunks.push(txt(`TOTAL: P${peso(total)}`));
-  chunks.push(nl());
-  chunks.push(normalSize);
-  chunks.push(boldOff);
 
   if (instructions) {
     chunks.push(alignLeft);
-    chunks.push(txt(repeat("-", LINE_WIDTH)));
-    chunks.push(nl());
     chunks.push(txt("INSTRUCTIONS"));
     chunks.push(nl());
     wrapText(instructions, LINE_WIDTH).forEach((l) => {
       chunks.push(txt(l));
       chunks.push(nl());
     });
+    chunks.push(txt(repeat("-", LINE_WIDTH)));
+    chunks.push(nl());
   }
 
   chunks.push(alignCenter);
@@ -2162,6 +2201,161 @@ function buildEscposOrderReceiptBuffer({
   chunks.push(nl(3));
   chunks.push(cutPaper);
 
+  return Buffer.concat(chunks);
+}
+
+// ── QR printing helpers ────────────────────────────────────────────────────
+function getPrinterLanguage(printerType) {
+  const map = getPrinterConfigMap();
+  return String(map[`${printerType}_language`] || "escpos").toLowerCase().trim();
+}
+
+function getPrinterSettingNumber(key, defaultValue) {
+  const map = getPrinterConfigMap();
+  const val = Number(map[key]);
+  return isNaN(val) ? defaultValue : val;
+}
+
+function escposQrStorePrint(value = "", size = 8, errorLevel = 48) {
+  const data = Buffer.from(String(value || ""), "utf8");
+  const model = Buffer.from([0x1d, 0x28, 0x6b, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00]);
+  const safeSize = Math.max(1, Math.min(16, Number(size || 8)));
+  const qrSize = Buffer.from([0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x43, safeSize]);
+  const safeEL = [48, 49, 50, 51].includes(Number(errorLevel)) ? Number(errorLevel) : 48;
+  const qrError = Buffer.from([0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x45, safeEL]);
+  const storeLength = data.length + 3;
+  const pL = storeLength % 256;
+  const pH = Math.floor(storeLength / 256);
+  const store = Buffer.concat([Buffer.from([0x1d, 0x28, 0x6b, pL, pH, 0x31, 0x50, 0x30]), data]);
+  const print = Buffer.from([0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x51, 0x30]);
+  return Buffer.concat([model, qrSize, qrError, store, print]);
+}
+
+function buildTsplQrItemsBuffer(data = {}) {
+  const items = Array.isArray(data.items) ? data.items : [];
+  const table = String(data.table || "").trim();
+
+  const labelWidthMm = getPrinterSettingNumber("qr_label_width_mm", 60);
+  const labelHeightMm = getPrinterSettingNumber("qr_label_height_mm", 40);
+  const gapMm = getPrinterSettingNumber("qr_gap_mm", 2);
+  const textX = getPrinterSettingNumber("qr_text_x", 15);
+  const textY = getPrinterSettingNumber("qr_text_y", 1);
+  const qrX = getPrinterSettingNumber("qr_x", 250);
+  const qrY = getPrinterSettingNumber("qr_y", 70);
+  const qrSize = getPrinterSettingNumber("qr_size", 4);
+
+  const cleanText = (value) =>
+    String(value || "")
+      .replace(/"/g, "")
+      .replace(/[^\x20-\x7E]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const chunks = [];
+  items.forEach((item, index) => {
+    const name = cleanText(
+      String(item.name || item.originalName || item.code || "ITEM")
+        .replace(/\bB1T1\s*Copy\b/gi, "")
+        .replace(/\bB1T1\b/gi, "")
+        .replace(/\bBuy\s*1\s*Take\s*1\b/gi, ""),
+    );
+    const qrValue = cleanText(item.qrValue || "");
+    const price = Number(item.price || 0).toFixed(2);
+    const itemText =
+      Number(item.qrCopyPerItem || 1) > 1
+        ? `ITEM ${item.qrItemNumber || index + 1} COPY ${item.qrCopyNumber || 1}/${item.qrCopyPerItem}`
+        : `ITEM ${item.qrItemNumber || index + 1}`;
+
+    const tsplLines = [
+      `SIZE ${labelWidthMm} mm,${labelHeightMm} mm`,
+      `GAP ${gapMm} mm,0 mm`,
+      `DIRECTION 1`,
+      `REFERENCE 0,0`,
+      `CLS`,
+      `TEXT ${textX},${textY},"3",0,1,1,"${name.slice(0, 28)}"`,
+      `TEXT ${textX},${textY + 30},"2",0,1,1,"Customer: ${table.slice(0, 20)}"`,
+      `TEXT ${textX},${textY + 60},"2",0,1,1,"AMOUNT: P${price}"`,
+      `TEXT ${textX},${textY + 90},"2",0,1,1,"${itemText.slice(0, 28)}"`,
+      `QRCODE ${qrX},${qrY},L,${qrSize},A,0,"${qrValue}"`,
+      `PRINT 1,1`,
+      ``,
+    ];
+    chunks.push(Buffer.from(tsplLines.join("\r\n"), "ascii"));
+  });
+
+  return Buffer.concat(chunks);
+}
+
+function buildEscposQrItemsBuffer(data = {}) {
+  const LINE_WIDTH = 42;
+  const items = Array.isArray(data.items) ? data.items : [];
+  const table = String(data.table || "").trim();
+  const transactionId = String(data.transactionId || "").trim();
+
+  const chunks = [];
+  const initPrinter = Buffer.from([0x1b, 0x40]);
+  const alignLeft = Buffer.from([0x1b, 0x61, 0x00]);
+  const alignCenter = Buffer.from([0x1b, 0x61, 0x01]);
+  const boldOn = Buffer.from([0x1b, 0x45, 0x01]);
+  const boldOff = Buffer.from([0x1b, 0x45, 0x00]);
+  const normalSize = Buffer.from([0x1d, 0x21, 0x00]);
+  const cutPaper = Buffer.from([0x1d, 0x56, 0x00]);
+
+  const nl = (count = 1) => Buffer.from("\n".repeat(count), "ascii");
+  const txt = (value) =>
+    Buffer.from(String(value || "").replace(/[^\x20-\x7E\n]/g, " ").trim(), "ascii");
+  const centerText = (value, width = LINE_WIDTH) => {
+    const raw = String(value || "").replace(/[^\x20-\x7E]/g, " ").trim();
+    if (raw.length >= width) return raw.slice(0, width);
+    return " ".repeat(Math.floor((width - raw.length) / 2)) + raw;
+  };
+  const line = () => "-".repeat(LINE_WIDTH);
+
+  chunks.push(initPrinter);
+
+  items.forEach((item, index) => {
+    const name = String(item.name || item.originalName || item.code || "ITEM")
+      .replace(/\bB1T1\s*Copy\b/gi, "")
+      .replace(/\bB1T1\b/gi, "")
+      .replace(/\bBuy\s*1\s*Take\s*1\b/gi, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    const code = String(item.code || "").trim();
+    const price = Number(item.price || 0).toFixed(2);
+    const qrValue = String(item.qrValue || "");
+
+    chunks.push(alignCenter);
+    chunks.push(boldOn);
+    chunks.push(txt(centerText(name.toUpperCase())));
+    chunks.push(nl());
+    chunks.push(boldOff);
+
+    if (code) { chunks.push(txt(centerText(code))); chunks.push(nl()); }
+    if (table) { chunks.push(txt(centerText(`TABLE: ${table}`))); chunks.push(nl()); }
+    if (transactionId) { chunks.push(txt(centerText(`TX: ${transactionId}`))); chunks.push(nl()); }
+
+    if (item.qrCopyPerItem > 1) {
+      chunks.push(txt(centerText(`ITEM ${item.qrItemNumber || 1} COPY ${item.qrCopyNumber || 1}/${item.qrCopyPerItem}`)));
+    } else {
+      chunks.push(txt(centerText(`ITEM ${item.qrItemNumber || index + 1}`)));
+    }
+    chunks.push(nl());
+    chunks.push(txt(centerText(`P${price}`)));
+    chunks.push(nl(1));
+
+    chunks.push(alignCenter);
+    chunks.push(escposQrStorePrint(qrValue, getPrinterSettingNumber("qr_size", 8), 48));
+    chunks.push(nl(2));
+
+    chunks.push(alignLeft);
+    chunks.push(txt(line()));
+    chunks.push(nl(3));
+    chunks.push(cutPaper);
+    chunks.push(initPrinter);
+  });
+
+  chunks.push(normalSize);
   return Buffer.concat(chunks);
 }
 
@@ -2254,6 +2448,34 @@ app.whenReady().then(() => {
         success: false,
         message: error.message || "Test print failed",
       };
+    }
+  });
+
+  ipcMain.handle("print-escposqr", async (_event, data) => {
+    try {
+      const items = Array.isArray(data?.items) ? data.items : [];
+      if (!items.length) {
+        return { success: false, message: "No QR items to print." };
+      }
+
+      const qrLanguage = getPrinterLanguage("qr");
+      const payload =
+        qrLanguage === "tspl"
+          ? buildTsplQrItemsBuffer(data)
+          : buildEscposQrItemsBuffer(data);
+
+      const map = getPrinterConfigMap();
+      const rawConn = map["printEscPosQr"] || map["qr"];
+      const config = rawConn ? parsePrinterConnection(rawConn) : getPrinterConnectionConfig();
+
+      return await writeEscposBuffer(payload, {
+        config,
+        tryUsbFallback: false,
+        tryWindowsFallback: false,
+      });
+    } catch (error) {
+      console.error("QR print error:", error);
+      return { success: false, message: error?.message || "QR print failed." };
     }
   });
 
@@ -2630,13 +2852,13 @@ app.whenReady().then(() => {
       const grossTotal = Number(safeComputed?.grossTotal || 0);
       const netAfterDiscount = Number(safeComputed?.netAfterDiscount || 0);
       const totalVatExemption = Number(safeComputed?.totalVatExemption || 0);
-      const serviceChargeAmount = Number(
-        safeComputed?.serviceChargeAmount || 0,
+      const appliedCharges = Array.isArray(safeComputed?.appliedCharges)
+        ? safeComputed.appliedCharges
+        : [];
+      const totalOtherCharges = appliedCharges.reduce(
+        (s, c) => s + Number(c.computedAmount || 0), 0,
       );
-      const serviceChargePercentage = Number(
-        safeComputed?.serviceChargePercentage || 0,
-      );
-      const totalAmountDue = netAfterDiscount + serviceChargeAmount;
+      const totalAmountDue = netAfterDiscount + totalOtherCharges;
 
       const billingRows = [
         ["Trans. No.", transaction?.transaction_id || "-"],
@@ -2797,12 +3019,13 @@ app.whenReady().then(() => {
         pushLR("VAT EXEMPTION:", signedNegativePeso(totalVatExemption));
       }
 
-      if (serviceChargeAmount > 0) {
-        pushLR(
-          `SERVICE CHARGE (${serviceChargePercentage}%):`,
-          peso(serviceChargeAmount),
-        );
-      }
+      appliedCharges.forEach((c) => {
+        if (Number(c.computedAmount || 0) > 0) {
+          const label = String(c.particulars || "CHARGE").toUpperCase();
+          const suffix = c.rate_type === "Percentage" ? ` (${c.rate}%)` : "";
+          pushLR(`${label}${suffix}:`, peso(c.computedAmount));
+        }
+      });
 
       line();
 
@@ -2856,26 +3079,8 @@ app.whenReady().then(() => {
       chunks.push(nl());
       chunks.push(boldOff);
 
-      if (mergedDiscountBI.posProviderName) {
-        chunks.push(boldOn);
-        pushWrapped(`SUPPLIER: ${mergedDiscountBI.posProviderName}`);
-        chunks.push(boldOff);
-      }
-      String(mergedDiscountBI.posProviderAddress || "")
-        .split(/\r?\n|\|/)
-        .map((l) => l.trim())
-        .filter(Boolean)
-        .forEach((l) => pushWrapped(l));
-      if (mergedDiscountBI.posProviderTin)
-        pushWrapped(`TIN: ${mergedDiscountBI.posProviderTin}`);
-      if (mergedDiscountBI.posProviderBirAccreNo)
-        pushWrapped(`BIR ACC#: ${mergedDiscountBI.posProviderBirAccreNo}`);
-      if (mergedDiscountBI.posProviderAccreDateIssued)
-        pushWrapped(`DATE ISSUED: ${mergedDiscountBI.posProviderAccreDateIssued}`);
-      if (mergedDiscountBI.posProviderPTUNo)
-        pushWrapped(`PTU: ${mergedDiscountBI.posProviderPTUNo}`);
-      if (mergedDiscountBI.posProviderPTUDateIssued)
-        pushWrapped(`PTU DATE ISSUED: ${mergedDiscountBI.posProviderPTUDateIssued}`);
+      chunks.push(nl());
+      pushWrapped("THIS DOCUMENT IS NOT VALID FOR CLAIM OF INPUT TAX");
 
       chunks.push(nl(3));
       chunks.push(cutPaper);
@@ -4239,38 +4444,13 @@ app.whenReady().then(() => {
       chunks.push(txt("_______________________________"));
       chunks.push(nl(3));
 
-      // POS Provider footer
+      // Footer
       chunks.push(alignCenter);
-      if (bi.posProviderName) {
-        chunks.push(boldOn);
-        chunks.push(txt(`SUPPLIER: ${bi.posProviderName}`));
-        chunks.push(nl());
-        chunks.push(boldOff);
-      }
-      splitBiLines(bi.posProviderAddress).forEach((addrLine) => {
-        chunks.push(txt(addrLine));
+      chunks.push(nl());
+      splitBiLines("THIS DOCUMENT IS NOT VALID FOR CLAIM OF INPUT TAX").forEach((line) => {
+        chunks.push(txt(line));
         chunks.push(nl());
       });
-      if (bi.posProviderTin) {
-        chunks.push(txt(`TIN: ${bi.posProviderTin}`));
-        chunks.push(nl());
-      }
-      if (bi.posProviderBirAccreNo) {
-        chunks.push(txt(`BIR ACC#: ${bi.posProviderBirAccreNo}`));
-        chunks.push(nl());
-      }
-      if (bi.posProviderAccreDateIssued) {
-        chunks.push(txt(`DATE ISSUED: ${bi.posProviderAccreDateIssued}`));
-        chunks.push(nl());
-      }
-      if (bi.posProviderPTUNo) {
-        chunks.push(txt(`PTU: ${bi.posProviderPTUNo}`));
-        chunks.push(nl());
-      }
-      if (bi.posProviderPTUDateIssued) {
-        chunks.push(txt(`PTU DATE ISSUED: ${bi.posProviderPTUDateIssued}`));
-        chunks.push(nl());
-      }
       chunks.push(nl(3));
 
       chunks.push(cutPaper);
@@ -4289,13 +4469,330 @@ app.whenReady().then(() => {
     }
   });
 
+  ipcMain.handle("print-escpos-void-refund", async (_event, data) => {
+    const LINE_WIDTH = 42;
+
+    const peso = (v) =>
+      Number(v || 0).toLocaleString("en-PH", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+
+    const padRight = (text, width) => {
+      const raw = String(text || "");
+      return raw.length >= width ? raw.slice(0, width) : raw + " ".repeat(width - raw.length);
+    };
+
+    const padLeft = (text, width) => {
+      const raw = String(text || "");
+      return raw.length >= width ? raw.slice(0, width) : " ".repeat(width - raw.length) + raw;
+    };
+
+    const formatLeftRight = (left, right) => {
+      const l = String(left || "");
+      const r = String(right || "");
+      const space = LINE_WIDTH - l.length - r.length;
+      return l + " ".repeat(space > 0 ? space : 1) + r;
+    };
+
+    const centerText = (text) => {
+      const raw = String(text || "");
+      if (raw.length >= LINE_WIDTH) return raw.slice(0, LINE_WIDTH);
+      const pad = Math.floor((LINE_WIDTH - raw.length) / 2);
+      return " ".repeat(pad) + raw;
+    };
+
+    const wrapText = (text, width) => {
+      const raw = String(text || "").trim();
+      if (!raw) return [];
+      const words = raw.split(/\s+/);
+      const lines = [];
+      let current = "";
+      words.forEach((word) => {
+        const test = current ? `${current} ${word}` : word;
+        if (test.length <= width) { current = test; }
+        else { if (current) lines.push(current); current = word; }
+      });
+      if (current) lines.push(current);
+      return lines;
+    };
+
+    try {
+      console.log("[ESC/POS VOID/REFUND] Payload:", data);
+
+      const {
+        type = "void",
+        transaction = {},
+        computed = {},
+        voidRefundInfo = {},
+        items = [],
+      } = data || {};
+
+      const safeItems = Array.isArray(items) ? items : [];
+      const safeComputed = computed || {};
+      const activeBreakdown = Array.isArray(safeComputed?.discountBreakdown)
+        ? safeComputed.discountBreakdown.filter(
+            (entry) =>
+              Number(entry?.qualifiedCount || 0) > 0 ||
+              Number(entry?.discountAmount || 0) > 0,
+          )
+        : [];
+      const shouldShowDiscountSummary =
+        Number(safeComputed?.safeCustomerCount || 0) > 0 ||
+        Number(
+          safeComputed?.totalQualifiedCount ||
+            safeComputed?.totalQualifiedAll ||
+            0,
+        ) > 0 ||
+        Number(safeComputed?.statutoryQualifiedCount || 0) > 0 ||
+        activeBreakdown.length > 0;
+
+      const bi = readJsonFileSafe(getBusinessInfoFilePath(), DEFAULT_BUSINESS_INFO);
+      const splitBiLines = (v) =>
+        String(v || "").split(/\r?\n|\|/).map((l) => l.trim()).filter(Boolean);
+
+      const receiptTitle = type === "refund" ? "REFUND RECEIPT" : "VOID RECEIPT";
+      const actionLabel  = type === "refund" ? "Refund" : "Void";
+
+      const chunks = [];
+      const initPrinter  = Buffer.from([0x1b, 0x40]);
+      const alignLeft    = Buffer.from([0x1b, 0x61, 0x00]);
+      const alignCenter  = Buffer.from([0x1b, 0x61, 0x01]);
+      const boldOn       = Buffer.from([0x1b, 0x45, 0x01]);
+      const boldOff      = Buffer.from([0x1b, 0x45, 0x00]);
+      const doubleSizeOn = Buffer.from([0x1d, 0x21, 0x11]);
+      const normalSize   = Buffer.from([0x1d, 0x21, 0x00]);
+      const cutPaper     = Buffer.from([0x1d, 0x56, 0x00]);
+      const nl  = (n = 1) => Buffer.from("\n".repeat(n), "ascii");
+      const txt = (v)     => Buffer.from(String(v || ""), "ascii");
+      const div = ()      => txt("-".repeat(LINE_WIDTH));
+
+      chunks.push(initPrinter);
+
+      // ── Business info header ──────────────────────────────────────────────
+      chunks.push(alignCenter, boldOn);
+      chunks.push(txt(String(bi.companyName || "COMPANY")), nl());
+      if (bi.storeName) { chunks.push(txt(String(bi.storeName)), nl()); }
+      chunks.push(boldOff);
+      if (bi.corpName) { chunks.push(txt(String(bi.corpName)), nl()); }
+      splitBiLines(bi.address).forEach((line) => { chunks.push(txt(line), nl()); });
+      if (bi.tin)           { chunks.push(txt(`VAT REG TIN: ${bi.tin}`), nl()); }
+      if (bi.machineNumber) { chunks.push(txt(`MIN: ${bi.machineNumber}`), nl()); }
+      if (bi.serialNumber)  { chunks.push(txt(`S/N: ${bi.serialNumber}`), nl()); }
+
+      // ── Receipt title ─────────────────────────────────────────────────────
+      chunks.push(nl());
+      chunks.push(boldOn, txt(receiptTitle), nl(), boldOff);
+      chunks.push(nl());
+
+      // ── Transaction meta ─────────────────────────────────────────────────
+      chunks.push(alignLeft);
+
+      const voidRefundNumber = type === "refund"
+        ? String(transaction.refund_id || "")
+        : String(transaction.void_id   || "");
+
+      const metaRows = [
+        ["Trans. No.:",  transaction.transaction_id   || "-"],
+        ["INV#:",        transaction.invoice_no        || "-"],
+        ...(voidRefundNumber ? [[`${actionLabel} #:`, voidRefundNumber]] : []),
+        ["Trans. Date:", transaction.transaction_date  || "-"],
+        ["Trans. Time:", transaction.transaction_time  || "-"],
+        ["Terminal No.:",transaction.terminal_number   || "-"],
+        ["Order Type:",  transaction.order_type        || "-"],
+        ["Ref./Tag #:",  transaction.table_number      || "-"],
+        ["Cashier:",     transaction.cashier           || "-"],
+        [`${actionLabel} Date:`, voidRefundInfo.actionDate || "-"],
+        [`${actionLabel} Time:`, voidRefundInfo.actionTime || "-"],
+      ];
+
+      metaRows.forEach(([label, value]) => {
+        chunks.push(txt(formatLeftRight(label, String(value))), nl());
+      });
+
+      chunks.push(div(), nl());
+
+      // ── Items ─────────────────────────────────────────────────────────────
+      if (safeItems.length > 0) {
+        chunks.push(alignLeft, boldOn);
+        chunks.push(txt(padRight("Item", 22) + padRight("Qty", 6) + padLeft("Price", 14)), nl());
+        chunks.push(boldOff);
+        chunks.push(div(), nl());
+
+        safeItems.forEach((item) => {
+          const isDiscountable = escposYesNoToBool(item?.isDiscountable);
+          const name     = `${String(item.item_name || item.product_id || "-").toUpperCase()}${isDiscountable ? " (D)" : ""}`;
+          const qty      = String(Number(item.sales_quantity || 0));
+          const lineTotal =
+            Number(item.subtotal || 0) ||
+            Number(item.sales_quantity || 0) * Number(item.selling_price || 0);
+          const subtotal = `${peso(lineTotal)}${item?.vatable === "Yes" ? "V" : ""}`;
+
+          // Name may wrap if too long; print qty + price on the same line as first name line
+          const maxNameWidth = LINE_WIDTH - 6 - 14 - 1;
+          const nameLines = [];
+          let remaining = name;
+          while (remaining.length > maxNameWidth) {
+            nameLines.push(remaining.slice(0, maxNameWidth));
+            remaining = remaining.slice(maxNameWidth);
+          }
+          nameLines.push(remaining);
+
+          nameLines.forEach((line, i) => {
+            if (i === 0) {
+              chunks.push(txt(padRight(line, maxNameWidth) + padRight(qty, 6) + padLeft(subtotal, 14)), nl());
+            } else {
+              chunks.push(txt(padRight(line, LINE_WIDTH)), nl());
+            }
+          });
+        });
+
+        chunks.push(div(), nl());
+      }
+
+      // ── Totals ────────────────────────────────────────────────────────────
+      chunks.push(alignLeft);
+      chunks.push(txt(formatLeftRight("TOTAL SALES:", peso(safeComputed.grossTotal || 0))), nl());
+
+      activeBreakdown.forEach((entry) => {
+        if (Number(entry?.discountAmount || 0) > 0) {
+          chunks.push(
+            txt(
+              formatLeftRight(
+                `${String(entry?.label || "DISCOUNT").toUpperCase()}:`,
+                `- ${peso(entry.discountAmount)}`,
+              ),
+            ),
+            nl(),
+          );
+        }
+      });
+
+      if (Number(safeComputed.totalVatExemption || 0) > 0) {
+        chunks.push(
+          txt(
+            formatLeftRight(
+              "VAT EXEMPTION:",
+              `- ${peso(safeComputed.totalVatExemption)}`,
+            ),
+          ),
+          nl(),
+        );
+      }
+
+      // ── Amount Due (large) ────────────────────────────────────────────────
+      chunks.push(alignCenter, doubleSizeOn, boldOn);
+      chunks.push(txt("AMOUNT DUE"), nl());
+      chunks.push(txt(peso(safeComputed.totalAmountDue || 0)), nl());
+      chunks.push(normalSize, boldOff);
+
+      // ── Payment section ───────────────────────────────────────────────────
+      chunks.push(div(), nl());
+      chunks.push(alignLeft);
+      const payMethod = String(safeComputed.paymentMethod || "Cash");
+      const payAmt    = Number(safeComputed.paymentAmount  || safeComputed.totalPaid || safeComputed.totalAmountDue || 0);
+      const changeAmt = Number(safeComputed.changeAmount   || 0);
+      chunks.push(txt(formatLeftRight(`PAYMENT (${payMethod}):`, peso(payAmt))), nl());
+      chunks.push(txt(formatLeftRight("TOTAL PAYMENT:", peso(payAmt))), nl());
+      chunks.push(txt(formatLeftRight("CHANGE:", peso(changeAmt))), nl());
+
+      // ── VAT section ───────────────────────────────────────────────────────
+      chunks.push(div(), nl());
+      chunks.push(txt(formatLeftRight("VATABLE SALES:",    peso(Number(safeComputed.vatableSales   || 0)))), nl());
+      chunks.push(txt(formatLeftRight("VAT AMOUNT:",       peso(Number(safeComputed.vatableSalesVat || 0)))), nl());
+      chunks.push(txt(formatLeftRight("VAT EXEMPT SALES:", peso(Number(safeComputed.vatExemptSales || 0)))), nl());
+      chunks.push(txt(formatLeftRight("VAT EXEMPTION:",    peso(Number(safeComputed.totalVatExemption || 0)))), nl());
+      chunks.push(txt(formatLeftRight("ZERO RATED SALES:", peso(Number(safeComputed.vatZeroRatedSales || 0)))), nl());
+
+      // ── Discount summary ──────────────────────────────────────────────────
+      if (shouldShowDiscountSummary) {
+        chunks.push(div(), nl());
+        chunks.push(txt(formatLeftRight("Total Customers:", String(Number(safeComputed.safeCustomerCount || 0)))), nl());
+        chunks.push(
+          txt(
+            formatLeftRight(
+              "Total Qualified:",
+              String(
+                Number(
+                  safeComputed.totalQualifiedCount ||
+                    safeComputed.totalQualifiedAll ||
+                    0,
+                ),
+              ),
+            ),
+          ),
+          nl(),
+        );
+
+        activeBreakdown.forEach((entry) => {
+          chunks.push(
+            txt(formatLeftRight(escposGetDiscountCountLabel(entry), String(Number(entry?.qualifiedCount || 0)))),
+            nl(),
+          );
+          chunks.push(
+            txt(formatLeftRight(escposGetDiscountAmountLabel(entry), peso(entry?.discountAmount || 0))),
+            nl(),
+          );
+        });
+
+        chunks.push(txt(formatLeftRight("Discountable Gross:", peso(Number(safeComputed.discountableGross || 0)))), nl());
+        chunks.push(txt(formatLeftRight("Discountable Base:",  peso(Number(safeComputed.discountableBase  || 0)))), nl());
+      }
+
+      chunks.push(div(), nl());
+
+      // ── Auth / Remarks ────────────────────────────────────────────────────
+      chunks.push(alignLeft);
+      chunks.push(txt(formatLeftRight("Auth By:", String(voidRefundInfo.authBy || "-"))), nl());
+      chunks.push(txt("Remarks:"), nl());
+
+      const remarkLines = wrapText(voidRefundInfo.remarks || "NO REMARKS", LINE_WIDTH - 2);
+      remarkLines.forEach((line) => { chunks.push(txt(`  ${line}`), nl()); });
+
+      chunks.push(div(), nl());
+
+      // ── Footer ────────────────────────────────────────────────────────────
+      chunks.push(alignCenter);
+      if (bi.posProviderName) {
+        chunks.push(boldOn, txt(String(bi.posProviderName)), nl(), boldOff);
+        splitBiLines(bi.posProviderAddress).forEach((l) => { chunks.push(txt(l), nl()); });
+        if (bi.posProviderTin)           { chunks.push(txt(`TIN: ${bi.posProviderTin}`), nl()); }
+        if (bi.posProviderBirAccreNo)    { chunks.push(txt(`BIR ACC#: ${bi.posProviderBirAccreNo}`), nl()); }
+        if (bi.posProviderAccreDateIssued) { chunks.push(txt(`DATE ISSUED: ${bi.posProviderAccreDateIssued}`), nl()); }
+        if (bi.posProviderPTUNo)         { chunks.push(txt(`PTU: ${bi.posProviderPTUNo}`), nl()); }
+        if (bi.posProviderPTUDateIssued) { chunks.push(txt(`PTU DATE ISSUED: ${bi.posProviderPTUDateIssued}`), nl()); }
+      }
+
+      chunks.push(nl(3), cutPaper);
+
+      const payload = Buffer.concat(chunks);
+      return await writeEscposBuffer(payload, {
+        printerName: data?.printerName,
+        configKey: "printEscpospospaymentreceipt",
+      });
+    } catch (error) {
+      console.error("ESC/POS void/refund print error:", error);
+      return { success: false, message: error?.message || "ESC/POS void/refund print failed" };
+    }
+  });
+
   ipcMain.handle("get-api-host", () => {
     try {
       const ipPath = getIpFilePath();
       console.log("Reading ip.txt from:", ipPath);
-      return readTextFileSafe(ipPath);
+      const map = getIpConfigMap();
+      return map.LOCAL || readTextFileSafe(ipPath);
     } catch (error) {
       console.error("Failed to read ip.txt:", error);
+      return "";
+    }
+  });
+
+  ipcMain.handle("get-web-api-host", () => {
+    try {
+      return getIpConfigMap().WEB || "";
+    } catch (error) {
+      console.error("Failed to read WEB endpoint from ip.txt:", error);
       return "";
     }
   });
@@ -4759,6 +5256,93 @@ app.whenReady().then(() => {
     } catch {
       return [];
     }
+  });
+
+  // ── Kiosk: second-screen management ──────────────────────────────────────
+  ipcMain.handle("kiosk:get-screens", () => {
+    const all = screen.getAllDisplays();
+    const primary = screen.getPrimaryDisplay();
+    return {
+      hasSecondary: all.length > 1,
+      displays: all.map((d) => ({
+        id: d.id,
+        bounds: d.bounds,
+        isPrimary: d.id === primary.id,
+      })),
+    };
+  });
+
+  ipcMain.handle("kiosk:open-second-screen", () => {
+    if (secondScreenWin && !secondScreenWin.isDestroyed()) {
+      return { ok: true, alreadyOpen: true };
+    }
+
+    const all = screen.getAllDisplays();
+    const primary = screen.getPrimaryDisplay();
+    const secondary = all.find((d) => d.id !== primary.id);
+
+    if (!secondary) return { ok: false, reason: "no-secondary-display" };
+
+    secondScreenWin = new BrowserWindow({
+      x: secondary.bounds.x,
+      y: secondary.bounds.y,
+      width: secondary.bounds.width,
+      height: secondary.bounds.height,
+      frame: false,
+      fullscreen: true,
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      webPreferences: {
+        preload: path.join(__dirname, "preload.cjs"),
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: false,
+        backgroundThrottling: false,
+      },
+    });
+
+    if (!app.isPackaged) {
+      secondScreenWin.loadURL(`${DEV_SERVER_URL}/#/kiosk-display`);
+    } else {
+      secondScreenWin.loadFile(
+        path.join(__dirname, "..", "dist", "index.html"),
+        { hash: "/kiosk-display" },
+      );
+    }
+
+    secondScreenWin.on("closed", () => {
+      secondScreenWin = null;
+    });
+
+    return { ok: true };
+  });
+
+  ipcMain.handle("kiosk:close-second-screen", () => {
+    if (secondScreenWin && !secondScreenWin.isDestroyed()) {
+      secondScreenWin.close();
+    }
+    secondScreenWin = null;
+    return { ok: true };
+  });
+
+  // Maximize / restore the main operator window (not fullscreen — second screen handles fullscreen)
+  ipcMain.handle("kiosk:set-fullscreen", (_event, value) => {
+    if (win && !win.isDestroyed()) {
+      if (value) {
+        win.maximize();
+      } else {
+        win.unmaximize();
+      }
+    }
+    return { ok: true };
+  });
+
+  // Forward live cart data from main window → second screen window
+  ipcMain.handle("kiosk:update-cart", (_event, cartData) => {
+    if (secondScreenWin && !secondScreenWin.isDestroyed()) {
+      secondScreenWin.webContents.send("kiosk:cart-updated", cartData);
+    }
+    return { ok: true };
   });
 
   ipcMain.on("close-app", () => {

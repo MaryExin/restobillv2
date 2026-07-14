@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("appConfig", {
   getApiHost: () => ipcRenderer.invoke("get-api-host"),
+  getWebApiHost: () => ipcRenderer.invoke("get-web-api-host"),
   getDefaultPrinterName: () => ipcRenderer.invoke("get-default-printer-name"),
   getBusinessInfo: () => ipcRenderer.invoke("get-business-info"),
   saveBusinessInfo: (payload) =>
@@ -22,6 +23,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   readBusinessInfo: () => ipcRenderer.invoke("read-business-info"),
   checkEscposPrinter: () => ipcRenderer.invoke("check-escpos-printer"),
   printEscPos: (data) => ipcRenderer.invoke("print-escpos", data),
+  printEscPosQr: (data) => ipcRenderer.invoke("print-escposqr", data),
+  printEscPosVoidRefund: (data) => ipcRenderer.invoke("print-escpos-void-refund", data),
   printEscPosBilling: (data) => ipcRenderer.invoke("print-escposbilling", data),
   printEscposDiscount: (data) =>
     ipcRenderer.invoke("print-escposdiscount", data),
@@ -40,4 +43,16 @@ contextBridge.exposeInMainWorld("electronAPI", {
   scanComPorts: () => ipcRenderer.invoke("scan-com-ports"),
   scanLanPrinters: () => ipcRenderer.invoke("scan-lan-printers"),
   quitApp: () => ipcRenderer.send("close-app"),
+});
+
+contextBridge.exposeInMainWorld("kioskAPI", {
+  getScreens: () => ipcRenderer.invoke("kiosk:get-screens"),
+  openSecondScreen: () => ipcRenderer.invoke("kiosk:open-second-screen"),
+  closeSecondScreen: () => ipcRenderer.invoke("kiosk:close-second-screen"),
+  setFullScreen: (value) => ipcRenderer.invoke("kiosk:set-fullscreen", value),
+  updateCart: (data) => ipcRenderer.invoke("kiosk:update-cart", data),
+  onCartUpdate: (cb) =>
+    ipcRenderer.on("kiosk:cart-updated", (_event, data) => cb(data)),
+  offCartUpdate: (cb) =>
+    ipcRenderer.removeListener("kiosk:cart-updated", cb),
 });

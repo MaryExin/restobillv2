@@ -14,6 +14,7 @@ import ModalSuccessNavToSelf from "../../Modals/ModalSuccessNavToSelf";
 import { useQueryClient } from "@tanstack/react-query";
 import useCustomInfiniteQuery from "../../../hooks/useCustomInfiniteQuery";
 import { useSecuredMutation } from "../../../hooks/useSecuredMutation";
+import useWebApiHost from "../../../hooks/useWebApiHost";
 import { supabase } from "../../../context/supaBaseClient";
 
 /* -------------------------------------------------------------------------- */
@@ -753,11 +754,12 @@ const ReadUserRolesWebModal = ({ isOpen, onClose }) => {
     return String(stored).trim().replace(/\/$/, "");
   }, []);
 
+  const rawWebApiHost = useWebApiHost();
   const webApiHost = useMemo(() => {
-    return String(import.meta.env.VITE_WEBAPIENDPOINT || "")
+    return String(rawWebApiHost || "")
       .trim()
       .replace(/\/$/, "");
-  }, []);
+  }, [rawWebApiHost]);
 
   const infiniteUserRoleWebUrl = useMemo(() => {
     return `${webApiHost}${import.meta.env.VITE_INFINITE_USER_ROLE_ENDPOINT}`;

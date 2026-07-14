@@ -20,8 +20,8 @@ if ($conn->connect_error) {
 
 ob_clean();
 
-$query = "SELECT product_id, item_category, item_name, unit_of_measure, selling_price, Status 
-          FROM tbl_inventory_products_masterlist where status = 'Active' 
+$query = "SELECT product_id, item_category, item_name, unit_of_measure, selling_price, Status, isDiscountable
+          FROM tbl_inventory_products_masterlist where status = 'Active'
           ORDER BY item_category ASC, item_name ASC";
 
 $result = $conn->query($query);
@@ -31,6 +31,7 @@ if ($result && $result->num_rows > 0) {
     while ($row = $result->fetch_assoc()) {
         $row['status'] = (trim($row['Status']) === "Active") ? "1" : "0";
         $row['selling_price'] = (float)$row['selling_price'];
+        $row['isDiscountable'] = (trim($row['isDiscountable'] ?? 'Yes') === 'Yes') ? 'Yes' : 'No';
         $products[] = $row;
     }
 }

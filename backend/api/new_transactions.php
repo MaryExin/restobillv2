@@ -82,6 +82,38 @@ try {
     $stmt_sales->execute();
     $sales_types = $stmt_sales->fetchAll();
 
+    // Apply the admin-configured display order (Settings > Sales Type Order),
+    // falling back to alphabetical for any sales type not yet configured.
+    $sql_order = "SELECT `value`
+                  FROM tbl_pos_settings
+                  WHERE category = 'SalesType'
+                    AND description = 'Sales Type Display Order'
+                  ORDER BY ID DESC
+                  LIMIT 1";
+    $stmt_order = $pdo->prepare($sql_order);
+    $stmt_order->execute();
+    $saved_order = json_decode((string)$stmt_order->fetchColumn(), true);
+
+    if (is_array($saved_order) && count($saved_order) > 0) {
+        $by_id = [];
+        foreach ($sales_types as $row) {
+            $by_id[$row['sales_type_id']] = $row;
+        }
+
+        $ordered_sales_types = [];
+        foreach ($saved_order as $id) {
+            if (isset($by_id[$id])) {
+                $ordered_sales_types[] = $by_id[$id];
+                unset($by_id[$id]);
+            }
+        }
+        foreach ($by_id as $row) {
+            $ordered_sales_types[] = $row;
+        }
+
+        $sales_types = $ordered_sales_types;
+    }
+
     /* ------------------------------
         7. FETCH ITEM CATEGORIES
     ------------------------------ */

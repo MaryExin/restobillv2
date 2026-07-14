@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
+import useZustandLayoutMode from "../../context/useZustandLayoutMode";
 import Orderlist from "./Orderlist";
 import {
   FaSearch,
@@ -152,9 +153,16 @@ const getContrastText = (hex, fallback = "#ffffff") => {
   return brightness > 155 ? "#0f172a" : "#ffffff";
 };
 
+const KIOSK_DEFAULT_TABLE = "Table 01";
+const RETAIL_DEFAULT_TABLE = "Register 1";
+
 const ViewOrdering = () => {
   const { themeSettings } = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { layoutMode } = useZustandLayoutMode();
+  // "Restaurant Version 2" is the stored id behind the "Retail POS" layout option.
+  const isRetailPosMode = layoutMode === "Restaurant Version 2";
   const apiHost = useApiHost();
   const floorRef = useRef(null);
   const floorLayoutLoadedRef = useRef(false);
@@ -1423,6 +1431,30 @@ const ViewOrdering = () => {
     setTransactionId(txId || "");
     setshoworderlist(true);
   };
+
+  // Kiosk Mode and Retail POS Mode: skip table selection and open the
+  // ordering screen immediately, same as Kiosk — neither mode has "tables".
+  useEffect(() => {
+    if (layoutMode === "Kiosk") {
+      if (location.state?.kioskEdit) {
+        const { kioskTransactionId, kioskTableName } = location.state;
+        openOrderList(
+          kioskTableName || KIOSK_DEFAULT_TABLE,
+          kioskTransactionId || "",
+        );
+        navigate(location.pathname, { replace: true, state: {} });
+      } else if (location.state?.kioskAutoOpen) {
+        openOrderList(KIOSK_DEFAULT_TABLE, "");
+        navigate(location.pathname, { replace: true, state: {} });
+      }
+      return;
+    }
+
+    if (isRetailPosMode) {
+      openOrderList(RETAIL_DEFAULT_TABLE, "");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleOrderSaved = () => {
     setTableRefreshKey((prev) => prev + 1);

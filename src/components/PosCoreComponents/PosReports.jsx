@@ -15,7 +15,9 @@ import {
   FaSyncAlt,
   FaTimes,
   FaCode,
-  FaTag, // New icon for Price Change
+  FaCalendarAlt,
+  FaTable,
+  FaCalendarCheck,
 } from "react-icons/fa";
 import { useTheme } from "../../context/ThemeContext";
 import useApiHost from "../../hooks/useApiHost";
@@ -33,7 +35,10 @@ import CustomersModal from "../MainComponents/ReportsModal/CustomersModal";
 import LogsModal from "../MainComponents/ReportsModal/LogsModal";
 import ModalXml from "../Modals/ModalXml";
 import ZReadingView from "../MainComponents/ReportsModal/ZReadingView";
+import ZReadingMonthlyView from "../MainComponents/ReportsModal/ZReadingMonthlyView";
 import PricingDashboard from "../MainComponents/ReportsModal/PricingDashboard";
+import MonthlySalesModal from "../MainComponents/ReportsModal/MonthlySalesModal";
+import SalesPerItemPerDateModal from "../MainComponents/ReportsModal/SalesPerItemPerDateModal";
 
 const MenuCard = ({
   icon: Icon,
@@ -107,6 +112,8 @@ const PosReports = ({
   const [activeModal, setActiveModal] = useState(null);
   const [zReadingData, setZReadingData] = useState(null);
   const [isLoadingZReading, setIsLoadingZReading] = useState(false);
+  const [zReadingMonthlyData, setZReadingMonthlyData] = useState(null);
+  const [isLoadingZReadingMonthly, setIsLoadingZReadingMonthly] = useState(false);
   const apiHost = useApiHost();
 
   // Authentication check for Price Change button
@@ -160,6 +167,53 @@ const PosReports = ({
     }
   };
 
+  const handleZReadingMonthlyClick = () => {
+    setActiveModal("zreadingmonthlyview");
+    setZReadingMonthlyData(null);
+  };
+
+  const handleFilterZReadingMonthly = async (dateFrom, dateTo) => {
+    try {
+      if (!dateFrom || !dateTo) {
+        alert("Please select both Date From and Date To.");
+        return;
+      }
+
+      setIsLoadingZReadingMonthly(true);
+      setZReadingMonthlyData(null);
+
+      const res = await fetch(`${apiHost}/api/reprint_z_reading_monthly.php`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          dateFrom,
+          dateTo,
+          categoryCode: localStorage.getItem("posBusinessCategoryCode") || "",
+          unitCode: localStorage.getItem("posBusinessUnitCode") || "",
+          terminalNumber: localStorage.getItem("posTerminalNumber") || "1",
+        }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok || !json.success) {
+        throw new Error(
+          json.message || "Failed to load Z-Reading Monthly data.",
+        );
+      }
+
+      setZReadingMonthlyData(json.data);
+    } catch (error) {
+      console.error("Z-Reading Monthly error:", error);
+      alert(error.message || "Failed to load Z-Reading Monthly.");
+      setZReadingMonthlyData(null);
+    } finally {
+      setIsLoadingZReadingMonthly(false);
+    }
+  };
+
   // Standard report items
   const reportItems = [
     {
@@ -205,6 +259,12 @@ const PosReports = ({
       action: handleZReadingClick,
     },
     {
+      label: "Z-Reading Monthly",
+      icon: FaCalendarCheck,
+      color: "#ca8a04",
+      action: handleZReadingMonthlyClick,
+    },
+    {
       label: "Customers",
       icon: FaUsers,
       color: "#6366f1",
@@ -236,10 +296,16 @@ const PosReports = ({
       action: () => setActiveModal("xml"),
     },
     {
-      label: "Pricing Management",
-      icon: FaTag,
-      color: "#10b981",
-      action: () => setActiveModal("priceChange"),
+      label: "Monthly Sales",
+      icon: FaCalendarAlt,
+      color: "#9333ea",
+      action: () => setActiveModal("monthlySales"),
+    },
+    {
+      label: "Sales Per Item Per Date",
+      icon: FaTable,
+      color: "#0d9488",
+      action: () => setActiveModal("salesPerItemPerDate"),
     },
   ];
 
@@ -358,6 +424,18 @@ const PosReports = ({
         onFilter={handleFilterZReading}
       />
 
+      <ZReadingMonthlyView
+        isOpen={activeModal === "zreadingmonthlyview"}
+        onClose={() => {
+          setActiveModal(null);
+          setZReadingMonthlyData(null);
+          setIsLoadingZReadingMonthly(false);
+        }}
+        reportData={zReadingMonthlyData}
+        isLoading={isLoadingZReadingMonthly}
+        onFilter={handleFilterZReadingMonthly}
+      />
+
       <RefundsModal
         isOpen={activeModal === "refunds"}
         onClose={() => setActiveModal(null)}
@@ -380,6 +458,14 @@ const PosReports = ({
       />
       <PricingDashboard
         isOpen={activeModal === "priceChange"}
+        onClose={() => setActiveModal(null)}
+      />
+      <MonthlySalesModal
+        isOpen={activeModal === "monthlySales"}
+        onClose={() => setActiveModal(null)}
+      />
+      <SalesPerItemPerDateModal
+        isOpen={activeModal === "salesPerItemPerDate"}
         onClose={() => setActiveModal(null)}
       />
 

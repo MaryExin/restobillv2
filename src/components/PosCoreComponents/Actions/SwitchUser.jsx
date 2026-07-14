@@ -194,9 +194,14 @@ const SwitchUser = () => {
         return;
       }
 
-      const nextUserId = result?.userid ?? "";
-      const nextUsername = result?.username ?? "";
-      const nextEmail = result?.email ?? loginEmail;
+      // Prefer the account the cashier explicitly picked from the list
+      // (selectedUser) over re-parsing login.php's response -- we already
+      // know exactly which uuid/email/name was clicked, so trust that as
+      // the source of truth for identity. login.php is only consulted here
+      // to verify the password and mint fresh tokens/role/profile pic.
+      const nextUserId = selectedUser?.uuid || result?.userid || "";
+      const nextUsername = selectedUser?.name || result?.username || "";
+      const nextEmail = selectedUser?.email || result?.email || loginEmail;
       const nextProfilePic = result?.profile_pic ?? "";
 
       let nextRole = result?.userrole ?? "";
@@ -206,7 +211,7 @@ const SwitchUser = () => {
 
       toggleAuthToTrue();
       setUserId(nextUserId);
-      toggleFirstName(selectedUser?.name || nextUsername);
+      toggleFirstName(nextUsername);
       toggleEmail(nextEmail);
       updateUserRole(nextRole);
       setProfilePic(nextProfilePic);
@@ -214,7 +219,7 @@ const SwitchUser = () => {
       localStorage.setItem("access_token", result?.access_token ?? "");
       localStorage.setItem("refresh_token", result?.refresh_token ?? "");
       localStorage.setItem("user_id", nextUserId);
-      localStorage.setItem("username", selectedUser?.name || nextUsername);
+      localStorage.setItem("username", nextUsername);
       localStorage.setItem("email", nextEmail);
       localStorage.setItem(
         "user_role",
@@ -223,6 +228,11 @@ const SwitchUser = () => {
           : (result?.userrole ?? ""),
       );
       localStorage.setItem("profile_pic", nextProfilePic);
+
+      // Clear the previous user's shift-derived Cashier name so any screen
+      // reading it fresh (Orderlist, PosPayment, receipts) fetches it again
+      // for the new user instead of showing a stale value.
+      localStorage.removeItem("Cashier");
 
       setPasswordModalOpen(false);
       setOpen(false);

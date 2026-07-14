@@ -10,11 +10,15 @@ import {
   FiEye,
   FiAlertTriangle,
   FiTrash2,
+  FiCheck,
+  FiShoppingCart,
+  FiPlus,
 } from "react-icons/fi";
 import ButtonComponent from "./Common/ButtonComponent";
 import { BuildPrintableDiscountReceiptHtml } from "../../utils/BuildPrintableDiscountReceiptHtml";
 import useGetDefaultPrinter from "../../hooks/useGetDefaultPrinter";
 import useBusinessInfo from "../../hooks/useBusinessInfo";
+import { computeDiscountLine } from "../../utils/discountLineMath";
 
 const peso = (value) =>
   Number(value || 0).toLocaleString("en-PH", {
@@ -98,6 +102,7 @@ const DISCOUNT_META = [
     color: "emerald",
     needsAmount: false,
     hasVatExemption: true,
+    percent: 20,
   },
   {
     key: "pwd",
@@ -106,6 +111,7 @@ const DISCOUNT_META = [
     color: "violet",
     needsAmount: false,
     hasVatExemption: true,
+    percent: 20,
   },
   {
     key: "naac",
@@ -114,6 +120,7 @@ const DISCOUNT_META = [
     color: "blue",
     needsAmount: false,
     hasVatExemption: true,
+    percent: 20,
   },
   {
     key: "soloParent",
@@ -122,6 +129,7 @@ const DISCOUNT_META = [
     color: "rose",
     needsAmount: false,
     hasVatExemption: true,
+    percent: 10,
   },
   {
     key: "manual",
@@ -130,8 +138,30 @@ const DISCOUNT_META = [
     color: "amber",
     needsAmount: true,
     hasVatExemption: false,
+    percent: 0,
   },
 ];
+
+// Statutory/manual labels that already have their own dedicated card + state
+// (see DISCOUNT_META / discountState above). Anything saved under a
+// different label is a custom discount type from Settings > Discount Mode >
+// Discount Types, tracked separately in `customDiscountLines`.
+const STATUTORY_DISCOUNT_LABELS = new Set([
+  "senior",
+  "senior citizen",
+  "senior citizen discount",
+  "pwd",
+  "pwd discount",
+  "naac",
+  "naac discount",
+  "national athletes and coaches",
+  "national athletes and coaches discount",
+  "solo parent",
+  "solo parent discount",
+  "soloparent",
+  "manual",
+  "manual discount",
+]);
 
 const buildInitialDiscountState = () => ({
   senior: { qualifiedCount: 0, manualAmount: "" },
@@ -404,6 +434,146 @@ const OrderedItemsSummaryModal = ({
   );
 };
 
+
+const DiscountTypePickerModal = ({
+  isOpen,
+  onClose,
+  isDark,
+  statutoryOptions,
+  customOptions,
+  onPickStatutory,
+  onPickCustom,
+}) => {
+  if (!isOpen) return null;
+
+  const modalClass = isDark
+    ? "bg-slate-900 border border-white/10 text-white"
+    : "bg-white border border-slate-200 text-slate-900";
+
+  const hasOptions = statutoryOptions.length > 0 || customOptions.length > 0;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        className={`fixed inset-0 z-[100001] flex items-center justify-center p-3 backdrop-blur-md ${
+          isDark ? "bg-slate-950/80" : "bg-slate-200/70"
+        }`}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+      >
+        <motion.div
+          initial={{ scale: 0.985, opacity: 0, y: 10 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          exit={{ scale: 0.985, opacity: 0, y: 10 }}
+          transition={{ duration: 0.16 }}
+          className={`w-full max-w-[900px] overflow-hidden rounded-[1rem] shadow-2xl ${modalClass}`}
+        >
+          <div
+            className={`relative px-4 py-3 ${
+              isDark
+                ? "border-b border-white/5 bg-white/5"
+                : "border-b border-slate-200 bg-slate-50"
+            }`}
+          >
+            <button
+              onClick={onClose}
+              className={`absolute right-3 top-3 rounded-full p-1.5 transition-all ${
+                isDark
+                  ? "bg-slate-800 text-slate-400 hover:bg-red-500/20 hover:text-red-400"
+                  : "bg-slate-100 text-slate-500 hover:bg-red-100 hover:text-red-500"
+              }`}
+            >
+              <FiX size={14} />
+            </button>
+
+            <div className="pr-8">
+              <h3 className="text-base font-black">Choose Discount Type</h3>
+              <p className="mt-0.5 text-[11px] text-slate-500">
+                Active for this sales type.
+              </p>
+            </div>
+          </div>
+
+          <div className="max-h-[70vh] overflow-y-auto p-4">
+            {!hasOptions ? (
+              <div
+                className={`flex min-h-[160px] items-center justify-center rounded-lg border border-dashed ${
+                  isDark ? "border-white/10" : "border-slate-300"
+                }`}
+              >
+                <p className="text-sm italic text-slate-500">
+                  No more discount types active for this sales type.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                {statutoryOptions.map((meta) => (
+                  <button
+                    key={meta.key}
+                    type="button"
+                    onClick={() => onPickStatutory(meta.key)}
+                    className={`rounded-xl border p-3 transition ${
+                      isDark
+                        ? "border-white/5 bg-slate-950 hover:border-slate-700"
+                        : "border-slate-200 bg-white hover:border-slate-300"
+                    }`}
+                  >
+                    <div className="flex min-h-[80px] flex-col items-center justify-center gap-1.5">
+                      <span className="text-xs font-semibold leading-tight text-center">
+                        {meta.label}
+                      </span>
+                      <span className="text-[11px] font-black text-emerald-500">
+                        {meta.percent}%
+                      </span>
+                    </div>
+                  </button>
+                ))}
+
+                {customOptions.map((type) => (
+                  <button
+                    key={type.id}
+                    type="button"
+                    onClick={() => onPickCustom(type)}
+                    className={`rounded-xl border p-3 transition ${
+                      isDark
+                        ? "border-white/5 bg-slate-950 hover:border-slate-700"
+                        : "border-slate-200 bg-white hover:border-slate-300"
+                    }`}
+                  >
+                    <div className="flex min-h-[80px] flex-col items-center justify-center gap-1.5">
+                      <span className="text-xs font-semibold leading-tight text-center">
+                        {type.discount_name}
+                      </span>
+                      <span className="text-[11px] font-black text-emerald-500">
+                        {type.calculation_type === "fixed"
+                          ? `₱${Number(type.percent).toFixed(2)}`
+                          : `${Number(type.percent)}%`}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="flex justify-center mt-5">
+              <button
+                onClick={onClose}
+                className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition-all ${
+                  isDark
+                    ? "bg-slate-800 text-slate-300 hover:text-white"
+                    : "bg-slate-200 text-slate-700 hover:text-slate-900"
+                }`}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+};
 
 const CustomerInfoModal = ({
   isOpen,
@@ -690,6 +860,7 @@ const DiscountEntryCard = ({
   onChangeManualAmount,
   onChangeManualPercent,
   manualBaseAmount = 0,
+  discountMode = "PerCustomer",
 }) => {
   const accentClass =
     meta.color === "emerald"
@@ -710,9 +881,11 @@ const DiscountEntryCard = ({
           <p className={`text-[11px] ${accentClass}`}>
             {meta.needsAmount
               ? "Enter a direct amount or percentage."
-              : meta.key === "soloParent"
-                ? "10% statutory discount per qualified share."
-                : "20% statutory discount per qualified share."}
+              : discountMode === "PerProduct"
+                ? `${meta.percent}% of per-person share (selected items ÷ total customers).`
+                : meta.hasVatExemption
+                  ? `${meta.percent}% discount per qualified share + VAT exemption.`
+                  : `${meta.percent}% discount per qualified share.`}
           </p>
         </div>
         <div
@@ -813,9 +986,9 @@ const DiscountEntryCard = ({
               Rule
             </p>
             <p className="mt-1 font-semibold">
-              {meta.key === "soloParent"
-                ? "10% of prorated base"
-                : "20% of prorated base"}
+              {discountMode === "PerProduct"
+                ? `${meta.percent}% of per-person share (selected items)`
+                : `${meta.percent}% of prorated base`}
             </p>
           </div>
         )}
@@ -862,10 +1035,26 @@ const ModalDiscountTransaction = ({
   const [initialLoadedSignature, setInitialLoadedSignature] = useState("");
   const [showOverrideWarning, setShowOverrideWarning] = useState(false);
   const [serviceChargeEnabled, setServiceChargeEnabled] = useState(false);
-  const [serviceChargePercentage, setServiceChargePercentage] = useState(0);
+  const [serviceCharges, setServiceCharges] = useState([]);
+  // per-transaction toggle: chargeId → boolean (true = include this transaction)
+  const [chargeToggles, setChargeToggles] = useState({});
+  const [discountMode, setDiscountMode] = useState("PerCustomer");
+  const [discountSharingMode, setDiscountSharingMode] = useState("shared");
+  // Per Product: object { [String(item.ID)]: number } — how many units per item are discounted
+  const [selectedProductIds, setSelectedProductIds] = useState({});
   const [customerInfoEnabled, setCustomerInfoEnabled] = useState(false);
   const [isSavingCustomerInfo, setIsSavingCustomerInfo] = useState(false);
   const [customerInfoSavedMessage, setCustomerInfoSavedMessage] = useState("");
+
+  // Discount types (Senior/PWD/NAAC/Solo Parent + any custom type from
+  // Settings > Discount Mode > Discount Types) are no longer always shown --
+  // cashier adds them via "+ Add Discount", filtered to whatever's active
+  // for this transaction's sales type.
+  const [availableDiscountTypes, setAvailableDiscountTypes] = useState([]);
+  const [addedStatutoryKeys, setAddedStatutoryKeys] = useState(() => new Set());
+  const [customDiscountLines, setCustomDiscountLines] = useState([]);
+  const [rawCustomCountsByLabel, setRawCustomCountsByLabel] = useState(null);
+  const [showAddDiscountMenu, setShowAddDiscountMenu] = useState(false);
 
   // let escposWarmedUp = false;
 
@@ -970,6 +1159,58 @@ const ModalDiscountTransaction = ({
     }));
   };
 
+  // "+ Add Discount" picker actions -- statutory cards (Senior/PWD/NAAC/Solo
+  // Parent) just toggle visibility (their state/math is unchanged); custom
+  // types (from Settings > Discount Mode > Discount Types) get their own
+  // dynamic line.
+  const addStatutoryDiscount = (key) => {
+    setAddedStatutoryKeys((prev) => {
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
+    setShowAddDiscountMenu(false);
+  };
+
+  const removeStatutoryDiscount = (key) => {
+    setAddedStatutoryKeys((prev) => {
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
+    setDiscountState((prev) => ({
+      ...prev,
+      [key]: { qualifiedCount: 0, manualAmount: "" },
+    }));
+  };
+
+  const addCustomDiscountLine = (type) => {
+    setCustomDiscountLines((prev) => [
+      ...prev,
+      {
+        localId: `new-${type.id}-${Date.now()}`,
+        discount_type_id: type.id,
+        label: type.discount_name,
+        calculation_type: type.calculation_type,
+        is_vat_exempt: !!Number(type.is_vat_exempt),
+        percent: Number(type.percent || 0),
+        qualifiedCount: 0,
+        manualAmount: "",
+      },
+    ]);
+    setShowAddDiscountMenu(false);
+  };
+
+  const removeCustomDiscountLine = (localId) => {
+    setCustomDiscountLines((prev) => prev.filter((line) => line.localId !== localId));
+  };
+
+  const updateCustomLine = (localId, patch) => {
+    setCustomDiscountLines((prev) =>
+      prev.map((line) => (line.localId === localId ? { ...line, ...patch } : line)),
+    );
+  };
+
   const resetForm = () => {
     setCustomerCount(1);
     setCustomerCards([]);
@@ -981,7 +1222,77 @@ const ModalDiscountTransaction = ({
     setShowOverrideWarning(false);
     setIsSavingCustomerInfo(false);
     setCustomerInfoSavedMessage("");
+    setAddedStatutoryKeys(new Set());
+    setCustomDiscountLines([]);
+    setRawCustomCountsByLabel(null);
+    setShowAddDiscountMenu(false);
   };
+
+  // Discount types active for this transaction's sales type -- what the
+  // "+ Add Discount" picker offers, resolved via lkp_discount_type +
+  // tbl_pos_discount_type_sales_type (Settings > Discount Mode).
+  useEffect(() => {
+    if (!isOpen || !apiHost) return undefined;
+
+    const salesTypeDescription = transaction?.order_type || "";
+    if (!salesTypeDescription) {
+      setAvailableDiscountTypes([]);
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    fetch(
+      `${apiHost}/api/pos_discount_types.php?sales_type_description=${encodeURIComponent(salesTypeDescription)}`,
+    )
+      .then((res) => res.json())
+      .then((result) => {
+        if (!cancelled && result?.success) {
+          setAvailableDiscountTypes(
+            Array.isArray(result?.data?.discount_types)
+              ? result.data.discount_types
+              : [],
+          );
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setAvailableDiscountTypes([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, apiHost, transaction?.order_type]);
+
+  // Once both the previously-saved custom discount rows (from the main load
+  // effect below) and the sales-type-active discount types are in, rebuild
+  // customDiscountLines so reopening an order doesn't lose custom lines.
+  useEffect(() => {
+    if (!rawCustomCountsByLabel) return;
+
+    const labels = Object.keys(rawCustomCountsByLabel);
+    if (labels.length === 0) return;
+
+    setCustomDiscountLines((prev) => {
+      if (prev.length > 0) return prev;
+
+      return labels.map((label) => {
+        const match = availableDiscountTypes.find(
+          (t) => t.discount_name === label,
+        );
+        return {
+          localId: `restored-${label}`,
+          discount_type_id: match?.id ?? null,
+          label,
+          calculation_type: match?.calculation_type || "percentage",
+          is_vat_exempt: !!Number(match?.is_vat_exempt || 0),
+          percent: Number(match?.percent ?? 0),
+          qualifiedCount: Number(rawCustomCountsByLabel[label]?.count || 0),
+          manualAmount: "",
+        };
+      });
+    });
+  }, [rawCustomCountsByLabel, availableDiscountTypes]);
 
   useEffect(() => {
     if (!isOpen || !apiHost || !transaction?.transaction_id) return;
@@ -1018,6 +1329,15 @@ const ModalDiscountTransaction = ({
           : [];
 
         setItems(nextItems);
+
+        // Initialize all discountable items at full qty for Per Product mode
+        const initSelected = {};
+        nextItems.forEach((item) => {
+          if (yesNoToBool(item.isDiscountable)) {
+            initSelected[String(item.ID)] = Number(item.sales_quantity || 0);
+          }
+        });
+        setSelectedProductIds(initSelected);
 
         const nextCustomerCount = Math.max(
           Number(
@@ -1064,6 +1384,24 @@ const ModalDiscountTransaction = ({
 
         setCustomerCount(nextCustomerCount);
         setDiscountState(nextDiscountState);
+
+        setAddedStatutoryKeys(
+          new Set(
+            ["senior", "pwd", "naac", "soloParent"].filter(
+              (k) => Number(nextDiscountState[k]?.qualifiedCount || 0) > 0,
+            ),
+          ),
+        );
+
+        const rawByLabel = data?.discount_counts_by_label || {};
+        const customByLabel = {};
+        Object.entries(rawByLabel).forEach(([label, info]) => {
+          if (!STATUTORY_DISCOUNT_LABELS.has(String(label).trim().toLowerCase())) {
+            customByLabel[label] = info;
+          }
+        });
+        setRawCustomCountsByLabel(customByLabel);
+
         setCustomerCards(
           discountRows.length > 0
             ? discountRows
@@ -1167,22 +1505,33 @@ const ModalDiscountTransaction = ({
 
     const fetchServiceChargeSettings = async () => {
       try {
-        const response = await fetch(`${apiHost}/api/pos_service_charge.php`);
-        const result = await response.json();
+        const [scRes, listRes, modeRes] = await Promise.all([
+          fetch(`${apiHost}/api/pos_service_charge.php`),
+          fetch(`${apiHost}/api/pos_manage_other_charges.php`),
+          fetch(`${apiHost}/api/pos_discount_mode.php`),
+        ]);
+        const scResult   = await scRes.json();
+        const listResult = await listRes.json();
+        const modeResult = await modeRes.json();
 
         if (!cancelled) {
-          setServiceChargeEnabled(
-            Boolean(result?.data?.service_charge_enabled || false),
-          );
-          setServiceChargePercentage(
-            Number(result?.data?.service_charge_percentage || 0),
-          );
+          setServiceChargeEnabled(Boolean(scResult?.data?.service_charge_enabled || false));
+          const loadedCharges = Array.isArray(listResult?.charges) ? listResult.charges : [];
+          setServiceCharges(loadedCharges);
+          // initialise per-transaction toggles: all charges default OFF, cashier picks which to turn on
+          const toggleInit = {};
+          loadedCharges.forEach((c) => {
+            toggleInit[Number(c.ID)] = false;
+          });
+          setChargeToggles(toggleInit);
+          setDiscountMode(modeResult?.data?.discount_mode === "PerProduct" ? "PerProduct" : "PerCustomer");
         }
       } catch (error) {
         console.error("Failed to load service charge settings:", error);
         if (!cancelled) {
           setServiceChargeEnabled(false);
-          setServiceChargePercentage(0);
+          setServiceCharges([]);
+          setDiscountMode("PerCustomer");
         }
       }
     };
@@ -1272,6 +1621,7 @@ const ModalDiscountTransaction = ({
   ]);
 
   const computed = useMemo(() => {
+    const isPerProduct = discountMode === "PerProduct";
     const safeCustomerCount = Math.max(Number(customerCount) || 1, 1);
 
     const rawSeniorCount = Math.max(
@@ -1305,14 +1655,36 @@ const ModalDiscountTransaction = ({
     const manualMode =
       discountState?.manual?.manualMode === "percent" ? "percent" : "amount";
 
+    // Custom discount lines (added via "+ Add Discount", any lkp_discount_type
+    // entry that isn't one of the 4 statutory types) qualify the same way --
+    // their qualified count counts toward VAT-exemption proration when
+    // is_vat_exempt, and toward the customer-info-capture count either way.
+    const customQualifiedCount = customDiscountLines
+      .filter((line) => line.calculation_type !== "fixed")
+      .reduce(
+        (sum, line) => sum + Math.max(Math.floor(Number(line.qualifiedCount || 0)), 0),
+        0,
+      );
+    const customVatExemptQualifiedCount = customDiscountLines
+      .filter((line) => line.calculation_type !== "fixed" && line.is_vat_exempt)
+      .reduce(
+        (sum, line) => sum + Math.max(Math.floor(Number(line.qualifiedCount || 0)), 0),
+        0,
+      );
+
     const totalQualifiedAll =
       rawSeniorCount +
       rawPwdCount +
       rawNaacCount +
       rawSoloParentCount +
-      rawManualCount;
+      rawManualCount +
+      customQualifiedCount;
     const statutoryQualifiedCount =
-      rawSeniorCount + rawPwdCount + rawNaacCount + rawSoloParentCount;
+      rawSeniorCount +
+      rawPwdCount +
+      rawNaacCount +
+      rawSoloParentCount +
+      customVatExemptQualifiedCount;
 
     const statutoryQualifiedRatio =
       safeCustomerCount > 0
@@ -1325,6 +1697,8 @@ const ModalDiscountTransaction = ({
 
     let discountableGross = 0;
     let discountableBase = 0;
+    let selectedDiscountableGross = 0;
+    let selectedDiscountableBase = 0;
     let rawVatableGross = 0;
     let vatableSales = 0;
     let vatableSalesVat = 0;
@@ -1337,14 +1711,35 @@ const ModalDiscountTransaction = ({
       const qty = Number(item.sales_quantity || 0);
       const price = Number(item.selling_price || 0);
       const lineTotal = qty * price;
+      const itemKey = String(item.ID || "");
+      // Per Product: discountQty = how many units are discounted (0..qty)
+      const discountQty = isPerProduct
+        ? Math.min(Math.max(Number(selectedProductIds[itemKey] ?? qty), 0), qty)
+        : qty;
+      const discountLineTotal = price * discountQty;
+      const nonDiscountLineTotal = lineTotal - discountLineTotal;
 
       if (isDiscountable) {
         discountableGross += lineTotal;
         discountableBase += isVatable ? lineTotal / 1.12 : lineTotal;
 
+        if (discountQty > 0) {
+          selectedDiscountableGross += discountLineTotal;
+          selectedDiscountableBase += isVatable ? discountLineTotal / 1.12 : discountLineTotal;
+        }
+
         if (isVatable) {
-          vatExemptSales += lineTotal * statutoryQualifiedRatio;
-          rawVatableGross += lineTotal * notQualifiedRatio;
+          if (isPerProduct) {
+            if (discountQty > 0) {
+              vatExemptSales += discountLineTotal * statutoryQualifiedRatio;
+              rawVatableGross += nonDiscountLineTotal + discountLineTotal * notQualifiedRatio;
+            } else {
+              rawVatableGross += lineTotal;
+            }
+          } else {
+            vatExemptSales += lineTotal * statutoryQualifiedRatio;
+            rawVatableGross += lineTotal * notQualifiedRatio;
+          }
         } else {
           vatExemptSales += lineTotal;
         }
@@ -1360,25 +1755,23 @@ const ModalDiscountTransaction = ({
     vatableSales = rawVatableGross / 1.12;
     vatableSalesVat = vatableSales * 0.12;
 
-    const seniorProratedBase =
-      safeCustomerCount > 0
-        ? discountableBase * (rawSeniorCount / safeCustomerCount)
-        : 0;
+    // Per Product: restrict the base to selected items, then prorate by qualified/total.
+    // Per Customer: use all discountable items, prorated by qualified/total.
+    // Formula in both modes: base × (qualifiedCount / totalCustomers)
+    // "base" = selectedDiscountableBase (Per Product) or discountableBase (Per Customer)
+    const discountBase = isPerProduct ? selectedDiscountableBase : discountableBase;
 
-    const pwdProratedBase =
-      safeCustomerCount > 0
-        ? discountableBase * (rawPwdCount / safeCustomerCount)
-        : 0;
+    // Solo: each qualified person gets the full base (no division by total customers)
+    // Shared: standard proration — base × (qualifiedCount / totalCustomers)
+    const prorate = (count) =>
+      discountSharingMode === "solo"
+        ? discountBase * count
+        : safeCustomerCount > 0 ? discountBase * (count / safeCustomerCount) : 0;
 
-    const naacProratedBase =
-      safeCustomerCount > 0
-        ? discountableBase * (rawNaacCount / safeCustomerCount)
-        : 0;
-
-    const soloParentProratedBase =
-      safeCustomerCount > 0
-        ? discountableBase * (rawSoloParentCount / safeCustomerCount)
-        : 0;
+    const seniorProratedBase = prorate(rawSeniorCount);
+    const pwdProratedBase = prorate(rawPwdCount);
+    const naacProratedBase = prorate(rawNaacCount);
+    const soloParentProratedBase = prorate(rawSoloParentCount);
 
     const seniorDiscountAmount = seniorProratedBase * 0.2;
     const seniorVatExemption = seniorProratedBase * 0.12;
@@ -1397,6 +1790,30 @@ const ModalDiscountTransaction = ({
         ? discountableGross * (manualPercent / 100)
         : rawManualAmount;
     const manualVatExemption = 0;
+
+    // Custom discount lines added via "+ Add Discount" (any lkp_discount_type
+    // entry active for this sales type besides the 4 statutory ones).
+    const customLinesComputed = customDiscountLines.map((line) => {
+      const isFixed = line.calculation_type === "fixed";
+      const qualifiedCount = isFixed
+        ? 0
+        : Math.max(Math.floor(Number(line.qualifiedCount || 0)), 0);
+      const proratedBase = isFixed ? 0 : prorate(qualifiedCount);
+      const { discountAmount, vatExemption } = computeDiscountLine(line, proratedBase);
+
+      return {
+        key: `custom-${line.localId}`,
+        label: line.label,
+        shortLabel: line.label,
+        // Fixed-amount lines aren't tied to a qualified-customer count, but
+        // still need count >= 1 so the save endpoints (which skip
+        // qualifiedCount <= 0 rows) persist them.
+        qualifiedCount: isFixed ? 1 : qualifiedCount,
+        proratedBase,
+        discountAmount,
+        vatExemption,
+      };
+    });
 
     const rawDiscountBreakdown = [
       {
@@ -1446,6 +1863,7 @@ const ModalDiscountTransaction = ({
         manualPercent,
         manualMode,
       },
+      ...customLinesComputed,
     ];
 
     const {
@@ -1480,15 +1898,30 @@ const ModalDiscountTransaction = ({
       grossTotal - totalDiscount - totalVatExemption,
       0,
     );
-    const serviceChargeBase =
-      totalDiscount > 0
-        ? Math.max(discountableBase - totalDiscount, 0)
-        : discountableBase;
-    const serviceChargeAmount =
-      serviceChargeEnabled && serviceChargePercentage > 0
-        ? roundMoney(serviceChargeBase * (serviceChargePercentage / 100))
-        : 0;
-    const totalOtherCharges = serviceChargeAmount;
+    const netOfVat = netAfterDiscount / 1.12;
+    const serviceChargeBase = netOfVat;
+
+    const appliedCharges = serviceChargeEnabled
+      ? (Array.isArray(serviceCharges) ? serviceCharges : [])
+          .filter((c) => Boolean(c.is_enabled) && chargeToggles[Number(c.ID)] !== false)
+          .map((c) => {
+            const rate = Number(c.amount || 0);
+            const computed =
+              c.rate_type === "Fixed"
+                ? roundMoney(rate)
+                : roundMoney(serviceChargeBase * (rate / 100));
+            return {
+              id:            Number(c.ID),
+              particulars:   String(c.particulars || ""),
+              rate_type:     String(c.rate_type || "Percentage"),
+              rate,
+              computedAmount: computed,
+            };
+          })
+          .filter((c) => c.computedAmount > 0)
+      : [];
+
+    const totalOtherCharges = appliedCharges.reduce((s, c) => s + c.computedAmount, 0);
     const totalAmountDue = Math.max(netAfterDiscount + totalOtherCharges, 0);
 
     const discountTypeSummary = discountBreakdown
@@ -1503,15 +1936,17 @@ const ModalDiscountTransaction = ({
     return {
       discountableGross,
       discountableBase,
+      selectedDiscountableGross,
+      selectedDiscountableBase,
       grossTotal,
       totalQuantity,
       discountableItemsCount,
       netAfterDiscount,
+      netOfVat,
       totalAmountDue,
       serviceChargeEnabled,
-      serviceChargePercentage,
+      appliedCharges,
       serviceChargeBase,
-      serviceChargeAmount,
       totalOtherCharges,
       safeCustomerCount,
       vatableSales,
@@ -1529,6 +1964,7 @@ const ModalDiscountTransaction = ({
       statutoryQualifiedRatio,
       discountBreakdown,
       discountTypeSummary,
+      discountMode,
     };
   }, [
     items,
@@ -1537,7 +1973,12 @@ const ModalDiscountTransaction = ({
     discountCeilingAmount,
     transaction,
     serviceChargeEnabled,
-    serviceChargePercentage,
+    serviceCharges,
+    chargeToggles,
+    discountMode,
+    discountSharingMode,
+    selectedProductIds,
+    customDiscountLines,
   ]);
 
   const validateQualifiedCounts = (nextTotal, nextState = discountState) => {
@@ -1563,12 +2004,19 @@ const ModalDiscountTransaction = ({
       0,
     );
 
+    const customNum = customDiscountLines
+      .filter((line) => line.calculation_type !== "fixed")
+      .reduce(
+        (sum, line) => sum + Math.max(Math.floor(Number(line.qualifiedCount || 0)), 0),
+        0,
+      );
+
     const totalQualified =
-      seniorNum + pwdNum + naacNum + soloParentNum + manualNum;
+      seniorNum + pwdNum + naacNum + soloParentNum + manualNum + customNum;
 
     if (totalNum > 0 && totalQualified > totalNum) {
       setQualifiedPrompt(
-        "Total qualified across Senior, PWD, NAAC, Solo Parent, and Manual should not be more than total customers.",
+        "Total qualified across all added discounts should not be more than total customers.",
       );
       return false;
     }
@@ -1609,7 +2057,7 @@ const ModalDiscountTransaction = ({
 
   useEffect(() => {
     validateQualifiedCounts(customerCount, discountState);
-  }, [customerCount, discountState]);
+  }, [customerCount, discountState, customDiscountLines]);
 
   const handleSaveCustomerInfo = async () => {
     if (!apiHost || !transaction?.transaction_id || isSavingCustomerInfo) {
@@ -1920,6 +2368,82 @@ const ModalDiscountTransaction = ({
       if (!result?.success) {
         throw new Error(result?.message || "Print failed.");
       }
+
+      // Always sync AUTO charges after billing — this deletes any stale charges from a
+      // prior billing print even when all charges are now OFF, preventing the payment
+      // modal from inflating Amount Due with leftover DB rows.
+      try {
+        const activeCharges = Array.isArray(computed?.appliedCharges)
+          ? computed.appliedCharges
+              .filter((c) => Number(c.computedAmount || 0) > 0)
+              .map((c) => ({ particulars: c.particulars, amount: c.computedAmount }))
+          : [];
+        await fetch(`${apiHost}/api/pos_save_transaction_charges.php`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            transaction_id: transaction?.transaction_id || "",
+            Category_Code: transaction?.Category_Code || "",
+            Unit_Code: transaction?.Unit_Code || "",
+            charges: activeCharges,
+          }),
+        });
+      } catch (e) {
+        console.warn("Failed to save billing charges:", e);
+      }
+
+      // Save per-product discount selection when mode is Per Product
+      if (discountMode === "PerProduct") {
+        try {
+          const activeDiscountTypes = computed.discountBreakdown.filter(
+            (entry) => Number(entry.qualifiedCount || 0) > 0 || Number(entry.discountAmount || 0) > 0,
+          );
+          const totalBase = computed.selectedDiscountableBase || 0;
+          const rows = [];
+
+          items.forEach((item) => {
+            if (!yesNoToBool(item.isDiscountable)) return;
+            const qty    = Number(item.sales_quantity || 0);
+            const price  = Number(item.selling_price || 0);
+            const itemKey = String(item.ID || "");
+            const discQty = Math.min(Math.max(Number(selectedProductIds[itemKey] ?? qty), 0), qty);
+            if (discQty === 0) return;
+
+            const isVatable = yesNoToBool(item.vatable);
+            const discLineTotal = price * discQty;
+            const itemBase = isVatable ? discLineTotal / 1.12 : discLineTotal;
+            const itemRatio = totalBase > 0 ? itemBase / totalBase : 0;
+
+            activeDiscountTypes.forEach((entry) => {
+              rows.push({
+                product_id:        itemKey,
+                item_name:         String(item.item_name || item.product_id || ""),
+                customer_id:       "",
+                discount_type:     String(entry.shortLabel || entry.label || ""),
+                discount_sharing:  discountSharingMode,
+                total_customers:   computed.safeCustomerCount,
+                qualified_customers: Number(entry.qualifiedCount || 0),
+                discount_amount:   Number((entry.discountAmount || 0) * itemRatio),
+                vat_exempt_amount: Number((entry.vatExemption || 0) * itemRatio),
+              });
+            });
+          });
+
+          await fetch(`${apiHost}/api/pos_save_discount_per_product.php`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              transaction_id:   transaction?.transaction_id || "",
+              transaction_date: transaction?.transaction_date || "",
+              category_code:    transaction?.Category_Code || "",
+              unit_code:        transaction?.Unit_Code || "",
+              rows,
+            }),
+          });
+        } catch (e) {
+          console.warn("Failed to save per-product discount data:", e);
+        }
+      }
     } catch (error) {
       console.error(error);
       alert(error.message || "Failed to print billing.");
@@ -2078,6 +2602,15 @@ const ModalDiscountTransaction = ({
                   <div className="mb-3 flex items-center gap-2">
                     <FiFileText size={14} className="text-slate-500" />
                     <h3 className="text-sm font-black">Discount Setup</h3>
+                    <span
+                      className="ml-auto rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider"
+                      style={{
+                        backgroundColor: discountMode === "PerProduct" ? "rgba(234,179,8,0.15)" : "rgba(99,102,241,0.15)",
+                        color: discountMode === "PerProduct" ? "#ca8a04" : "#6366f1",
+                      }}
+                    >
+                      {discountMode === "PerProduct" ? "Per Product" : "Per Customer"}
+                    </span>
                   </div>
 
                   <div
@@ -2129,6 +2662,44 @@ const ModalDiscountTransaction = ({
                       </div>
                     </div>
 
+                    {/* Solo / Shared toggle — Per Product mode only */}
+                    {discountMode === "PerProduct" && <div className="mt-3">
+                      <label className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">
+                        Discount Sharing
+                      </label>
+                      <div className={`flex overflow-hidden rounded-lg border text-[10px] font-black uppercase tracking-[0.14em] ${isDark ? "border-white/10" : "border-slate-200"}`}>
+                        <button
+                          type="button"
+                          disabled={isPrinting}
+                          onClick={() => setDiscountSharingMode("solo")}
+                          className={`flex-1 py-2 transition-colors ${
+                            discountSharingMode === "solo"
+                              ? "bg-emerald-500 text-white"
+                              : isDark ? "bg-slate-900 text-slate-400 hover:text-slate-200" : "bg-white text-slate-400 hover:text-slate-700"
+                          }`}
+                        >
+                          Solo
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isPrinting}
+                          onClick={() => setDiscountSharingMode("shared")}
+                          className={`flex-1 py-2 transition-colors ${
+                            discountSharingMode === "shared"
+                              ? "bg-blue-500 text-white"
+                              : isDark ? "bg-slate-900 text-slate-400 hover:text-slate-200" : "bg-white text-slate-400 hover:text-slate-700"
+                          }`}
+                        >
+                          Shared
+                        </button>
+                      </div>
+                      <p className={`mt-1 text-[9px] ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+                        {discountSharingMode === "solo"
+                          ? "Each qualified person gets the full discount on the entire discountable amount."
+                          : "Discount is prorated — each person's share = total ÷ head count."}
+                      </p>
+                    </div>}
+
                     <p className="mt-2 text-xs font-semibold text-red-500 min-h-[18px]">
                       {qualifiedPrompt}
                     </p>
@@ -2159,22 +2730,271 @@ const ModalDiscountTransaction = ({
                     ) : null}
                   </div>
 
+                  {discountMode === "PerProduct" && (() => {
+                    const discountableItems = items.filter((item) =>
+                      yesNoToBool(item.isDiscountable),
+                    );
+                    const allSelected = discountableItems.every((item) => {
+                      const k = String(item.ID);
+                      const q = Number(item.sales_quantity || 0);
+                      return Number(selectedProductIds[k] ?? q) >= q;
+                    });
+                    const noneSelected = discountableItems.every(
+                      (item) => Number(selectedProductIds[String(item.ID)] ?? 0) === 0,
+                    );
+                    return (
+                      <div className={`rounded-[0.95rem] p-3 mb-3 ${innerCardClass}`}>
+                        <div className="mb-2 flex items-center gap-2">
+                          <FiShoppingCart size={14} className="text-slate-500" />
+                          <h3 className="text-sm font-black">Products for Discount</h3>
+                          <div className="ml-auto flex gap-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const next = {};
+                                discountableItems.forEach((item) => {
+                                  next[String(item.ID)] = Number(item.sales_quantity || 0);
+                                });
+                                setSelectedProductIds((prev) => ({ ...prev, ...next }));
+                              }}
+                              className={`rounded-lg px-2 py-1 text-[9px] font-black uppercase tracking-wider transition-colors ${
+                                allSelected
+                                  ? "opacity-40 cursor-default"
+                                  : isDark
+                                    ? "bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25"
+                                    : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                              }`}
+                              disabled={allSelected}
+                            >
+                              All
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const next = {};
+                                discountableItems.forEach((item) => {
+                                  next[String(item.ID)] = 0;
+                                });
+                                setSelectedProductIds((prev) => ({ ...prev, ...next }));
+                              }}
+                              className={`rounded-lg px-2 py-1 text-[9px] font-black uppercase tracking-wider transition-colors ${
+                                noneSelected
+                                  ? "opacity-40 cursor-default"
+                                  : isDark
+                                    ? "bg-rose-500/15 text-rose-400 hover:bg-rose-500/25"
+                                    : "bg-rose-50 text-rose-600 hover:bg-rose-100"
+                              }`}
+                              disabled={noneSelected}
+                            >
+                              None
+                            </button>
+                          </div>
+                        </div>
+
+                        {discountableItems.length === 0 ? (
+                          <p className="text-xs text-slate-500 py-2">No discountable items in this transaction.</p>
+                        ) : (
+                          <div className="space-y-1 max-h-48 overflow-y-auto">
+                            {discountableItems.map((item) => {
+                              const itemKey = String(item.ID);
+                              const maxQty = Number(item.sales_quantity || 0);
+                              const price = Number(item.selling_price || 0);
+                              const discQty = Math.min(Math.max(Number(selectedProductIds[itemKey] ?? maxQty), 0), maxQty);
+                              const isOn = discQty > 0;
+                              const discLineTotal = price * discQty;
+                              return (
+                                <div
+                                  key={itemKey}
+                                  className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs transition-colors ${
+                                    isOn
+                                      ? isDark
+                                        ? "bg-emerald-500/10"
+                                        : "bg-emerald-50"
+                                      : isDark
+                                        ? "bg-slate-900/40 opacity-50"
+                                        : "bg-slate-100 opacity-50"
+                                  }`}
+                                >
+                                  {/* Checkbox toggle */}
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setSelectedProductIds((prev) => ({
+                                        ...prev,
+                                        [itemKey]: isOn ? 0 : maxQty,
+                                      }))
+                                    }
+                                    className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border transition-colors ${
+                                      isOn
+                                        ? "border-emerald-500 bg-emerald-500"
+                                        : isDark
+                                          ? "border-slate-600 bg-transparent"
+                                          : "border-slate-300 bg-white"
+                                    }`}
+                                  >
+                                    {isOn && <FiCheck size={10} className="text-white" />}
+                                  </button>
+
+                                  {/* Item name */}
+                                  <span className={`flex-1 font-semibold truncate ${isOn ? "" : "line-through"}`}>
+                                    {item.item_name || item.product_id || `Item #${itemKey}`}
+                                  </span>
+
+                                  {/* Qty stepper (only when maxQty >= 2) */}
+                                  {maxQty >= 2 ? (
+                                    <div className="flex items-center gap-1 flex-shrink-0">
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setSelectedProductIds((prev) => ({
+                                            ...prev,
+                                            [itemKey]: Math.max(discQty - 1, 0),
+                                          }))
+                                        }
+                                        disabled={discQty === 0}
+                                        className={`flex h-5 w-5 items-center justify-center rounded font-black text-[11px] disabled:opacity-30 transition-colors ${
+                                          isDark ? "bg-slate-700 hover:bg-slate-600" : "bg-slate-200 hover:bg-slate-300"
+                                        }`}
+                                      >
+                                        −
+                                      </button>
+                                      <span className={`w-8 text-center font-black tabular-nums text-[11px] ${isOn ? "text-emerald-600" : "text-slate-400"}`}>
+                                        {discQty}/{maxQty}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setSelectedProductIds((prev) => ({
+                                            ...prev,
+                                            [itemKey]: Math.min(discQty + 1, maxQty),
+                                          }))
+                                        }
+                                        disabled={discQty === maxQty}
+                                        className={`flex h-5 w-5 items-center justify-center rounded font-black text-[11px] disabled:opacity-30 transition-colors ${
+                                          isDark ? "bg-slate-700 hover:bg-slate-600" : "bg-slate-200 hover:bg-slate-300"
+                                        }`}
+                                      >
+                                        +
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <span className={`flex-shrink-0 font-bold ${isOn ? "text-emerald-600" : "text-slate-400"}`}>
+                                      ×{maxQty}
+                                    </span>
+                                  )}
+
+                                  {/* Line total based on discounted qty */}
+                                  <span className={`flex-shrink-0 font-bold tabular-nums w-16 text-right ${isOn ? "" : "text-slate-400"}`}>
+                                    ₱{peso(discLineTotal)}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        <div className={`mt-2 flex items-center justify-between rounded-lg px-2.5 py-1.5 text-[11px] font-black ${
+                          isDark ? "bg-slate-900/60" : "bg-white border border-slate-200"
+                        }`}>
+                          <span className="text-slate-500">Selected Total</span>
+                          <span>₱{peso(computed.selectedDiscountableGross)}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  <div className="mb-3 flex items-center justify-between">
+                    <h4 className="text-[11px] font-black uppercase tracking-widest text-slate-500">
+                      Applied Discounts
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddDiscountMenu(true)}
+                      className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-black uppercase tracking-wide ${
+                        isDark
+                          ? "bg-blue-500/15 text-blue-400"
+                          : "bg-blue-50 text-blue-600"
+                      }`}
+                    >
+                      <FiPlus size={12} />
+                      Add Discount
+                    </button>
+                  </div>
+
                   <div className="grid grid-cols-1 gap-3">
-                    {DISCOUNT_META.map((meta) => (
-                      <DiscountEntryCard
-                        key={meta.key}
-                        meta={meta}
-                        values={discountState[meta.key]}
-                        isDark={isDark}
-                        inputClass={`${inputClass} ${
-                          isPrinting ? "opacity-60 cursor-not-allowed" : ""
-                        }`}
-                        cardClass={innerCardClass}
-                        onChangeCount={handleChangeCount}
-                        onChangeManualAmount={handleChangeManualAmount}
-                        onChangeManualPercent={handleChangeManualPercent}
-                        manualBaseAmount={computed.discountableGross}
-                      />
+                    {DISCOUNT_META.filter(
+                      (meta) => meta.key === "manual" || addedStatutoryKeys.has(meta.key),
+                    ).map((meta) => (
+                      <div key={meta.key} className="relative">
+                        <DiscountEntryCard
+                          meta={meta}
+                          values={discountState[meta.key]}
+                          isDark={isDark}
+                          inputClass={`${inputClass} ${
+                            isPrinting ? "opacity-60 cursor-not-allowed" : ""
+                          }`}
+                          cardClass={innerCardClass}
+                          onChangeCount={handleChangeCount}
+                          onChangeManualAmount={handleChangeManualAmount}
+                          onChangeManualPercent={handleChangeManualPercent}
+                          manualBaseAmount={computed.discountableGross}
+                          discountMode={discountMode}
+                        />
+                        {meta.key !== "manual" && (
+                          <button
+                            type="button"
+                            onClick={() => removeStatutoryDiscount(meta.key)}
+                            className="absolute right-3 top-3 rounded-lg p-1.5 text-red-500 hover:bg-red-500/10"
+                            title="Remove"
+                          >
+                            <FiTrash2 size={13} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+
+                    {customDiscountLines.map((line) => (
+                      <div key={line.localId} className="relative">
+                        <DiscountEntryCard
+                          meta={{
+                            key: line.localId,
+                            label: line.label,
+                            shortLabel: line.label,
+                            color: "amber",
+                            needsAmount: line.calculation_type === "fixed",
+                            hasVatExemption: line.is_vat_exempt,
+                            percent: line.percent,
+                          }}
+                          values={{
+                            qualifiedCount: line.qualifiedCount,
+                            manualAmount: line.manualAmount,
+                            manualPercent: "",
+                            manualMode: "amount",
+                          }}
+                          isDark={isDark}
+                          inputClass={`${inputClass} ${
+                            isPrinting ? "opacity-60 cursor-not-allowed" : ""
+                          }`}
+                          cardClass={innerCardClass}
+                          onChangeCount={(_key, value) =>
+                            updateCustomLine(line.localId, { qualifiedCount: value })
+                          }
+                          onChangeManualAmount={(_key, value) =>
+                            updateCustomLine(line.localId, { manualAmount: value })
+                          }
+                          onChangeManualPercent={() => {}}
+                          manualBaseAmount={computed.discountableGross}
+                          discountMode={discountMode}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeCustomDiscountLine(line.localId)}
+                          className="absolute right-3 top-3 rounded-lg p-1.5 text-red-500 hover:bg-red-500/10"
+                          title="Remove"
+                        >
+                          <FiTrash2 size={13} />
+                        </button>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -2183,20 +3003,29 @@ const ModalDiscountTransaction = ({
                   <div className="mb-2 flex items-center gap-2">
                     <FiTag size={14} className="text-slate-500" />
                     <h3 className="text-sm font-black">Computation Summary</h3>
+                    <span
+                      className="ml-auto rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider"
+                      style={{
+                        backgroundColor: computed.discountMode === "PerProduct" ? "rgba(234,179,8,0.15)" : "rgba(99,102,241,0.15)",
+                        color: computed.discountMode === "PerProduct" ? "#ca8a04" : "#6366f1",
+                      }}
+                    >
+                      {computed.discountMode === "PerProduct" ? "Per Product" : "Per Customer"}
+                    </span>
                   </div>
 
                   <div className="space-y-2 text-[13px]">
                     <div className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
                       <span className="text-slate-500">Disc. Gross</span>
                       <span className="font-semibold">
-                        ₱ {peso(computed.discountableGross)}
+                        ₱ {peso(computed.discountMode === "PerProduct" ? computed.selectedDiscountableGross : computed.discountableGross)}
                       </span>
                     </div>
 
                     <div className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
                       <span className="text-slate-500">Disc. Base</span>
                       <span className="font-semibold">
-                        ₱ {peso(computed.discountableBase)}
+                        ₱ {peso(computed.discountMode === "PerProduct" ? computed.selectedDiscountableBase : computed.discountableBase)}
                       </span>
                     </div>
 
@@ -2277,16 +3106,47 @@ const ModalDiscountTransaction = ({
                       </span>
                     </div>
 
-                    {computed.serviceChargeAmount > 0 ? (
-                      <div className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
-                        <span className="text-slate-500">
-                          Service Charge ({computed.serviceChargePercentage}%)
-                        </span>
-                        <span className="font-semibold">
-                          ₱ {peso(computed.serviceChargeAmount)}
-                        </span>
-                      </div>
-                    ) : null}
+                    <div className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
+                      <span className="text-slate-500">Net of VAT</span>
+                      <span className="font-semibold">
+                        ₱ {peso(computed.netOfVat)}
+                      </span>
+                    </div>
+
+                    {serviceChargeEnabled && serviceCharges
+                      .filter((c) => Boolean(c.is_enabled))
+                      .map((c) => {
+                        const id      = Number(c.ID);
+                        const isOn    = chargeToggles[id] !== false;
+                        const applied = computed.appliedCharges?.find((a) => a.id === id);
+                        return (
+                          <div key={id} className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setChargeToggles((prev) => ({ ...prev, [id]: !isOn }))
+                                }
+                                className={`flex-shrink-0 rounded-md px-2 py-0.5 text-[10px] font-black uppercase tracking-wide transition ${
+                                  isOn
+                                    ? "bg-emerald-500/15 text-emerald-500"
+                                    : "bg-slate-200/60 text-slate-400 dark:bg-slate-700/60"
+                                }`}
+                              >
+                                {isOn ? "ON" : "OFF"}
+                              </button>
+                              <span className={isOn ? "text-slate-500" : "text-slate-400 line-through"}>
+                                {c.particulars}
+                                {c.rate_type === "Percentage" ? ` (${Number(c.amount)}%)` : ""}
+                              </span>
+                            </div>
+                            <span className={`font-semibold ${isOn ? "" : "text-slate-400"}`}>
+                              ₱ {peso(isOn && applied ? applied.computedAmount : 0)}
+                            </span>
+                          </div>
+                        );
+                      })
+                    }
 
                     <div className="flex items-center justify-between gap-2 rounded-lg bg-blue-500/10 px-3 py-2.5">
                       <span className="text-sm font-black">
@@ -2371,6 +3231,20 @@ const ModalDiscountTransaction = ({
         onSave={handleSaveCustomerInfo}
         isSaving={isSavingCustomerInfo}
         readOnly={isPrinting}
+      />
+
+      <DiscountTypePickerModal
+        isOpen={showAddDiscountMenu}
+        onClose={() => setShowAddDiscountMenu(false)}
+        isDark={isDark}
+        statutoryOptions={DISCOUNT_META.filter(
+          (meta) => meta.key !== "manual" && !addedStatutoryKeys.has(meta.key),
+        )}
+        customOptions={availableDiscountTypes.filter(
+          (type) => !customDiscountLines.some((line) => line.discount_type_id === type.id),
+        )}
+        onPickStatutory={addStatutoryDiscount}
+        onPickCustom={addCustomDiscountLine}
       />
     </>
   );

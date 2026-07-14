@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { parseIpConfigText } from "../utils/parseIpConfig";
 
 const normalizeHost = (s) =>
   String(s || "")
@@ -23,7 +24,8 @@ export default function useApiHost() {
         // ✅ Browser dev: read from public/ip.txt (served by Vite)
         const res = await fetch("./ip.txt", { cache: "no-store" });
         const txt = await res.text();
-        if (!cancelled) setApiHost(normalizeHost(txt));
+        const map = parseIpConfigText(txt);
+        if (!cancelled) setApiHost(normalizeHost(map.LOCAL || txt));
       } catch (e) {
         // No fallback (you asked “just from ip.txt”)
         // But at least keep it empty so you can detect and show message.

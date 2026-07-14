@@ -511,6 +511,7 @@ const PosPaymentReceipt = React.forwardRef(
               <td style={{ fontWeight: "700", padding: "1px 0" }}>Cashier:</td>
               <td style={{ textAlign: "right", padding: "1px 0" }}>
                 {transaction?.cashier ||
+                  localStorage.getItem("username") ||
                   shiftDetails?.userName ||
                   localStorage.getItem("Cashier") ||
                   "-"}

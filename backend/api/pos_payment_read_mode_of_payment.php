@@ -16,7 +16,9 @@ try {
             seq,
             mop_id,
             mop,
-            sl_code
+            sl_code,
+            reference_On_Off,
+            MOP_On_Off
         FROM tbl_mode_of_payment
         ORDER BY seq ASC
     ";

@@ -3,6 +3,7 @@ import React, { useEffect } from "react";
 import useZustandLoginCred from "../../context/useZustandLoginCred";
 import useCustomQuery from "../../hooks/useCustomQuery";
 import { colorSchemes } from "../../constants/ColorSchemes";
+import useZustandLayoutMode from "../../context/useZustandLayoutMode";
 
 import "../../fonts/font-style.css";
 
@@ -23,6 +24,7 @@ const branchInfo = {
 
 const PosHomeScreenComponent = () => {
   const { userId } = useZustandLoginCred();
+  const { layoutMode } = useZustandLayoutMode();
 
   const { data: userSelectedTheme } = useCustomQuery(
     localStorage.getItem("apiendpoint") +
@@ -69,8 +71,28 @@ const PosHomeScreenComponent = () => {
           }}
         >
           <div className="flex items-start justify-between gap-3">
-            <div className="text-[20px] font-black tracking-tight sm:text-[24px]">
-              Recent Shift
+            <div className="flex items-center gap-2">
+              <div className="text-[20px] font-black tracking-tight sm:text-[24px]">
+                Recent Shift
+              </div>
+              {layoutMode === "Kiosk" && (
+                <button
+                  type="button"
+                  title="Exit Fullscreen"
+                  onClick={() => {
+                    if (window.kioskAPI?.setFullScreen) {
+                      window.kioskAPI.setFullScreen(false).catch(() => {});
+                    } else if (document.fullscreenElement) {
+                      document.exitFullscreen();
+                    }
+                  }}
+                  className="flex items-center justify-center w-7 h-7 rounded-lg bg-white/10 hover:bg-white/25 transition"
+                >
+                  <svg className="w-4 h-4 text-white/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 9L4 4m0 0h5m-5 0v5M15 9l5-5m0 0h-5m5 0v5M9 15l-5 5m0 0h5m-5 0v-5M15 15l5 5m0 0h-5m5 0v-5" />
+                  </svg>
+                </button>
+              )}
             </div>
             <div className="text-[24px] font-black leading-none text-orange-500 sm:text-[32px]">
               {branchInfo.shiftStatus}

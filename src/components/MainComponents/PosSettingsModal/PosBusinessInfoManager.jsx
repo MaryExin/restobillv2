@@ -12,6 +12,7 @@ import {
   FiAlertTriangle,
   FiRotateCcw,
   FiShield,
+  FiLock,
 } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 import useBusinessInfo from "../../../hooks/useBusinessInfo";
@@ -24,6 +25,7 @@ const EMPTY_FORM = {
   tin: "",
   machineNumber: "",
   serialNumber: "",
+  terminalId: "",
   posProviderName: "",
   posProviderAddress: "",
   posProviderTin: "",
@@ -33,9 +35,15 @@ const EMPTY_FORM = {
   posProviderPTUDateIssued: "",
 };
 
+const MASTER_PASSWORD = "LESI_POSPASS@2023";
+
 const PosBusinessInfoManager = ({ isDark, accent, getContrastText }) => {
   const { businessInfo, isLoading, error, refetchBusinessInfo } =
     useBusinessInfo();
+
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [authError, setAuthError] = useState(false);
 
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -55,6 +63,7 @@ const PosBusinessInfoManager = ({ isDark, accent, getContrastText }) => {
       tin: businessInfo?.tin || "",
       machineNumber: businessInfo?.machineNumber || "",
       serialNumber: businessInfo?.serialNumber || "",
+      terminalId: businessInfo?.terminalId || "",
       posProviderName: businessInfo?.posProviderName || "",
       posProviderAddress: businessInfo?.posProviderAddress || "",
       posProviderTin: businessInfo?.posProviderTin || "",
@@ -78,6 +87,17 @@ const PosBusinessInfoManager = ({ isDark, accent, getContrastText }) => {
     subPanel: isDark ? "bg-white/[0.04]" : "bg-slate-50",
   };
 
+  const handleAuth = (e) => {
+    e.preventDefault();
+    if (passwordInput === MASTER_PASSWORD) {
+      setIsAuthenticated(true);
+      setAuthError(false);
+    } else {
+      setAuthError(true);
+      setTimeout(() => setAuthError(false), 2000);
+    }
+  };
+
   const contrast = getContrastText ? getContrastText() : "#fff";
 
   const fields = [
@@ -88,6 +108,7 @@ const PosBusinessInfoManager = ({ isDark, accent, getContrastText }) => {
     { id: "tin", label: "TIN" },
     { id: "machineNumber", label: "Machine Number" },
     { id: "serialNumber", label: "Serial Number" },
+    { id: "terminalId", label: "Terminal ID" },
     { id: "posProviderName", label: "POS Provider Name" },
     {
       id: "posProviderAddress",
@@ -120,6 +141,7 @@ const PosBusinessInfoManager = ({ isDark, accent, getContrastText }) => {
       tin: businessInfo?.tin || "",
       machineNumber: businessInfo?.machineNumber || "",
       serialNumber: businessInfo?.serialNumber || "",
+      terminalId: businessInfo?.terminalId || "",
       posProviderName: businessInfo?.posProviderName || "",
       posProviderAddress: businessInfo?.posProviderAddress || "",
       posProviderTin: businessInfo?.posProviderTin || "",
@@ -249,6 +271,81 @@ const PosBusinessInfoManager = ({ isDark, accent, getContrastText }) => {
     return (
       <div className="flex h-96 items-center justify-center">
         <FiLoader className="animate-spin text-4xl" style={{ color: accent }} />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="max-w-3xl mx-auto">
+        <div
+          className={`relative overflow-hidden rounded-[32px] border p-6 sm:p-8 lg:p-10 ${theme.panel}`}
+        >
+          <div className="absolute inset-0 pointer-events-none overflow-hidden">
+            <div
+              className="absolute top-[-40px] right-[-40px] h-40 w-40 rounded-full blur-3xl opacity-20"
+              style={{ backgroundColor: accent }}
+            />
+          </div>
+
+          <div className="relative max-w-md mx-auto">
+            <div className="text-center">
+              <div
+                className={`mx-auto h-24 w-24 rounded-[28px] flex items-center justify-center ${
+                  isDark
+                    ? "bg-slate-950 border border-slate-800"
+                    : "bg-slate-50 border border-slate-200"
+                }`}
+              >
+                <FiLock size={38} style={{ color: accent }} />
+              </div>
+
+              <p
+                className={`mt-6 text-[10px] font-black tracking-[0.24em] uppercase ${theme.textMuted}`}
+              >
+                Business Profile
+              </p>
+              <h2
+                className={`mt-2 text-3xl sm:text-4xl font-black ${theme.textPrimary}`}
+              >
+                Protected Access
+              </h2>
+              <p className={`mt-3 text-sm ${theme.textMuted}`}>
+                Enter the master access key to view and edit business
+                information, receipt headers, and BIR details.
+              </p>
+            </div>
+
+            <form onSubmit={handleAuth} className="mt-8 space-y-4">
+              <input
+                type="password"
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+                placeholder="Enter access key"
+                autoFocus
+                className={`w-full px-5 py-4 rounded-2xl border text-center font-bold outline-none transition-all ${
+                  authError
+                    ? "border-red-500 ring-4 ring-red-500/10"
+                    : theme.input
+                }`}
+              />
+
+              {authError && (
+                <p className="text-center text-sm font-bold text-red-500">
+                  Incorrect access key. Please try again.
+                </p>
+              )}
+
+              <button
+                type="submit"
+                style={{ backgroundColor: accent, color: contrast }}
+                className="w-full py-4 rounded-2xl font-black uppercase tracking-[0.18em] transition-all active:scale-95"
+              >
+                Verify Credentials
+              </button>
+            </form>
+          </div>
+        </div>
       </div>
     );
   }

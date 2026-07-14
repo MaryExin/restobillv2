@@ -15,7 +15,14 @@ import {
   FiPercent,
   FiChevronRight,
   FiPrinter,
+  FiImage,
+  FiTag,
+  FiMonitor,
+  FiLock,
+  FiSlash,
   FiGrid,
+  FiAward,
+  FiList,
 } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "../../context/ThemeContext";
@@ -28,12 +35,28 @@ import PosUserAccounts from "./PosSettingsModal/PosUserAccounts";
 import PosSystemLogs from "./PosSettingsModal/PosSystemLogs";
 import PosExpenses from "./PosSettingsModal/PosExpenses";
 import PosReportingModal from "./PosSettingsModal/PosReportingModal";
-import PosBackupModal from "./PosSettingsModal/PosBackupModal";
+import PosDataSecurity from "./PosSettingsModal/PosDataSecurity";
 import PosDiscountCeiling from "./PosSettingsModal/PosDiscountCeiling"
+import PosDiscountMode from "./PosSettingsModal/PosDiscountMode";
 import PosServiceCharge from "./PosSettingsModal/PosServiceCharge";
 import PosCustomerInfo from "./PosSettingsModal/PosCustomerInfo";
 import PrinterSettings from "./PosSettingsModal/PrinterSettings";
+import PosPrintSettings from "./PosSettingsModal/PosPrintSettings";
+import PosModeOfPayment from "./PosSettingsModal/PosModeOfPayment";
+import PosPictureSettings from "./PosSettingsModal/PosPictureSettings";
+import PosProductSubcategories from "./PosSettingsModal/PosProductSubcategories";
+import PosPricingDashboard from "./PosSettingsModal/PosPricingDashboard";
+import PosLayoutMode from "./PosSettingsModal/PosLayoutMode";
+import PosSecondScreen from "./PosSettingsModal/PosSecondScreen";
 import PosTableLayout from "./PosSettingsModal/PosTableLayout";
+import PosLoyaltyConfig from "./PosSettingsModal/PosLoyaltyConfig";
+import PosSalesTypeOrder from "./PosSettingsModal/PosSalesTypeOrder";
+
+const MASTER_PASS    = "LESI_POSPASS@2023";
+const PROTECTED_TABS = new Set(["Mode of Payment", "Discount Mode", "Layout Mode"]);
+// LightemAdmin is a trusted POS account -- skip the password gate on
+// protected settings tabs entirely for this user.
+const UNGATED_USERNAME = "lightemadmin";
 
 const PosSettings = ({ isOpen, onClose, branchInfo }) => {
   const { theme, setTheme } = useTheme();
@@ -51,6 +74,12 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
   const [selectedColorObj, setSelectedColorObj] = useState(adaptivePalette[1]);
   const [activeTab, setActiveTab] = useState("My Account");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // ── Password gate for protected tabs ──────────────────────────────────────
+  const [pendingTab, setPendingTab]   = useState(null);
+  const [gateOpen, setGateOpen]       = useState(false);
+  const [gatePass, setGatePass]       = useState("");
+  const [gateError, setGateError]     = useState(false); // true = wrong password → Oops
 
   useEffect(() => {
     if (isOpen) {
@@ -74,15 +103,29 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
     { id: "User Roles", icon: FiShield, route: "/userroles" },
     { id: "Registry Sales", icon: FiTrendingUp },
     { id: "Expenses & Petty", icon: FiCreditCard },
+    { id: "Mode of Payment", icon: FiCreditCard },
     { id: "Service Charge", icon: FiPercent },
     { id: "Discount Ceiling", icon: FiPercent },
+    { id: "Discount Mode", icon: FiPercent },
     { id: "Customer Info", icon: FiUsers },
     { id: "Table Layout", icon: FiGrid },
+    { id: "Sales Type Order", icon: FiList },
+    { id: "Loyalty Configuration", icon: FiAward },
     { id: "Email Reports", icon: FiMail },
     { id: "Data & Security", icon: FiDatabase },
     { id: "Appearance", icon: FiLayers },
     { id: "Printer Settings", icon: FiPrinter },
+    { id: "Print Options", icon: FiPrinter },
+    { id: "Picture Settings", icon: FiImage },
+    { id: "Product Subcategories", icon: FiLayers },
+    { id: "Pricing Engine", icon: FiTag },
+    { id: "Layout Mode", icon: FiMonitor },
+    { id: "Second Screen", icon: FiMonitor },
   ];
+
+  const isUngatedUser =
+    String(localStorage.getItem("username") || "").trim().toLowerCase() ===
+    UNGATED_USERNAME;
 
   const handleNavClick = (nav) => {
     if (nav.route) {
@@ -92,8 +135,27 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
       return;
     }
 
+    if (PROTECTED_TABS.has(nav.id) && !isUngatedUser) {
+      setPendingTab(nav.id);
+      setGatePass("");
+      setGateError(false);
+      setGateOpen(true);
+      setIsMobileMenuOpen(false);
+      return;
+    }
+
     setActiveTab(nav.id);
     setIsMobileMenuOpen(false);
+  };
+
+  const handleGateSubmit = () => {
+    if (gatePass === MASTER_PASS) {
+      setGateOpen(false);
+      setActiveTab(pendingTab);
+      setPendingTab(null);
+    } else {
+      setGateError(true);
+    }
   };
 
   const ActiveContent = () => {
@@ -135,6 +197,10 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
       return <PosDiscountCeiling isDark={isDark} accent={accentColor} />;
     }
 
+    if (activeTab === "Discount Mode") {
+      return <PosDiscountMode isDark={isDark} accent={accentColor} />;
+    }
+
     if (activeTab === "Service Charge") {
       return <PosServiceCharge isDark={isDark} accent={accentColor} />;
     }
@@ -147,12 +213,26 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
       return <PosTableLayout isDark={isDark} accent={accentColor} />;
     }
 
+    if (activeTab === "Sales Type Order") {
+      return <PosSalesTypeOrder isDark={isDark} accent={accentColor} />;
+    }
+
+    if (activeTab === "Loyalty Configuration") {
+      return <PosLoyaltyConfig isDark={isDark} accent={accentColor} />;
+    }
+
     if (activeTab === "Email Reports") {
       return <PosReportingModal isDark={isDark} accent={accentColor} />;
     }
 
     if (activeTab === "Data & Security") {
-      return <PosBackupModal isDark={isDark} accent={accentColor} />;
+      return (
+        <PosDataSecurity
+          isDark={isDark}
+          accent={accentColor}
+          getContrastText={getContrastText}
+        />
+      );
     }
 
     if (activeTab === "Appearance") {
@@ -176,6 +256,39 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
           accent={accentColor}
         />
       );
+    }
+
+    if (activeTab === "Print Options") {
+      return (
+        <PosPrintSettings
+          isDark={isDark}
+          accent={accentColor}
+        />
+      );
+    }
+
+    if (activeTab === "Mode of Payment") {
+      return <PosModeOfPayment isDark={isDark} accent={accentColor} />;
+    }
+
+    if (activeTab === "Picture Settings") {
+      return <PosPictureSettings isDark={isDark} accent={accentColor} />;
+    }
+
+    if (activeTab === "Product Subcategories") {
+      return <PosProductSubcategories isDark={isDark} accent={accentColor} />;
+    }
+
+    if (activeTab === "Pricing Engine") {
+      return <PosPricingDashboard isDark={isDark} accent={accentColor} />;
+    }
+
+    if (activeTab === "Layout Mode") {
+      return <PosLayoutMode isDark={isDark} accent={accentColor} />;
+    }
+
+    if (activeTab === "Second Screen") {
+      return <PosSecondScreen isDark={isDark} accent={accentColor} />;
     }
 
     return null;
@@ -498,6 +611,77 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
           </AnimatePresence>
         </motion.div>
       </div>
+
+      {/* ── Password Gate Modal ─────────────────────────────────────────────── */}
+      {gateOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="w-full max-w-sm mx-4 bg-white rounded-[2rem] p-8 shadow-2xl flex flex-col items-center gap-5">
+            {gateError ? (
+              /* ── Oops screen ── */
+              <>
+                <div className="w-20 h-20 rounded-[1.5rem] bg-blue-50 flex items-center justify-center">
+                  <FiSlash size={44} className="text-blue-600" />
+                </div>
+                <h2 className="text-2xl font-black text-slate-900">Oops!</h2>
+                <p className="text-center text-slate-600 text-sm leading-relaxed">
+                  You don't have access to{" "}
+                  <code className="font-bold text-slate-800">
+                    /{pendingTab?.toLowerCase().replace(/\s+/g, "")}
+                  </code>
+                  .
+                </p>
+                <button
+                  onClick={() => {
+                    setGateOpen(false);
+                    setGateError(false);
+                    setPendingTab(null);
+                  }}
+                  className="w-full py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-black text-sm transition"
+                >
+                  Take Me Home
+                </button>
+                <p className="text-xs text-slate-400">Need help? Contact support.</p>
+              </>
+            ) : (
+              /* ── Password form ── */
+              <>
+                <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center">
+                  <FiLock size={26} className="text-blue-600" />
+                </div>
+                <div className="text-center">
+                  <h2 className="text-lg font-black text-slate-900">Password Required</h2>
+                  <p className="text-sm text-slate-500 mt-1">
+                    Enter admin password to access <strong className="text-slate-700">{pendingTab}</strong>.
+                  </p>
+                </div>
+                <input
+                  type="password"
+                  value={gatePass}
+                  onChange={(e) => setGatePass(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleGateSubmit()}
+                  placeholder="Enter password"
+                  autoFocus
+                  className="w-full border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <div className="grid grid-cols-2 gap-3 w-full">
+                  <button
+                    onClick={() => { setGateOpen(false); setPendingTab(null); }}
+                    className="py-3 rounded-2xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleGateSubmit}
+                    className="py-3 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold transition"
+                  >
+                    Unlock
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
