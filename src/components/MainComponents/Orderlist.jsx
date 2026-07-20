@@ -107,7 +107,9 @@ const Orderlist = ({
         }
       })
       .catch(() => {});
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [apiHost]);
 
   const [enableSubcategories, setEnableSubcategories] = useState(false);
@@ -123,7 +125,9 @@ const Orderlist = ({
         }
       })
       .catch(() => {});
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [apiHost]);
 
   const [productsearch, setproductsearch] = useState("");
@@ -148,7 +152,7 @@ const Orderlist = ({
     customer: tableselected || "",
     items: [],
   });
-  
+
   const [cartlist, setcartlist] = useState([]);
   const [originalLoadedItems, setOriginalLoadedItems] = useState([]);
 
@@ -1269,7 +1273,6 @@ const Orderlist = ({
       grouped[category].push(item);
     });
 
-
     return Object.entries(grouped)
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([category, items]) => ({
@@ -1579,7 +1582,10 @@ const Orderlist = ({
 
     const normalizedCode = scannedCode.toLowerCase();
     const existingMatch = (productlist || []).find(
-      (p) => String(p.sku || "").trim().toLowerCase() === normalizedCode,
+      (p) =>
+        String(p.sku || "")
+          .trim()
+          .toLowerCase() === normalizedCode,
     );
 
     if (existingMatch) {
@@ -1619,7 +1625,10 @@ const Orderlist = ({
         : [];
 
       const scannedMatch = products.find(
-        (p) => String(p.sku || "").trim().toLowerCase() === normalizedCode,
+        (p) =>
+          String(p.sku || "")
+            .trim()
+            .toLowerCase() === normalizedCode,
       );
 
       if (scannedMatch) {
@@ -1948,7 +1957,8 @@ const Orderlist = ({
 
       // Use the internal ref first (set after first save), then fall back to the prop.
       // This prevents a second save (e.g. after a print error) from creating a new transaction.
-      const currentTransactionId = internalTransactionIdRef.current ?? transactionId;
+      const currentTransactionId =
+        internalTransactionIdRef.current ?? transactionId;
       const txId = currentTransactionId || Date.now();
 
       const loggedUserId =
@@ -2061,8 +2071,7 @@ const Orderlist = ({
       return;
     }
 
-    const tableRef =
-      layoutMode === "Kiosk" ? kioskTableName : tableselected;
+    const tableRef = layoutMode === "Kiosk" ? kioskTableName : tableselected;
     const txRef = transactionId || `TXN-${Date.now()}`;
 
     let globalItemIndex = 0;
@@ -3065,16 +3074,16 @@ const Orderlist = ({
           >
             <div className="flex items-center gap-4">
               {!isRetailPosMode && (
-              <button
-                onClick={() => setShowMobileCats(!showMobileCats)}
-                className={`rounded-xl p-3 transition-colors md:hidden ${
-                  isDark
-                    ? "bg-slate-800 text-blue-400"
-                    : "bg-slate-100 text-blue-600"
-                }`}
-              >
-                <FaFilter />
-              </button>
+                <button
+                  onClick={() => setShowMobileCats(!showMobileCats)}
+                  className={`rounded-xl p-3 transition-colors md:hidden ${
+                    isDark
+                      ? "bg-slate-800 text-blue-400"
+                      : "bg-slate-100 text-blue-600"
+                  }`}
+                >
+                  <FaFilter />
+                </button>
               )}
 
               <div className="flex items-center justify-between gap-4">
@@ -3090,12 +3099,14 @@ const Orderlist = ({
                           value={kioskTableName}
                           onChange={(e) => setKioskTableName(e.target.value)}
                           onBlur={() => {
-                            if (!kioskTableName.trim()) setKioskTableName("Table 01");
+                            if (!kioskTableName.trim())
+                              setKioskTableName("Table 01");
                             setIsEditingTableName(false);
                           }}
                           onKeyDown={(e) => {
                             if (e.key === "Enter" || e.key === "Escape") {
-                              if (!kioskTableName.trim()) setKioskTableName("Table 01");
+                              if (!kioskTableName.trim())
+                                setKioskTableName("Table 01");
                               setIsEditingTableName(false);
                             }
                           }}
@@ -3148,36 +3159,38 @@ const Orderlist = ({
                 </div>
 
                 {/* Right Side: Transfer Table Action */}
-                {transactionId && loadedCartItems.length > 0 && layoutMode !== "Kiosk" && (
-                  <button
-                    type="button"
-                    onClick={openTransferModal}
-                    className={`group flex items-center gap-2 rounded-lg px-3 py-2 transition-all duration-200 ${
-                      isDark
-                        ? "bg-slate-800 text-slate-300 hover:bg-slate-700"
-                        : "bg-slate-100 text-slate-600 hover:bg-teal-50 hover:text-teal-600"
-                    }`}
-                    title="Manage Table"
-                  >
-                    <svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="transition-transform group-hover:translate-x-1"
+                {transactionId &&
+                  loadedCartItems.length > 0 &&
+                  layoutMode !== "Kiosk" && (
+                    <button
+                      type="button"
+                      onClick={openTransferModal}
+                      className={`group flex items-center gap-2 rounded-lg px-3 py-2 transition-all duration-200 ${
+                        isDark
+                          ? "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                          : "bg-slate-100 text-slate-600 hover:bg-teal-50 hover:text-teal-600"
+                      }`}
+                      title="Manage Table"
                     >
-                      <path d="M16 3L21 8L16 13" />
-                      <path d="M21 8H9C6.23858 8 4 10.2386 4 13V19" />
-                    </svg>
-                    <span className="text-xs font-semibold tracking-wider uppercase">
-                      Manage Table
-                    </span>
-                  </button>
-                )}
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="transition-transform group-hover:translate-x-1"
+                      >
+                        <path d="M16 3L21 8L16 13" />
+                        <path d="M21 8H9C6.23858 8 4 10.2386 4 13V19" />
+                      </svg>
+                      <span className="text-xs font-semibold tracking-wider uppercase">
+                        Manage Table
+                      </span>
+                    </button>
+                  )}
               </div>
             </div>
 
@@ -3200,13 +3213,15 @@ const Orderlist = ({
                   setshoworderlist(false);
                   if (layoutMode === "Kiosk") {
                     if (window.kioskAPI?.updateCart) {
-                      window.kioskAPI.updateCart({
-                        phase: "transaction",
-                        isClear: true,
-                        items: [],
-                        totalItems: 0,
-                        totalPrice: 0,
-                      }).catch(() => {});
+                      window.kioskAPI
+                        .updateCart({
+                          phase: "transaction",
+                          isClear: true,
+                          items: [],
+                          totalItems: 0,
+                          totalPrice: 0,
+                        })
+                        .catch(() => {});
                     }
                     navigate("/poscorehomescreen");
                   } else if (isRetailPosMode) {
@@ -3226,123 +3241,125 @@ const Orderlist = ({
 
           <div className="relative flex flex-1 min-h-0">
             {!isRetailPosMode && (
-            <aside
-              className={`no-scrollbar absolute z-20 h-full min-h-0 w-64 overflow-auto transition-transform duration-300 md:relative ${
-                showMobileCats
-                  ? "translate-x-0"
-                  : "-translate-x-full md:translate-x-0"
-              } ${
-                isDark
-                  ? "border-r border-white/5 bg-slate-900"
-                  : "border-r border-slate-200 bg-white"
-              }`}
-            >
-              {layoutMode !== "Kiosk" && (
-              <div className="px-4 pt-4 mb-2">
-                <label
-                  className={`mb-2 block px-1 text-[10px] font-bold uppercase tracking-[0.2em] ${
-                    isDark ? "text-slate-500" : "text-slate-400"
-                  }`}
-                >
-                  Service Type
-                </label>
+              <aside
+                className={`no-scrollbar absolute z-20 h-full min-h-0 w-64 overflow-auto transition-transform duration-300 md:relative ${
+                  showMobileCats
+                    ? "translate-x-0"
+                    : "-translate-x-full md:translate-x-0"
+                } ${
+                  isDark
+                    ? "border-r border-white/5 bg-slate-900"
+                    : "border-r border-slate-200 bg-white"
+                }`}
+              >
+                {layoutMode !== "Kiosk" && (
+                  <div className="px-4 pt-4 mb-2">
+                    <label
+                      className={`mb-2 block px-1 text-[10px] font-bold uppercase tracking-[0.2em] ${
+                        isDark ? "text-slate-500" : "text-slate-400"
+                      }`}
+                    >
+                      Service Type
+                    </label>
 
-                <div className="relative group">
-                  <select
-                    value={selectedSalesType}
-                    onChange={(e) => setSelectedSalesType(e.target.value)}
-                    className={`w-full cursor-pointer appearance-none rounded-2xl py-3.5 pl-5 pr-12 text-sm font-semibold outline-none transition-all duration-300 ${
-                      isDark
-                        ? "border border-slate-700 bg-slate-800/40 text-white focus:border-blue-500/50 focus:bg-slate-800/60"
-                        : "border border-slate-200 bg-white text-slate-900 shadow-sm focus:border-blue-400 focus:shadow-md"
-                    }`}
-                  >
-                    <option value="" disabled>
-                      Choose Sales Type...
-                    </option>
-                    {salesTypeList.map((item) => (
-                      <option
-                        key={item.sales_type_id}
-                        value={String(item.sales_type_id)}
-                        className={
+                    <div className="relative group">
+                      <select
+                        value={selectedSalesType}
+                        onChange={(e) => setSelectedSalesType(e.target.value)}
+                        className={`w-full cursor-pointer appearance-none rounded-2xl py-3.5 pl-5 pr-12 text-sm font-semibold outline-none transition-all duration-300 ${
                           isDark
-                            ? "bg-slate-900 text-white"
-                            : "bg-white text-slate-900"
-                        }
+                            ? "border border-slate-700 bg-slate-800/40 text-white focus:border-blue-500/50 focus:bg-slate-800/60"
+                            : "border border-slate-200 bg-white text-slate-900 shadow-sm focus:border-blue-400 focus:shadow-md"
+                        }`}
                       >
-                        {item.sales_type || item.description}
-                      </option>
-                    ))}
-                  </select>
+                        <option value="" disabled>
+                          Choose Sales Type...
+                        </option>
+                        {salesTypeList.map((item) => (
+                          <option
+                            key={item.sales_type_id}
+                            value={String(item.sales_type_id)}
+                            className={
+                              isDark
+                                ? "bg-slate-900 text-white"
+                                : "bg-white text-slate-900"
+                            }
+                          >
+                            {item.sales_type || item.description}
+                          </option>
+                        ))}
+                      </select>
 
-                  <div className="absolute transition-transform -translate-y-1/2 pointer-events-none right-4 top-1/2 group-focus-within:rotate-180">
-                    <svg
-                      width="12"
-                      height="12"
-                      viewBox="0 0 12 12"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                      className={isDark ? "text-slate-500" : "text-slate-400"}
-                    >
-                      <path
-                        d="M2.5 4.5L6 8L9.5 4.5"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
+                      <div className="absolute transition-transform -translate-y-1/2 pointer-events-none right-4 top-1/2 group-focus-within:rotate-180">
+                        <svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 12 12"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                          className={
+                            isDark ? "text-slate-500" : "text-slate-400"
+                          }
+                        >
+                          <path
+                            d="M2.5 4.5L6 8L9.5 4.5"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </div>
+
+                      {isDark && (
+                        <div className="pointer-events-none absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-blue-500/20 to-cyan-500/20 opacity-0 blur transition duration-500 group-hover:opacity-100" />
+                      )}
+                    </div>
                   </div>
+                )}
 
-                  {isDark && (
-                    <div className="pointer-events-none absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-blue-500/20 to-cyan-500/20 opacity-0 blur transition duration-500 group-hover:opacity-100" />
-                  )}
-                </div>
-              </div>
-              )}
-
-              {!isRetailPosMode && (
-              <div className="flex flex-col h-full p-4">
-                <h3
-                  className={`mb-4 px-2 text-[10px] font-bold uppercase tracking-widest ${
-                    isDark ? "text-slate-500" : "text-slate-500"
-                  }`}
-                >
-                  Menu Sections
-                </h3>
-
-                <div className="flex-1 space-y-2 overflow-y-auto no-scrollbar">
-                  {categorylist.map((cat, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => {
-                        setselectcategory(cat.item_category);
-                        setShowMobileCats(false);
-                      }}
-                      className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-semibold transition-all `}
-                      style={{
-                        backgroundColor:
-                          selectcategory === cat.item_category
-                            ? "var(--app-accent)"
-                            : "transparent",
-                        color:
-                          selectcategory === cat.item_category
-                            ? "#ffffff"
-                            : "var(--app-text)",
-                        boxShadow:
-                          selectcategory === cat.item_category
-                            ? "0 12px 28px var(--app-accent-glow)"
-                            : "none",
-                      }}
+                {!isRetailPosMode && (
+                  <div className="flex flex-col h-full p-4">
+                    <h3
+                      className={`mb-4 px-2 text-[10px] font-bold uppercase tracking-widest ${
+                        isDark ? "text-slate-500" : "text-slate-500"
+                      }`}
                     >
-                      <span>{getCategoryIcon(cat.item_category)}</span>
-                      {cat.item_category}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              )}
-            </aside>
+                      Menu Sections
+                    </h3>
+
+                    <div className="flex-1 space-y-2 overflow-y-auto no-scrollbar">
+                      {categorylist.map((cat, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            setselectcategory(cat.item_category);
+                            setShowMobileCats(false);
+                          }}
+                          className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-semibold transition-all `}
+                          style={{
+                            backgroundColor:
+                              selectcategory === cat.item_category
+                                ? "var(--app-accent)"
+                                : "transparent",
+                            color:
+                              selectcategory === cat.item_category
+                                ? "#ffffff"
+                                : "var(--app-text)",
+                            boxShadow:
+                              selectcategory === cat.item_category
+                                ? "0 12px 28px var(--app-accent-glow)"
+                                : "none",
+                          }}
+                        >
+                          <span>{getCategoryIcon(cat.item_category)}</span>
+                          {cat.item_category}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </aside>
             )}
 
             <main
@@ -3352,9 +3369,7 @@ const Orderlist = ({
             >
               {/* ── Kiosk: Service Type pill selector above category tabs ── */}
               {layoutMode === "Kiosk" && salesTypeList.length > 0 && (
-                <div
-                  className="flex items-center gap-2 px-4 pt-3 pb-1 shrink-0 overflow-x-auto no-scrollbar"
-                >
+                <div className="flex items-center gap-2 px-4 pt-3 pb-1 shrink-0 overflow-x-auto no-scrollbar">
                   <span
                     className="text-[10px] font-bold uppercase tracking-widest shrink-0"
                     style={{ color: "var(--app-muted-text)" }}
@@ -3399,9 +3414,15 @@ const Orderlist = ({
                     className={`absolute left-4 top-1/2 -translate-y-1/2 ${
                       isRetailPosMode
                         ? ""
-                        : isDark ? "text-slate-500" : "text-slate-400"
+                        : isDark
+                          ? "text-slate-500"
+                          : "text-slate-400"
                     }`}
-                    style={isRetailPosMode ? { color: "var(--app-accent)" } : undefined}
+                    style={
+                      isRetailPosMode
+                        ? { color: "var(--app-accent)" }
+                        : undefined
+                    }
                   />
                   <input
                     ref={searchInputRef}
@@ -3448,9 +3469,7 @@ const Orderlist = ({
                       }, 0);
                     }}
                     className={`w-full rounded-2xl border py-3 pl-12 pr-4 outline-none transition-colors ${
-                      isRetailPosMode
-                        ? "border-2 font-semibold"
-                        : "border"
+                      isRetailPosMode ? "border-2 font-semibold" : "border"
                     } ${
                       isDark
                         ? "border-slate-700 bg-slate-800/40 text-white focus:border-blue-500/50"
@@ -3468,49 +3487,29 @@ const Orderlist = ({
                 </div>
               </div>
 
-              {enableSubcategories && availableSubcategories.length > 0 && !productsearch.trim() && (
-                <div className="flex items-center gap-2 px-4 pb-3 shrink-0 overflow-x-auto no-scrollbar">
-                  {selectedSubcategory && (
+              {enableSubcategories &&
+                availableSubcategories.length > 0 &&
+                !productsearch.trim() && (
+                  <div className="flex items-center gap-2 px-4 pb-3 shrink-0 overflow-x-auto no-scrollbar">
+                    {selectedSubcategory && (
+                      <button
+                        onClick={() => setSelectedSubcategory("")}
+                        className="shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold transition-all border"
+                        style={{
+                          borderColor: "var(--app-border)",
+                          color: "var(--app-text)",
+                          background: "var(--app-surface)",
+                        }}
+                      >
+                        <FaArrowLeft size={9} />
+                        Back
+                      </button>
+                    )}
                     <button
                       onClick={() => setSelectedSubcategory("")}
-                      className="shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold transition-all border"
-                      style={{
-                        borderColor: "var(--app-border)",
-                        color: "var(--app-text)",
-                        background: "var(--app-surface)",
-                      }}
-                    >
-                      <FaArrowLeft size={9} />
-                      Back
-                    </button>
-                  )}
-                  <button
-                    onClick={() => setSelectedSubcategory("")}
-                    className="shrink-0 px-3 py-1 rounded-full text-[11px] font-bold transition-all"
-                    style={
-                      !selectedSubcategory
-                        ? {
-                            background:
-                              "linear-gradient(180deg, var(--app-accent) 0%, var(--app-accent-secondary) 100%)",
-                            color: "#fff",
-                            boxShadow: "0 4px 12px var(--app-accent-glow)",
-                          }
-                        : {
-                            border: "1px solid var(--app-border)",
-                            color: "var(--app-muted-text)",
-                            background: "var(--app-surface)",
-                          }
-                    }
-                  >
-                    All
-                  </button>
-                  {availableSubcategories.map((sub) => (
-                    <button
-                      key={sub}
-                      onClick={() => setSelectedSubcategory(sub)}
                       className="shrink-0 px-3 py-1 rounded-full text-[11px] font-bold transition-all"
                       style={
-                        selectedSubcategory === sub
+                        !selectedSubcategory
                           ? {
                               background:
                                 "linear-gradient(180deg, var(--app-accent) 0%, var(--app-accent-secondary) 100%)",
@@ -3524,166 +3523,234 @@ const Orderlist = ({
                             }
                       }
                     >
-                      {sub}
+                      All
                     </button>
-                  ))}
+                    {availableSubcategories.map((sub) => (
+                      <button
+                        key={sub}
+                        onClick={() => setSelectedSubcategory(sub)}
+                        className="shrink-0 px-3 py-1 rounded-full text-[11px] font-bold transition-all"
+                        style={
+                          selectedSubcategory === sub
+                            ? {
+                                background:
+                                  "linear-gradient(180deg, var(--app-accent) 0%, var(--app-accent-secondary) 100%)",
+                                color: "#fff",
+                                boxShadow: "0 4px 12px var(--app-accent-glow)",
+                              }
+                            : {
+                                border: "1px solid var(--app-border)",
+                                color: "var(--app-muted-text)",
+                                background: "var(--app-surface)",
+                              }
+                        }
+                      >
+                        {sub}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+              {isRetailPosMode &&
+              totalItems === 0 &&
+              !productsearch.trim() &&
+              !selectedSubcategory ? (
+                <RetailEmptyState />
+              ) : isRetailPosMode &&
+                !productsearch.trim() &&
+                !selectedSubcategory ? (
+                // Retail POS: show the scanned cart here, below the search bar, instead of
+                // the narrow right sidebar — more room to review items while scanning.
+                <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
+                  {cartItemsListNode}
                 </div>
-              )}
+              ) : (
+                <div className="flex-1 min-h-0 overflow-hidden">
+                  <div className="h-full p-6 pt-2 overflow-y-auto no-scrollbar">
+                    <div className="grid grid-cols-2 gap-6 p-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4">
+                      {filteredProducts &&
+                        filteredProducts.map((p, i) => (
+                          <motion.button
+                            key={
+                              p._isFolder
+                                ? `folder-${p.subcategory_item_category}`
+                                : p.item_code || p.product_id || i
+                            }
+                            whileHover={{ y: -8, scale: 1.02, rotate: 0.5 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() =>
+                              p._isFolder
+                                ? setSelectedSubcategory(
+                                    p.subcategory_item_category,
+                                  )
+                                : addToCart(p)
+                            }
+                            className="group relative flex w-full flex-col overflow-hidden rounded-[2.5rem] border transition-all duration-500 shadow-lg hover:shadow-2xl"
+                            style={{
+                              borderColor: isDark
+                                ? "rgba(255,255,255,0.1)"
+                                : "var(--app-border)",
+                              backgroundColor: isDark
+                                ? "rgba(30, 41, 59, 0.5)"
+                                : "var(--app-surface)",
+                              backdropFilter: "blur(12px)",
+                              minWidth: "140px",
+                            }}
+                          >
+                            {/* THEME-BASED GLOW BORDER */}
+                            <div className="absolute inset-0 transition-opacity duration-500 opacity-0 pointer-events-none group-hover:opacity-100">
+                              <div
+                                className="absolute inset-0 animate-pulse opacity-10"
+                                style={{ background: "var(--app-accent)" }}
+                              />
+                            </div>
 
-{isRetailPosMode &&
-totalItems === 0 &&
-!productsearch.trim() &&
-!selectedSubcategory ? (
-  <RetailEmptyState />
-) : isRetailPosMode && !productsearch.trim() && !selectedSubcategory ? (
-  // Retail POS: show the scanned cart here, below the search bar, instead of
-  // the narrow right sidebar — more room to review items while scanning.
-  <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
-    {cartItemsListNode}
-  </div>
-) : (
-<div className="flex-1 min-h-0 overflow-hidden">
-  <div className="h-full p-6 pt-2 overflow-y-auto no-scrollbar">
-    <div className="grid grid-cols-2 gap-6 p-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4">
-      {filteredProducts && filteredProducts.map((p, i) => (
-        <motion.button
-          key={p._isFolder ? `folder-${p.subcategory_item_category}` : (p.item_code || p.product_id || i)}
-          whileHover={{ y: -8, scale: 1.02, rotate: 0.5 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() =>
-            p._isFolder
-              ? setSelectedSubcategory(p.subcategory_item_category)
-              : addToCart(p)
-          }
-          className="group relative flex w-full flex-col overflow-hidden rounded-[2.5rem] border transition-all duration-500 shadow-lg hover:shadow-2xl"
-          style={{
-            borderColor: isDark ? "rgba(255,255,255,0.1)" : "var(--app-border)",
-            backgroundColor: isDark ? "rgba(30, 41, 59, 0.5)" : "var(--app-surface)",
-            backdropFilter: "blur(12px)",
-            minWidth: "140px"
-          }}
-        >
-          {/* THEME-BASED GLOW BORDER */}
-          <div className="absolute inset-0 transition-opacity duration-500 opacity-0 pointer-events-none group-hover:opacity-100">
-            <div
-              className="absolute inset-0 animate-pulse opacity-10"
-              style={{ background: "var(--app-accent)" }}
-            />
-          </div>
+                            {p._isFolder ? (
+                              /* TIER 1: SUBCATEGORY FOLDER CARD */
+                              <div className="relative z-10 flex flex-col items-center justify-center flex-1 gap-3 p-6 text-center min-h-[168px]">
+                                <div
+                                  className="flex items-center justify-center w-14 h-14 rounded-2xl"
+                                  style={{
+                                    backgroundColor: "var(--app-accent)",
+                                    opacity: 0.85,
+                                  }}
+                                >
+                                  <FaLayerGroup size={22} color="#fff" />
+                                </div>
 
-          {p._isFolder ? (
-            /* TIER 1: SUBCATEGORY FOLDER CARD */
-            <div className="relative z-10 flex flex-col items-center justify-center flex-1 gap-3 p-6 text-center min-h-[168px]">
-              <div
-                className="flex items-center justify-center w-14 h-14 rounded-2xl"
-                style={{ backgroundColor: "var(--app-accent)", opacity: 0.85 }}
-              >
-                <FaLayerGroup size={22} color="#fff" />
-              </div>
+                                <h4
+                                  className="line-clamp-2 break-words text-[13px] font-black leading-tight uppercase tracking-tight"
+                                  style={{ color: "var(--app-text)" }}
+                                >
+                                  {p.item_name}
+                                </h4>
 
-              <h4
-                className="line-clamp-2 break-words text-[13px] font-black leading-tight uppercase tracking-tight"
-                style={{ color: "var(--app-text)" }}
-              >
-                {p.item_name}
-              </h4>
+                                <p
+                                  className="text-[9px] font-bold uppercase tracking-widest"
+                                  style={{ color: "var(--app-muted-text)" }}
+                                >
+                                  {p.variantCount} option
+                                  {p.variantCount === 1 ? "" : "s"}
+                                </p>
 
-              <p
-                className="text-[9px] font-bold uppercase tracking-widest"
-                style={{ color: "var(--app-muted-text)" }}
-              >
-                {p.variantCount} option{p.variantCount === 1 ? "" : "s"}
-              </p>
+                                <div
+                                  className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black"
+                                  style={{
+                                    backgroundColor: "var(--app-accent)",
+                                    color: "#fff",
+                                  }}
+                                >
+                                  From ₱
+                                  {Number(p.minPrice || 0).toLocaleString()}
+                                  <FaChevronRight size={8} />
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                {/* SAFE +1 POP-UP */}
+                                <motion.div
+                                  className="absolute inset-0 flex items-center justify-center pointer-events-none z-[100] opacity-0"
+                                  initial={false}
+                                  whileTap={{
+                                    opacity: [0, 1, 0],
+                                    y: [0, -100],
+                                    scale: [0.5, 1.5, 1],
+                                    transition: {
+                                      duration: 0.6,
+                                      ease: "easeOut",
+                                    },
+                                  }}
+                                >
+                                  <span
+                                    className="text-3xl italic font-black drop-shadow-lg"
+                                    style={{ color: "var(--app-accent)" }}
+                                  >
+                                    +1
+                                  </span>
+                                </motion.div>
 
-              <div
-                className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black"
-                style={{ backgroundColor: "var(--app-accent)", color: "#fff" }}
-              >
-                From ₱{Number(p.minPrice || 0).toLocaleString()}
-                <FaChevronRight size={8} />
-              </div>
-            </div>
-          ) : (
-            <>
-              {/* SAFE +1 POP-UP */}
-              <motion.div
-                className="absolute inset-0 flex items-center justify-center pointer-events-none z-[100] opacity-0"
-                initial={false}
-                whileTap={{
-                  opacity: [0, 1, 0],
-                  y: [0, -100],
-                  scale: [0.5, 1.5, 1],
-                  transition: { duration: 0.6, ease: "easeOut" }
-                }}
-              >
-                <span className="text-3xl italic font-black drop-shadow-lg" style={{ color: "var(--app-accent)" }}>
-                  +1
-                </span>
-              </motion.div>
-
-              {/* 1. SQUARE IMAGE SECTION */}
-              {enableItemPictures && (
-                <div className="relative flex items-center justify-center w-full overflow-hidden aspect-square shrink-0 bg-slate-800/10">
-                  <img
-                    src={`${apiHost}/item_pictures/${p.item_name}.jpg`}
-                    alt={p.item_name}
-                    className="object-cover w-full h-full transition-transform duration-700 group-hover:scale-125"
-                    onError={(e) => {
-                      /* DITO ANG SOLUSYON:
+                                {/* 1. SQUARE IMAGE SECTION */}
+                                {enableItemPictures && (
+                                  <div className="relative flex items-center justify-center w-full overflow-hidden aspect-square shrink-0 bg-slate-800/10">
+                                    <img
+                                      src={`${apiHost}/item_pictures/${p.item_name}.jpg`}
+                                      alt={p.item_name}
+                                      className="object-cover w-full h-full transition-transform duration-700 group-hover:scale-125"
+                                      onError={(e) => {
+                                        /* DITO ANG SOLUSYON:
                         Magdagdag ng timestamp (?t=) para ma-bypass ang cache sa production/app mode.
                       */
-                      e.target.src = `${apiHost}/item_pictures/default.jpg?t=${Date.now()}`;
-                      e.target.onerror = null;
-                    }}
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60" />
+                                        e.target.src = `${apiHost}/item_pictures/default.jpg?t=${Date.now()}`;
+                                        e.target.onerror = null;
+                                      }}
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60" />
 
-                  <div className="absolute top-3 left-3 px-2 py-1 rounded-lg bg-black/40 backdrop-blur-md border border-white/10 text-[8px] font-black text-white uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all">
-                    {p.item_category || 'Hot Item'}
+                                    <div className="absolute top-3 left-3 px-2 py-1 rounded-lg bg-black/40 backdrop-blur-md border border-white/10 text-[8px] font-black text-white uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all">
+                                      {p.item_category || "Hot Item"}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* 2. PREMIUM INFO SECTION */}
+                                <div className="relative z-10 flex flex-col justify-between flex-1 p-4 pb-6 text-left">
+                                  <div className="flex-1 min-h-[32px]">
+                                    <h4
+                                      className="line-clamp-2 break-words text-[12px] font-black leading-tight mb-1 uppercase tracking-tight transition-colors duration-300"
+                                      style={{ color: "var(--app-text)" }}
+                                    >
+                                      {p.item_name}
+                                    </h4>
+                                  </div>
+
+                                  <div className="flex items-end justify-between mt-2 shrink-0">
+                                    <div
+                                      className="flex items-center justify-center w-6 h-6 transition-all rounded-full opacity-0 group-hover:opacity-100"
+                                      style={{
+                                        backgroundColor: "var(--app-accent)",
+                                        opacity: 0.1,
+                                      }}
+                                    >
+                                      <FaPlus
+                                        size={8}
+                                        style={{ color: "var(--app-accent)" }}
+                                      />
+                                    </div>
+
+                                    <div className="text-right">
+                                      <p
+                                        className="mb-0 text-[7px] font-black uppercase tracking-[0.2em]"
+                                        style={{
+                                          color: "var(--app-muted-text)",
+                                        }}
+                                      >
+                                        Price
+                                      </p>
+                                      <p
+                                        className="text-[18px] font-black leading-none"
+                                        style={{ color: "var(--app-accent)" }}
+                                      >
+                                        ₱
+                                        {Number(
+                                          p.selling_price || 0,
+                                        ).toLocaleString()}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              </>
+                            )}
+
+                            <div
+                              className="absolute bottom-0 left-0 w-0 h-1 transition-all duration-500 group-hover:w-full"
+                              style={{ backgroundColor: "var(--app-accent)" }}
+                            />
+                          </motion.button>
+                        ))}
+                    </div>
                   </div>
                 </div>
               )}
-
-              {/* 2. PREMIUM INFO SECTION */}
-              <div className="relative z-10 flex flex-col justify-between flex-1 p-4 pb-6 text-left">
-                <div className="flex-1 min-h-[32px]">
-                  <h4
-                    className="line-clamp-2 break-words text-[12px] font-black leading-tight mb-1 uppercase tracking-tight transition-colors duration-300"
-                    style={{ color: "var(--app-text)" }}
-                  >
-                    {p.item_name}
-                  </h4>
-                </div>
-
-                <div className="flex items-end justify-between mt-2 shrink-0">
-                   <div className="flex items-center justify-center w-6 h-6 transition-all rounded-full opacity-0 group-hover:opacity-100"
-                        style={{ backgroundColor: "var(--app-accent)", opacity: 0.1 }}>
-                      <FaPlus size={8} style={{ color: "var(--app-accent)" }} />
-                   </div>
-
-                  <div className="text-right">
-                    <p className="mb-0 text-[7px] font-black uppercase tracking-[0.2em]"
-                       style={{ color: "var(--app-muted-text)" }}>
-                      Price
-                    </p>
-                    <p className="text-[18px] font-black leading-none"
-                       style={{ color: "var(--app-accent)" }}>
-                      ₱{Number(p.selling_price || 0).toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-
-          <div className="absolute bottom-0 left-0 w-0 h-1 transition-all duration-500 group-hover:w-full"
-               style={{ backgroundColor: "var(--app-accent)" }} />
-        </motion.button>
-      ))}
-    </div>
-  </div>
-</div>
-)}
             </main>
 
             {layoutMode === "Kiosk" ? (
@@ -3707,423 +3774,294 @@ totalItems === 0 &&
                 onPrintOrderSummary={handleKioskPrintOrderSummary}
               />
             ) : (
-            <aside
-              className="relative flex-col hidden min-h-0 overflow-hidden transition-colors w-80 lg:flex"
-              style={{
-                borderLeft: "1px solid var(--app-border)",
-                backgroundColor: "var(--app-surface-soft)",
-              }}
-            >
-              <div
-                className="flex items-center gap-2 p-6 font-bold transition-colors border-b"
+              <aside
+                className="relative flex-col hidden min-h-0 overflow-hidden transition-colors w-80 lg:flex"
                 style={{
-                  borderColor: "var(--app-border)",
-                  color: "var(--app-text)",
+                  borderLeft: "1px solid var(--app-border)",
+                  backgroundColor: "var(--app-surface-soft)",
                 }}
               >
-                {isRetailPosMode ? (
-                  <>
-                    <FaShoppingCart style={{ color: "var(--app-accent)" }} />
-                    Order #{transactionId || "—"}
-                    {totalItems === 0 && (
-                      <span
-                        className="text-xs font-bold"
-                        style={{ color: "var(--app-accent)" }}
-                      >
-                        (New Transaction)
-                      </span>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <FaShoppingCart style={{ color: "var(--app-accent)" }} /> Cart
-                    Summary
-                  </>
-                )}
-                {isCartFromDB && (
-                  <span className="ml-auto rounded-full border border-green-500/20 bg-green-500/10 px-2 py-1 text-[10px] text-green-400">
-                    Loaded Order
-                  </span>
-                )}
-              </div>
-
-              {isRetailPosMode && (
-                <div className="px-4 pt-4">
-                  <label
-                    className={`mb-2 block px-1 text-[10px] font-bold uppercase tracking-[0.2em] ${
-                      isDark ? "text-slate-500" : "text-slate-400"
-                    }`}
-                  >
-                    Service Type
-                  </label>
-
-                  <div className="relative group">
-                    <select
-                      value={selectedSalesType}
-                      onChange={(e) => setSelectedSalesType(e.target.value)}
-                      className={`w-full cursor-pointer appearance-none rounded-2xl py-3.5 pl-5 pr-12 text-sm font-semibold outline-none transition-all duration-300 ${
-                        isDark
-                          ? "border border-slate-700 bg-slate-800/40 text-white focus:border-blue-500/50 focus:bg-slate-800/60"
-                          : "border border-slate-200 bg-white text-slate-900 shadow-sm focus:border-blue-400 focus:shadow-md"
-                      }`}
-                    >
-                      <option value="" disabled>
-                        Choose Sales Type...
-                      </option>
-                      {salesTypeList.map((item) => (
-                        <option
-                          key={item.sales_type_id}
-                          value={String(item.sales_type_id)}
-                          className={
-                            isDark
-                              ? "bg-slate-900 text-white"
-                              : "bg-white text-slate-900"
-                          }
-                        >
-                          {item.sales_type || item.description}
-                        </option>
-                      ))}
-                    </select>
-
-                    <div className="absolute transition-transform -translate-y-1/2 pointer-events-none right-4 top-1/2 group-focus-within:rotate-180">
-                      <svg
-                        width="12"
-                        height="12"
-                        viewBox="0 0 12 12"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                        className={isDark ? "text-slate-500" : "text-slate-400"}
-                      >
-                        <path
-                          d="M2.5 4.5L6 8L9.5 4.5"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    </div>
-
-                    {isDark && (
-                      <div className="pointer-events-none absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-blue-500/20 to-cyan-500/20 opacity-0 blur transition duration-500 group-hover:opacity-100" />
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {isRetailPosMode && (
                 <div
-                  className="mx-4 mt-4 rounded-2xl border p-3 text-xs space-y-1.5"
+                  className="flex items-center gap-2 p-6 font-bold transition-colors border-b"
                   style={{
                     borderColor: "var(--app-border)",
-                    background: "var(--app-surface)",
+                    color: "var(--app-text)",
                   }}
                 >
-                  <div className="flex items-center justify-between">
-                    <span style={{ color: "var(--app-muted-text)" }}>Sub Total</span>
-                    <span style={{ color: "var(--app-text)" }}>₱{totalPrice.toLocaleString()}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span style={{ color: "var(--app-muted-text)" }}>Discounts</span>
-                    <span style={{ color: "var(--app-text)" }}>---</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span style={{ color: "var(--app-muted-text)" }}>Tax</span>
-                    <span style={{ color: "var(--app-text)" }}>---</span>
-                  </div>
-                  <div
-                    className="flex items-center justify-between pt-1.5 mt-1 border-t font-bold"
-                    style={{ borderColor: "var(--app-border)" }}
-                  >
-                    <span style={{ color: "var(--app-text)" }}>Total</span>
-                    <span style={{ color: "var(--app-accent)" }}>₱{totalPrice.toLocaleString()}</span>
-                  </div>
+                  {isRetailPosMode ? (
+                    <>
+                      <FaShoppingCart style={{ color: "var(--app-accent)" }} />
+                      Order #{transactionId || "—"}
+                      {totalItems === 0 && (
+                        <span
+                          className="text-xs font-bold"
+                          style={{ color: "var(--app-accent)" }}
+                        >
+                          (New Transaction)
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <FaShoppingCart style={{ color: "var(--app-accent)" }} />{" "}
+                      Cart Summary
+                    </>
+                  )}
+                  {isCartFromDB && (
+                    <span className="ml-auto rounded-full border border-green-500/20 bg-green-500/10 px-2 py-1 text-[10px] text-green-400">
+                      Loaded Order
+                    </span>
+                  )}
                 </div>
-              )}
 
-              <button
-                onClick={() =>
-                  isRetailPosMode ? handleKioskCharge() : setSummaryCart(true)
-                }
-                disabled={
-                  isRetailPosMode
-                    ? totalItems === 0 || isKioskCharging
-                    : false
-                }
-                className="flex items-center justify-center gap-2 px-4 py-3 mx-4 mt-4 text-sm font-semibold text-gray-100 rounded-2xl disabled:opacity-50"
-                style={{
-                  background:
-                    "linear-gradient(180deg, var(--app-accent) 0%, var(--app-accent-secondary) 100%)",
-                  boxShadow: "0 12px 28px var(--app-accent-glow)",
-                }}
-              >
-                <FaReceipt />
-                {isRetailPosMode
-                  ? isKioskCharging
-                    ? "Processing..."
-                    : "Proceed to Payment (F12)"
-                  : "View Full Summary"}
-              </button>
+                {isRetailPosMode && (
+                  <div className="px-4 pt-4">
+                    <label
+                      className={`mb-2 block px-1 text-[10px] font-bold uppercase tracking-[0.2em] ${
+                        isDark ? "text-slate-500" : "text-slate-400"
+                      }`}
+                    >
+                      Service Type
+                    </label>
 
-              <div className="absolute right-4 top-[10px] z-20 flex flex-row items-center gap-2">
-                {!isRetailPosMode && (
+                    <div className="relative group">
+                      <select
+                        value={selectedSalesType}
+                        onChange={(e) => setSelectedSalesType(e.target.value)}
+                        className={`w-full cursor-pointer appearance-none rounded-2xl py-3.5 pl-5 pr-12 text-sm font-semibold outline-none transition-all duration-300 ${
+                          isDark
+                            ? "border border-slate-700 bg-slate-800/40 text-white focus:border-blue-500/50 focus:bg-slate-800/60"
+                            : "border border-slate-200 bg-white text-slate-900 shadow-sm focus:border-blue-400 focus:shadow-md"
+                        }`}
+                      >
+                        <option value="" disabled>
+                          Choose Sales Type...
+                        </option>
+                        {salesTypeList.map((item) => (
+                          <option
+                            key={item.sales_type_id}
+                            value={String(item.sales_type_id)}
+                            className={
+                              isDark
+                                ? "bg-slate-900 text-white"
+                                : "bg-white text-slate-900"
+                            }
+                          >
+                            {item.sales_type || item.description}
+                          </option>
+                        ))}
+                      </select>
+
+                      <div className="absolute transition-transform -translate-y-1/2 pointer-events-none right-4 top-1/2 group-focus-within:rotate-180">
+                        <svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 12 12"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                          className={
+                            isDark ? "text-slate-500" : "text-slate-400"
+                          }
+                        >
+                          <path
+                            d="M2.5 4.5L6 8L9.5 4.5"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </div>
+
+                      {isDark && (
+                        <div className="pointer-events-none absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-blue-500/20 to-cyan-500/20 opacity-0 blur transition duration-500 group-hover:opacity-100" />
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {isRetailPosMode && (
+                  <div
+                    className="mx-4 mt-4 rounded-2xl border p-3 text-xs space-y-1.5"
+                    style={{
+                      borderColor: "var(--app-border)",
+                      background: "var(--app-surface)",
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span style={{ color: "var(--app-muted-text)" }}>
+                        Sub Total
+                      </span>
+                      <span style={{ color: "var(--app-text)" }}>
+                        ₱{totalPrice.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span style={{ color: "var(--app-muted-text)" }}>
+                        Discounts
+                      </span>
+                      <span style={{ color: "var(--app-text)" }}>---</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span style={{ color: "var(--app-muted-text)" }}>
+                        Tax
+                      </span>
+                      <span style={{ color: "var(--app-text)" }}>---</span>
+                    </div>
+                    <div
+                      className="flex items-center justify-between pt-1.5 mt-1 border-t font-bold"
+                      style={{ borderColor: "var(--app-border)" }}
+                    >
+                      <span style={{ color: "var(--app-text)" }}>Total</span>
+                      <span style={{ color: "var(--app-accent)" }}>
+                        ₱{totalPrice.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 <button
-                  onClick={() => setShowDesktopCartActions((prev) => !prev)}
-                  className="inline-flex items-center justify-center h-10 px-4 text-sm font-semibold text-gray-100 transition rounded-xl"
+                  onClick={() =>
+                    isRetailPosMode ? handleKioskCharge() : setSummaryCart(true)
+                  }
+                  disabled={
+                    isRetailPosMode
+                      ? totalItems === 0 || isKioskCharging
+                      : false
+                  }
+                  className="flex items-center justify-center gap-2 px-4 py-3 mx-4 mt-4 text-sm font-semibold text-gray-100 rounded-2xl disabled:opacity-50"
                   style={{
                     background:
                       "linear-gradient(180deg, var(--app-accent) 0%, var(--app-accent-secondary) 100%)",
                     boxShadow: "0 12px 28px var(--app-accent-glow)",
                   }}
                 >
-                  Save
+                  <FaReceipt />
+                  {isRetailPosMode
+                    ? isKioskCharging
+                      ? "Processing..."
+                      : "Proceed to Payment (F12)"
+                    : "View Full Summary"}
                 </button>
-                )}
 
-                {canPrintOnly && (
-                  <ButtonComponent
-                    onClick={handlePrintOnly}
-                    variant="warning"
-                    icon={<FiPrinter size={16} />}
-                    fullWidth={false}
-                    isLoading={isPrintingOnly}
-                    disabled={isPrintingOnly}
-                    loadingText=""
-                    className="mt-3 mb-0 h-10 min-w-[44px] rounded-xl px-4 text-sm"
-                  ></ButtonComponent>
-                )}
-              </div>
+                <div className="absolute right-4 top-[10px] z-20 flex flex-row items-center gap-2">
+                  {!isRetailPosMode && (
+                    <button
+                      onClick={() => setShowDesktopCartActions((prev) => !prev)}
+                      className="inline-flex items-center justify-center h-10 px-4 text-sm font-semibold text-gray-100 transition rounded-xl"
+                      style={{
+                        background:
+                          "linear-gradient(180deg, var(--app-accent) 0%, var(--app-accent-secondary) 100%)",
+                        boxShadow: "0 12px 28px var(--app-accent-glow)",
+                      }}
+                    >
+                      Save
+                    </button>
+                  )}
 
-              {/* Retail POS: cart list now renders in the center column below
-                  the search bar (more room while scanning) instead of here. */}
-              {!isRetailPosMode && (
-                <div className="flex-1 min-h-0 pr-2 overflow-y-auto">
-                  {cartItemsListNode}
+                  {canPrintOnly && (
+                    <ButtonComponent
+                      onClick={handlePrintOnly}
+                      variant="warning"
+                      icon={<FiPrinter size={16} />}
+                      fullWidth={false}
+                      isLoading={isPrintingOnly}
+                      disabled={isPrintingOnly}
+                      loadingText=""
+                      className="mt-3 mb-0 h-10 min-w-[44px] rounded-xl px-4 text-sm"
+                    ></ButtonComponent>
+                  )}
                 </div>
-              )}
 
-              <AnimatePresence>
-                {showDeleteItemModal && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="fixed inset-0 z-[370] flex items-center justify-center p-4"
-                    style={{ backgroundColor: "rgba(0,0,0,0.55)" }}
-                  >
+                {/* Retail POS: cart list now renders in the center column below
+                  the search bar (more room while scanning) instead of here. */}
+                {!isRetailPosMode && (
+                  <div className="flex-1 min-h-0 pr-2 overflow-y-auto">
+                    {cartItemsListNode}
+                  </div>
+                )}
+
+                <AnimatePresence>
+                  {showDeleteItemModal && (
                     <motion.div
-                      initial={{ scale: 0.95, y: 10 }}
-                      animate={{ scale: 1, y: 0 }}
-                      exit={{ scale: 0.95, y: 10 }}
-                      className="w-full max-w-sm p-8 text-center transition-colors border shadow-2xl rounded-3xl"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="fixed inset-0 z-[370] flex items-center justify-center p-4"
+                      style={{ backgroundColor: "rgba(0,0,0,0.55)" }}
+                    >
+                      <motion.div
+                        initial={{ scale: 0.95, y: 10 }}
+                        animate={{ scale: 1, y: 0 }}
+                        exit={{ scale: 0.95, y: 10 }}
+                        className="w-full max-w-sm p-8 text-center transition-colors border shadow-2xl rounded-3xl"
+                        style={{
+                          borderColor: "var(--app-border)",
+                          backgroundColor: "var(--app-surface)",
+                          color: "var(--app-text)",
+                        }}
+                      >
+                        <h3 className="mb-2 text-xl font-black">
+                          Remove Item?
+                        </h3>
+
+                        <p
+                          className="mb-6 text-sm"
+                          style={{ color: "var(--app-muted-text)" }}
+                        >
+                          Are you sure you want to delete this item from the
+                          cart?
+                        </p>
+
+                        <div className="flex gap-3">
+                          <button
+                            onClick={confirmRemoveItem}
+                            className="flex-1 py-3 font-bold text-white bg-red-600 rounded-2xl hover:bg-red-500"
+                          >
+                            Yes
+                          </button>
+
+                          <button
+                            onClick={cancelRemoveItem}
+                            className="flex-1 py-3 font-bold transition-colors rounded-2xl"
+                            style={{
+                              backgroundColor: "var(--app-surface-soft)",
+                              color: "var(--app-text)",
+                              border: "1px solid var(--app-border)",
+                            }}
+                          >
+                            No
+                          </button>
+                        </div>
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <AnimatePresence>
+                  {showDesktopCartActions && (
+                    <motion.div
+                      initial={{ opacity: 0, x: 30 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 30 }}
+                      transition={{ duration: 0.2 }}
+                      className="absolute inset-y-0 right-0 z-20 flex w-[88%] max-w-[320px] flex-col border-l p-5 shadow-2xl backdrop-blur-xl transition-colors"
                       style={{
                         borderColor: "var(--app-border)",
                         backgroundColor: "var(--app-surface)",
-                        color: "var(--app-text)",
                       }}
                     >
-                      <h3 className="mb-2 text-xl font-black">Remove Item?</h3>
-
-                      <p
-                        className="mb-6 text-sm"
-                        style={{ color: "var(--app-muted-text)" }}
-                      >
-                        Are you sure you want to delete this item from the cart?
-                      </p>
-
-                      <div className="flex gap-3">
-                        <button
-                          onClick={confirmRemoveItem}
-                          className="flex-1 py-3 font-bold text-white bg-red-600 rounded-2xl hover:bg-red-500"
-                        >
-                          Yes
-                        </button>
-
-                        <button
-                          onClick={cancelRemoveItem}
-                          className="flex-1 py-3 font-bold transition-colors rounded-2xl"
-                          style={{
-                            backgroundColor: "var(--app-surface-soft)",
-                            color: "var(--app-text)",
-                            border: "1px solid var(--app-border)",
-                          }}
-                        >
-                          No
-                        </button>
-                      </div>
-                    </motion.div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              <AnimatePresence>
-                {showDesktopCartActions && (
-                  <motion.div
-                    initial={{ opacity: 0, x: 30 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 30 }}
-                    transition={{ duration: 0.2 }}
-                    className="absolute inset-y-0 right-0 z-20 flex w-[88%] max-w-[320px] flex-col border-l p-5 shadow-2xl backdrop-blur-xl transition-colors"
-                    style={{
-                      borderColor: "var(--app-border)",
-                      backgroundColor: "var(--app-surface)",
-                    }}
-                  >
-                    <div className="flex items-center justify-between mb-4">
-                      <h3
-                        className="text-lg font-black"
-                        style={{ color: "var(--app-text)" }}
-                      >
-                        Cart Actions
-                      </h3>
-
-                      <button
-                        onClick={() => setShowDesktopCartActions(false)}
-                        className="flex items-center justify-center transition-colors rounded-full h-9 w-9"
-                        style={{
-                          backgroundColor: "var(--app-surface-soft)",
-                          color: "var(--app-text)",
-                          border: "1px solid var(--app-border)",
-                        }}
-                      >
-                        <FiX size={16} />
-                      </button>
-                    </div>
-
-                    <div className="flex-1 pr-1 space-y-4 overflow-y-auto custom-scrollbar">
-                      <div
-                        className="p-4 transition-colors border rounded-2xl"
-                        style={{
-                          borderColor: "var(--app-border)",
-                          backgroundColor: "var(--app-surface-soft)",
-                        }}
-                      >
-                        <div
-                          className="flex items-center justify-between text-xl font-black"
+                      <div className="flex items-center justify-between mb-4">
+                        <h3
+                          className="text-lg font-black"
                           style={{ color: "var(--app-text)" }}
                         >
-                          <span>Total</span>
-                          <span style={{ color: "var(--app-accent)" }}>
-                            ₱{totalPrice.toLocaleString()}
-                          </span>
-                        </div>
-                        <p
-                          className="mt-1 text-xs"
-                          style={{ color: "var(--app-muted-text)" }}
-                        >
-                          {totalItems} item{totalItems !== 1 ? "s" : ""}
-                        </p>
-                      </div>
-
-                      <div
-                        className="p-3 transition-colors border rounded-2xl"
-                        style={{
-                          borderColor: "var(--app-border)",
-                          backgroundColor: "var(--app-surface-soft)",
-                        }}
-                      >
-                        <label
-                          className="mb-2 block text-[10px] font-bold uppercase tracking-[0.18em]"
-                          style={{ color: "var(--app-muted-text)" }}
-                        >
-                          Printer
-                        </label>
-
-                        <select
-                          value={printerName}
-                          onChange={(e) => setPrinterName(e.target.value)}
-                          className="w-full px-3 py-3 text-sm outline-none rounded-xl"
-                          style={{
-                            border: "1px solid var(--app-border)",
-                            backgroundColor: "var(--app-surface)",
-                            color: "var(--app-text)",
-                          }}
-                        >
-                          <option value="">Default Printer</option>
-                          {printers.map((printer) => (
-                            <option key={printer.name} value={printer.name}>
-                              {printer.displayName || printer.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    <div
-                      className="pt-4 space-y-3 border-t"
-                      style={{ borderColor: "var(--app-border)" }}
-                    >
-                      <button
-                        onClick={handleGenerateQR}
-                        className="flex items-center justify-center w-full gap-2 py-4 font-bold text-white shadow-xl rounded-2xl"
-                        style={{
-                          background:
-                            "linear-gradient(180deg, var(--app-accent) 0%, var(--app-accent-secondary) 100%)",
-                          boxShadow: "0 12px 28px var(--app-accent-glow)",
-                        }}
-                      >
-                        <IoQrCode size={20} /> Confirm Order
-                      </button>
-
-                      <button
-                        onClick={requestClearCart}
-                        disabled={isCartFromDB}
-                        className="flex items-center justify-center w-full gap-2 py-3 font-bold transition-colors rounded-2xl"
-                        style={{
-                          backgroundColor: isCartFromDB
-                            ? "var(--app-surface-soft)"
-                            : "var(--app-surface)",
-                          color: isCartFromDB
-                            ? "var(--app-muted-text)"
-                            : "var(--app-text)",
-                          border: "1px solid var(--app-border)",
-                          opacity: isCartFromDB ? 0.6 : 1,
-                        }}
-                      >
-                        <FaTrash size={16} /> Clear Cart
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              <AnimatePresence>
-                {showTransferModal && (
-                  <motion.div
-                    className="fixed inset-0 z-[500] flex items-center justify-center px-3 py-3 backdrop-blur-sm sm:px-4"
-                    style={{ backgroundColor: "rgba(0,0,0,0.55)" }}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                  >
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.97, y: 8 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.97, y: 8 }}
-                      className="w-full max-w-[820px] rounded-[1.5rem] border p-4 shadow-2xl sm:p-5"
-                      style={{
-                        backgroundColor: "var(--app-surface)",
-                        borderColor: "var(--app-border)",
-                        color: "var(--app-text)",
-                      }}
-                    >
-                      <div className="flex items-start justify-between gap-3 mb-4">
-                        <div>
-                          <h2 className="text-lg font-black sm:text-xl">
-                            Transfer Table
-                          </h2>
-                          <p
-                            className="text-xs sm:text-sm"
-                            style={{ color: "var(--app-muted-text)" }}
-                          >
-                            Choose fixed table, merge tables, or type a special
-                            table name.
-                          </p>
-                        </div>
+                          Cart Actions
+                        </h3>
 
                         <button
-                          onClick={resetTransferState}
-                          className="flex items-center justify-center transition-all rounded-full h-9 w-9"
+                          onClick={() => setShowDesktopCartActions(false)}
+                          className="flex items-center justify-center transition-colors rounded-full h-9 w-9"
                           style={{
                             backgroundColor: "var(--app-surface-soft)",
                             color: "var(--app-text)",
@@ -4134,134 +4072,464 @@ totalItems === 0 &&
                         </button>
                       </div>
 
-                      <div
-                        className="grid grid-cols-3 gap-2 p-1 mb-4 border rounded-2xl"
-                        style={{
-                          backgroundColor: "var(--app-surface-soft)",
-                          borderColor: "var(--app-border)",
-                        }}
-                      >
-                        <button
-                          onClick={() => setTransferMode("fixed")}
-                          className="rounded-xl px-3 py-2.5 text-sm font-bold transition-all"
+                      <div className="flex-1 pr-1 space-y-4 overflow-y-auto custom-scrollbar">
+                        <div
+                          className="p-4 transition-colors border rounded-2xl"
                           style={{
-                            backgroundColor:
-                              transferMode === "fixed"
-                                ? "var(--app-accent)"
-                                : "transparent",
-                            color:
-                              transferMode === "fixed"
-                                ? "#ffffff"
-                                : "var(--app-muted-text)",
+                            borderColor: "var(--app-border)",
+                            backgroundColor: "var(--app-surface-soft)",
                           }}
                         >
-                          Fixed Table
-                        </button>
+                          <div
+                            className="flex items-center justify-between text-xl font-black"
+                            style={{ color: "var(--app-text)" }}
+                          >
+                            <span>Total</span>
+                            <span style={{ color: "var(--app-accent)" }}>
+                              ₱{totalPrice.toLocaleString()}
+                            </span>
+                          </div>
+                          <p
+                            className="mt-1 text-xs"
+                            style={{ color: "var(--app-muted-text)" }}
+                          >
+                            {totalItems} item{totalItems !== 1 ? "s" : ""}
+                          </p>
+                        </div>
 
-                        <button
-                          onClick={() => {
-                            setTransferMode("merge");
-                            seedCurrentMergeTables();
-                          }}
-                          className="rounded-xl px-3 py-2.5 text-sm font-bold transition-all"
+                        <div
+                          className="p-3 transition-colors border rounded-2xl"
                           style={{
-                            backgroundColor:
-                              transferMode === "merge"
-                                ? "var(--app-accent)"
-                                : "transparent",
-                            color:
-                              transferMode === "merge"
-                                ? "#ffffff"
-                                : "var(--app-muted-text)",
+                            borderColor: "var(--app-border)",
+                            backgroundColor: "var(--app-surface-soft)",
                           }}
                         >
-                          Merge Table
-                        </button>
+                          <label
+                            className="mb-2 block text-[10px] font-bold uppercase tracking-[0.18em]"
+                            style={{ color: "var(--app-muted-text)" }}
+                          >
+                            Printer
+                          </label>
 
-                        <button
-                          onClick={() => {
-                            setTransferMode("transferItem");
-                            setSelectedTransferTable("");
-                            setTransferSearch("");
-                          }}
-                          className="rounded-xl px-3 py-2.5 text-sm font-bold transition-all"
-                          style={{
-                            backgroundColor:
-                              transferMode === "transferItem"
-                                ? "var(--app-accent)"
-                                : "transparent",
-                            color:
-                              transferMode === "transferItem"
-                                ? "#ffffff"
-                                : "var(--app-muted-text)",
-                          }}
-                        >
-                          Transfer Product
-                        </button>
+                          <select
+                            value={printerName}
+                            onChange={(e) => setPrinterName(e.target.value)}
+                            className="w-full px-3 py-3 text-sm outline-none rounded-xl"
+                            style={{
+                              border: "1px solid var(--app-border)",
+                              backgroundColor: "var(--app-surface)",
+                              color: "var(--app-text)",
+                            }}
+                          >
+                            <option value="">Default Printer</option>
+                            {printers.map((printer) => (
+                              <option key={printer.name} value={printer.name}>
+                                {printer.displayName || printer.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
 
-                      {transferMode === "fixed" ? (
-                        <div className="space-y-4">
-                          <div className="relative">
-                            <FaSearch
-                              className="absolute -translate-y-1/2 left-4 top-1/2"
+                      <div
+                        className="pt-4 space-y-3 border-t"
+                        style={{ borderColor: "var(--app-border)" }}
+                      >
+                        <button
+                          onClick={handleGenerateQR}
+                          className="flex items-center justify-center w-full gap-2 py-4 font-bold text-white shadow-xl rounded-2xl"
+                          style={{
+                            background:
+                              "linear-gradient(180deg, var(--app-accent) 0%, var(--app-accent-secondary) 100%)",
+                            boxShadow: "0 12px 28px var(--app-accent-glow)",
+                          }}
+                        >
+                          <IoQrCode size={20} /> Confirm Order
+                        </button>
+
+                        <button
+                          onClick={requestClearCart}
+                          disabled={isCartFromDB}
+                          className="flex items-center justify-center w-full gap-2 py-3 font-bold transition-colors rounded-2xl"
+                          style={{
+                            backgroundColor: isCartFromDB
+                              ? "var(--app-surface-soft)"
+                              : "var(--app-surface)",
+                            color: isCartFromDB
+                              ? "var(--app-muted-text)"
+                              : "var(--app-text)",
+                            border: "1px solid var(--app-border)",
+                            opacity: isCartFromDB ? 0.6 : 1,
+                          }}
+                        >
+                          <FaTrash size={16} /> Clear Cart
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <AnimatePresence>
+                  {showTransferModal && (
+                    <motion.div
+                      className="fixed inset-0 z-[500] flex items-center justify-center px-3 py-3 backdrop-blur-sm sm:px-4"
+                      style={{ backgroundColor: "rgba(0,0,0,0.55)" }}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                    >
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.97, y: 8 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.97, y: 8 }}
+                        className="w-full max-w-[820px] rounded-[1.5rem] border p-4 shadow-2xl sm:p-5"
+                        style={{
+                          backgroundColor: "var(--app-surface)",
+                          borderColor: "var(--app-border)",
+                          color: "var(--app-text)",
+                        }}
+                      >
+                        <div className="flex items-start justify-between gap-3 mb-4">
+                          <div>
+                            <h2 className="text-lg font-black sm:text-xl">
+                              Transfer Table
+                            </h2>
+                            <p
+                              className="text-xs sm:text-sm"
                               style={{ color: "var(--app-muted-text)" }}
-                            />
-                            <input
-                              type="text"
-                              placeholder="Search fixed table..."
-                              value={transferSearch}
-                              onChange={(e) =>
-                                setTransferSearch(e.target.value)
-                              }
-                              className="w-full py-3 pr-4 text-sm transition-all rounded-xl pl-11 focus:outline-none"
-                              style={{
-                                backgroundColor: "var(--app-surface-soft)",
-                                border: "1px solid var(--app-border)",
-                                color: "var(--app-text)",
-                              }}
-                            />
+                            >
+                              Choose fixed table, merge tables, or type a
+                              special table name.
+                            </p>
                           </div>
 
-                          <div>
-                            <label
-                              className="mb-2 block text-[10px] font-black uppercase tracking-[0.25em]"
-                              style={{ color: "var(--app-muted-text)" }}
-                            >
-                              Select Fixed Table
-                            </label>
+                          <button
+                            onClick={resetTransferState}
+                            className="flex items-center justify-center transition-all rounded-full h-9 w-9"
+                            style={{
+                              backgroundColor: "var(--app-surface-soft)",
+                              color: "var(--app-text)",
+                              border: "1px solid var(--app-border)",
+                            }}
+                          >
+                            <FiX size={16} />
+                          </button>
+                        </div>
+
+                        <div
+                          className="grid grid-cols-3 gap-2 p-1 mb-4 border rounded-2xl"
+                          style={{
+                            backgroundColor: "var(--app-surface-soft)",
+                            borderColor: "var(--app-border)",
+                          }}
+                        >
+                          <button
+                            onClick={() => setTransferMode("fixed")}
+                            className="rounded-xl px-3 py-2.5 text-sm font-bold transition-all"
+                            style={{
+                              backgroundColor:
+                                transferMode === "fixed"
+                                  ? "var(--app-accent)"
+                                  : "transparent",
+                              color:
+                                transferMode === "fixed"
+                                  ? "#ffffff"
+                                  : "var(--app-muted-text)",
+                            }}
+                          >
+                            Fixed Table
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              setTransferMode("merge");
+                              seedCurrentMergeTables();
+                            }}
+                            className="rounded-xl px-3 py-2.5 text-sm font-bold transition-all"
+                            style={{
+                              backgroundColor:
+                                transferMode === "merge"
+                                  ? "var(--app-accent)"
+                                  : "transparent",
+                              color:
+                                transferMode === "merge"
+                                  ? "#ffffff"
+                                  : "var(--app-muted-text)",
+                            }}
+                          >
+                            Merge Table
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              setTransferMode("transferItem");
+                              setSelectedTransferTable("");
+                              setTransferSearch("");
+                            }}
+                            className="rounded-xl px-3 py-2.5 text-sm font-bold transition-all"
+                            style={{
+                              backgroundColor:
+                                transferMode === "transferItem"
+                                  ? "var(--app-accent)"
+                                  : "transparent",
+                              color:
+                                transferMode === "transferItem"
+                                  ? "#ffffff"
+                                  : "var(--app-muted-text)",
+                            }}
+                          >
+                            Transfer Product
+                          </button>
+                        </div>
+
+                        {transferMode === "fixed" ? (
+                          <div className="space-y-4">
+                            <div className="relative">
+                              <FaSearch
+                                className="absolute -translate-y-1/2 left-4 top-1/2"
+                                style={{ color: "var(--app-muted-text)" }}
+                              />
+                              <input
+                                type="text"
+                                placeholder="Search fixed table..."
+                                value={transferSearch}
+                                onChange={(e) =>
+                                  setTransferSearch(e.target.value)
+                                }
+                                className="w-full py-3 pr-4 text-sm transition-all rounded-xl pl-11 focus:outline-none"
+                                style={{
+                                  backgroundColor: "var(--app-surface-soft)",
+                                  border: "1px solid var(--app-border)",
+                                  color: "var(--app-text)",
+                                }}
+                              />
+                            </div>
+
+                            <div>
+                              <label
+                                className="mb-2 block text-[10px] font-black uppercase tracking-[0.25em]"
+                                style={{ color: "var(--app-muted-text)" }}
+                              >
+                                Select Fixed Table
+                              </label>
+
+                              <div
+                                className="max-h-[200px] overflow-y-auto rounded-2xl border p-2"
+                                style={{
+                                  borderColor: "var(--app-border)",
+                                  backgroundColor: "var(--app-surface-soft)",
+                                }}
+                              >
+                                {transferTableList.filter((table) =>
+                                  String(table.table_name || "")
+                                    .toLowerCase()
+                                    .includes(transferSearch.toLowerCase()),
+                                ).length > 0 ? (
+                                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+                                    {transferTableList
+                                      .filter((table) =>
+                                        String(table.table_name || "")
+                                          .toLowerCase()
+                                          .includes(
+                                            transferSearch.toLowerCase(),
+                                          ),
+                                      )
+                                      .map((table) => {
+                                        const tableName = table.table_name;
+                                        const isSelected =
+                                          String(selectedTransferTable) ===
+                                          String(tableName);
+
+                                        return (
+                                          <button
+                                            key={table.ID ?? tableName}
+                                            type="button"
+                                            onClick={() =>
+                                              setSelectedTransferTable(
+                                                tableName,
+                                              )
+                                            }
+                                            className="group relative rounded-xl border px-3 py-3 text-left shadow-sm transition-all duration-200 hover:scale-[1.01] active:scale-[0.98]"
+                                            style={{
+                                              backgroundColor: isSelected
+                                                ? "color-mix(in srgb, var(--app-accent) 12%, transparent)"
+                                                : "var(--app-surface)",
+                                              borderColor: isSelected
+                                                ? "var(--app-accent)"
+                                                : "var(--app-border)",
+                                              color: "var(--app-text)",
+                                            }}
+                                          >
+                                            <div className="flex items-start justify-between gap-2">
+                                              <div>
+                                                <p
+                                                  className="mb-1 text-[9px] font-black uppercase tracking-[0.2em]"
+                                                  style={{
+                                                    color: isSelected
+                                                      ? "var(--app-accent)"
+                                                      : "var(--app-muted-text)",
+                                                  }}
+                                                >
+                                                  Table
+                                                </p>
+                                                <p className="text-sm font-extrabold leading-tight break-words">
+                                                  {tableName}
+                                                </p>
+                                              </div>
+
+                                              <div
+                                                className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-all"
+                                                style={{
+                                                  backgroundColor: isSelected
+                                                    ? "var(--app-accent)"
+                                                    : "var(--app-surface-soft)",
+                                                  color: isSelected
+                                                    ? "#ffffff"
+                                                    : "var(--app-muted-text)",
+                                                }}
+                                              >
+                                                {isSelected ? (
+                                                  <FaCheck size={9} />
+                                                ) : (
+                                                  <span className="text-[9px] font-bold">
+                                                    +
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </div>
+                                          </button>
+                                        );
+                                      })}
+                                  </div>
+                                ) : (
+                                  <div
+                                    className="px-4 py-5 text-sm text-center rounded-xl"
+                                    style={{
+                                      backgroundColor: "var(--app-surface)",
+                                      color: "var(--app-muted-text)",
+                                      border: "1px dashed var(--app-border)",
+                                    }}
+                                  >
+                                    No fixed table found.
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <div>
+                              <label
+                                className="mb-2 block text-[10px] font-black uppercase tracking-[0.25em]"
+                                style={{ color: "var(--app-muted-text)" }}
+                              >
+                                Or Type Custom / Special Table
+                              </label>
+
+                              <input
+                                type="text"
+                                placeholder="e.g. VIP Table, Function Hall"
+                                value={customTransferTableName}
+                                onChange={(e) =>
+                                  setCustomTransferTableName(e.target.value)
+                                }
+                                className="w-full px-4 py-3 text-sm transition-all rounded-xl focus:outline-none"
+                                style={{
+                                  backgroundColor: "var(--app-surface-soft)",
+                                  border: "1px solid var(--app-border)",
+                                  color: "var(--app-text)",
+                                }}
+                              />
+                            </div>
 
                             <div
-                              className="max-h-[200px] overflow-y-auto rounded-2xl border p-2"
+                              className="px-4 py-4 border rounded-2xl"
                               style={{
-                                borderColor: "var(--app-border)",
                                 backgroundColor: "var(--app-surface-soft)",
+                                borderColor: "var(--app-border)",
                               }}
                             >
-                              {transferTableList.filter((table) =>
-                                String(table.table_name || "")
-                                  .toLowerCase()
-                                  .includes(transferSearch.toLowerCase()),
-                              ).length > 0 ? (
-                                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-                                  {transferTableList
-                                    .filter((table) =>
-                                      String(table.table_name || "")
-                                        .toLowerCase()
-                                        .includes(transferSearch.toLowerCase()),
-                                    )
-                                    .map((table) => {
+                              <p
+                                className="mb-2 text-[10px] font-black uppercase tracking-[0.25em]"
+                                style={{ color: "var(--app-muted-text)" }}
+                              >
+                                Selected
+                              </p>
+
+                              <div
+                                className="px-4 py-3 border rounded-xl"
+                                style={{
+                                  backgroundColor: "var(--app-surface)",
+                                  borderColor: "var(--app-border)",
+                                }}
+                              >
+                                <p className="text-sm font-bold leading-relaxed sm:text-base">
+                                  {customTransferTableName.trim() ||
+                                    selectedTransferTable ||
+                                    "None"}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ) : transferMode === "merge" ? (
+                          <div className="space-y-4">
+                            <div className="relative">
+                              <FaSearch
+                                className="absolute -translate-y-1/2 left-4 top-1/2"
+                                style={{ color: "var(--app-muted-text)" }}
+                              />
+                              <input
+                                type="text"
+                                placeholder="Search tables to merge..."
+                                value={transferSearch}
+                                onChange={(e) =>
+                                  setTransferSearch(e.target.value)
+                                }
+                                className="w-full py-3 pr-4 text-sm transition-all rounded-xl pl-11 focus:outline-none"
+                                style={{
+                                  backgroundColor: "var(--app-surface-soft)",
+                                  border: "1px solid var(--app-border)",
+                                  color: "var(--app-text)",
+                                }}
+                              />
+                            </div>
+
+                            <div>
+                              <label
+                                className="mb-2 block text-[10px] font-black uppercase tracking-[0.25em]"
+                                style={{ color: "var(--app-muted-text)" }}
+                              >
+                                Select Tables To Merge
+                              </label>
+
+                              <div
+                                className="max-h-[200px] overflow-y-auto rounded-2xl border p-2"
+                                style={{
+                                  borderColor: "var(--app-border)",
+                                  backgroundColor: "var(--app-surface-soft)",
+                                }}
+                              >
+                                {mergeSelectableTables.length > 0 ? (
+                                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                                    {mergeSelectableTables.map((table) => {
                                       const tableName = table.table_name;
                                       const isSelected =
-                                        String(selectedTransferTable) ===
-                                        String(tableName);
+                                        selectedMergeTables.some(
+                                          (item) =>
+                                            normalizeTableName(item) ===
+                                            normalizeTableName(tableName),
+                                        );
+                                      const isCurrentTable =
+                                        currentTableParts.some(
+                                          (item) =>
+                                            normalizeTableName(item) ===
+                                            normalizeTableName(tableName),
+                                        );
 
                                       return (
                                         <button
                                           key={table.ID ?? tableName}
                                           type="button"
                                           onClick={() =>
-                                            setSelectedTransferTable(tableName)
+                                            toggleMergeTableSelection(tableName)
                                           }
                                           className="group relative rounded-xl border px-3 py-3 text-left shadow-sm transition-all duration-200 hover:scale-[1.01] active:scale-[0.98]"
                                           style={{
@@ -4284,7 +4552,9 @@ totalItems === 0 &&
                                                     : "var(--app-muted-text)",
                                                 }}
                                               >
-                                                Table
+                                                {isCurrentTable
+                                                  ? "Current"
+                                                  : "Table"}
                                               </p>
                                               <p className="text-sm font-extrabold leading-tight break-words">
                                                 {tableName}
@@ -4314,555 +4584,7 @@ totalItems === 0 &&
                                         </button>
                                       );
                                     })}
-                                </div>
-                              ) : (
-                                <div
-                                  className="px-4 py-5 text-sm text-center rounded-xl"
-                                  style={{
-                                    backgroundColor: "var(--app-surface)",
-                                    color: "var(--app-muted-text)",
-                                    border: "1px dashed var(--app-border)",
-                                  }}
-                                >
-                                  No fixed table found.
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          <div>
-                            <label
-                              className="mb-2 block text-[10px] font-black uppercase tracking-[0.25em]"
-                              style={{ color: "var(--app-muted-text)" }}
-                            >
-                              Or Type Custom / Special Table
-                            </label>
-
-                            <input
-                              type="text"
-                              placeholder="e.g. VIP Table, Function Hall"
-                              value={customTransferTableName}
-                              onChange={(e) =>
-                                setCustomTransferTableName(e.target.value)
-                              }
-                              className="w-full px-4 py-3 text-sm transition-all rounded-xl focus:outline-none"
-                              style={{
-                                backgroundColor: "var(--app-surface-soft)",
-                                border: "1px solid var(--app-border)",
-                                color: "var(--app-text)",
-                              }}
-                            />
-                          </div>
-
-                          <div
-                            className="px-4 py-4 border rounded-2xl"
-                            style={{
-                              backgroundColor: "var(--app-surface-soft)",
-                              borderColor: "var(--app-border)",
-                            }}
-                          >
-                            <p
-                              className="mb-2 text-[10px] font-black uppercase tracking-[0.25em]"
-                              style={{ color: "var(--app-muted-text)" }}
-                            >
-                              Selected
-                            </p>
-
-                            <div
-                              className="px-4 py-3 border rounded-xl"
-                              style={{
-                                backgroundColor: "var(--app-surface)",
-                                borderColor: "var(--app-border)",
-                              }}
-                            >
-                              <p className="text-sm font-bold leading-relaxed sm:text-base">
-                                {customTransferTableName.trim() ||
-                                  selectedTransferTable ||
-                                  "None"}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      ) : transferMode === "merge" ? (
-                        <div className="space-y-4">
-                          <div className="relative">
-                            <FaSearch
-                              className="absolute -translate-y-1/2 left-4 top-1/2"
-                              style={{ color: "var(--app-muted-text)" }}
-                            />
-                            <input
-                              type="text"
-                              placeholder="Search tables to merge..."
-                              value={transferSearch}
-                              onChange={(e) =>
-                                setTransferSearch(e.target.value)
-                              }
-                              className="w-full py-3 pr-4 text-sm transition-all rounded-xl pl-11 focus:outline-none"
-                              style={{
-                                backgroundColor: "var(--app-surface-soft)",
-                                border: "1px solid var(--app-border)",
-                                color: "var(--app-text)",
-                              }}
-                            />
-                          </div>
-
-                          <div>
-                            <label
-                              className="mb-2 block text-[10px] font-black uppercase tracking-[0.25em]"
-                              style={{ color: "var(--app-muted-text)" }}
-                            >
-                              Select Tables To Merge
-                            </label>
-
-                            <div
-                              className="max-h-[200px] overflow-y-auto rounded-2xl border p-2"
-                              style={{
-                                borderColor: "var(--app-border)",
-                                backgroundColor: "var(--app-surface-soft)",
-                              }}
-                            >
-                              {mergeSelectableTables.length > 0 ? (
-                                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-                                  {mergeSelectableTables.map((table) => {
-                                    const tableName = table.table_name;
-                                    const isSelected = selectedMergeTables.some(
-                                      (item) =>
-                                        normalizeTableName(item) ===
-                                        normalizeTableName(tableName),
-                                    );
-                                    const isCurrentTable =
-                                      currentTableParts.some(
-                                        (item) =>
-                                          normalizeTableName(item) ===
-                                          normalizeTableName(tableName),
-                                      );
-
-                                    return (
-                                      <button
-                                        key={table.ID ?? tableName}
-                                        type="button"
-                                        onClick={() =>
-                                          toggleMergeTableSelection(tableName)
-                                        }
-                                        className="group relative rounded-xl border px-3 py-3 text-left shadow-sm transition-all duration-200 hover:scale-[1.01] active:scale-[0.98]"
-                                        style={{
-                                          backgroundColor: isSelected
-                                            ? "color-mix(in srgb, var(--app-accent) 12%, transparent)"
-                                            : "var(--app-surface)",
-                                          borderColor: isSelected
-                                            ? "var(--app-accent)"
-                                            : "var(--app-border)",
-                                          color: "var(--app-text)",
-                                        }}
-                                      >
-                                        <div className="flex items-start justify-between gap-2">
-                                          <div>
-                                            <p
-                                              className="mb-1 text-[9px] font-black uppercase tracking-[0.2em]"
-                                              style={{
-                                                color: isSelected
-                                                  ? "var(--app-accent)"
-                                                  : "var(--app-muted-text)",
-                                              }}
-                                            >
-                                              {isCurrentTable
-                                                ? "Current"
-                                                : "Table"}
-                                            </p>
-                                            <p className="text-sm font-extrabold leading-tight break-words">
-                                              {tableName}
-                                            </p>
-                                          </div>
-
-                                          <div
-                                            className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-all"
-                                            style={{
-                                              backgroundColor: isSelected
-                                                ? "var(--app-accent)"
-                                                : "var(--app-surface-soft)",
-                                              color: isSelected
-                                                ? "#ffffff"
-                                                : "var(--app-muted-text)",
-                                            }}
-                                          >
-                                            {isSelected ? (
-                                              <FaCheck size={9} />
-                                            ) : (
-                                              <span className="text-[9px] font-bold">
-                                                +
-                                              </span>
-                                            )}
-                                          </div>
-                                        </div>
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              ) : (
-                                <div
-                                  className="px-4 py-5 text-sm text-center rounded-xl"
-                                  style={{
-                                    backgroundColor: "var(--app-surface)",
-                                    color: "var(--app-muted-text)",
-                                    border: "1px dashed var(--app-border)",
-                                  }}
-                                >
-                                  No tables found.
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          <div>
-                            <label
-                              className="mb-2 block text-[10px] font-black uppercase tracking-[0.25em]"
-                              style={{ color: "var(--app-muted-text)" }}
-                            >
-                              Add Custom / Special Table To Merge
-                            </label>
-
-                            <input
-                              type="text"
-                              placeholder="e.g. VIP Table, Function Hall"
-                              value={customMergeTableName}
-                              onChange={(e) =>
-                                setCustomMergeTableName(e.target.value)
-                              }
-                              className="w-full px-4 py-3 text-sm transition-all rounded-xl focus:outline-none"
-                              style={{
-                                backgroundColor: "var(--app-surface-soft)",
-                                border: "1px solid var(--app-border)",
-                                color: "var(--app-text)",
-                              }}
-                            />
-                          </div>
-
-                          <div
-                            className="px-4 py-4 border rounded-2xl"
-                            style={{
-                              backgroundColor: "var(--app-surface-soft)",
-                              borderColor: "var(--app-border)",
-                            }}
-                          >
-                            <p
-                              className="mb-2 text-[10px] font-black uppercase tracking-[0.25em]"
-                              style={{ color: "var(--app-muted-text)" }}
-                            >
-                              Preview
-                            </p>
-
-                            <div
-                              className="px-4 py-3 border rounded-xl"
-                              style={{
-                                backgroundColor: "var(--app-surface)",
-                                borderColor: "var(--app-border)",
-                              }}
-                            >
-                              <p className="text-sm font-bold leading-relaxed sm:text-base">
-                                {mergeTablePreview}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      ) : transferMode === "transferItem" ? (
-                        <div className="grid gap-4 lg:grid-cols-[1.2fr,0.95fr]">
-                          <div className="space-y-4">
-                            <div
-                              className="px-4 py-4 border rounded-2xl"
-                              style={{
-                                backgroundColor: "var(--app-surface-soft)",
-                                borderColor: "var(--app-border)",
-                              }}
-                            >
-                              <div className="flex items-center justify-between gap-3 mb-3">
-                                <div>
-                                  <p
-                                    className="text-[10px] font-black uppercase tracking-[0.25em]"
-                                    style={{ color: "var(--app-muted-text)" }}
-                                  >
-                                    Current Order
-                                  </p>
-                                  <p className="mt-1 text-sm font-bold">
-                                    Select Product to move from {tableselected}
-                                  </p>
-                                </div>
-
-                                <div
-                                  className="px-3 py-2 text-right border rounded-xl"
-                                  style={{
-                                    backgroundColor: "var(--app-surface)",
-                                    borderColor: "var(--app-border)",
-                                  }}
-                                >
-                                  <p
-                                    className="text-[10px] font-black uppercase tracking-[0.2em]"
-                                    style={{ color: "var(--app-muted-text)" }}
-                                  >
-                                    Selected
-                                  </p>
-                                  <p
-                                    className="text-base font-black"
-                                    style={{ color: "var(--app-accent)" }}
-                                  >
-                                    {selectedTransferProductTotalQty} item
-                                    {selectedTransferProductTotalQty !== 1
-                                      ? "s"
-                                      : ""}
-                                  </p>
-                                  <p
-                                    className="text-xs"
-                                    style={{ color: "var(--app-muted-text)" }}
-                                  >
-                                    ₱
-                                    {selectedTransferProductSubtotal.toLocaleString()}
-                                  </p>
-                                </div>
-                              </div>
-
-                              <div className="max-h-[360px] space-y-3 overflow-y-auto pr-1">
-                                {transferProductItems.length > 0 ? (
-                                  transferProductItems.map((item) => {
-                                    const selectedQty = Math.min(
-                                      Number(item.quantity || 0),
-                                      Number(
-                                        transferItemSelections[
-                                          item.transferKey
-                                        ] || 0,
-                                      ),
-                                    );
-                                    const remainingQty = Math.max(
-                                      0,
-                                      Number(item.quantity || 0) - selectedQty,
-                                    );
-
-                                    return (
-                                      <div
-                                        key={item.transferKey}
-                                        className="p-3 border rounded-2xl"
-                                        style={{
-                                          backgroundColor: "var(--app-surface)",
-                                          borderColor: "var(--app-border)",
-                                        }}
-                                      >
-                                        <div className="flex items-start justify-between gap-3">
-                                          <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-extrabold">
-                                              {item.name}
-                                            </p>
-                                            <div className="mt-1 flex flex-wrap gap-2 text-[11px]">
-                                              <span
-                                                className="px-2 py-1 rounded-full"
-                                                style={{
-                                                  backgroundColor:
-                                                    "var(--app-surface-soft)",
-                                                  color:
-                                                    "var(--app-muted-text)",
-                                                }}
-                                              >
-                                                Qty:{" "}
-                                                {Number(item.quantity || 0)}
-                                              </span>
-                                              <span
-                                                className="px-2 py-1 rounded-full"
-                                                style={{
-                                                  backgroundColor:
-                                                    "var(--app-surface-soft)",
-                                                  color:
-                                                    "var(--app-muted-text)",
-                                                }}
-                                              >
-                                                Remaining: {remainingQty}
-                                              </span>
-                                              {item.item_category ? (
-                                                <span
-                                                  className="px-2 py-1 rounded-full"
-                                                  style={{
-                                                    backgroundColor:
-                                                      "var(--app-surface-soft)",
-                                                    color:
-                                                      "var(--app-muted-text)",
-                                                  }}
-                                                >
-                                                  {item.item_category}
-                                                </span>
-                                              ) : null}
-                                            </div>
-                                            {item.itemInstruction ? (
-                                              <p
-                                                className="mt-2 text-xs"
-                                                style={{
-                                                  color:
-                                                    "var(--app-muted-text)",
-                                                }}
-                                              >
-                                                Note: {item.itemInstruction}
-                                              </p>
-                                            ) : null}
-                                          </div>
-
-                                          <div className="w-[190px] shrink-0">
-                                            <label
-                                              className="mb-2 block text-[10px] font-black uppercase tracking-[0.2em]"
-                                              style={{
-                                                color: "var(--app-muted-text)",
-                                              }}
-                                            >
-                                              Transfer Qty
-                                            </label>
-
-                                            <div
-                                              className="p-2 border rounded-2xl"
-                                              style={{
-                                                borderColor:
-                                                  "var(--app-border)",
-                                                backgroundColor:
-                                                  "var(--app-surface-soft)",
-                                              }}
-                                            >
-                                              <div className="grid grid-cols-[50px_1fr_50px] gap-2">
-                                                <button
-                                                  type="button"
-                                                  onClick={() => {
-                                                    const currentQty = Number(
-                                                      transferItemSelections[
-                                                        item.transferKey
-                                                      ] || 0,
-                                                    );
-                                                    handleTransferProductQtyChange(
-                                                      item,
-                                                      Math.max(
-                                                        0,
-                                                        currentQty - 1,
-                                                      ),
-                                                    );
-                                                  }}
-                                                  className="flex items-center justify-center text-3xl font-black transition h-14 rounded-2xl active:scale-95"
-                                                  style={{
-                                                    backgroundColor:
-                                                      "var(--app-surface)",
-                                                    color: "var(--app-text)",
-                                                    border:
-                                                      "1px solid var(--app-border)",
-                                                  }}
-                                                >
-                                                  −
-                                                </button>
-
-                                                <div
-                                                  className="flex flex-col items-center justify-center border h-15 rounded-2xl"
-                                                  style={{
-                                                    backgroundColor:
-                                                      "var(--app-surface)",
-                                                    color: "var(--app-text)",
-                                                    borderColor:
-                                                      "var(--app-border)",
-                                                  }}
-                                                >
-                                                  <input
-                                                    type="number"
-                                                    min="0"
-                                                    max={Number(
-                                                      item.quantity || 0,
-                                                    )}
-                                                    inputMode="numeric"
-                                                    value={
-                                                      transferItemSelections[
-                                                        item.transferKey
-                                                      ] ?? 0
-                                                    }
-                                                    onChange={(e) =>
-                                                      handleTransferProductQtyChange(
-                                                        item,
-                                                        e.target.value,
-                                                      )
-                                                    }
-                                                    className="w-full bg-transparent text-center text-2xl font-black outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                                                    style={{
-                                                      color: "var(--app-text)",
-                                                    }}
-                                                  />
-                                                  <span
-                                                    className="text-[10px] font-bold uppercase tracking-[0.18em]"
-                                                    style={{
-                                                      color:
-                                                        "var(--app-muted-text)",
-                                                    }}
-                                                  >
-                                                    selected
-                                                  </span>
-                                                </div>
-
-                                                <button
-                                                  type="button"
-                                                  onClick={() => {
-                                                    const currentQty = Number(
-                                                      transferItemSelections[
-                                                        item.transferKey
-                                                      ] || 0,
-                                                    );
-                                                    const maxQty = Number(
-                                                      item.quantity || 0,
-                                                    );
-                                                    handleTransferProductQtyChange(
-                                                      item,
-                                                      Math.min(
-                                                        maxQty,
-                                                        currentQty + 1,
-                                                      ),
-                                                    );
-                                                  }}
-                                                  className="flex items-center justify-center text-3xl font-black text-white transition h-14 rounded-2xl active:scale-95"
-                                                  style={{
-                                                    background:
-                                                      "linear-gradient(180deg, var(--app-accent) 0%, var(--app-accent-secondary) 100%)",
-                                                  }}
-                                                >
-                                                  +
-                                                </button>
-                                              </div>
-
-                                              <div className="grid grid-cols-2 gap-2 mt-2">
-                                                <button
-                                                  type="button"
-                                                  onClick={() =>
-                                                    handleTransferProductQtyChange(
-                                                      item,
-                                                      0,
-                                                    )
-                                                  }
-                                                  className="h-12 text-sm font-black transition rounded-xl active:scale-95"
-                                                  style={{
-                                                    backgroundColor:
-                                                      "var(--app-surface)",
-                                                    color: "var(--app-text)",
-                                                    border:
-                                                      "1px solid var(--app-border)",
-                                                  }}
-                                                >
-                                                  Clear
-                                                </button>
-
-                                                <button
-                                                  type="button"
-                                                  onClick={() =>
-                                                    handleTransferProductQtyChange(
-                                                      item,
-                                                      Number(
-                                                        item.quantity || 0,
-                                                      ),
-                                                    )
-                                                  }
-                                                  className="h-12 text-sm font-black text-white transition rounded-xl bg-emerald-600 active:scale-95 hover:bg-emerald-500"
-                                                >
-                                                  All
-                                                </button>
-                                              </div>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    );
-                                  })
+                                  </div>
                                 ) : (
                                   <div
                                     className="px-4 py-5 text-sm text-center rounded-xl"
@@ -4872,27 +4594,28 @@ totalItems === 0 &&
                                       border: "1px dashed var(--app-border)",
                                     }}
                                   >
-                                    No order items available for transfer.
+                                    No tables found.
                                   </div>
                                 )}
                               </div>
                             </div>
-                          </div>
 
-                          <div className="space-y-4">
-                            <div className="relative">
-                              <FaSearch
-                                className="absolute -translate-y-1/2 left-4 top-1/2"
+                            <div>
+                              <label
+                                className="mb-2 block text-[10px] font-black uppercase tracking-[0.25em]"
                                 style={{ color: "var(--app-muted-text)" }}
-                              />
+                              >
+                                Add Custom / Special Table To Merge
+                              </label>
+
                               <input
                                 type="text"
-                                placeholder="Search pending tables..."
-                                value={transferSearch}
+                                placeholder="e.g. VIP Table, Function Hall"
+                                value={customMergeTableName}
                                 onChange={(e) =>
-                                  setTransferSearch(e.target.value)
+                                  setCustomMergeTableName(e.target.value)
                                 }
-                                className="w-full py-3 pr-4 text-sm transition-all rounded-xl pl-11 focus:outline-none"
+                                className="w-full px-4 py-3 text-sm transition-all rounded-xl focus:outline-none"
                                 style={{
                                   backgroundColor: "var(--app-surface-soft)",
                                   border: "1px solid var(--app-border)",
@@ -4902,208 +4625,579 @@ totalItems === 0 &&
                             </div>
 
                             <div
-                              className="p-3 border rounded-2xl"
+                              className="px-4 py-4 border rounded-2xl"
                               style={{
-                                borderColor: "var(--app-border)",
                                 backgroundColor: "var(--app-surface-soft)",
+                                borderColor: "var(--app-border)",
                               }}
                             >
-                              <div className="flex items-center justify-between gap-2 mb-3">
-                                <div>
-                                  <p
-                                    className="text-[10px] font-black uppercase tracking-[0.25em]"
-                                    style={{ color: "var(--app-muted-text)" }}
-                                  >
-                                    Pending Tables
-                                  </p>
-                                </div>
-                                <span
-                                  className="rounded-full px-2.5 py-1 text-[11px] font-bold"
-                                  style={{
-                                    backgroundColor: "var(--app-surface)",
-                                    color: "var(--app-muted-text)",
-                                    border: "1px solid var(--app-border)",
-                                  }}
-                                >
-                                  {filteredTransferTables.length}
-                                </span>
-                              </div>
+                              <p
+                                className="mb-2 text-[10px] font-black uppercase tracking-[0.25em]"
+                                style={{ color: "var(--app-muted-text)" }}
+                              >
+                                Preview
+                              </p>
 
-                              <div className="max-h-[220px] overflow-y-auto pr-1">
-                                {filteredTransferTables.length > 0 ? (
-                                  <div className="space-y-2">
-                                    {filteredTransferTables.map((table) => {
-                                      const tableName =
-                                        getTransferTableName(table);
-                                      const isSelected =
-                                        normalizeTableName(
-                                          selectedTransferTable,
-                                        ) === normalizeTableName(tableName);
+                              <div
+                                className="px-4 py-3 border rounded-xl"
+                                style={{
+                                  backgroundColor: "var(--app-surface)",
+                                  borderColor: "var(--app-border)",
+                                }}
+                              >
+                                <p className="text-sm font-bold leading-relaxed sm:text-base">
+                                  {mergeTablePreview}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ) : transferMode === "transferItem" ? (
+                          <div className="grid gap-4 lg:grid-cols-[1.2fr,0.95fr]">
+                            <div className="space-y-4">
+                              <div
+                                className="px-4 py-4 border rounded-2xl"
+                                style={{
+                                  backgroundColor: "var(--app-surface-soft)",
+                                  borderColor: "var(--app-border)",
+                                }}
+                              >
+                                <div className="flex items-center justify-between gap-3 mb-3">
+                                  <div>
+                                    <p
+                                      className="text-[10px] font-black uppercase tracking-[0.25em]"
+                                      style={{ color: "var(--app-muted-text)" }}
+                                    >
+                                      Current Order
+                                    </p>
+                                    <p className="mt-1 text-sm font-bold">
+                                      Select Product to move from{" "}
+                                      {tableselected}
+                                    </p>
+                                  </div>
+
+                                  <div
+                                    className="px-3 py-2 text-right border rounded-xl"
+                                    style={{
+                                      backgroundColor: "var(--app-surface)",
+                                      borderColor: "var(--app-border)",
+                                    }}
+                                  >
+                                    <p
+                                      className="text-[10px] font-black uppercase tracking-[0.2em]"
+                                      style={{ color: "var(--app-muted-text)" }}
+                                    >
+                                      Selected
+                                    </p>
+                                    <p
+                                      className="text-base font-black"
+                                      style={{ color: "var(--app-accent)" }}
+                                    >
+                                      {selectedTransferProductTotalQty} item
+                                      {selectedTransferProductTotalQty !== 1
+                                        ? "s"
+                                        : ""}
+                                    </p>
+                                    <p
+                                      className="text-xs"
+                                      style={{ color: "var(--app-muted-text)" }}
+                                    >
+                                      ₱
+                                      {selectedTransferProductSubtotal.toLocaleString()}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="max-h-[360px] space-y-3 overflow-y-auto pr-1">
+                                  {transferProductItems.length > 0 ? (
+                                    transferProductItems.map((item) => {
+                                      const selectedQty = Math.min(
+                                        Number(item.quantity || 0),
+                                        Number(
+                                          transferItemSelections[
+                                            item.transferKey
+                                          ] || 0,
+                                        ),
+                                      );
+                                      const remainingQty = Math.max(
+                                        0,
+                                        Number(item.quantity || 0) -
+                                          selectedQty,
+                                      );
 
                                       return (
-                                        <button
-                                          key={table.ID ?? tableName}
-                                          type="button"
-                                          onClick={() =>
-                                            setSelectedTransferTable(tableName)
-                                          }
-                                          className="w-full px-3 py-3 text-left transition-all border rounded-xl"
+                                        <div
+                                          key={item.transferKey}
+                                          className="p-3 border rounded-2xl"
                                           style={{
-                                            backgroundColor: isSelected
-                                              ? "color-mix(in srgb, var(--app-accent) 12%, transparent)"
-                                              : "var(--app-surface)",
-                                            borderColor: isSelected
-                                              ? "var(--app-accent)"
-                                              : "var(--app-border)",
-                                            color: "var(--app-text)",
+                                            backgroundColor:
+                                              "var(--app-surface)",
+                                            borderColor: "var(--app-border)",
                                           }}
                                         >
                                           <div className="flex items-start justify-between gap-3">
-                                            <div>
-                                              <p
-                                                className="text-[10px] font-black uppercase tracking-[0.2em]"
+                                            <div className="flex-1 min-w-0">
+                                              <p className="text-sm font-extrabold">
+                                                {item.name}
+                                              </p>
+                                              <div className="mt-1 flex flex-wrap gap-2 text-[11px]">
+                                                <span
+                                                  className="px-2 py-1 rounded-full"
+                                                  style={{
+                                                    backgroundColor:
+                                                      "var(--app-surface-soft)",
+                                                    color:
+                                                      "var(--app-muted-text)",
+                                                  }}
+                                                >
+                                                  Qty:{" "}
+                                                  {Number(item.quantity || 0)}
+                                                </span>
+                                                <span
+                                                  className="px-2 py-1 rounded-full"
+                                                  style={{
+                                                    backgroundColor:
+                                                      "var(--app-surface-soft)",
+                                                    color:
+                                                      "var(--app-muted-text)",
+                                                  }}
+                                                >
+                                                  Remaining: {remainingQty}
+                                                </span>
+                                                {item.item_category ? (
+                                                  <span
+                                                    className="px-2 py-1 rounded-full"
+                                                    style={{
+                                                      backgroundColor:
+                                                        "var(--app-surface-soft)",
+                                                      color:
+                                                        "var(--app-muted-text)",
+                                                    }}
+                                                  >
+                                                    {item.item_category}
+                                                  </span>
+                                                ) : null}
+                                              </div>
+                                              {item.itemInstruction ? (
+                                                <p
+                                                  className="mt-2 text-xs"
+                                                  style={{
+                                                    color:
+                                                      "var(--app-muted-text)",
+                                                  }}
+                                                >
+                                                  Note: {item.itemInstruction}
+                                                </p>
+                                              ) : null}
+                                            </div>
+
+                                            <div className="w-[190px] shrink-0">
+                                              <label
+                                                className="mb-2 block text-[10px] font-black uppercase tracking-[0.2em]"
                                                 style={{
-                                                  color: isSelected
-                                                    ? "var(--app-accent)"
-                                                    : "var(--app-muted-text)",
+                                                  color:
+                                                    "var(--app-muted-text)",
                                                 }}
                                               >
-                                                Pending Table
-                                              </p>
-                                              <p className="mt-1 text-sm font-extrabold">
-                                                {tableName}
-                                              </p>
-                                            </div>
-                                            <div
-                                              className="flex items-center justify-center w-5 h-5 mt-1 rounded-full"
-                                              style={{
-                                                backgroundColor: isSelected
-                                                  ? "var(--app-accent)"
-                                                  : "var(--app-surface-soft)",
-                                                color: isSelected
-                                                  ? "#ffffff"
-                                                  : "var(--app-muted-text)",
-                                              }}
-                                            >
-                                              {isSelected ? (
-                                                <FaCheck size={9} />
-                                              ) : (
-                                                <span className="text-[9px] font-bold">
-                                                  +
-                                                </span>
-                                              )}
+                                                Transfer Qty
+                                              </label>
+
+                                              <div
+                                                className="p-2 border rounded-2xl"
+                                                style={{
+                                                  borderColor:
+                                                    "var(--app-border)",
+                                                  backgroundColor:
+                                                    "var(--app-surface-soft)",
+                                                }}
+                                              >
+                                                <div className="grid grid-cols-[50px_1fr_50px] gap-2">
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                      const currentQty = Number(
+                                                        transferItemSelections[
+                                                          item.transferKey
+                                                        ] || 0,
+                                                      );
+                                                      handleTransferProductQtyChange(
+                                                        item,
+                                                        Math.max(
+                                                          0,
+                                                          currentQty - 1,
+                                                        ),
+                                                      );
+                                                    }}
+                                                    className="flex items-center justify-center text-3xl font-black transition h-14 rounded-2xl active:scale-95"
+                                                    style={{
+                                                      backgroundColor:
+                                                        "var(--app-surface)",
+                                                      color: "var(--app-text)",
+                                                      border:
+                                                        "1px solid var(--app-border)",
+                                                    }}
+                                                  >
+                                                    −
+                                                  </button>
+
+                                                  <div
+                                                    className="flex flex-col items-center justify-center border h-15 rounded-2xl"
+                                                    style={{
+                                                      backgroundColor:
+                                                        "var(--app-surface)",
+                                                      color: "var(--app-text)",
+                                                      borderColor:
+                                                        "var(--app-border)",
+                                                    }}
+                                                  >
+                                                    <input
+                                                      type="number"
+                                                      min="0"
+                                                      max={Number(
+                                                        item.quantity || 0,
+                                                      )}
+                                                      inputMode="numeric"
+                                                      value={
+                                                        transferItemSelections[
+                                                          item.transferKey
+                                                        ] ?? 0
+                                                      }
+                                                      onChange={(e) =>
+                                                        handleTransferProductQtyChange(
+                                                          item,
+                                                          e.target.value,
+                                                        )
+                                                      }
+                                                      className="w-full bg-transparent text-center text-2xl font-black outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                                      style={{
+                                                        color:
+                                                          "var(--app-text)",
+                                                      }}
+                                                    />
+                                                    <span
+                                                      className="text-[10px] font-bold uppercase tracking-[0.18em]"
+                                                      style={{
+                                                        color:
+                                                          "var(--app-muted-text)",
+                                                      }}
+                                                    >
+                                                      selected
+                                                    </span>
+                                                  </div>
+
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                      const currentQty = Number(
+                                                        transferItemSelections[
+                                                          item.transferKey
+                                                        ] || 0,
+                                                      );
+                                                      const maxQty = Number(
+                                                        item.quantity || 0,
+                                                      );
+                                                      handleTransferProductQtyChange(
+                                                        item,
+                                                        Math.min(
+                                                          maxQty,
+                                                          currentQty + 1,
+                                                        ),
+                                                      );
+                                                    }}
+                                                    className="flex items-center justify-center text-3xl font-black text-white transition h-14 rounded-2xl active:scale-95"
+                                                    style={{
+                                                      background:
+                                                        "linear-gradient(180deg, var(--app-accent) 0%, var(--app-accent-secondary) 100%)",
+                                                    }}
+                                                  >
+                                                    +
+                                                  </button>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-2 mt-2">
+                                                  <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                      handleTransferProductQtyChange(
+                                                        item,
+                                                        0,
+                                                      )
+                                                    }
+                                                    className="h-12 text-sm font-black transition rounded-xl active:scale-95"
+                                                    style={{
+                                                      backgroundColor:
+                                                        "var(--app-surface)",
+                                                      color: "var(--app-text)",
+                                                      border:
+                                                        "1px solid var(--app-border)",
+                                                    }}
+                                                  >
+                                                    Clear
+                                                  </button>
+
+                                                  <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                      handleTransferProductQtyChange(
+                                                        item,
+                                                        Number(
+                                                          item.quantity || 0,
+                                                        ),
+                                                      )
+                                                    }
+                                                    className="h-12 text-sm font-black text-white transition rounded-xl bg-emerald-600 active:scale-95 hover:bg-emerald-500"
+                                                  >
+                                                    All
+                                                  </button>
+                                                </div>
+                                              </div>
                                             </div>
                                           </div>
-                                        </button>
+                                        </div>
                                       );
-                                    })}
-                                  </div>
-                                ) : (
-                                  <div
-                                    className="px-4 py-5 text-sm text-center rounded-xl"
-                                    style={{
-                                      backgroundColor: "var(--app-surface)",
-                                      color: "var(--app-muted-text)",
-                                      border: "1px dashed var(--app-border)",
-                                    }}
-                                  >
-                                    No pending tables found.
-                                  </div>
-                                )}
+                                    })
+                                  ) : (
+                                    <div
+                                      className="px-4 py-5 text-sm text-center rounded-xl"
+                                      style={{
+                                        backgroundColor: "var(--app-surface)",
+                                        color: "var(--app-muted-text)",
+                                        border: "1px dashed var(--app-border)",
+                                      }}
+                                    >
+                                      No order items available for transfer.
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             </div>
 
-                            <div
-                              className="p-4 border rounded-2xl"
-                              style={{
-                                backgroundColor: "var(--app-surface-soft)",
-                                borderColor: "var(--app-border)",
-                              }}
-                            >
-                              <p
-                                className="text-[10px] font-black uppercase tracking-[0.25em]"
-                                style={{ color: "var(--app-muted-text)" }}
+                            <div className="space-y-4">
+                              <div className="relative">
+                                <FaSearch
+                                  className="absolute -translate-y-1/2 left-4 top-1/2"
+                                  style={{ color: "var(--app-muted-text)" }}
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="Search pending tables..."
+                                  value={transferSearch}
+                                  onChange={(e) =>
+                                    setTransferSearch(e.target.value)
+                                  }
+                                  className="w-full py-3 pr-4 text-sm transition-all rounded-xl pl-11 focus:outline-none"
+                                  style={{
+                                    backgroundColor: "var(--app-surface-soft)",
+                                    border: "1px solid var(--app-border)",
+                                    color: "var(--app-text)",
+                                  }}
+                                />
+                              </div>
+
+                              <div
+                                className="p-3 border rounded-2xl"
+                                style={{
+                                  borderColor: "var(--app-border)",
+                                  backgroundColor: "var(--app-surface-soft)",
+                                }}
                               >
-                                Destination Preview
-                              </p>
-                              <p
-                                className="mt-1 text-lg font-bold"
-                                style={{ color: "var(--app-text)" }}
+                                <div className="flex items-center justify-between gap-2 mb-3">
+                                  <div>
+                                    <p
+                                      className="text-[10px] font-black uppercase tracking-[0.25em]"
+                                      style={{ color: "var(--app-muted-text)" }}
+                                    >
+                                      Pending Tables
+                                    </p>
+                                  </div>
+                                  <span
+                                    className="rounded-full px-2.5 py-1 text-[11px] font-bold"
+                                    style={{
+                                      backgroundColor: "var(--app-surface)",
+                                      color: "var(--app-muted-text)",
+                                      border: "1px solid var(--app-border)",
+                                    }}
+                                  >
+                                    {filteredTransferTables.length}
+                                  </span>
+                                </div>
+
+                                <div className="max-h-[220px] overflow-y-auto pr-1">
+                                  {filteredTransferTables.length > 0 ? (
+                                    <div className="space-y-2">
+                                      {filteredTransferTables.map((table) => {
+                                        const tableName =
+                                          getTransferTableName(table);
+                                        const isSelected =
+                                          normalizeTableName(
+                                            selectedTransferTable,
+                                          ) === normalizeTableName(tableName);
+
+                                        return (
+                                          <button
+                                            key={table.ID ?? tableName}
+                                            type="button"
+                                            onClick={() =>
+                                              setSelectedTransferTable(
+                                                tableName,
+                                              )
+                                            }
+                                            className="w-full px-3 py-3 text-left transition-all border rounded-xl"
+                                            style={{
+                                              backgroundColor: isSelected
+                                                ? "color-mix(in srgb, var(--app-accent) 12%, transparent)"
+                                                : "var(--app-surface)",
+                                              borderColor: isSelected
+                                                ? "var(--app-accent)"
+                                                : "var(--app-border)",
+                                              color: "var(--app-text)",
+                                            }}
+                                          >
+                                            <div className="flex items-start justify-between gap-3">
+                                              <div>
+                                                <p
+                                                  className="text-[10px] font-black uppercase tracking-[0.2em]"
+                                                  style={{
+                                                    color: isSelected
+                                                      ? "var(--app-accent)"
+                                                      : "var(--app-muted-text)",
+                                                  }}
+                                                >
+                                                  Pending Table
+                                                </p>
+                                                <p className="mt-1 text-sm font-extrabold">
+                                                  {tableName}
+                                                </p>
+                                              </div>
+                                              <div
+                                                className="flex items-center justify-center w-5 h-5 mt-1 rounded-full"
+                                                style={{
+                                                  backgroundColor: isSelected
+                                                    ? "var(--app-accent)"
+                                                    : "var(--app-surface-soft)",
+                                                  color: isSelected
+                                                    ? "#ffffff"
+                                                    : "var(--app-muted-text)",
+                                                }}
+                                              >
+                                                {isSelected ? (
+                                                  <FaCheck size={9} />
+                                                ) : (
+                                                  <span className="text-[9px] font-bold">
+                                                    +
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </div>
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  ) : (
+                                    <div
+                                      className="px-4 py-5 text-sm text-center rounded-xl"
+                                      style={{
+                                        backgroundColor: "var(--app-surface)",
+                                        color: "var(--app-muted-text)",
+                                        border: "1px dashed var(--app-border)",
+                                      }}
+                                    >
+                                      No pending tables found.
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div
+                                className="p-4 border rounded-2xl"
+                                style={{
+                                  backgroundColor: "var(--app-surface-soft)",
+                                  borderColor: "var(--app-border)",
+                                }}
                               >
-                                {selectedTransferTable ||
-                                  "No pending table selected"}
-                              </p>
-                              {destinationTransferLoading ? (
                                 <p
-                                  className="mt-3 text-sm"
+                                  className="text-[10px] font-black uppercase tracking-[0.25em]"
                                   style={{ color: "var(--app-muted-text)" }}
                                 >
-                                  Loading destination order...
+                                  Destination Preview
                                 </p>
-                              ) : (
                                 <p
-                                  className="mt-3 text-sm"
-                                  style={{ color: "var(--app-muted-text)" }}
-                                ></p>
-                              )}
+                                  className="mt-1 text-lg font-bold"
+                                  style={{ color: "var(--app-text)" }}
+                                >
+                                  {selectedTransferTable ||
+                                    "No pending table selected"}
+                                </p>
+                                {destinationTransferLoading ? (
+                                  <p
+                                    className="mt-3 text-sm"
+                                    style={{ color: "var(--app-muted-text)" }}
+                                  >
+                                    Loading destination order...
+                                  </p>
+                                ) : (
+                                  <p
+                                    className="mt-3 text-sm"
+                                    style={{ color: "var(--app-muted-text)" }}
+                                  ></p>
+                                )}
+                              </div>
                             </div>
                           </div>
+                        ) : null}
+
+                        <div className="flex gap-2 pt-4">
+                          <button
+                            onClick={resetTransferState}
+                            className="flex-1 px-4 py-3 text-sm transition-all rounded-xl"
+                            style={{
+                              backgroundColor: "var(--app-surface-soft)",
+                              color: "var(--app-text)",
+                              border: "1px solid var(--app-border)",
+                            }}
+                          >
+                            Cancel
+                          </button>
+
+                          <button
+                            onClick={requestTransferConfirm}
+                            className="flex-1 px-4 py-3 text-sm font-bold text-white transition-all rounded-xl"
+                            style={{
+                              background:
+                                "linear-gradient(180deg, var(--app-accent) 0%, var(--app-accent-secondary) 100%)",
+                              boxShadow: "0 12px 28px var(--app-accent-glow)",
+                            }}
+                          >
+                            Confirm Transfer
+                          </button>
                         </div>
-                      ) : null}
-
-                      <div className="flex gap-2 pt-4">
-                        <button
-                          onClick={resetTransferState}
-                          className="flex-1 px-4 py-3 text-sm transition-all rounded-xl"
-                          style={{
-                            backgroundColor: "var(--app-surface-soft)",
-                            color: "var(--app-text)",
-                            border: "1px solid var(--app-border)",
-                          }}
-                        >
-                          Cancel
-                        </button>
-
-                        <button
-                          onClick={requestTransferConfirm}
-                          className="flex-1 px-4 py-3 text-sm font-bold text-white transition-all rounded-xl"
-                          style={{
-                            background:
-                              "linear-gradient(180deg, var(--app-accent) 0%, var(--app-accent-secondary) 100%)",
-                            boxShadow: "0 12px 28px var(--app-accent-glow)",
-                          }}
-                        >
-                          Confirm Transfer
-                        </button>
-                      </div>
+                      </motion.div>
                     </motion.div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                  )}
+                </AnimatePresence>
 
-              <AnimatePresence>
-                {showTransferConfirmModal && (
-                  <ModalYesNoReusable
-                    header={
-                      transferMode === "merge"
-                        ? "Confirm Table Merge"
-                        : transferMode === "transferItem"
-                          ? "Confirm Product Transfer"
-                          : "Confirm Table Transfer"
-                    }
-                    message={
-                      transferMode === "merge"
-                        ? `Are you sure you want to update this transaction table into ${mergePreview}?`
-                        : transferMode === "transferItem"
-                          ? `Are you sure you want to transfer ${selectedTransferProductTotalQty} selected item${selectedTransferProductTotalQty !== 1 ? "s" : ""} from ${tableselected} to pending table ${selectedTransferTable}?`
-                          : `Are you sure you want to transfer this order from ${tableselected} to ${customTransferTableName.trim() || selectedTransferTable}?`
-                    }
-                    setYesNoModalOpen={setShowTransferConfirmModal}
-                    triggerYesNoEvent={handleConfirmTransferTable}
-                  />
-                )}
-              </AnimatePresence>
-            </aside>
+                <AnimatePresence>
+                  {showTransferConfirmModal && (
+                    <ModalYesNoReusable
+                      header={
+                        transferMode === "merge"
+                          ? "Confirm Table Merge"
+                          : transferMode === "transferItem"
+                            ? "Confirm Product Transfer"
+                            : "Confirm Table Transfer"
+                      }
+                      message={
+                        transferMode === "merge"
+                          ? `Are you sure you want to update this transaction table into ${mergePreview}?`
+                          : transferMode === "transferItem"
+                            ? `Are you sure you want to transfer ${selectedTransferProductTotalQty} selected item${selectedTransferProductTotalQty !== 1 ? "s" : ""} from ${tableselected} to pending table ${selectedTransferTable}?`
+                            : `Are you sure you want to transfer this order from ${tableselected} to ${customTransferTableName.trim() || selectedTransferTable}?`
+                      }
+                      setYesNoModalOpen={setShowTransferConfirmModal}
+                      triggerYesNoEvent={handleConfirmTransferTable}
+                    />
+                  )}
+                </AnimatePresence>
+              </aside>
             )}
           </div>
 
@@ -5306,105 +5400,129 @@ totalItems === 0 &&
         )}
       </AnimatePresence>
 
- <AnimatePresence>
-  {summaryCart && (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[380] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-    >
-      <motion.div
-        initial={{ scale: 0.95, y: 20 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.95, y: 20 }}
-        className={`w-full max-w-sm overflow-hidden rounded-[2rem] shadow-2xl transition-colors ${
-          isDark ? "bg-slate-900 border border-white/10" : "bg-white border border-slate-200"
-        }`}
-      >
-        {/* ORDER SLIP HEADER */}
-        <div className="p-8 text-center border-b-2 border-dashed border-slate-300/50">
-          <h2 className={`text-2xl font-black uppercase tracking-tighter ${isDark ? "text-white" : "text-slate-900"}`}>
-            Order Summary
-          </h2>
-          <div className={`mt-4 py-2 border-y border-slate-100/10 font-mono text-base font-bold ${isDark ? "text-slate-300" : "text-slate-700"}`}>
-            TABLE: {tableselected}
-          </div>
-        </div>
-
-        {/* ITEMS LIST (RECEIPT STYLE) */}
-        <div className="p-8 overflow-y-auto max-h-[50vh] no-scrollbar font-mono">
-          <div className="space-y-6">
-            {groupedSummaryOrders.map((group) => (
-              <div key={group.category}>
-                <p className="text-[10px] font-black text-blue-500 mb-4 uppercase tracking-[0.3em] text-center italic">
-                  -- {group.category} --
-                </p>
-                
-                {group.items.map((item, idx) => (
-                  <div key={idx} className="mb-4 last:mb-0">
-                    <div className="flex flex-col gap-1">
-                      {/* ITEM ROW: Quantity, Name, and Total Price */}
-                      <div className="flex items-start justify-between gap-4">
-                        <span className={`text-base font-black leading-tight uppercase flex-1 ${isDark ? "text-white" : "text-slate-800"}`}>
-                          {item.quantity}x {item.name}
-                        </span>
-                        <span className={`text-base font-black shrink-0 ${isDark ? "text-blue-500" : "text-blue-600"}`}>
-                          ₱{(item.price * item.quantity).toLocaleString()}
-                        </span>
-                      </div>
-
-                      {/* SPECIAL INSTRUCTIONS (Kung meron) */}
-                      {item.itemInstruction && (
-                        <div className="px-3 py-1 mt-1 border-l-2 rounded-r-lg bg-rose-500/5 border-rose-500/50">
-                          <p className="text-[10px] text-rose-500 font-bold italic leading-tight uppercase">
-                            ** {item.itemInstruction}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-
-          {/* TOTAL AREA */}
-          <div className="pt-6 mt-6 border-t-4 border-double border-slate-300/50">
-            <div className="flex items-center justify-between opacity-60">
-              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">TOTAL ITEMS:</span>
-              <span className={`text-sm font-black ${isDark ? "text-slate-300" : "text-slate-700"}`}>{totalItems}</span>
-            </div>
-            <div className="flex items-center justify-between mt-2">
-              <span className={`text-lg font-black ${isDark ? "text-white" : "text-slate-900"}`}>AMOUNT DUE:</span>
-              <span className="text-2xl font-black tracking-tighter text-blue-500">₱{totalPrice.toLocaleString()}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* ACTION BUTTONS */}
-        <div className="flex flex-col gap-3 p-8 pt-0">
-          {layoutMode !== "Kiosk" && (
-            <button
-              onClick={handleGenerateQR}
-              className="w-full py-5 font-black text-white text-lg transition-all bg-blue-600 shadow-xl rounded-[1.5rem] hover:bg-blue-500 shadow-blue-600/30 active:scale-95 uppercase tracking-widest"
-            >
-              CONFIRM ORDER
-            </button>
-          )}
-          <button
-            onClick={() => setSummaryCart(false)}
-            className={`w-full py-2 text-[10px] font-black uppercase tracking-[0.3em] transition-all ${
-              isDark ? "text-slate-500 hover:text-white" : "text-slate-400 hover:text-slate-600"
-            }`}
+      <AnimatePresence>
+        {summaryCart && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[380] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
           >
-            Go Back
-          </button>
-        </div>
-      </motion.div>
-    </motion.div>
-  )}
-</AnimatePresence>
+            <motion.div
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              className={`w-full max-w-sm overflow-hidden rounded-[2rem] shadow-2xl transition-colors ${
+                isDark
+                  ? "bg-slate-900 border border-white/10"
+                  : "bg-white border border-slate-200"
+              }`}
+            >
+              {/* ORDER SLIP HEADER */}
+              <div className="p-8 text-center border-b-2 border-dashed border-slate-300/50">
+                <h2
+                  className={`text-2xl font-black uppercase tracking-tighter ${isDark ? "text-white" : "text-slate-900"}`}
+                >
+                  Order Summary
+                </h2>
+                <div
+                  className={`mt-4 py-2 border-y border-slate-100/10 font-mono text-base font-bold ${isDark ? "text-slate-300" : "text-slate-700"}`}
+                >
+                  TABLE: {tableselected}
+                </div>
+              </div>
+
+              {/* ITEMS LIST (RECEIPT STYLE) */}
+              <div className="p-8 overflow-y-auto max-h-[50vh] no-scrollbar font-mono">
+                <div className="space-y-6">
+                  {groupedSummaryOrders.map((group) => (
+                    <div key={group.category}>
+                      <p className="text-[10px] font-black text-blue-500 mb-4 uppercase tracking-[0.3em] text-center italic">
+                        -- {group.category} --
+                      </p>
+
+                      {group.items.map((item, idx) => (
+                        <div key={idx} className="mb-4 last:mb-0">
+                          <div className="flex flex-col gap-1">
+                            {/* ITEM ROW: Quantity, Name, and Total Price */}
+                            <div className="flex items-start justify-between gap-4">
+                              <span
+                                className={`text-base font-black leading-tight uppercase flex-1 ${isDark ? "text-white" : "text-slate-800"}`}
+                              >
+                                {item.quantity}x {item.name}
+                              </span>
+                              <span
+                                className={`text-base font-black shrink-0 ${isDark ? "text-blue-500" : "text-blue-600"}`}
+                              >
+                                ₱{(item.price * item.quantity).toLocaleString()}
+                              </span>
+                            </div>
+
+                            {/* SPECIAL INSTRUCTIONS (Kung meron) */}
+                            {item.itemInstruction && (
+                              <div className="px-3 py-1 mt-1 border-l-2 rounded-r-lg bg-rose-500/5 border-rose-500/50">
+                                <p className="text-[10px] text-rose-500 font-bold italic leading-tight uppercase">
+                                  ** {item.itemInstruction}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+
+                {/* TOTAL AREA */}
+                <div className="pt-6 mt-6 border-t-4 border-double border-slate-300/50">
+                  <div className="flex items-center justify-between opacity-60">
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                      TOTAL ITEMS:
+                    </span>
+                    <span
+                      className={`text-sm font-black ${isDark ? "text-slate-300" : "text-slate-700"}`}
+                    >
+                      {totalItems}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <span
+                      className={`text-lg font-black ${isDark ? "text-white" : "text-slate-900"}`}
+                    >
+                      AMOUNT DUE:
+                    </span>
+                    <span className="text-2xl font-black tracking-tighter text-blue-500">
+                      ₱{totalPrice.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* ACTION BUTTONS */}
+              <div className="flex flex-col gap-3 p-8 pt-0">
+                {layoutMode !== "Kiosk" && (
+                  <button
+                    onClick={handleGenerateQR}
+                    className="w-full py-5 font-black text-white text-lg transition-all bg-blue-600 shadow-xl rounded-[1.5rem] hover:bg-blue-500 shadow-blue-600/30 active:scale-95 uppercase tracking-widest"
+                  >
+                    CONFIRM ORDER
+                  </button>
+                )}
+                <button
+                  onClick={() => setSummaryCart(false)}
+                  className={`w-full py-2 text-[10px] font-black uppercase tracking-[0.3em] transition-all ${
+                    isDark
+                      ? "text-slate-500 hover:text-white"
+                      : "text-slate-400 hover:text-slate-600"
+                  }`}
+                >
+                  Go Back
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {showSaveSuccessModal && (
@@ -6135,32 +6253,36 @@ const CartList = ({
   extraClassName = "",
   openItemInstructionModal,
   showInstructionButton = true,
-  emptyStateText = "Your cart is feeling empty",
 }) => (
-  <div className={`flex-1 space-y-3 overflow-y-auto p-4 ${extraClassName}`}>
+  <div className={`flex-1 space-y-2 overflow-y-auto p-4 ${extraClassName}`}>
     {items.length === 0 ? (
       <div className="py-20 text-center">
         <FaShoppingCart
-          className="mx-auto mb-4 text-5xl"
+          size={48}
+          className="mx-auto mb-4"
           style={{ color: "var(--app-muted-text)" }}
         />
         <p className="font-medium" style={{ color: "var(--app-muted-text)" }}>
-          {emptyStateText}
+          Your cart is feeling empty
         </p>
       </div>
     ) : (
       items.map((item, index) => {
+        const lineTotal = Number(item.price) * Number(item.quantity);
+        const isLocked = readOnly || item.hasAdditionalEntry;
+
         return (
           <div
             key={item.lineId || `${item.code}-${index}`}
-            className="p-3 transition-colors border rounded-xl"
+            className="p-2.5 border rounded-xl transition-shadow hover:shadow-sm"
             style={{
               backgroundColor: "var(--app-surface)",
               borderColor: "var(--app-border)",
               color: "var(--app-text)",
             }}
           >
-            <div className="flex items-start justify-between gap-2 mb-2">
+            {/* Name + price share a row, so the total reads right next to what it's for */}
+            <div className="flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
                 <span
                   className="block text-xs font-medium leading-tight"
@@ -6168,40 +6290,30 @@ const CartList = ({
                 >
                   {item.name}
                 </span>
-
-                {item.itemInstruction && (
-                  <p className="mt-1 break-words text-[10px] text-amber-500">
-                    Note: {item.itemInstruction}
-                  </p>
-                )}
+                <span
+                  className="block mt-0.5 text-xs"
+                  style={{ color: "var(--app-muted-text)" }}
+                >
+                  ₱{Number(item.price).toLocaleString()} each
+                </span>
               </div>
 
-              {!readOnly && (
-                <div className="flex items-center gap-3 shrink-0">
-                  {showInstructionButton && (
-                    <button
-                      onClick={() => openItemInstructionModal?.(item)}
-                      className="p-2 transition-colors"
-                      style={{ color: "var(--app-muted-text)" }}
-                      title="Add instruction"
-                    >
-                      <FaEdit size={18} />
-                    </button>
-                  )}
-
-                  <button
-                    onClick={() => removeItem?.(item.lineId, item)}
-                    className="p-2 transition-colors"
-                    style={{ color: "var(--app-muted-text)" }}
-                  >
-                    <FaTrash size={18} />
-                  </button>
-                </div>
-              )}
+              <span
+                className="text-sm font-bold whitespace-nowrap shrink-0"
+                style={{ color: "var(--app-accent)" }}
+              >
+                ₱{lineTotal.toLocaleString()}
+              </span>
             </div>
 
-            <div className="flex items-center justify-between">
-              {readOnly || item.hasAdditionalEntry ? (
+            {item.itemInstruction && (
+              <p className="mt-1.5 break-words text-xs text-amber-500">
+                Note: {item.itemInstruction}
+              </p>
+            )}
+
+            <div className="flex items-center justify-between mt-2">
+              {isLocked ? (
                 <div
                   className="text-xs font-bold"
                   style={{ color: "var(--app-muted-text)" }}
@@ -6214,7 +6326,7 @@ const CartList = ({
                 </div>
               ) : (
                 <div
-                  className="flex items-center gap-2 p-1 transition-colors border rounded-lg"
+                  className="flex items-center gap-1 p-1 border rounded-lg"
                   style={{
                     backgroundColor: "var(--app-surface-soft)",
                     borderColor: "var(--app-border)",
@@ -6222,22 +6334,17 @@ const CartList = ({
                 >
                   <button
                     onClick={() => updateQuantity?.(item.lineId, -1, item)}
-                    className="flex items-center justify-center transition-colors rounded-md h-7 w-7"
+                    aria-label="Decrease quantity"
+                    className="flex items-center justify-center rounded-md h-7 w-7 transition hover:opacity-70"
                     style={{
                       color: "var(--app-text)",
                       backgroundColor: "var(--app-surface)",
                       border: "1px solid var(--app-border)",
                     }}
                   >
-                    <FaMinus size={8} />
+                    <FaMinus size={10} />
                   </button>
 
-                  <span
-                    className="text-xs"
-                    style={{ color: "var(--app-muted-text)" }}
-                  >
-                    Qty
-                  </span>
                   <input
                     type="number"
                     min="0.01"
@@ -6246,11 +6353,7 @@ const CartList = ({
                     value={item.quantity}
                     onFocus={(e) => e.target.select()}
                     onChange={(e) =>
-                      updateQuantityByInput?.(
-                        item.lineId,
-                        e.target.value,
-                        item,
-                      )
+                      updateQuantityByInput?.(item.lineId, e.target.value, item)
                     }
                     onBlur={(e) => {
                       const value = e.target.value.trim();
@@ -6262,34 +6365,50 @@ const CartList = ({
                         updateQuantityByInput?.(item.lineId, "1", item);
                       }
                     }}
-                    className="w-20 px-2 py-1.5 text-sm font-bold text-center transition-colors rounded-lg outline-none"
-                    style={{
-                      backgroundColor: "var(--app-surface)",
-                      border: "1px solid var(--app-border)",
-                      color: "var(--app-text)",
-                    }}
+                    className="w-11 py-1 text-sm font-bold text-center bg-transparent outline-none"
+                    style={{ color: "var(--app-text)" }}
                   />
 
                   <button
                     onClick={() => updateQuantity?.(item.lineId, 1, item)}
-                    className="flex items-center justify-center transition-colors rounded-md h-7 w-7"
+                    aria-label="Increase quantity"
+                    className="flex items-center justify-center rounded-md h-7 w-7 transition hover:opacity-70"
                     style={{
                       color: "var(--app-text)",
                       backgroundColor: "var(--app-surface)",
                       border: "1px solid var(--app-border)",
                     }}
                   >
-                    <FaPlus size={8} />
+                    <FaPlus size={10} />
                   </button>
                 </div>
               )}
 
-              <span
-                className="text-sm font-bold"
-                style={{ color: "var(--app-accent)" }}
-              >
-                ₱{(Number(item.price) * Number(item.quantity)).toLocaleString()}
-              </span>
+              {!readOnly && (
+                <div className="flex items-center gap-1 shrink-0">
+                  {showInstructionButton && (
+                    <button
+                      onClick={() => openItemInstructionModal?.(item)}
+                      aria-label="Add instruction"
+                      title="Add instruction"
+                      className="p-2 rounded-md transition hover:opacity-70"
+                      style={{ color: "var(--app-muted-text)" }}
+                    >
+                      <FaEdit size={18} />
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => removeItem?.(item.lineId, item)}
+                    aria-label="Remove item"
+                    title="Remove item"
+                    className="p-2 rounded-md transition hover:text-red-500"
+                    style={{ color: "var(--app-muted-text)" }}
+                  >
+                    <FaTrash size={15} />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         );
@@ -6297,5 +6416,4 @@ const CartList = ({
     )}
   </div>
 );
-
 export default Orderlist;
