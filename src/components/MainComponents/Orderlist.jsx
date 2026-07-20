@@ -70,14 +70,14 @@ const Orderlist = ({
         // Calls your new PHP API using config.php and tbl_pos_settings
         const response = await fetch(`${apiHost}/api/get_item_pictures.php`);
         const data = await response.json();
-        
+
         if (data.status === "success") {
           setEnableItemPictures(data.enableItemPictures);
         }
       } catch (error) {
         console.error("Failed to sync image settings:", error);
         // Defaults to False (text-only) if the database cannot be reached
-        setEnableItemPictures(false); 
+        setEnableItemPictures(false);
       }
     };
 
@@ -102,7 +102,7 @@ const Orderlist = ({
     customer: tableselected || "",
     items: [],
   });
-  
+
   const [cartlist, setcartlist] = useState([]);
   const [originalLoadedItems, setOriginalLoadedItems] = useState([]);
 
@@ -1061,7 +1061,6 @@ const Orderlist = ({
       grouped[category].push(item);
     });
 
-
     return Object.entries(grouped)
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([category, items]) => ({
@@ -1670,7 +1669,8 @@ const Orderlist = ({
 
       // Use the internal ref first (set after first save), then fall back to the prop.
       // This prevents a second save (e.g. after a print error) from creating a new transaction.
-      const currentTransactionId = internalTransactionIdRef.current ?? transactionId;
+      const currentTransactionId =
+        internalTransactionIdRef.current ?? transactionId;
       const txId = currentTransactionId || Date.now();
 
       const loggedUserId =
@@ -2729,107 +2729,132 @@ const Orderlist = ({
                 </div>
               </div>
 
-<div className="flex-1 min-h-0 overflow-hidden"> 
-  <div className="h-full p-6 pt-2 overflow-y-auto no-scrollbar">
-    <div className="grid grid-cols-2 gap-6 p-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4">
-      {filteredProducts && filteredProducts.map((p, i) => (
-        <motion.button
-          key={p.item_code || i}
-          whileHover={{ y: -8, scale: 1.02, rotate: 0.5 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => addToCart(p)}
-          className="group relative flex w-full flex-col overflow-hidden rounded-[2.5rem] border transition-all duration-500 shadow-lg hover:shadow-2xl"
-          style={{
-            borderColor: isDark ? "rgba(255,255,255,0.1)" : "var(--app-border)",
-            backgroundColor: isDark ? "rgba(30, 41, 59, 0.5)" : "var(--app-surface)",
-            backdropFilter: "blur(12px)",
-            minWidth: "140px" 
-          }}
-        >
-          {/* SAFE +1 POP-UP */}
-          <motion.div 
-            className="absolute inset-0 flex items-center justify-center pointer-events-none z-[100] opacity-0"
-            initial={false}
-            whileTap={{ 
-              opacity: [0, 1, 0], 
-              y: [0, -100], 
-              scale: [0.5, 1.5, 1],
-              transition: { duration: 0.6, ease: "easeOut" } 
-            }}
-          >
-            <span className="text-3xl italic font-black drop-shadow-lg" style={{ color: "var(--app-accent)" }}>
-              +1
-            </span>
-          </motion.div>
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <div className="h-full p-6 pt-2 overflow-y-auto no-scrollbar">
+                  <div className="grid grid-cols-2 gap-6 p-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4">
+                    {filteredProducts &&
+                      filteredProducts.map((p, i) => (
+                        <motion.button
+                          key={p.item_code || i}
+                          whileHover={{ y: -8, scale: 1.02, rotate: 0.5 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => addToCart(p)}
+                          className="group relative flex w-full flex-col overflow-hidden rounded-[2.5rem] border transition-all duration-500 shadow-lg hover:shadow-2xl"
+                          style={{
+                            borderColor: isDark
+                              ? "rgba(255,255,255,0.1)"
+                              : "var(--app-border)",
+                            backgroundColor: isDark
+                              ? "rgba(30, 41, 59, 0.5)"
+                              : "var(--app-surface)",
+                            backdropFilter: "blur(12px)",
+                            minWidth: "140px",
+                          }}
+                        >
+                          {/* SAFE +1 POP-UP */}
+                          <motion.div
+                            className="absolute inset-0 flex items-center justify-center pointer-events-none z-[100] opacity-0"
+                            initial={false}
+                            whileTap={{
+                              opacity: [0, 1, 0],
+                              y: [0, -100],
+                              scale: [0.5, 1.5, 1],
+                              transition: { duration: 0.6, ease: "easeOut" },
+                            }}
+                          >
+                            <span
+                              className="text-3xl italic font-black drop-shadow-lg"
+                              style={{ color: "var(--app-accent)" }}
+                            >
+                              +1
+                            </span>
+                          </motion.div>
 
-          {/* THEME-BASED GLOW BORDER */}
-          <div className="absolute inset-0 transition-opacity duration-500 opacity-0 pointer-events-none group-hover:opacity-100">
-            <div 
-              className="absolute inset-0 animate-pulse opacity-10" 
-              style={{ background: "var(--app-accent)" }}
-            />
-          </div>
+                          {/* THEME-BASED GLOW BORDER */}
+                          <div className="absolute inset-0 transition-opacity duration-500 opacity-0 pointer-events-none group-hover:opacity-100">
+                            <div
+                              className="absolute inset-0 animate-pulse opacity-10"
+                              style={{ background: "var(--app-accent)" }}
+                            />
+                          </div>
 
-          {/* 1. SQUARE IMAGE SECTION */}
-          {enableItemPictures && (
-            <div className="relative flex items-center justify-center w-full overflow-hidden aspect-square shrink-0 bg-slate-800/10">
-              <img
-                src={`${apiHost}/item_pictures/${p.item_name}.jpg`}
-                alt={p.item_name}
-                className="object-cover w-full h-full transition-transform duration-700 group-hover:scale-125"
-                onError={(e) => {
-                  /* DITO ANG SOLUSYON: 
+                          {/* 1. SQUARE IMAGE SECTION */}
+                          {enableItemPictures && (
+                            <div className="relative flex items-center justify-center w-full overflow-hidden aspect-square shrink-0 bg-slate-800/10">
+                              <img
+                                src={`${apiHost}/item_pictures/${p.item_name}.jpg`}
+                                alt={p.item_name}
+                                className="object-cover w-full h-full transition-transform duration-700 group-hover:scale-125"
+                                onError={(e) => {
+                                  /* DITO ANG SOLUSYON: 
                     Magdagdag ng timestamp (?t=) para ma-bypass ang cache sa production/app mode.
                   */
-                  e.target.src = `${apiHost}/item_pictures/default.jpg?t=${Date.now()}`;
-                  e.target.onerror = null; 
-                }}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60" />
-              
-              <div className="absolute top-3 left-3 px-2 py-1 rounded-lg bg-black/40 backdrop-blur-md border border-white/10 text-[8px] font-black text-white uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all">
-                {p.item_category || 'Hot Item'}
+                                  e.target.src = `${apiHost}/item_pictures/default.jpg?t=${Date.now()}`;
+                                  e.target.onerror = null;
+                                }}
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60" />
+
+                              <div className="absolute top-3 left-3 px-2 py-1 rounded-lg bg-black/40 backdrop-blur-md border border-white/10 text-[8px] font-black text-white uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all">
+                                {p.item_category || "Hot Item"}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 2. PREMIUM INFO SECTION */}
+                          <div className="relative z-10 flex flex-col justify-between flex-1 p-4 pb-6 text-left">
+                            <div className="flex-1 min-h-[32px]">
+                              <h4
+                                className="line-clamp-2 break-words text-[12px] font-black leading-tight mb-1 uppercase tracking-tight transition-colors duration-300"
+                                style={{ color: "var(--app-text)" }}
+                              >
+                                {p.item_name}
+                              </h4>
+                            </div>
+
+                            <div className="flex items-end justify-between mt-2 shrink-0">
+                              <div
+                                className="flex items-center justify-center w-6 h-6 transition-all rounded-full opacity-0 group-hover:opacity-100"
+                                style={{
+                                  backgroundColor: "var(--app-accent)",
+                                  opacity: 0.1,
+                                }}
+                              >
+                                <FaPlus
+                                  size={8}
+                                  style={{ color: "var(--app-accent)" }}
+                                />
+                              </div>
+
+                              <div className="text-right">
+                                <p
+                                  className="mb-0 text-[7px] font-black uppercase tracking-[0.2em]"
+                                  style={{ color: "var(--app-muted-text)" }}
+                                >
+                                  Price
+                                </p>
+                                <p
+                                  className="text-[18px] font-black leading-none"
+                                  style={{ color: "var(--app-accent)" }}
+                                >
+                                  ₱
+                                  {Number(
+                                    p.selling_price || 0,
+                                  ).toLocaleString()}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div
+                            className="absolute bottom-0 left-0 w-0 h-1 transition-all duration-500 group-hover:w-full"
+                            style={{ backgroundColor: "var(--app-accent)" }}
+                          />
+                        </motion.button>
+                      ))}
+                  </div>
+                </div>
               </div>
-            </div>
-          )}
-
-          {/* 2. PREMIUM INFO SECTION */}
-          <div className="relative z-10 flex flex-col justify-between flex-1 p-4 pb-6 text-left">
-            <div className="flex-1 min-h-[32px]">
-              <h4 
-                className="line-clamp-2 break-words text-[12px] font-black leading-tight mb-1 uppercase tracking-tight transition-colors duration-300"
-                style={{ color: "var(--app-text)" }}
-              >
-                {p.item_name}
-              </h4>
-            </div>
-
-            <div className="flex items-end justify-between mt-2 shrink-0">
-               <div className="flex items-center justify-center w-6 h-6 transition-all rounded-full opacity-0 group-hover:opacity-100"
-                    style={{ backgroundColor: "var(--app-accent)", opacity: 0.1 }}>
-                  <FaPlus size={8} style={{ color: "var(--app-accent)" }} />
-               </div>
-
-              <div className="text-right">
-                <p className="mb-0 text-[7px] font-black uppercase tracking-[0.2em]"
-                   style={{ color: "var(--app-muted-text)" }}>
-                  Price
-                </p>
-                <p className="text-[18px] font-black leading-none"
-                   style={{ color: "var(--app-accent)" }}>
-                  ₱{Number(p.selling_price || 0).toLocaleString()}
-                </p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="absolute bottom-0 left-0 w-0 h-1 transition-all duration-500 group-hover:w-full" 
-               style={{ backgroundColor: "var(--app-accent)" }} />
-        </motion.button>
-      ))}
-    </div>
-  </div>
-</div>
             </main>
 
             <aside
@@ -4350,103 +4375,127 @@ const Orderlist = ({
         )}
       </AnimatePresence>
 
- <AnimatePresence>
-  {summaryCart && (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[380] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-    >
-      <motion.div
-        initial={{ scale: 0.95, y: 20 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.95, y: 20 }}
-        className={`w-full max-w-sm overflow-hidden rounded-[2rem] shadow-2xl transition-colors ${
-          isDark ? "bg-slate-900 border border-white/10" : "bg-white border border-slate-200"
-        }`}
-      >
-        {/* ORDER SLIP HEADER */}
-        <div className="p-8 text-center border-b-2 border-dashed border-slate-300/50">
-          <h2 className={`text-2xl font-black uppercase tracking-tighter ${isDark ? "text-white" : "text-slate-900"}`}>
-            Order Summary
-          </h2>
-          <div className={`mt-4 py-2 border-y border-slate-100/10 font-mono text-base font-bold ${isDark ? "text-slate-300" : "text-slate-700"}`}>
-            TABLE: {tableselected}
-          </div>
-        </div>
-
-        {/* ITEMS LIST (RECEIPT STYLE) */}
-        <div className="p-8 overflow-y-auto max-h-[50vh] no-scrollbar font-mono">
-          <div className="space-y-6">
-            {groupedSummaryOrders.map((group) => (
-              <div key={group.category}>
-                <p className="text-[10px] font-black text-blue-500 mb-4 uppercase tracking-[0.3em] text-center italic">
-                  -- {group.category} --
-                </p>
-                
-                {group.items.map((item, idx) => (
-                  <div key={idx} className="mb-4 last:mb-0">
-                    <div className="flex flex-col gap-1">
-                      {/* ITEM ROW: Quantity, Name, and Total Price */}
-                      <div className="flex items-start justify-between gap-4">
-                        <span className={`text-base font-black leading-tight uppercase flex-1 ${isDark ? "text-white" : "text-slate-800"}`}>
-                          {item.quantity}x {item.name}
-                        </span>
-                        <span className={`text-base font-black shrink-0 ${isDark ? "text-blue-500" : "text-blue-600"}`}>
-                          ₱{(item.price * item.quantity).toLocaleString()}
-                        </span>
-                      </div>
-
-                      {/* SPECIAL INSTRUCTIONS (Kung meron) */}
-                      {item.itemInstruction && (
-                        <div className="px-3 py-1 mt-1 border-l-2 rounded-r-lg bg-rose-500/5 border-rose-500/50">
-                          <p className="text-[10px] text-rose-500 font-bold italic leading-tight uppercase">
-                            ** {item.itemInstruction}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
+      <AnimatePresence>
+        {summaryCart && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[380] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              className={`w-full max-w-sm overflow-hidden rounded-[2rem] shadow-2xl transition-colors ${
+                isDark
+                  ? "bg-slate-900 border border-white/10"
+                  : "bg-white border border-slate-200"
+              }`}
+            >
+              {/* ORDER SLIP HEADER */}
+              <div className="p-8 text-center border-b-2 border-dashed border-slate-300/50">
+                <h2
+                  className={`text-2xl font-black uppercase tracking-tighter ${isDark ? "text-white" : "text-slate-900"}`}
+                >
+                  Order Summary
+                </h2>
+                <div
+                  className={`mt-4 py-2 border-y border-slate-100/10 font-mono text-base font-bold ${isDark ? "text-slate-300" : "text-slate-700"}`}
+                >
+                  TABLE: {tableselected}
+                </div>
               </div>
-            ))}
-          </div>
 
-          {/* TOTAL AREA */}
-          <div className="pt-6 mt-6 border-t-4 border-double border-slate-300/50">
-            <div className="flex items-center justify-between opacity-60">
-              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">TOTAL ITEMS:</span>
-              <span className={`text-sm font-black ${isDark ? "text-slate-300" : "text-slate-700"}`}>{totalItems}</span>
-            </div>
-            <div className="flex items-center justify-between mt-2">
-              <span className={`text-lg font-black ${isDark ? "text-white" : "text-slate-900"}`}>AMOUNT DUE:</span>
-              <span className="text-2xl font-black tracking-tighter text-blue-500">₱{totalPrice.toLocaleString()}</span>
-            </div>
-          </div>
-        </div>
+              {/* ITEMS LIST (RECEIPT STYLE) */}
+              <div className="p-8 overflow-y-auto max-h-[50vh] no-scrollbar font-mono">
+                <div className="space-y-6">
+                  {groupedSummaryOrders.map((group) => (
+                    <div key={group.category}>
+                      <p className="text-[10px] font-black text-blue-500 mb-4 uppercase tracking-[0.3em] text-center italic">
+                        -- {group.category} --
+                      </p>
 
-        {/* ACTION BUTTONS */}
-        <div className="flex flex-col gap-3 p-8 pt-0">
-          <button
-            onClick={handleGenerateQR}
-            className="w-full py-5 font-black text-white text-lg transition-all bg-blue-600 shadow-xl rounded-[1.5rem] hover:bg-blue-500 shadow-blue-600/30 active:scale-95 uppercase tracking-widest"
-          >
-            CONFIRM ORDER
-          </button>
-          <button
-            onClick={() => setSummaryCart(false)}
-            className={`w-full py-2 text-[10px] font-black uppercase tracking-[0.3em] transition-all ${
-              isDark ? "text-slate-500 hover:text-white" : "text-slate-400 hover:text-slate-600"
-            }`}
-          >
-            Go Back
-          </button>
-        </div>
-      </motion.div>
-    </motion.div>
-  )}
-</AnimatePresence>
+                      {group.items.map((item, idx) => (
+                        <div key={idx} className="mb-4 last:mb-0">
+                          <div className="flex flex-col gap-1">
+                            {/* ITEM ROW: Quantity, Name, and Total Price */}
+                            <div className="flex items-start justify-between gap-4">
+                              <span
+                                className={`text-base font-black leading-tight uppercase flex-1 ${isDark ? "text-white" : "text-slate-800"}`}
+                              >
+                                {item.quantity}x {item.name}
+                              </span>
+                              <span
+                                className={`text-base font-black shrink-0 ${isDark ? "text-blue-500" : "text-blue-600"}`}
+                              >
+                                ₱{(item.price * item.quantity).toLocaleString()}
+                              </span>
+                            </div>
+
+                            {/* SPECIAL INSTRUCTIONS (Kung meron) */}
+                            {item.itemInstruction && (
+                              <div className="px-3 py-1 mt-1 border-l-2 rounded-r-lg bg-rose-500/5 border-rose-500/50">
+                                <p className="text-[10px] text-rose-500 font-bold italic leading-tight uppercase">
+                                  ** {item.itemInstruction}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+
+                {/* TOTAL AREA */}
+                <div className="pt-6 mt-6 border-t-4 border-double border-slate-300/50">
+                  <div className="flex items-center justify-between opacity-60">
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                      TOTAL ITEMS:
+                    </span>
+                    <span
+                      className={`text-sm font-black ${isDark ? "text-slate-300" : "text-slate-700"}`}
+                    >
+                      {totalItems}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <span
+                      className={`text-lg font-black ${isDark ? "text-white" : "text-slate-900"}`}
+                    >
+                      AMOUNT DUE:
+                    </span>
+                    <span className="text-2xl font-black tracking-tighter text-blue-500">
+                      ₱{totalPrice.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* ACTION BUTTONS */}
+              <div className="flex flex-col gap-3 p-8 pt-0">
+                <button
+                  onClick={handleGenerateQR}
+                  className="w-full py-5 font-black text-white text-lg transition-all bg-blue-600 shadow-xl rounded-[1.5rem] hover:bg-blue-500 shadow-blue-600/30 active:scale-95 uppercase tracking-widest"
+                >
+                  CONFIRM ORDER
+                </button>
+                <button
+                  onClick={() => setSummaryCart(false)}
+                  className={`w-full py-2 text-[10px] font-black uppercase tracking-[0.3em] transition-all ${
+                    isDark
+                      ? "text-slate-500 hover:text-white"
+                      : "text-slate-400 hover:text-slate-600"
+                  }`}
+                >
+                  Go Back
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {showSaveSuccessModal && (
@@ -5178,11 +5227,12 @@ const CartList = ({
   openItemInstructionModal,
   showInstructionButton = true,
 }) => (
-  <div className={`flex-1 space-y-3 overflow-y-auto p-4 ${extraClassName}`}>
+  <div className={`flex-1 space-y-2 overflow-y-auto p-4 ${extraClassName}`}>
     {items.length === 0 ? (
       <div className="py-20 text-center">
         <FaShoppingCart
-          className="mx-auto mb-4 text-5xl"
+          size={48}
+          className="mx-auto mb-4"
           style={{ color: "var(--app-muted-text)" }}
         />
         <p className="font-medium" style={{ color: "var(--app-muted-text)" }}>
@@ -5191,17 +5241,21 @@ const CartList = ({
       </div>
     ) : (
       items.map((item, index) => {
+        const lineTotal = Number(item.price) * Number(item.quantity);
+        const isLocked = readOnly || item.hasAdditionalEntry;
+
         return (
           <div
             key={item.lineId || `${item.code}-${index}`}
-            className="p-3 transition-colors border rounded-xl"
+            className="p-2.5 border rounded-xl transition-shadow hover:shadow-sm"
             style={{
               backgroundColor: "var(--app-surface)",
               borderColor: "var(--app-border)",
               color: "var(--app-text)",
             }}
           >
-            <div className="flex items-start justify-between gap-2 mb-2">
+            {/* Name + price share a row, so the total reads right next to what it's for */}
+            <div className="flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
                 <span
                   className="block text-xs font-medium leading-tight"
@@ -5209,40 +5263,30 @@ const CartList = ({
                 >
                   {item.name}
                 </span>
-
-                {item.itemInstruction && (
-                  <p className="mt-1 break-words text-[10px] text-amber-500">
-                    Note: {item.itemInstruction}
-                  </p>
-                )}
+                <span
+                  className="block mt-0.5 text-xs"
+                  style={{ color: "var(--app-muted-text)" }}
+                >
+                  ₱{Number(item.price).toLocaleString()} each
+                </span>
               </div>
 
-              {!readOnly && (
-                <div className="flex items-center gap-3 shrink-0">
-                  {showInstructionButton && (
-                    <button
-                      onClick={() => openItemInstructionModal?.(item)}
-                      className="p-2 transition-colors"
-                      style={{ color: "var(--app-muted-text)" }}
-                      title="Add instruction"
-                    >
-                      <FaEdit size={18} />
-                    </button>
-                  )}
-
-                  <button
-                    onClick={() => removeItem?.(item.lineId, item)}
-                    className="p-2 transition-colors"
-                    style={{ color: "var(--app-muted-text)" }}
-                  >
-                    <FaTrash size={18} />
-                  </button>
-                </div>
-              )}
+              <span
+                className="text-sm font-bold whitespace-nowrap shrink-0"
+                style={{ color: "var(--app-accent)" }}
+              >
+                ₱{lineTotal.toLocaleString()}
+              </span>
             </div>
 
-            <div className="flex items-center justify-between">
-              {readOnly || item.hasAdditionalEntry ? (
+            {item.itemInstruction && (
+              <p className="mt-1.5 break-words text-xs text-amber-500">
+                Note: {item.itemInstruction}
+              </p>
+            )}
+
+            <div className="flex items-center justify-between mt-2">
+              {isLocked ? (
                 <div
                   className="text-xs font-bold"
                   style={{ color: "var(--app-muted-text)" }}
@@ -5255,7 +5299,7 @@ const CartList = ({
                 </div>
               ) : (
                 <div
-                  className="flex items-center gap-2 p-1 transition-colors border rounded-lg"
+                  className="flex items-center gap-1 p-1 border rounded-lg"
                   style={{
                     backgroundColor: "var(--app-surface-soft)",
                     borderColor: "var(--app-border)",
@@ -5263,22 +5307,17 @@ const CartList = ({
                 >
                   <button
                     onClick={() => updateQuantity?.(item.lineId, -1, item)}
-                    className="flex items-center justify-center transition-colors rounded-md h-7 w-7"
+                    aria-label="Decrease quantity"
+                    className="flex items-center justify-center rounded-md h-7 w-7 transition hover:opacity-70"
                     style={{
                       color: "var(--app-text)",
                       backgroundColor: "var(--app-surface)",
                       border: "1px solid var(--app-border)",
                     }}
                   >
-                    <FaMinus size={8} />
+                    <FaMinus size={10} />
                   </button>
 
-                  <span
-                    className="text-xs"
-                    style={{ color: "var(--app-muted-text)" }}
-                  >
-                    Qty
-                  </span>
                   <input
                     type="number"
                     min="0.01"
@@ -5287,11 +5326,7 @@ const CartList = ({
                     value={item.quantity}
                     onFocus={(e) => e.target.select()}
                     onChange={(e) =>
-                      updateQuantityByInput?.(
-                        item.lineId,
-                        e.target.value,
-                        item,
-                      )
+                      updateQuantityByInput?.(item.lineId, e.target.value, item)
                     }
                     onBlur={(e) => {
                       const value = e.target.value.trim();
@@ -5303,34 +5338,50 @@ const CartList = ({
                         updateQuantityByInput?.(item.lineId, "1", item);
                       }
                     }}
-                    className="w-20 px-2 py-1.5 text-sm font-bold text-center transition-colors rounded-lg outline-none"
-                    style={{
-                      backgroundColor: "var(--app-surface)",
-                      border: "1px solid var(--app-border)",
-                      color: "var(--app-text)",
-                    }}
+                    className="w-11 py-1 text-sm font-bold text-center bg-transparent outline-none"
+                    style={{ color: "var(--app-text)" }}
                   />
 
                   <button
                     onClick={() => updateQuantity?.(item.lineId, 1, item)}
-                    className="flex items-center justify-center transition-colors rounded-md h-7 w-7"
+                    aria-label="Increase quantity"
+                    className="flex items-center justify-center rounded-md h-7 w-7 transition hover:opacity-70"
                     style={{
                       color: "var(--app-text)",
                       backgroundColor: "var(--app-surface)",
                       border: "1px solid var(--app-border)",
                     }}
                   >
-                    <FaPlus size={8} />
+                    <FaPlus size={10} />
                   </button>
                 </div>
               )}
 
-              <span
-                className="text-sm font-bold"
-                style={{ color: "var(--app-accent)" }}
-              >
-                ₱{(Number(item.price) * Number(item.quantity)).toLocaleString()}
-              </span>
+              {!readOnly && (
+                <div className="flex items-center gap-1 shrink-0">
+                  {showInstructionButton && (
+                    <button
+                      onClick={() => openItemInstructionModal?.(item)}
+                      aria-label="Add instruction"
+                      title="Add instruction"
+                      className="p-2 rounded-md transition hover:opacity-70"
+                      style={{ color: "var(--app-muted-text)" }}
+                    >
+                      <FaEdit size={18} />
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => removeItem?.(item.lineId, item)}
+                    aria-label="Remove item"
+                    title="Remove item"
+                    className="p-2 rounded-md transition hover:text-red-500"
+                    style={{ color: "var(--app-muted-text)" }}
+                  >
+                    <FaTrash size={15} />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         );
