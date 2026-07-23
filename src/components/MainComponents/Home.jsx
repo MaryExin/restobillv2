@@ -7,10 +7,12 @@ import Background from "../../assets/background.png";
 import Ordering from "../../assets/Ordering.jpg";
 import Billing from "../../assets/Billing.jpg";
 import { useTheme } from "../../context/ThemeContext";
+import useBillingEnabled from "../../hooks/useBillingEnabled";
 
 const Home = () => {
   const navigate = useNavigate();
   const { isDark } = useTheme();
+  const billingEnabled = useBillingEnabled();
 
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [dashboardPassword, setDashboardPassword] = useState("");
@@ -62,7 +64,7 @@ const Home = () => {
       icon: <FaChartPie className="text-2xl mb-4" />,
       color: isDark ? "from-indigo-600/80" : "from-indigo-500/70",
     },
-  ];
+  ].filter((item) => item.id !== "billing" || billingEnabled);
 
   const handleCardClick = (item) => {
     if (item.id === "salesdashboard") {

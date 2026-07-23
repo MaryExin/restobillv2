@@ -29,6 +29,8 @@ import PosQuickActionTile from "../MainComponents/Common/PosQuickActionTile";
 
 import useZustandLoginCred from "../../context/useZustandLoginCred";
 import useApiHost from "../../hooks/useApiHost";
+import useBillingEnabled from "../../hooks/useBillingEnabled";
+import useVersionLabel from "../../hooks/useVersionLabel";
 import { useTheme } from "../../context/ThemeContext";
 import useZustandLayoutMode from "../../context/useZustandLayoutMode";
 
@@ -91,6 +93,8 @@ const LayoutPos = ({ children }) => {
   const apiHost = useApiHost();
   const { theme, isDark, themeSettings } = useTheme();
   const { layoutMode } = useZustandLayoutMode();
+  const billingEnabled = useBillingEnabled();
+  const versionLabel = useVersionLabel();
 
   const brandPrimary = isDark
     ? themeSettings?.Dark_Primary || "#2563eb"
@@ -175,7 +179,7 @@ const LayoutPos = ({ children }) => {
   const branchInfo = useMemo(() => {
     return {
       title: "Point of Sales",
-      subtitle: "Restaurant (Version: 1.0.1-1) Offline",
+      subtitle: `${versionLabel} Offline`,
       branch: dateselection?.Unit_Name || "N/A",
       userName: dateselection?.userName || "Guest",
       userRole: dateselection?.userRole || "User",
@@ -199,7 +203,7 @@ const LayoutPos = ({ children }) => {
         localStorage.getItem("posCorpName") ||
         "N/A",
     };
-  }, [dateselection]);
+  }, [dateselection, versionLabel]);
 
   const isClosed = branchInfo.shiftStatus?.toLowerCase() !== "open";
 
@@ -315,7 +319,7 @@ const LayoutPos = ({ children }) => {
         }}
       />
 
-      {layoutMode !== "Kiosk" && (
+      {layoutMode !== "Kiosk" && billingEnabled && (
         <PosQuickActionTile
           label="Billing"
           icon={<FaReceipt className="text-[28px] sm:text-[30px]" />}

@@ -4,12 +4,12 @@ import useZustandLoginCred from "../../context/useZustandLoginCred";
 import useCustomQuery from "../../hooks/useCustomQuery";
 import { colorSchemes } from "../../constants/ColorSchemes";
 import useZustandLayoutMode from "../../context/useZustandLayoutMode";
+import useVersionLabel from "../../hooks/useVersionLabel";
 
 import "../../fonts/font-style.css";
 
-const branchInfo = {
+const branchInfoBase = {
   title: "Point of Sales",
-  subtitle: "Restaurant (Version: 1.0.1-1) Offline",
   branch: "CNC - STA MARIA",
   userName: "Supervisor Admin",
   userRole: "Manager",
@@ -25,6 +25,11 @@ const branchInfo = {
 const PosHomeScreenComponent = () => {
   const { userId } = useZustandLoginCred();
   const { layoutMode } = useZustandLayoutMode();
+  const versionLabel = useVersionLabel();
+  const branchInfo = {
+    ...branchInfoBase,
+    subtitle: `${versionLabel} Offline`,
+  };
 
   const { data: userSelectedTheme } = useCustomQuery(
     localStorage.getItem("apiendpoint") +

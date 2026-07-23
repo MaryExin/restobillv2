@@ -5,10 +5,12 @@ import useZustandLoginCred from "../../context/useZustandLoginCred";
 import { colorSchemes } from "../../constants/ColorSchemes";
 import "../../fonts/font-style.css";
 import useApiHost from "../../hooks/useApiHost";
+import useVersionLabel from "../../hooks/useVersionLabel";
 
 const PosHomeScreenComponent = () => {
   const { userId } = useZustandLoginCred();
   const apiHost = useApiHost();
+  const versionLabel = useVersionLabel();
 
   const [dateselection, setDateSelection] = useState(null);
   const [userSelectedTheme, setUserSelectedTheme] = useState([]);
@@ -69,7 +71,7 @@ const PosHomeScreenComponent = () => {
 
     return {
       title: "Point of Sales",
-      subtitle: "Restaurant (Version: 1.0.1-1) Offline",
+      subtitle: `${versionLabel} Offline`,
       branch: dateselection?.Unit_Name || "N/A",
       userName: dateselection?.userName || "Guest",
       userRole: dateselection?.userRole || "User",
@@ -87,7 +89,7 @@ const PosHomeScreenComponent = () => {
           : "N/A",
       closedBy: dateselection?.closed_by_name || "N/A",
     };
-  }, [dateselection]);
+  }, [dateselection, versionLabel]);
 
   // Theme apply logic
   useEffect(() => {

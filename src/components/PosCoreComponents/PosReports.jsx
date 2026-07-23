@@ -18,6 +18,7 @@ import {
   FaCalendarAlt,
   FaTable,
   FaCalendarCheck,
+  FaBook,
 } from "react-icons/fa";
 import { useTheme } from "../../context/ThemeContext";
 import useApiHost from "../../hooks/useApiHost";
@@ -39,6 +40,7 @@ import ZReadingMonthlyView from "../MainComponents/ReportsModal/ZReadingMonthlyV
 import PricingDashboard from "../MainComponents/ReportsModal/PricingDashboard";
 import MonthlySalesModal from "../MainComponents/ReportsModal/MonthlySalesModal";
 import SalesPerItemPerDateModal from "../MainComponents/ReportsModal/SalesPerItemPerDateModal";
+import EJournalReportModal from "../MainComponents/ReportsModal/EJournalReportModal";
 
 const MenuCard = ({
   icon: Icon,
@@ -114,6 +116,8 @@ const PosReports = ({
   const [isLoadingZReading, setIsLoadingZReading] = useState(false);
   const [zReadingMonthlyData, setZReadingMonthlyData] = useState(null);
   const [isLoadingZReadingMonthly, setIsLoadingZReadingMonthly] = useState(false);
+  const [eJournalData, setEJournalData] = useState(null);
+  const [isLoadingEJournal, setIsLoadingEJournal] = useState(false);
   const apiHost = useApiHost();
 
   // Authentication check for Price Change button
@@ -214,6 +218,66 @@ const PosReports = ({
     }
   };
 
+  const handleEJournalClick = () => {
+    setActiveModal("ejournal");
+    setEJournalData(null);
+  };
+
+  const handleFilterEJournal = async ({
+    dateFrom,
+    dateTo,
+    transactionId,
+    invoiceNo,
+    refundNo,
+    voidNo,
+  }) => {
+    try {
+      const hasIdSearch = transactionId || invoiceNo || refundNo || voidNo;
+
+      if (!hasIdSearch && (!dateFrom || !dateTo)) {
+        alert(
+          "Please select both Date From and Date To, or search by Transaction ID / Invoice Number / Refund Number / Void Number.",
+        );
+        return;
+      }
+
+      setIsLoadingEJournal(true);
+      setEJournalData(null);
+
+      const res = await fetch(`${apiHost}/api/e_journal_report.php`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          dateFrom,
+          dateTo,
+          transactionId,
+          invoiceNo,
+          refundNo,
+          voidNo,
+          categoryCode: localStorage.getItem("posBusinessCategoryCode") || "",
+          unitCode: localStorage.getItem("posBusinessUnitCode") || "",
+          terminalNumber: localStorage.getItem("posTerminalNumber") || "1",
+        }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok || !json.success) {
+        throw new Error(json.message || "Failed to load E-Journal report.");
+      }
+
+      setEJournalData(json.data || []);
+    } catch (error) {
+      console.error("E-Journal report error:", error);
+      alert(error.message || "Failed to load E-Journal report.");
+      setEJournalData(null);
+    } finally {
+      setIsLoadingEJournal(false);
+    }
+  };
+
   // Standard report items
   const reportItems = [
     {
@@ -306,6 +370,12 @@ const PosReports = ({
       icon: FaTable,
       color: "#0d9488",
       action: () => setActiveModal("salesPerItemPerDate"),
+    },
+    {
+      label: "E-Journal Report",
+      icon: FaBook,
+      color: "#475569",
+      action: handleEJournalClick,
     },
   ];
 
@@ -434,6 +504,18 @@ const PosReports = ({
         reportData={zReadingMonthlyData}
         isLoading={isLoadingZReadingMonthly}
         onFilter={handleFilterZReadingMonthly}
+      />
+
+      <EJournalReportModal
+        isOpen={activeModal === "ejournal"}
+        onClose={() => {
+          setActiveModal(null);
+          setEJournalData(null);
+          setIsLoadingEJournal(false);
+        }}
+        reportData={eJournalData}
+        isLoading={isLoadingEJournal}
+        onFilter={handleFilterEJournal}
       />
 
       <RefundsModal

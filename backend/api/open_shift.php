@@ -224,6 +224,27 @@ try {
 
     /*
     |--------------------------------------------------------------------------
+    | Check Pending Sync (closed shifts not yet synced)
+    |--------------------------------------------------------------------------
+    */
+    $sqlCheckPendingSync = "
+        SELECT COUNT(*)
+        FROM tbl_pos_shifting_records
+        WHERE Unit_Code = ?
+          AND terminal_number = ?
+          AND Shift_Status = 'Closed'
+          AND (Remarks IS NULL OR Remarks <> 'Synced')
+        FOR UPDATE
+    ";
+    $stmtCheckPendingSync = $pdo->prepare($sqlCheckPendingSync);
+    $stmtCheckPendingSync->execute([$unit_code, $terminal_number]);
+
+    if ((int)$stmtCheckPendingSync->fetchColumn() > 0) {
+        throw new Exception("There is a closed shift pending sync. Please sync offline sales before opening a new day.");
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | Check Duplicate Date Record
     |--------------------------------------------------------------------------
     */

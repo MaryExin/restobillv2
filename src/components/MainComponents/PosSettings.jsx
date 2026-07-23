@@ -27,11 +27,13 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "../../context/ThemeContext";
 import { useNavigate } from "react-router-dom";
+import useCurrentUserPermissions from "../../hooks/useCurrentUserPermissions";
 
 // Import Components
 import PosMyAccount from "./PosSettingsModal/PosMyAccount";
 import PosAppearance from "./PosSettingsModal/PosAppearance";
 import PosUserAccounts from "./PosSettingsModal/PosUserAccounts";
+import PosUserRoles from "./PosSettingsModal/PosUserRoles";
 import PosSystemLogs from "./PosSettingsModal/PosSystemLogs";
 import PosExpenses from "./PosSettingsModal/PosExpenses";
 import PosReportingModal from "./PosSettingsModal/PosReportingModal";
@@ -62,6 +64,7 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
   const isDark = theme === "dark";
+  const { permissions: userPermissions } = useCurrentUserPermissions();
 
   const adaptivePalette = [
     { name: "Crimson", light: "#ef4444", dark: "#fca5a5" },
@@ -74,6 +77,7 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
   const [selectedColorObj, setSelectedColorObj] = useState(adaptivePalette[1]);
   const [activeTab, setActiveTab] = useState("My Account");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [deniedTab, setDeniedTab] = useState(null);
 
   // ── Password gate for protected tabs ──────────────────────────────────────
   const [pendingTab, setPendingTab]   = useState(null);
@@ -85,6 +89,7 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
     if (isOpen) {
       setActiveTab("My Account");
       setIsMobileMenuOpen(false);
+      setDeniedTab(null);
     }
   }, [isOpen]);
 
@@ -98,9 +103,9 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
 
   const navItems = [
     { id: "My Account", icon: FiUser },
-    { id: "User Accounts", icon: FiUsers, route: "/employeeinfo" },
+    { id: "User Accounts", icon: FiUsers },
     { id: "User Approval", icon: FiUsers, route: "/usersqueu" },
-    { id: "User Roles", icon: FiShield, route: "/userroles" },
+    { id: "User Roles", icon: FiShield },
     { id: "Registry Sales", icon: FiTrendingUp },
     { id: "Expenses & Petty", icon: FiCreditCard },
     { id: "Mode of Payment", icon: FiCreditCard },
@@ -127,6 +132,35 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
     String(localStorage.getItem("username") || "").trim().toLowerCase() ===
     UNGATED_USERNAME;
 
+  // Per-user function permissions (tbl_pos_user_permissions, set from the
+  // User Roles tab). Tabs stay visible either way -- this only decides
+  // whether clicking one opens the real content or the Oops screen.
+  const canAccessTab = (navId) => {
+    if (isUngatedUser) return true;
+    if (navId === "My Account") return true;
+
+    // Fallback lock: only applies when the user has no broader Settings
+    // access. If open_settings is granted, it wins even alongside this flag.
+    if (
+      userPermissions.settings_my_account_only &&
+      !userPermissions.open_settings
+    ) {
+      return false;
+    }
+
+    if (navId === "User Accounts" || navId === "User Roles") {
+      return Boolean(
+        userPermissions.create_user || userPermissions.edit_delete_user,
+      );
+    }
+
+    if (navId === "Email Reports") {
+      return Boolean(userPermissions.view_reports);
+    }
+
+    return Boolean(userPermissions.open_settings);
+  };
+
   const handleNavClick = (nav) => {
     if (nav.route) {
       onClose?.();
@@ -134,6 +168,15 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
       navigate(nav.route);
       return;
     }
+
+    if (!canAccessTab(nav.id)) {
+      setDeniedTab(nav.id);
+      setActiveTab(nav.id);
+      setIsMobileMenuOpen(false);
+      return;
+    }
+
+    setDeniedTab(null);
 
     if (PROTECTED_TABS.has(nav.id) && !isUngatedUser) {
       setPendingTab(nav.id);
@@ -159,6 +202,33 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
   };
 
   const ActiveContent = () => {
+    if (deniedTab === activeTab) {
+      return (
+        <div className="flex flex-col items-center justify-center gap-5 py-16 text-center">
+          <div className="flex items-center justify-center w-20 h-20 bg-blue-50 rounded-[1.5rem]">
+            <FiSlash size={44} className="text-blue-600" />
+          </div>
+          <h2 className="text-2xl font-black text-slate-900">Oops!</h2>
+          <p className="max-w-sm text-sm leading-relaxed text-slate-600">
+            You don't have access to{" "}
+            <code className="font-bold text-slate-800">
+              /{activeTab?.toLowerCase().replace(/\s+/g, "")}
+            </code>
+            .
+          </p>
+          <button
+            onClick={() => {
+              setDeniedTab(null);
+              setActiveTab("My Account");
+            }}
+            className="px-8 py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-black text-sm transition"
+          >
+            Take Me Home
+          </button>
+        </div>
+      );
+    }
+
     if (activeTab === "My Account") {
       return (
         <PosMyAccount
@@ -172,6 +242,16 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
     if (activeTab === "User Accounts") {
       return (
         <PosUserAccounts
+          isDark={isDark}
+          accent={accentColor}
+          getContrastText={getContrastText}
+        />
+      );
+    }
+
+    if (activeTab === "User Roles") {
+      return (
+        <PosUserRoles
           isDark={isDark}
           accent={accentColor}
           getContrastText={getContrastText}

@@ -16,12 +16,18 @@ import {
 } from "react-icons/fa";
 import { motion, AnimatePresence } from "framer-motion";
 import useApiHost from "../../hooks/useApiHost";
+import useBillingEnabled from "../../hooks/useBillingEnabled";
 import { useTheme } from "../../context/ThemeContext";
 
 const PrintBilling = () => {
   const { themeSettings } = useTheme();
   const navigate = useNavigate();
+  const billingEnabled = useBillingEnabled();
   const dateInputRef = useRef(null);
+
+  useEffect(() => {
+    if (!billingEnabled) navigate("/", { replace: true });
+  }, [billingEnabled, navigate]);
 
   const [dateFrom, setDateFrom] = useState("");
   const [originalTableList, setOriginalTableList] = useState([]);

@@ -13,6 +13,7 @@ import ModalAttemp from "../Modals/ModalAttemp";
 import useZustandLoginCred from "../../context/useZustandLoginCred";
 import useLoginAttempts from "../../context/useLoginAttempts ";
 import { useTheme } from "../../context/ThemeContext";
+import useVersionLabel from "../../hooks/useVersionLabel";
 
 const FALLBACK_RIGHT_IMAGE = ".//login-visual.png";
 
@@ -70,6 +71,7 @@ const PosLoginComponent = () => {
   const apiHost = useApiHost();
 
   const { isThemeLoading, themeSettings } = useTheme();
+  const versionLabel = useVersionLabel();
 
   const {
     toggleAuthToTrue,
@@ -462,7 +464,7 @@ const PosLoginComponent = () => {
                   className="mt-12 text-center text-[15px] font-semibold sm:mt-16"
                   style={{ color: "var(--app-muted-text)" }}
                 >
-                  Restaurant (Version: 1.0.1-1)
+                  {versionLabel}
                 </div>
               </div>
             </section>
