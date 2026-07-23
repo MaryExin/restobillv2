@@ -43,6 +43,7 @@ import {
   BuildOrderReceiptHtml,
 } from "../../utils/BuildOrderlistPrintHtml";
 import useGetDefaultPrinter from "../../hooks/useGetDefaultPrinter";
+import useBillingEnabled from "../../hooks/useBillingEnabled";
 import useZustandLayoutMode from "../../context/useZustandLayoutMode";
 import KioskRightPanel from "./KioskRightPanel";
 import RetailEmptyState from "./PosRetailComponents/RetailEmptyState";
@@ -71,6 +72,7 @@ const Orderlist = ({
   onOrderSaved,
 }) => {
   const defaultPrinterName = useGetDefaultPrinter();
+  const billingEnabled = useBillingEnabled();
   const { layoutMode } = useZustandLayoutMode();
   // "Restaurant Version 2" is the stored id behind the "Retail POS" layout option.
   const isRetailPosMode = layoutMode === "Restaurant Version 2";
@@ -3182,7 +3184,7 @@ const Orderlist = ({
             </div>
 
             <div className="flex items-center gap-2">
-              {transactionId && layoutMode !== "Kiosk" && (
+              {transactionId && layoutMode !== "Kiosk" && billingEnabled && (
                 <button
                   onClick={openBillingModal}
                   className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-gray-100 rounded-xl "
