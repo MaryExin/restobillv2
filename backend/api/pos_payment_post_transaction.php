@@ -11,6 +11,7 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
 date_default_timezone_set("Asia/Manila");
 
 require __DIR__ . "/pdo.php";
+require_once __DIR__ . "/pos_report_mirror.php";
 
 function normalizeDiscountType($value)
 {
@@ -1012,6 +1013,8 @@ try {
     $finalTxn = $stmtFinal->fetch(PDO::FETCH_ASSOC);
 
     $savedInvoiceNo = (int)($finalTxn['invoice_no'] ?? 0);
+
+    mirrorPosTransactionToReport($pdo, $config, (string)$transaction_id, $Category_Code, $Unit_Code);
 
     $pdo->commit();
 

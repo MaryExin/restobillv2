@@ -190,6 +190,8 @@ const PosLoginComponent = () => {
         const nextUsername = result.username || "";
         const nextEmail = result.email || "";
         const nextProfilePic = result.profile_pic || "";
+        const nextReadingDatabaseScope =
+          result.reading_database_scope === "report" ? "report" : "cnc";
 
         let nextRole = result.userrole || "";
         if (Array.isArray(nextRole)) {
@@ -214,6 +216,10 @@ const PosLoginComponent = () => {
             : nextRole,
         );
         localStorage.setItem("profile_pic", nextProfilePic);
+        localStorage.setItem(
+          "posReadingDatabaseScope",
+          nextReadingDatabaseScope,
+        );
 
         toggleAuthToTrue();
         toggleFirstName(nextUsername);

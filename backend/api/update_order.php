@@ -11,6 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 $config = require __DIR__ . "/config.php";
+require_once __DIR__ . "/pos_report_mirror.php";
 
 $conn = new mysqli(
     $config["host"],
@@ -379,12 +380,25 @@ try {
         throw new Exception("Commit failed: " . $conn->error);
     }
 
+    $reportMirrorWarning = "";
+    try {
+        $dsn = "mysql:host={$config['host']};dbname={$config['db']};charset={$config['charset']}";
+        $mirrorPdo = new PDO($dsn, $config["user"], $config["pass"], [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        ]);
+        mirrorPosTransactionToReport($mirrorPdo, $config, (string)$transaction_id, $Category_Code, $Unit_Code);
+    } catch (Throwable $mirrorError) {
+        $reportMirrorWarning = $mirrorError->getMessage();
+    }
+
     echo json_encode([
         "status" => "success",
         "message" => "Transaction updated successfully",
         "transaction_id" => $transaction_id,
         "order_slip_no" => $order_slip_no,
-        "total_amount" => $totalAmount
+        "total_amount" => $totalAmount,
+        "report_mirror_warning" => $reportMirrorWarning
     ]);
 } catch (Throwable $e) {
     try {

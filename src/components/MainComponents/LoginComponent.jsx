@@ -310,6 +310,10 @@ const LoginComponent = () => {
           localStorage.setItem("apiendpoint", endpoint);
           localStorage.setItem("companycode", companyCode);
           localStorage.setItem("isFirstTimeLogin", logInData.isFirsTimeLogin);
+          localStorage.setItem(
+            "posReadingDatabaseScope",
+            logInData.reading_database_scope === "report" ? "report" : "cnc",
+          );
           toggleAuthToTrue();
           toggleFirstName(logInData.username);
           updateUserRole(logInData.userrole);

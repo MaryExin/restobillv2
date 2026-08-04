@@ -13,9 +13,47 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
 
 $config = require __DIR__ . "/config.php";
 
+function requireMysqlIdentifier($value, string $label): string
+{
+    $identifier = trim((string)$value);
+
+    if ($identifier === "" || !preg_match('/^[A-Za-z0-9_]+$/', $identifier)) {
+        throw new InvalidArgumentException("Invalid {$label} configured.");
+    }
+
+    return $identifier;
+}
+
+function resolveReadingDatabaseName(array $input, string $posDbName, string $reportDbName): array
+{
+    $scope = strtolower(trim((string)(
+        $input["readingDatabaseScope"] ??
+        $input["reading_database_scope"] ??
+        "cnc"
+    )));
+
+    if ($scope === "report") {
+        return [$reportDbName, "report"];
+    }
+
+    return [$posDbName, "cnc"];
+}
+
 try {
+    $raw = file_get_contents("php://input");
+    $input = json_decode($raw, true);
+
+    if (!$input || !is_array($input)) {
+        $input = $_POST;
+    }
+
+    $posDbName = requireMysqlIdentifier($config["db"] ?? "db_cnc_pos", "POS database name");
+    $reportDbName = requireMysqlIdentifier($config["report_db"] ?? "reports_database", "report database name");
+    $charset = requireMysqlIdentifier($config["charset"] ?? "utf8mb4", "database charset");
+    [$readingDbName, $readingDatabaseScope] = resolveReadingDatabaseName($input, $posDbName, $reportDbName);
+
     $pdo = new PDO(
-        "mysql:host={$config['host']};dbname={$config['db']};charset=utf8mb4",
+        "mysql:host={$config['host']};dbname={$readingDbName};charset={$charset}",
         $config["user"],
         $config["pass"],
         [
@@ -23,13 +61,6 @@ try {
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
         ]
     );
-
-    $raw = file_get_contents("php://input");
-    $input = json_decode($raw, true);
-
-    if (!$input || !is_array($input)) {
-        $input = $_POST;
-    }
 
     $selectedCashier = isset($input["selectedCashier"])
         ? trim((string)$input["selectedCashier"])
@@ -642,6 +673,8 @@ try {
     try {
         $valuesOfData = json_encode([
             "selected_cashier" => $selectedCashier,
+            "reading_database_scope" => $readingDatabaseScope,
+            "reading_database" => $readingDbName,
             "terminal_number" => $terminalNumber,
             "report_date" => $reportDate,
             "opening_fund" => $parOpeningFund,
@@ -765,6 +798,8 @@ try {
         "data" => [
             "reportDate" => $parReportDate,
             "reportTime" => $parReportTime,
+            "readingDatabaseScope" => $readingDatabaseScope,
+            "readingDatabase" => $readingDbName,
             "startDateTime" => $parStartDateTime,
             "endDateTime" => $parEndDateTime,
             "cashier" => $selectedCashier,

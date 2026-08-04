@@ -13,6 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 require __DIR__ . "/bootstrap.php";
+require_once __DIR__ . "/pos_report_mirror.php";
 
 date_default_timezone_set('Asia/Manila');
 
@@ -445,6 +446,8 @@ try {
         ":Log_Date" => $Log_Date,
         ":Log_Time" => $Log_Time
     ]);
+
+    mirrorPosTransactionToReport($pdo, $config, (string)$transaction_id, $Category_Code, $Unit_Code);
 
     $pdo->commit();
     $manualTransactionStarted = false;

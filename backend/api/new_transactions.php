@@ -15,6 +15,7 @@ date_default_timezone_set("Asia/Manila");
     1. LOAD CONFIG & DB
 ------------------------------ */
 $config = require __DIR__ . "/config.php";
+require_once __DIR__ . "/pos_report_mirror.php";
 
 try {
     $dsn = "mysql:host={$config['host']};dbname={$config['db']};charset={$config['charset']}";
@@ -41,6 +42,9 @@ $user_id = $input['user_id'] ?? 0;
     3. FETCH DATA
 ------------------------------ */
 try {
+    $reportMirrorSynced = 0;
+    $reportMirrorWarning = "";
+
     /* ------------------------------
         4. FETCH BUSINESS CODES
     ------------------------------ */
@@ -129,6 +133,12 @@ try {
     $stmt_cats->execute();
     $item_categories = $stmt_cats->fetchAll();
 
+    try {
+        $reportMirrorSynced = mirrorRecentPosTransactionsToReport($pdo, $config, 200);
+    } catch (Throwable $mirrorError) {
+        $reportMirrorWarning = $mirrorError->getMessage();
+    }
+
     /* ------------------------------
         8. RESPONSE
     ------------------------------ */
@@ -137,7 +147,9 @@ try {
         "business_info" => $codes ?: [],
         "inventory_types" => $inventory_types,
         "sales_types" => $sales_types,
-        "item_categories" => $item_categories
+        "item_categories" => $item_categories,
+        "report_mirror_synced" => $reportMirrorSynced,
+        "report_mirror_warning" => $reportMirrorWarning
     ]);
 
 } catch (Exception $e) {

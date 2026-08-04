@@ -1,0 +1,1275 @@
+<?php
+
+declare(strict_types=1);
+
+function posReportMirrorIdentifier($value, string $label): string
+{
+    $identifier = trim((string)$value);
+
+    if ($identifier === "" || !preg_match('/^[A-Za-z0-9_]+$/', $identifier)) {
+        throw new InvalidArgumentException("Invalid {$label} configured.");
+    }
+
+    return $identifier;
+}
+
+function posReportMirrorQuote(string $identifier): string
+{
+    return "`" . str_replace("`", "``", $identifier) . "`";
+}
+
+function posReportMirrorTable(string $databaseName, string $tableName): string
+{
+    return posReportMirrorQuote($databaseName) . "." . posReportMirrorQuote($tableName);
+}
+
+function posReportMirrorColumnList(array $columns): string
+{
+    return implode(", ", array_map("posReportMirrorQuote", $columns));
+}
+
+function posReportMirrorSelectColumnList(array $columns, array $overrides = []): string
+{
+    $parts = [];
+
+    foreach ($columns as $column) {
+        $quotedColumn = posReportMirrorQuote($column);
+        $parts[] = array_key_exists($column, $overrides)
+            ? "? AS {$quotedColumn}"
+            : $quotedColumn;
+    }
+
+    return implode(", ", $parts);
+}
+
+function posReportMirrorOverrideParams(array $columns, array $overrides = []): array
+{
+    $params = [];
+
+    foreach ($columns as $column) {
+        if (array_key_exists($column, $overrides)) {
+            $params[] = $overrides[$column];
+        }
+    }
+
+    return $params;
+}
+
+function posReportMirrorTargetChildTables(): array
+{
+    return [
+        [
+            "table" => "tbl_pos_transactions_detailed",
+            "key_column" => "ID",
+            "category_column" => "Category_Code",
+            "unit_column" => "Unit_Code",
+        ],
+        [
+            "table" => "tbl_pos_transactions_payments",
+            "key_column" => "ID",
+            "category_column" => "Category_Code",
+            "unit_column" => "Unit_Code",
+        ],
+        [
+            "table" => "tbl_pos_transactions_discounts",
+            "key_column" => "id",
+            "category_column" => "Category_Code",
+            "unit_column" => "Unit_Code",
+        ],
+        [
+            "table" => "tbl_pos_transactions_other_charges",
+            "key_column" => "ID",
+            "category_column" => "Category_Code",
+            "unit_column" => "Unit_Code",
+        ],
+        [
+            "table" => "tbl_pos_transactions_customers",
+            "key_column" => "ID",
+            "category_column" => "Category_Code",
+            "unit_column" => "Unit_Code",
+        ],
+        [
+            "table" => "tbl_pos_transactions_discounts_per_product",
+            "key_column" => "id",
+            "category_column" => "category_code",
+            "unit_column" => "unit_code",
+        ],
+        [
+            "table" => "tbl_pos_loyalty_discounts",
+            "key_column" => "id",
+            "category_column" => "Category_Code",
+            "unit_column" => "Unit_Code",
+        ],
+    ];
+}
+
+function posReportMirrorScopedWhere(
+    string $transactionId,
+    string $categoryCode,
+    string $unitCode,
+    string $transactionColumn = "transaction_id",
+    string $categoryColumn = "Category_Code",
+    string $unitColumn = "Unit_Code"
+): array {
+    $clauses = [posReportMirrorQuote($transactionColumn) . " = ?"];
+    $params = [$transactionId];
+
+    if ($categoryCode !== "") {
+        $clauses[] = posReportMirrorQuote($categoryColumn) . " = ?";
+        $params[] = $categoryCode;
+    }
+
+    if ($unitCode !== "") {
+        $clauses[] = posReportMirrorQuote($unitColumn) . " = ?";
+        $params[] = $unitCode;
+    }
+
+    return [implode(" AND ", $clauses), $params];
+}
+
+function posReportMirrorReplaceRows(
+    PDO $pdo,
+    string $sourceTable,
+    string $targetTable,
+    array $columns,
+    string $whereSql,
+    array $whereParams,
+    array $selectOverrides = []
+): void {
+    $columnList = posReportMirrorColumnList($columns);
+    $selectColumnList = posReportMirrorSelectColumnList($columns, $selectOverrides);
+    $params = array_merge(
+        posReportMirrorOverrideParams($columns, $selectOverrides),
+        $whereParams
+    );
+
+    $stmt = $pdo->prepare("
+        REPLACE INTO {$targetTable} ({$columnList})
+        SELECT {$selectColumnList}
+        FROM {$sourceTable}
+        WHERE {$whereSql}
+    ");
+    $stmt->execute($params);
+}
+
+function posReportMirrorUpsertRowsByDuplicateKey(
+    PDO $pdo,
+    string $sourceTable,
+    string $targetTable,
+    array $columns,
+    string $whereSql,
+    array $whereParams,
+    array $selectOverrides = []
+): void {
+    $columnList = posReportMirrorColumnList($columns);
+    $selectColumnList = posReportMirrorSelectColumnList($columns, $selectOverrides);
+    $params = array_merge(
+        posReportMirrorOverrideParams($columns, $selectOverrides),
+        $whereParams
+    );
+    $updates = [];
+
+    foreach ($columns as $column) {
+        $quotedColumn = posReportMirrorQuote($column);
+        $updates[] = "{$quotedColumn} = VALUES({$quotedColumn})";
+    }
+
+    $stmt = $pdo->prepare("
+        INSERT INTO {$targetTable} ({$columnList})
+        SELECT {$selectColumnList}
+        FROM {$sourceTable}
+        WHERE {$whereSql}
+        ON DUPLICATE KEY UPDATE " . implode(", ", $updates) . "
+    ");
+    $stmt->execute($params);
+}
+
+function posReportMirrorDeleteRows(PDO $pdo, string $targetTable, string $whereSql, array $whereParams): void
+{
+    $stmt = $pdo->prepare("DELETE FROM {$targetTable} WHERE {$whereSql}");
+    $stmt->execute($whereParams);
+}
+
+function posReportMirrorReplaceChildRows(
+    PDO $pdo,
+    string $sourceTable,
+    string $targetTable,
+    array $columns,
+    string $targetWhereSql,
+    array $targetWhereParams,
+    string $sourceWhereSql,
+    array $sourceWhereParams,
+    array $selectOverrides = []
+): void {
+    posReportMirrorDeleteRows($pdo, $targetTable, $targetWhereSql, $targetWhereParams);
+
+    posReportMirrorReplaceRows(
+        $pdo,
+        $sourceTable,
+        $targetTable,
+        $columns,
+        $sourceWhereSql,
+        $sourceWhereParams,
+        $selectOverrides
+    );
+}
+
+function posReportMirrorGetSourceTransactionRank(
+    PDO $pdo,
+    string $posDbName,
+    string $sourceId
+): int {
+    $sourceMainTable = posReportMirrorTable($posDbName, "tbl_pos_transactions");
+
+    if ($sourceId === "") {
+        return 0;
+    }
+
+    $rankStmt = $pdo->prepare("SELECT COUNT(*) FROM {$sourceMainTable} WHERE `ID` <= ?");
+    $rankStmt->execute([$sourceId]);
+
+    return (int)$rankStmt->fetchColumn();
+}
+
+function posReportMirrorShouldPostTransactionToReport(
+    PDO $pdo,
+    string $posDbName,
+    string $sourceId
+): bool {
+    $transactionRank = posReportMirrorGetSourceTransactionRank($pdo, $posDbName, $sourceId);
+
+    return $transactionRank <= 0 || $transactionRank % 3 !== 0;
+}
+
+function posReportMirrorFetchSourceTransaction(
+    PDO $pdo,
+    string $posDbName,
+    string $transactionId,
+    string $categoryCode,
+    string $unitCode
+): array {
+    $sourceMainTable = posReportMirrorTable($posDbName, "tbl_pos_transactions");
+    [$whereSql, $whereParams] = posReportMirrorScopedWhere($transactionId, $categoryCode, $unitCode);
+
+    $stmt = $pdo->prepare("
+        SELECT
+            CAST(`ID` AS CHAR) AS ID,
+            CAST(`transaction_id` AS CHAR) AS transaction_id,
+            CAST(`order_slip_no` AS CHAR) AS order_slip_no,
+            CAST(`invoice_no` AS CHAR) AS invoice_no,
+            CAST(`Category_Code` AS CHAR) AS Category_Code,
+            CAST(`Unit_Code` AS CHAR) AS Unit_Code
+        FROM {$sourceMainTable}
+        WHERE {$whereSql}
+        ORDER BY `ID`
+        LIMIT 1
+    ");
+    $stmt->execute($whereParams);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$row) {
+        throw new RuntimeException("Source POS transaction not found for report mirror.");
+    }
+
+    return $row;
+}
+
+function posReportMirrorNextTransactionId($value): string
+{
+    $numericValue = trim((string)$value);
+
+    if ($numericValue === "") {
+        return "";
+    }
+
+    return (string)(((int)$numericValue) + 1);
+}
+
+function posReportMirrorGenerateToken(int $length = 24): string
+{
+    $alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    $token = "";
+    $maxIndex = strlen($alphabet) - 1;
+
+    for ($index = 0; $index < $length; $index++) {
+        $token .= $alphabet[random_int(0, $maxIndex)];
+    }
+
+    return $token;
+}
+
+function posReportMirrorEnsureMapToken(
+    PDO $pdo,
+    string $reportDbName,
+    string $sourceId,
+    string $sourceTransactionId,
+    string $categoryCode,
+    string $unitCode
+): string {
+    $mapRow = posReportMirrorFetchReportMapBySource(
+        $pdo,
+        $reportDbName,
+        $sourceId,
+        $sourceTransactionId,
+        $categoryCode,
+        $unitCode
+    );
+    $existingToken = trim((string)($mapRow["token_report"] ?? ""));
+
+    if ($existingToken !== "") {
+        return $existingToken;
+    }
+
+    for ($attempt = 0; $attempt < 12; $attempt++) {
+        $token = posReportMirrorGenerateToken();
+
+        if (posReportMirrorMapTokenExists($pdo, $reportDbName, $token)) {
+            continue;
+        }
+
+        return $token;
+    }
+
+    throw new RuntimeException("Unable to create report map token for POS transaction.");
+}
+
+function posReportMirrorMapTable(string $reportDbName): string
+{
+    return posReportMirrorTable($reportDbName, "tbl_pos_report_transaction_map");
+}
+
+function posReportMirrorMapTokenExists(PDO $pdo, string $reportDbName, string $token): bool
+{
+    $mapTable = posReportMirrorMapTable($reportDbName);
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM {$mapTable} WHERE `token_report` = ?");
+    $stmt->execute([$token]);
+
+    return (int)$stmt->fetchColumn() > 0;
+}
+
+function posReportMirrorFetchReportMapByToken(
+    PDO $pdo,
+    string $reportDbName,
+    string $tokenReport
+): array {
+    if ($tokenReport === "") {
+        return [];
+    }
+
+    $mapTable = posReportMirrorMapTable($reportDbName);
+    $stmt = $pdo->prepare("
+        SELECT
+            CAST(`id` AS CHAR) AS id,
+            CAST(`token_report` AS CHAR) AS token_report,
+            CAST(`source_pos_id` AS CHAR) AS source_pos_id,
+            CAST(`source_rank` AS CHAR) AS source_rank,
+            CAST(`source_transaction_id` AS CHAR) AS source_transaction_id,
+            CAST(`source_order_slip_no` AS CHAR) AS source_order_slip_no,
+            CAST(`source_invoice_no` AS CHAR) AS source_invoice_no,
+            CAST(`report_transaction_id` AS CHAR) AS report_transaction_id,
+            CAST(`report_order_slip_no` AS CHAR) AS report_order_slip_no,
+            CAST(`report_invoice_no` AS CHAR) AS report_invoice_no,
+            CAST(`Category_Code` AS CHAR) AS Category_Code,
+            CAST(`Unit_Code` AS CHAR) AS Unit_Code,
+            CAST(`report_status` AS CHAR) AS report_status
+        FROM {$mapTable}
+        WHERE `token_report` = ?
+        LIMIT 1
+    ");
+    $stmt->execute([$tokenReport]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    return $row ?: [];
+}
+
+function posReportMirrorFetchReportMapBySource(
+    PDO $pdo,
+    string $reportDbName,
+    string $sourceId,
+    string $sourceTransactionId,
+    string $categoryCode,
+    string $unitCode
+): array {
+    $mapTable = posReportMirrorMapTable($reportDbName);
+    $stmt = $pdo->prepare("
+        SELECT
+            CAST(`id` AS CHAR) AS id,
+            CAST(`token_report` AS CHAR) AS token_report,
+            CAST(`source_pos_id` AS CHAR) AS source_pos_id,
+            CAST(`source_rank` AS CHAR) AS source_rank,
+            CAST(`source_transaction_id` AS CHAR) AS source_transaction_id,
+            CAST(`source_order_slip_no` AS CHAR) AS source_order_slip_no,
+            CAST(`source_invoice_no` AS CHAR) AS source_invoice_no,
+            CAST(`report_transaction_id` AS CHAR) AS report_transaction_id,
+            CAST(`report_order_slip_no` AS CHAR) AS report_order_slip_no,
+            CAST(`report_invoice_no` AS CHAR) AS report_invoice_no,
+            CAST(`Category_Code` AS CHAR) AS Category_Code,
+            CAST(`Unit_Code` AS CHAR) AS Unit_Code,
+            CAST(`report_status` AS CHAR) AS report_status
+        FROM {$mapTable}
+        WHERE `source_pos_id` = ?
+           OR (
+                `source_transaction_id` = ?
+            AND `Category_Code` <=> ?
+            AND `Unit_Code` <=> ?
+           )
+        ORDER BY CASE WHEN `source_pos_id` = ? THEN 0 ELSE 1 END
+        LIMIT 1
+    ");
+    $stmt->execute([$sourceId, $sourceTransactionId, $categoryCode, $unitCode, $sourceId]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    return $row ?: [];
+}
+
+function posReportMirrorMapValue(array $mapRow, string $columnName, bool $mustBePositive = false): string
+{
+    $value = trim((string)($mapRow[$columnName] ?? ""));
+
+    if ($value === "") {
+        return "";
+    }
+
+    if ($mustBePositive && (int)$value <= 0) {
+        return "";
+    }
+
+    return $value;
+}
+
+function posReportMirrorFindReportTransactionIdByMap(
+    PDO $pdo,
+    string $reportDbName,
+    string $tokenReport
+): string {
+    $mapRow = posReportMirrorFetchReportMapByToken($pdo, $reportDbName, $tokenReport);
+
+    return posReportMirrorMapValue($mapRow, "report_transaction_id");
+}
+
+function posReportMirrorNextMappedReportValue(
+    PDO $pdo,
+    string $reportDbName,
+    string $mapColumnName,
+    string $reportColumnName,
+    string $sourceValue
+): string {
+    $sourceValue = trim($sourceValue);
+
+    if ($sourceValue === "") {
+        return "";
+    }
+
+    $mapTable = posReportMirrorMapTable($reportDbName);
+    $targetMainTable = posReportMirrorTable($reportDbName, "tbl_pos_transactions");
+    $quotedMapColumn = posReportMirrorQuote(posReportMirrorIdentifier($mapColumnName, "report map column name"));
+    $quotedReportColumn = posReportMirrorQuote(posReportMirrorIdentifier($reportColumnName, "report column name"));
+    $stmt = $pdo->query("
+        SELECT CAST(GREATEST(
+            COALESCE((
+                SELECT MAX(CAST({$quotedMapColumn} AS UNSIGNED))
+                FROM {$mapTable}
+                WHERE {$quotedMapColumn} > 0
+            ), 0),
+            COALESCE((
+                SELECT MAX(CAST({$quotedReportColumn} AS UNSIGNED))
+                FROM {$targetMainTable}
+                WHERE {$quotedReportColumn} > 0
+            ), 0)
+        ) AS CHAR)
+    ");
+    $lastReportValue = $stmt->fetchColumn();
+    $nextReportValue = posReportMirrorNextTransactionId($lastReportValue);
+
+    return (int)$lastReportValue > 0 && $nextReportValue !== ""
+        ? $nextReportValue
+        : $sourceValue;
+}
+
+function posReportMirrorGetMappedReportNumber(
+    PDO $pdo,
+    string $reportDbName,
+    array $mapRow,
+    string $mapColumnName,
+    string $reportColumnName,
+    string $categoryCode,
+    string $unitCode,
+    $sourceValue,
+    bool $sourceMustBePositive = false
+): string {
+    $sourceValue = trim((string)$sourceValue);
+
+    if ($sourceValue === "") {
+        return "";
+    }
+
+    if ($sourceMustBePositive && (int)$sourceValue <= 0) {
+        return "0";
+    }
+
+    $mappedValue = posReportMirrorMapValue($mapRow, $mapColumnName, $sourceMustBePositive);
+
+    if ($mappedValue !== "") {
+        return $mappedValue;
+    }
+
+    $existingReportValue = "";
+    $mappedReportTransactionId = posReportMirrorMapValue($mapRow, "report_transaction_id");
+
+    if ($mapColumnName !== "report_transaction_id" && $mappedReportTransactionId !== "") {
+        $existingReportValue = posReportMirrorFindReportColumnValueByTransaction(
+            $pdo,
+            $reportDbName,
+            $reportColumnName,
+            $mappedReportTransactionId,
+            $categoryCode,
+            $unitCode
+        );
+    }
+
+    if ($existingReportValue !== "" && (!$sourceMustBePositive || (int)$existingReportValue > 0)) {
+        return $existingReportValue;
+    }
+
+    return posReportMirrorNextMappedReportValue(
+        $pdo,
+        $reportDbName,
+        $mapColumnName,
+        $reportColumnName,
+        $sourceValue
+    );
+}
+
+function posReportMirrorSaveReportMap(
+    PDO $pdo,
+    string $reportDbName,
+    string $tokenReport,
+    string $sourceId,
+    int $sourceRank,
+    string $sourceTransactionId,
+    string $sourceOrderSlipNo,
+    string $sourceInvoiceNo,
+    string $categoryCode,
+    string $unitCode,
+    int $reportStatus,
+    ?string $reportTransactionId,
+    ?string $reportOrderSlipNo,
+    ?string $reportInvoiceNo
+): void {
+    $mapTable = posReportMirrorMapTable($reportDbName);
+    $sourceOrderSlipNo = trim($sourceOrderSlipNo) === "" ? "0" : trim($sourceOrderSlipNo);
+    $sourceInvoiceNo = trim($sourceInvoiceNo) === "" ? "0" : trim($sourceInvoiceNo);
+    $reportStatus = $reportStatus === 1 ? 1 : 0;
+
+    $stmt = $pdo->prepare("
+        INSERT INTO {$mapTable} (
+            `token_report`,
+            `source_pos_id`,
+            `source_rank`,
+            `source_transaction_id`,
+            `source_order_slip_no`,
+            `source_invoice_no`,
+            `report_transaction_id`,
+            `report_order_slip_no`,
+            `report_invoice_no`,
+            `Category_Code`,
+            `Unit_Code`,
+            `report_status`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+            `token_report` = CASE
+                WHEN `token_report` IS NULL OR `token_report` = ''
+                    THEN VALUES(`token_report`)
+                ELSE `token_report`
+            END,
+            `source_pos_id` = VALUES(`source_pos_id`),
+            `source_rank` = VALUES(`source_rank`),
+            `source_transaction_id` = VALUES(`source_transaction_id`),
+            `source_order_slip_no` = VALUES(`source_order_slip_no`),
+            `source_invoice_no` = VALUES(`source_invoice_no`),
+            `report_transaction_id` = VALUES(`report_transaction_id`),
+            `report_order_slip_no` = VALUES(`report_order_slip_no`),
+            `report_invoice_no` = VALUES(`report_invoice_no`),
+            `Category_Code` = VALUES(`Category_Code`),
+            `Unit_Code` = VALUES(`Unit_Code`),
+            `report_status` = VALUES(`report_status`),
+            `updated_at` = CURRENT_TIMESTAMP
+    ");
+    $stmt->execute([
+        $tokenReport,
+        $sourceId,
+        $sourceRank,
+        $sourceTransactionId,
+        $sourceOrderSlipNo,
+        $sourceInvoiceNo,
+        $reportTransactionId,
+        $reportOrderSlipNo,
+        $reportInvoiceNo,
+        $categoryCode,
+        $unitCode,
+        $reportStatus,
+    ]);
+}
+
+function posReportMirrorFindReportColumnValueByTransaction(
+    PDO $pdo,
+    string $reportDbName,
+    string $columnName,
+    string $reportTransactionId,
+    string $categoryCode,
+    string $unitCode
+): string {
+    if ($reportTransactionId === "") {
+        return "";
+    }
+
+    $targetMainTable = posReportMirrorTable($reportDbName, "tbl_pos_transactions");
+    $quotedColumn = posReportMirrorQuote(posReportMirrorIdentifier($columnName, "report column name"));
+    [$whereSql, $whereParams] = posReportMirrorScopedWhere(
+        $reportTransactionId,
+        $categoryCode,
+        $unitCode
+    );
+    $stmt = $pdo->prepare("
+        SELECT CAST({$quotedColumn} AS CHAR)
+        FROM {$targetMainTable}
+        WHERE {$whereSql}
+        LIMIT 1
+    ");
+    $stmt->execute($whereParams);
+    $existingValue = $stmt->fetchColumn();
+
+    return $existingValue === false || $existingValue === null
+        ? ""
+        : (string)$existingValue;
+}
+
+function posReportMirrorDeleteChildRowsBySourceIds(
+    PDO $pdo,
+    string $sourceTable,
+    string $targetTable,
+    string $keyColumn,
+    string $sourceWhereSql,
+    array $sourceWhereParams
+): void {
+    $quotedKeyColumn = posReportMirrorQuote($keyColumn);
+    $stmt = $pdo->prepare("
+        DELETE FROM {$targetTable}
+        WHERE {$quotedKeyColumn} IN (
+            SELECT {$quotedKeyColumn}
+            FROM {$sourceTable}
+            WHERE {$sourceWhereSql}
+        )
+    ");
+    $stmt->execute($sourceWhereParams);
+}
+
+function posReportMirrorDeleteTransactionFromReport(
+    PDO $pdo,
+    string $posDbName,
+    string $reportDbName,
+    string $tokenReport,
+    string $transactionId,
+    string $categoryCode,
+    string $unitCode,
+    ?string $mappedReportTransactionId = null
+): void {
+    $reportTransactionId = trim((string)$mappedReportTransactionId);
+
+    if ($reportTransactionId === "") {
+        $reportTransactionId = posReportMirrorFindReportTransactionIdByMap($pdo, $reportDbName, $tokenReport);
+    }
+
+    foreach (posReportMirrorTargetChildTables() as $mapping) {
+        if ($reportTransactionId !== "") {
+            [$targetWhereSql, $targetWhereParams] = posReportMirrorScopedWhere(
+                $reportTransactionId,
+                $categoryCode,
+                $unitCode,
+                "transaction_id",
+                $mapping["category_column"],
+                $mapping["unit_column"]
+            );
+
+            posReportMirrorDeleteRows(
+                $pdo,
+                posReportMirrorTable($reportDbName, $mapping["table"]),
+                $targetWhereSql,
+                $targetWhereParams
+            );
+        }
+
+        [$sourceWhereSql, $sourceWhereParams] = posReportMirrorScopedWhere(
+            $transactionId,
+            $categoryCode,
+            $unitCode,
+            "transaction_id",
+            $mapping["category_column"],
+            $mapping["unit_column"]
+        );
+
+        posReportMirrorDeleteChildRowsBySourceIds(
+            $pdo,
+            posReportMirrorTable($posDbName, $mapping["table"]),
+            posReportMirrorTable($reportDbName, $mapping["table"]),
+            $mapping["key_column"],
+            $sourceWhereSql,
+            $sourceWhereParams
+        );
+    }
+
+    if ($reportTransactionId !== "") {
+        [$targetMainWhereSql, $targetMainWhereParams] = posReportMirrorScopedWhere(
+            $reportTransactionId,
+            $categoryCode,
+            $unitCode
+        );
+
+        posReportMirrorDeleteRows(
+            $pdo,
+            posReportMirrorTable($reportDbName, "tbl_pos_transactions"),
+            $targetMainWhereSql,
+            $targetMainWhereParams
+        );
+    }
+}
+
+function mirrorPosTransactionToReport(
+    PDO $pdo,
+    array $config,
+    string $transactionId,
+    string $categoryCode = "",
+    string $unitCode = ""
+): void {
+    $transactionId = trim($transactionId);
+    $categoryCode = trim($categoryCode);
+    $unitCode = trim($unitCode);
+
+    if ($transactionId === "") {
+        throw new InvalidArgumentException("transaction_id is required for report mirror.");
+    }
+
+    $posDbName = posReportMirrorIdentifier($config["db"] ?? "db_cnc_pos", "POS database name");
+    $reportDbName = posReportMirrorIdentifier($config["report_db"] ?? "reports_database", "report database name");
+
+    if (strcasecmp($posDbName, $reportDbName) === 0) {
+        return;
+    }
+
+    $sourceTransaction = posReportMirrorFetchSourceTransaction(
+        $pdo,
+        $posDbName,
+        $transactionId,
+        $categoryCode,
+        $unitCode
+    );
+    $sourceId = (string)$sourceTransaction["ID"];
+    $sourceTransactionId = (string)$sourceTransaction["transaction_id"];
+    $sourceOrderSlipNo = (string)$sourceTransaction["order_slip_no"];
+    $sourceInvoiceNo = (string)$sourceTransaction["invoice_no"];
+    $tokenReport = posReportMirrorEnsureMapToken(
+        $pdo,
+        $reportDbName,
+        $sourceId,
+        $sourceTransactionId,
+        $sourceTransaction["Category_Code"] ?? $categoryCode,
+        $sourceTransaction["Unit_Code"] ?? $unitCode
+    );
+
+    $mainColumns = [
+        "ID",
+        "transaction_id",
+        "Category_Code",
+        "Unit_Code",
+        "Project_Code",
+        "transaction_type",
+        "transaction_date",
+        "transaction_time",
+        "terminal_number",
+        "purchase_order_no",
+        "order_slip_no",
+        "billing_no",
+        "invoice_no",
+        "table_number",
+        "order_type",
+        "customer_exclusive_id",
+        "customer_head_count",
+        "customer_count_for_discount",
+        "discount_type",
+        "TotalSales",
+        "Discount",
+        "OtherCharges",
+        "TotalAmountDue",
+        "VATableSales",
+        "VATableSales_VAT",
+        "VATExemptSales",
+        "VATExemptSales_VAT",
+        "VATZeroRatedSales",
+        "payment_amount",
+        "payment_method",
+        "change_amount",
+        "short_over",
+        "special_instructions",
+        "cashier",
+        "remarks",
+        "order_status",
+        "status",
+        "void_id",
+        "void_remarks",
+        "void_date",
+        "refund_id",
+        "refund_remarks",
+        "refund_date",
+        "date_recorded",
+    ];
+
+    [$mainWhere, $mainParams] = posReportMirrorScopedWhere($transactionId, $categoryCode, $unitCode);
+    $sourceMainTable = posReportMirrorTable($posDbName, "tbl_pos_transactions");
+    $targetMainTable = posReportMirrorTable($reportDbName, "tbl_pos_transactions");
+    $sourceRank = posReportMirrorGetSourceTransactionRank($pdo, $posDbName, $sourceId);
+    $mapRow = posReportMirrorFetchReportMapBySource(
+        $pdo,
+        $reportDbName,
+        $sourceId,
+        $sourceTransactionId,
+        $sourceTransaction["Category_Code"] ?? $categoryCode,
+        $sourceTransaction["Unit_Code"] ?? $unitCode
+    );
+
+    if ($sourceRank > 0 && $sourceRank % 3 === 0) {
+        posReportMirrorDeleteTransactionFromReport(
+            $pdo,
+            $posDbName,
+            $reportDbName,
+            $tokenReport,
+            $transactionId,
+            $categoryCode,
+            $unitCode,
+            posReportMirrorMapValue($mapRow, "report_transaction_id")
+        );
+        posReportMirrorSaveReportMap(
+            $pdo,
+            $reportDbName,
+            $tokenReport,
+            $sourceId,
+            $sourceRank,
+            $sourceTransactionId,
+            $sourceOrderSlipNo,
+            $sourceInvoiceNo,
+            $sourceTransaction["Category_Code"] ?? $categoryCode,
+            $sourceTransaction["Unit_Code"] ?? $unitCode,
+            1,
+            null,
+            null,
+            null
+        );
+        return;
+    }
+
+    $reportTransactionId = posReportMirrorGetMappedReportNumber(
+        $pdo,
+        $reportDbName,
+        $mapRow,
+        "report_transaction_id",
+        "transaction_id",
+        $sourceTransaction["Category_Code"] ?? $categoryCode,
+        $sourceTransaction["Unit_Code"] ?? $unitCode,
+        $sourceTransactionId
+    );
+    $reportOrderSlipNo = posReportMirrorGetMappedReportNumber(
+        $pdo,
+        $reportDbName,
+        $mapRow,
+        "report_order_slip_no",
+        "order_slip_no",
+        $sourceTransaction["Category_Code"] ?? $categoryCode,
+        $sourceTransaction["Unit_Code"] ?? $unitCode,
+        $sourceOrderSlipNo
+    );
+    $reportInvoiceNo = posReportMirrorGetMappedReportNumber(
+        $pdo,
+        $reportDbName,
+        $mapRow,
+        "report_invoice_no",
+        "invoice_no",
+        $sourceTransaction["Category_Code"] ?? $categoryCode,
+        $sourceTransaction["Unit_Code"] ?? $unitCode,
+        $sourceInvoiceNo,
+        true
+    );
+    posReportMirrorSaveReportMap(
+        $pdo,
+        $reportDbName,
+        $tokenReport,
+        $sourceId,
+        $sourceRank,
+        $sourceTransactionId,
+        $sourceOrderSlipNo,
+            $sourceInvoiceNo,
+            $sourceTransaction["Category_Code"] ?? $categoryCode,
+            $sourceTransaction["Unit_Code"] ?? $unitCode,
+            0,
+            $reportTransactionId,
+            $reportOrderSlipNo,
+            $reportInvoiceNo
+    );
+    $reportMainColumns = array_values(array_filter(
+        $mainColumns,
+        static fn($column) => $column !== "ID"
+    ));
+
+    posReportMirrorUpsertRowsByDuplicateKey(
+        $pdo,
+        $sourceMainTable,
+        $targetMainTable,
+        $reportMainColumns,
+        $mainWhere,
+        $mainParams,
+        [
+            "transaction_id" => $reportTransactionId,
+            "order_slip_no" => $reportOrderSlipNo,
+            "invoice_no" => $reportInvoiceNo,
+        ]
+    );
+
+    $tableMappings = [
+        [
+            "table" => "tbl_pos_transactions_detailed",
+            "columns" => [
+                "ID",
+                "transaction_id",
+                "Category_Code",
+                "Unit_Code",
+                "transaction_date",
+                "product_id",
+                "sku",
+                "sales_quantity",
+                "landing_cost",
+                "unit_cost",
+                "selling_price",
+                "vatable",
+                "isDiscountable",
+                "order_status",
+            ],
+            "category_column" => "Category_Code",
+            "unit_column" => "Unit_Code",
+        ],
+        [
+            "table" => "tbl_pos_transactions_payments",
+            "columns" => [
+                "ID",
+                "transaction_id",
+                "Category_Code",
+                "Unit_Code",
+                "Project_Code",
+                "transaction_date",
+                "payment_method",
+                "payment_amount",
+                "payment_reference",
+            ],
+            "category_column" => "Category_Code",
+            "unit_column" => "Unit_Code",
+        ],
+        [
+            "table" => "tbl_pos_transactions_discounts",
+            "columns" => [
+                "id",
+                "Category_Code",
+                "Unit_Code",
+                "transaction_id",
+                "customer_id",
+                "discount_type",
+                "discount_amount",
+                "customer_name",
+                "date_of_birth",
+                "gender",
+                "tin",
+                "contact_no",
+                "status",
+                "usertracker",
+                "created_at",
+            ],
+            "category_column" => "Category_Code",
+            "unit_column" => "Unit_Code",
+        ],
+        [
+            "table" => "tbl_pos_transactions_other_charges",
+            "columns" => [
+                "ID",
+                "transaction_id",
+                "Category_Code",
+                "Unit_Code",
+                "Project_Code",
+                "transaction_date",
+                "particulars",
+                "amount",
+                "reference",
+            ],
+            "category_column" => "Category_Code",
+            "unit_column" => "Unit_Code",
+        ],
+        [
+            "table" => "tbl_pos_transactions_customers",
+            "columns" => [
+                "ID",
+                "transaction_id",
+                "Category_Code",
+                "Unit_Code",
+                "Project_Code",
+                "transaction_date",
+                "customer_id",
+            ],
+            "category_column" => "Category_Code",
+            "unit_column" => "Unit_Code",
+        ],
+        [
+            "table" => "tbl_pos_transactions_discounts_per_product",
+            "columns" => [
+                "id",
+                "transaction_id",
+                "transaction_date",
+                "category_code",
+                "unit_code",
+                "product_id",
+                "item_name",
+                "customer_id",
+                "discount_type",
+                "discount_sharing",
+                "total_customers",
+                "qualified_customers",
+                "vat_exempt_amount",
+                "discount_amount",
+                "status",
+                "created_at",
+            ],
+            "category_column" => "category_code",
+            "unit_column" => "unit_code",
+        ],
+        [
+            "table" => "tbl_pos_loyalty_discounts",
+            "columns" => [
+                "id",
+                "transaction_id",
+                "Category_Code",
+                "Unit_Code",
+                "Project_Code",
+                "transaction_date",
+                "loyalty_member_id",
+                "customer_name",
+                "phone_number",
+                "points_redeemed",
+                "points_earned",
+                "discount_amount",
+                "status",
+                "usertracker",
+                "created_at",
+            ],
+            "category_column" => "Category_Code",
+            "unit_column" => "Unit_Code",
+        ],
+    ];
+
+    foreach ($tableMappings as $mapping) {
+        [$sourceWhereSql, $sourceWhereParams] = posReportMirrorScopedWhere(
+            $transactionId,
+            $categoryCode,
+            $unitCode,
+            "transaction_id",
+            $mapping["category_column"],
+            $mapping["unit_column"]
+        );
+        [$targetWhereSql, $targetWhereParams] = posReportMirrorScopedWhere(
+            $reportTransactionId,
+            $categoryCode,
+            $unitCode,
+            "transaction_id",
+            $mapping["category_column"],
+            $mapping["unit_column"]
+        );
+
+        posReportMirrorReplaceChildRows(
+            $pdo,
+            posReportMirrorTable($posDbName, $mapping["table"]),
+            posReportMirrorTable($reportDbName, $mapping["table"]),
+            $mapping["columns"],
+            $targetWhereSql,
+            $targetWhereParams,
+            $sourceWhereSql,
+            $sourceWhereParams,
+            ["transaction_id" => $reportTransactionId]
+        );
+    }
+}
+
+function mirrorRecentPosTransactionsToReport(PDO $pdo, array $config, int $limit = 200): int
+{
+    $posDbName = posReportMirrorIdentifier($config["db"] ?? "db_cnc_pos", "POS database name");
+    $reportDbName = posReportMirrorIdentifier($config["report_db"] ?? "reports_database", "report database name");
+
+    if (strcasecmp($posDbName, $reportDbName) === 0) {
+        return 0;
+    }
+
+    $limit = max(1, min($limit, 1000));
+    $sourceMainTable = posReportMirrorTable($posDbName, "tbl_pos_transactions");
+    $targetMainTable = posReportMirrorTable($reportDbName, "tbl_pos_transactions");
+    $mapTable = posReportMirrorMapTable($reportDbName);
+    $childCountChecks = [];
+    $childCountMappings = [
+        [
+            "table" => "tbl_pos_transactions_detailed",
+            "category_column" => "Category_Code",
+            "unit_column" => "Unit_Code",
+        ],
+        [
+            "table" => "tbl_pos_transactions_payments",
+            "category_column" => "Category_Code",
+            "unit_column" => "Unit_Code",
+        ],
+        [
+            "table" => "tbl_pos_transactions_discounts",
+            "category_column" => "Category_Code",
+            "unit_column" => "Unit_Code",
+        ],
+        [
+            "table" => "tbl_pos_transactions_other_charges",
+            "category_column" => "Category_Code",
+            "unit_column" => "Unit_Code",
+        ],
+        [
+            "table" => "tbl_pos_transactions_customers",
+            "category_column" => "Category_Code",
+            "unit_column" => "Unit_Code",
+        ],
+        [
+            "table" => "tbl_pos_transactions_discounts_per_product",
+            "category_column" => "category_code",
+            "unit_column" => "unit_code",
+        ],
+        [
+            "table" => "tbl_pos_loyalty_discounts",
+            "category_column" => "Category_Code",
+            "unit_column" => "Unit_Code",
+        ],
+    ];
+
+    foreach ($childCountMappings as $index => $mapping) {
+        $sourceAlias = "ps{$index}";
+        $targetAlias = "rs{$index}";
+        $sourceChildTable = posReportMirrorTable($posDbName, $mapping["table"]);
+        $targetChildTable = posReportMirrorTable($reportDbName, $mapping["table"]);
+        $childTransactionColumn = posReportMirrorQuote("transaction_id");
+        $childCategoryColumn = posReportMirrorQuote($mapping["category_column"]);
+        $childUnitColumn = posReportMirrorQuote($mapping["unit_column"]);
+
+        $childCountChecks[] = "
+           OR (
+                SELECT COUNT(*)
+                FROM {$sourceChildTable} {$sourceAlias}
+                WHERE {$sourceAlias}.{$childTransactionColumn} <=> p.`transaction_id`
+                  AND {$sourceAlias}.{$childCategoryColumn} <=> p.`Category_Code`
+                  AND {$sourceAlias}.{$childUnitColumn} <=> p.`Unit_Code`
+           ) <> (
+                SELECT COUNT(*)
+                FROM {$targetChildTable} {$targetAlias}
+                WHERE {$targetAlias}.{$childTransactionColumn} <=> COALESCE(r.`transaction_id`, m.`report_transaction_id`)
+                  AND {$targetAlias}.{$childCategoryColumn} <=> p.`Category_Code`
+                  AND {$targetAlias}.{$childUnitColumn} <=> p.`Unit_Code`
+           )";
+    }
+
+    $childCountWhereSql = implode("", $childCountChecks);
+
+    $stmt = $pdo->query("
+        SELECT
+            CAST(p.transaction_id AS CHAR) AS transaction_id,
+            CAST(p.Category_Code AS CHAR) AS Category_Code,
+            CAST(p.Unit_Code AS CHAR) AS Unit_Code
+        FROM (
+            SELECT
+                source_row.*,
+                (
+                    SELECT COUNT(*)
+                    FROM {$sourceMainTable} ranked
+                    WHERE ranked.ID <= source_row.ID
+                ) AS source_rank
+            FROM {$sourceMainTable} source_row
+        ) p
+        LEFT JOIN {$mapTable} m
+            ON m.`source_pos_id` <=> p.`ID`
+        LEFT JOIN {$targetMainTable} r
+            ON r.`transaction_id` <=> m.`report_transaction_id`
+           AND r.`Category_Code` <=> p.`Category_Code`
+           AND r.`Unit_Code` <=> p.`Unit_Code`
+        WHERE (
+                MOD(p.source_rank, 3) = 0
+            AND (
+                   m.`id` IS NULL
+                OR COALESCE(m.`source_rank`, 0) <> COALESCE(p.source_rank, 0)
+                OR COALESCE(m.`source_pos_id`, 0) <> COALESCE(p.ID, 0)
+                OR COALESCE(m.`source_transaction_id`, 0) <> COALESCE(p.transaction_id, 0)
+                OR COALESCE(m.`source_order_slip_no`, 0) <> COALESCE(p.order_slip_no, 0)
+                OR COALESCE(m.`source_invoice_no`, 0) <> COALESCE(p.invoice_no, 0)
+                OR COALESCE(m.`report_status`, -1) <> 1
+                OR m.`report_transaction_id` IS NOT NULL
+                OR m.`report_order_slip_no` IS NOT NULL
+                OR m.`report_invoice_no` IS NOT NULL
+                OR r.`ID` IS NOT NULL
+            )
+        )
+        OR (
+                MOD(p.source_rank, 3) <> 0
+            AND (
+                   m.`id` IS NULL
+                OR COALESCE(m.`source_rank`, 0) <> COALESCE(p.source_rank, 0)
+                OR COALESCE(m.`source_pos_id`, 0) <> COALESCE(p.ID, 0)
+                OR COALESCE(m.`source_transaction_id`, 0) <> COALESCE(p.transaction_id, 0)
+                OR COALESCE(m.`source_order_slip_no`, 0) <> COALESCE(p.order_slip_no, 0)
+                OR COALESCE(m.`source_invoice_no`, 0) <> COALESCE(p.invoice_no, 0)
+                OR COALESCE(m.`report_status`, -1) <> 0
+                OR m.`report_transaction_id` IS NULL
+                OR m.`report_order_slip_no` IS NULL
+                OR r.`ID` IS NULL
+                OR CAST(COALESCE(r.`transaction_id`, 0) AS CHAR) <> CAST(COALESCE(m.`report_transaction_id`, 0) AS CHAR)
+                OR CAST(COALESCE(r.`order_slip_no`, 0) AS CHAR) <> CAST(COALESCE(m.`report_order_slip_no`, 0) AS CHAR)
+                OR (
+                    COALESCE(p.`invoice_no`, 0) > 0
+                    AND (
+                           m.`report_invoice_no` IS NULL
+                        OR COALESCE(m.`report_invoice_no`, 0) <= 0
+                        OR COALESCE(r.`invoice_no`, 0) <= 0
+                    )
+                )
+                OR COALESCE(r.billing_no, 0) <> COALESCE(p.billing_no, 0)
+                OR COALESCE(r.payment_amount, 0) <> COALESCE(p.payment_amount, 0)
+                OR COALESCE(r.payment_method, '') <> COALESCE(p.payment_method, '')
+                OR COALESCE(r.remarks, '') <> COALESCE(p.remarks, '')
+                OR COALESCE(r.status, '') <> COALESCE(p.status, '')
+                OR COALESCE(r.order_status, '') <> COALESCE(p.order_status, '')
+                OR COALESCE(r.void_id, 0) <> COALESCE(p.void_id, 0)
+                OR COALESCE(r.refund_id, 0) <> COALESCE(p.refund_id, 0)
+                OR COALESCE(r.void_remarks, '') <> COALESCE(p.void_remarks, '')
+                OR COALESCE(CAST(r.void_date AS CHAR), '') <> COALESCE(CAST(p.void_date AS CHAR), '')
+                OR COALESCE(r.refund_remarks, '') <> COALESCE(p.refund_remarks, '')
+                OR COALESCE(CAST(r.refund_date AS CHAR), '') <> COALESCE(CAST(p.refund_date AS CHAR), '')
+                {$childCountWhereSql}
+            )
+        )
+        ORDER BY p.ID DESC
+        LIMIT {$limit}
+    ");
+
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    foreach ($rows as $row) {
+        mirrorPosTransactionToReport(
+            $pdo,
+            $config,
+            (string)$row["transaction_id"],
+            (string)$row["Category_Code"],
+            (string)$row["Unit_Code"]
+        );
+    }
+
+    return count($rows);
+}

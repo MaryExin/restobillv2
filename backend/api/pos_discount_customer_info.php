@@ -10,6 +10,7 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
 }
 
 require __DIR__ . "/pdo.php";
+require_once __DIR__ . "/pos_report_mirror.php";
 
 function respond($success, $message, $data = null, $statusCode = 200)
 {
@@ -311,6 +312,8 @@ try {
             $unusedRowIds
         ));
     }
+
+    mirrorPosTransactionToReport($pdo, $config, (string)$transactionId, $categoryCode, $unitCode);
 
     $pdo->commit();
 
