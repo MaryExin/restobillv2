@@ -24,6 +24,7 @@ import {
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
 import { useTheme } from "../../../context/ThemeContext";
+import { getCurrentUserRole } from "../../../utils/getCurrentUserRole";
 
 // --- 1. CUSTOM DROP-DOWN CALENDAR ---
 const CustomCalendar = ({
@@ -134,7 +135,7 @@ const DetailsModal = ({ transaction, isOpen, onClose, isDark }) => {
   useEffect(() => {
     if (isOpen && transaction) {
       setLoading(true);
-      fetch(`http://localhost/api/get_transaction_items.php?id=${transaction.transaction_id}`)
+      fetch(`http://localhost/api/get_transaction_items.php?id=${transaction.transaction_id}&role=${getCurrentUserRole()}`)
         .then((res) => res.json())
         .then((res) => {
           if (res.success) {
@@ -267,7 +268,7 @@ const TransactionsModal = ({ isOpen, onClose }) => {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost/api/read_transaction_records.php?dateFrom=${dateFrom}&dateTo=${dateTo}&search=${searchTerm}&recordStatus=${statusFilter}`);
+      const response = await fetch(`http://localhost/api/read_transaction_records.php?dateFrom=${dateFrom}&dateTo=${dateTo}&search=${searchTerm}&recordStatus=${statusFilter}&role=${getCurrentUserRole()}`);
       const result = await response.json();
       if (result.success) {
         const uniqueData = result.data.filter((value, index, self) =>

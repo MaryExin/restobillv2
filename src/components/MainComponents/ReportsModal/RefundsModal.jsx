@@ -3,6 +3,7 @@ import { FaSyncAlt, FaTimes, FaSearch, FaHistory, FaCalendarAlt, FaPrint, FaFile
 import { useTheme } from "../../../context/ThemeContext";
 import * as XLSX from 'xlsx';
 import useApiHost from "../../../hooks/useApiHost";
+import { getCurrentUserRole } from "../../../utils/getCurrentUserRole";
 
 const RefundsModal = ({ isOpen, onClose }) => {
   const { theme } = useTheme();
@@ -42,7 +43,7 @@ const RefundsModal = ({ isOpen, onClose }) => {
       const response = await fetch("http://localhost/api/get_voids_refunds.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: 'refunds', dateFrom, dateTo }),
+        body: JSON.stringify({ type: 'refunds', dateFrom, dateTo, role: getCurrentUserRole() }),
       });
       const result = await response.json();
       setData(Array.isArray(result) ? result : []);

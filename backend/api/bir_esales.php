@@ -6,16 +6,11 @@ header("Content-Type: application/json");
 
 if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') exit;
 
-$config = include 'config.php';
+require __DIR__ . '/report_db.php';
 
 try {
-    $dsn = "mysql:host={$config['host']};dbname={$config['db']};charset={$config['charset']}";
-    $conn = new PDO($dsn, $config['user'], $config['pass'], [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
-    ]);
-
     $input = json_decode(file_get_contents("php://input"), true);
+    $conn = getReportPdo($input['role'] ?? $input['user_role'] ?? null);
     $activeTab = $input['tab'] ?? 'E1';
     $dateFrom = $input['dateFrom'] ?? date('Y-m-d');
     $dateTo = $input['dateTo'] ?? date('Y-m-d');

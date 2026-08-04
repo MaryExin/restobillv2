@@ -11,19 +11,9 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
     exit;
 }
 
-$config = require __DIR__ . "/config.php";
+require __DIR__ . "/report_db.php";
 
 try {
-    $pdo = new PDO(
-        "mysql:host={$config['host']};dbname={$config['db']};charset=utf8mb4",
-        $config["user"],
-        $config["pass"],
-        [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        ]
-    );
-
     $raw = file_get_contents("php://input");
     $input = json_decode($raw, true);
 
@@ -34,6 +24,8 @@ try {
     if ($_SERVER["REQUEST_METHOD"] === "GET") {
         $input = array_merge($input ?: [], $_GET);
     }
+
+    $pdo = getReportPdo($input["role"] ?? $input["user_role"] ?? null);
 
     $dateFrom = isset($input["dateFrom"])
         ? trim((string)$input["dateFrom"])

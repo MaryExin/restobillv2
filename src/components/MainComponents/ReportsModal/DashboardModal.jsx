@@ -11,6 +11,7 @@ import {
   FaDatabase,
   FaSyncAlt, // Added a sync icon for the refresh button
 } from "react-icons/fa";
+import { getCurrentUserRole } from "../../../utils/getCurrentUserRole";
 
 const peso = (value) =>
   `₱ ${Number(value || 0).toLocaleString("en-PH", {
@@ -48,6 +49,7 @@ const DashboardModal = ({ isOpen, onClose }) => {
             datefrom: dateFrom,
             dateto: dateTo,
             includeVoided: false,
+            role: getCurrentUserRole(),
           }),
         }
       );

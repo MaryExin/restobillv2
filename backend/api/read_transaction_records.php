@@ -8,6 +8,8 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
     exit;
 }
 
+$role = $_GET["role"] ?? $_GET["user_role"] ?? "";
+
 require __DIR__ . "/pdo.php";
 
 $dateFrom     = isset($_GET["dateFrom"]) ? trim($_GET["dateFrom"]) : null;

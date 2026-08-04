@@ -13,6 +13,7 @@ import {
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
 import { useTheme } from "../../../context/ThemeContext";
+import { getCurrentUserRole } from "../../../utils/getCurrentUserRole";
 
 const peso = (value) =>
   `₱${Number(value || 0).toLocaleString(undefined, {
@@ -156,6 +157,7 @@ const DailySalesModal = ({ isOpen, onClose }) => {
           dateto: dateTo,
           includeVoided: status === "All" || status === "Voided",
           voidOnly: status === "Voided",
+          role: getCurrentUserRole(),
         }),
       });
       const result = await response.json();

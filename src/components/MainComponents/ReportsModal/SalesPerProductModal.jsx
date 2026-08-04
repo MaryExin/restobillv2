@@ -7,6 +7,7 @@ import {
   FaFileExcel,
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
+import { getCurrentUserRole } from "../../../utils/getCurrentUserRole";
 
 const SalesPerProductModal = ({ isOpen, onClose }) => {
   const today = new Date().toISOString().split("T")[0];
@@ -28,6 +29,7 @@ const SalesPerProductModal = ({ isOpen, onClose }) => {
         body: JSON.stringify({
           datefrom: dateFrom,
           dateto: dateTo,
+          role: getCurrentUserRole(),
         }),
       });
 

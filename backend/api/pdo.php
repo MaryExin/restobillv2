@@ -2,7 +2,15 @@
 
 $config = require __DIR__ . "/config.php";
 
-$dsn = "mysql:host={$config['host']};dbname={$config['db']};charset={$config['charset']}";
+// Callers that need role-aware DB selection (superadmin -> archive_db) set
+// $role before requiring this file. Everyone else keeps the original
+// flat/main_db connection untouched.
+$dbConfig = $config;
+if (isset($role) && strtolower(trim((string)$role)) === "superadmin") {
+  $dbConfig = $config["archive_db"];
+}
+
+$dsn = "mysql:host={$dbConfig['host']};dbname={$dbConfig['db']};charset={$dbConfig['charset']}";
 
 $options = [
   PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
@@ -11,7 +19,7 @@ $options = [
 ];
 
 try {
-  $pdo = new PDO($dsn, $config["user"], $config["pass"], $options);
+  $pdo = new PDO($dsn, $dbConfig["user"], $dbConfig["pass"], $options);
 } catch (PDOException $e) {
   http_response_code(500);
   header("Content-Type: application/json");

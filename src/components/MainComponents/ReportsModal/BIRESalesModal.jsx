@@ -4,6 +4,7 @@ import { useTheme } from "../../../context/ThemeContext";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
+import { getCurrentUserRole } from "../../../utils/getCurrentUserRole";
 
 const BirESalesModal = ({ isOpen, onClose }) => {
   const { theme } = useTheme();
@@ -36,7 +37,7 @@ const BirESalesModal = ({ isOpen, onClose }) => {
       const response = await fetch(`http://localhost/api/bir_esales.php`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tab: activeTab, dateFrom, dateTo }),
+        body: JSON.stringify({ tab: activeTab, dateFrom, dateTo, role: getCurrentUserRole() }),
       });
       const result = await response.json();
       setData(Array.isArray(result[activeTab]) ? result[activeTab] : []);
@@ -60,7 +61,7 @@ const BirESalesModal = ({ isOpen, onClose }) => {
         const response = await fetch(`http://localhost/api/bir_esales.php`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tab: tab.id, dateFrom, dateTo }),
+          body: JSON.stringify({ tab: tab.id, dateFrom, dateTo, role: getCurrentUserRole() }),
         });
         const result = await response.json();
         const sheetData = Array.isArray(result[tab.id]) ? result[tab.id] : [];

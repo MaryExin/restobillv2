@@ -6,17 +6,12 @@ header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers
 
 if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') exit;
 
-$cfg = require_once 'config.php'; 
+require_once __DIR__ . '/report_db.php';
 
 try {
-    $dsn = "mysql:host={$cfg['host']};dbname={$cfg['db']};charset={$cfg['charset']}";
-    $conn = new PDO($dsn, $cfg['user'], $cfg['pass'], [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
-    ]);
-
     $data = json_decode(file_get_contents("php://input"), true);
-    $type = $data['type'] ?? 'activity'; 
+    $conn = getReportPdo($data['role'] ?? $data['user_role'] ?? null);
+    $type = $data['type'] ?? 'activity';
     $dateFrom = $data['dateFrom'] ?? date('Y-m-d');
     $dateTo = $data['dateTo'] ?? date('Y-m-d');
 

@@ -22,7 +22,7 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
     exit;
 }
 
-$config = require __DIR__ . "/config.php";
+require __DIR__ . "/report_db.php";
 
 function valueOrZero($value): string
 {
@@ -85,19 +85,11 @@ function buildAffectedProductsXml(array $affectedProducts): string
 }
 
 try {
-    $pdo = new PDO(
-        "mysql:host={$config["host"]};dbname={$config["db"]};charset=utf8mb4",
-        $config["user"],
-        $config["pass"],
-        [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        ]
-    );
-
     $raw = file_get_contents("php://input");
     $json = json_decode($raw, true);
     $input = is_array($json) ? $json : $_POST;
+
+    $pdo = getReportPdo($input["role"] ?? $input["user_role"] ?? null);
 
     $categoryCode = trim((string)($input["categoryCode"] ?? $input["category_code"] ?? ""));
     $unitCode = trim((string)($input["unitCode"] ?? $input["unit_code"] ?? ""));
