@@ -3,19 +3,10 @@ header("Access-Control-Allow-Origin: *");
 header("Content-Type: application/json; charset=UTF-8");
 header("Access-Control-Allow-Methods: GET");
 
-// 1. Load configuration from config.php
-$config = require 'config.php';
+require __DIR__ . '/report_db.php';
 
 try {
-    // 2. Set up PDO connection
-    $dsn = "mysql:host={$config['host']};dbname={$config['db']};charset={$config['charset']}";
-    $options = [
-        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_EMULATE_PREPARES   => false,
-    ];
-
-    $pdo = new PDO($dsn, $config['user'], $config['pass'], $options);
+    $pdo = getReportPdo($_GET['role'] ?? $_GET['user_role'] ?? null);
 
     // 3. Check if 'id' is provided
     if (isset($_GET['id'])) {

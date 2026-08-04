@@ -7,10 +7,11 @@ header("Content-Type: application/json");
 
 if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") { exit; }
 
-require __DIR__ . "/pdo.php";
-
 $raw = file_get_contents("php://input");
 $body = json_decode($raw, true) ?: [];
+$role = $body["role"] ?? $body["user_role"] ?? ($_GET["role"] ?? "");
+
+require __DIR__ . "/pdo.php";
 
 $datefrom = $body["datefrom"] ?? date("Y-m-d");
 $dateto   = $body["dateto"] ?? date("Y-m-d");

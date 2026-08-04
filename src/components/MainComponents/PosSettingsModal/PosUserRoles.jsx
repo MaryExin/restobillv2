@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { FiShield, FiLoader, FiCheck, FiSave } from "react-icons/fi";
+import { FiShield, FiLoader, FiCheck, FiSave, FiSlash } from "react-icons/fi";
 import useApiHost from "../../../hooks/useApiHost";
 
 const PERMISSION_ITEMS = [
@@ -38,6 +38,8 @@ const PosUserRoles = ({ isDark, accent, getContrastText }) => {
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
+  const [isBulkRemoving, setIsBulkRemoving] = useState(false);
+  const [bulkMessage, setBulkMessage] = useState("");
 
   useEffect(() => {
     if (!apiHost) return;
@@ -96,6 +98,51 @@ const PosUserRoles = ({ isDark, accent, getContrastText }) => {
 
   const togglePermission = (key) => {
     setPermissions((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const handleRemoveAll = () => {
+    setPermissions(emptyPermissions());
+    setSaveMessage("");
+  };
+
+  const handleRemoveAllAccounts = async () => {
+    if (!users.length) return;
+    if (
+      !window.confirm(
+        `Remove ALL permissions for ALL ${users.length} user accounts? This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+
+    setIsBulkRemoving(true);
+    setBulkMessage("");
+    try {
+      const empty = emptyPermissions();
+      const results = await Promise.all(
+        users.map((u) =>
+          fetch(`${apiHost}/api/pos_user_permissions.php`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user_uuid: u.uuid, permissions: empty }),
+          })
+            .then((res) => res.json())
+            .then((result) => Boolean(result?.success))
+            .catch(() => false),
+        ),
+      );
+      const failCount = results.filter((ok) => !ok).length;
+      setBulkMessage(
+        failCount
+          ? `Done with ${failCount} failure(s) out of ${users.length}.`
+          : `Removed all permissions for ${users.length} accounts.`,
+      );
+      if (selectedUuid) setPermissions(empty);
+    } catch (err) {
+      setBulkMessage("Bulk remove failed.");
+    } finally {
+      setIsBulkRemoving(false);
+    }
   };
 
   const handleSave = async () => {
@@ -165,11 +212,22 @@ const PosUserRoles = ({ isDark, accent, getContrastText }) => {
 
       {/* USER SELECT */}
       <div className={`rounded-[40px] border p-8 ${theme.panel}`}>
-        <label
-          className={`block mb-3 text-[10px] font-black uppercase tracking-widest ${theme.textMuted}`}
-        >
-          Select User
-        </label>
+        <div className="flex items-center justify-between mb-3">
+          <label
+            className={`text-[10px] font-black uppercase tracking-widest ${theme.textMuted}`}
+          >
+            Select User
+          </label>
+          <button
+            type="button"
+            onClick={handleRemoveAllAccounts}
+            disabled={isLoadingUsers || isBulkRemoving || !users.length}
+            className={`flex items-center gap-2 px-5 py-3 rounded-[20px] border font-black uppercase text-[10px] tracking-[0.2em] transition-transform hover:scale-105 disabled:opacity-50 ${theme.pill} ${theme.textMuted}`}
+          >
+            <FiSlash size={14} />
+            {isBulkRemoving ? "Removing..." : "Remove All (All Accounts)"}
+          </button>
+        </div>
         {isLoadingUsers ? (
           <div className="flex items-center gap-3">
             <FiLoader
@@ -192,6 +250,11 @@ const PosUserRoles = ({ isDark, accent, getContrastText }) => {
             ))}
           </select>
         )}
+        {bulkMessage && (
+          <p className={`mt-3 text-[11px] font-bold ${theme.textMuted}`}>
+            {bulkMessage}
+          </p>
+        )}
       </div>
 
       {/* PERMISSIONS CHECKLIST */}
@@ -203,12 +266,23 @@ const PosUserRoles = ({ isDark, accent, getContrastText }) => {
             >
               Functions for {selectedUser?.firstname || "User"}
             </h3>
-            {isLoadingPermissions && (
-              <FiLoader
-                className="text-xl animate-spin"
-                style={{ color: accent }}
-              />
-            )}
+            <div className="flex items-center gap-4">
+              {isLoadingPermissions && (
+                <FiLoader
+                  className="text-xl animate-spin"
+                  style={{ color: accent }}
+                />
+              )}
+              <button
+                type="button"
+                onClick={handleRemoveAll}
+                disabled={isLoadingPermissions}
+                className={`flex items-center gap-2 px-5 py-3 rounded-[20px] border font-black uppercase text-[10px] tracking-[0.2em] transition-transform hover:scale-105 disabled:opacity-50 ${theme.pill} ${theme.textMuted}`}
+              >
+                <FiSlash size={14} />
+                Remove All
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

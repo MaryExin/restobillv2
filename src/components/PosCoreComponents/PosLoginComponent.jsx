@@ -215,6 +215,7 @@ const PosLoginComponent = () => {
             ? JSON.stringify(result.userrole)
             : nextRole,
         );
+        localStorage.setItem("user_classification", result.classification || "");
         localStorage.setItem("profile_pic", nextProfilePic);
         localStorage.setItem(
           "posReadingDatabaseScope",

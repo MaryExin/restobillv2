@@ -6,6 +6,7 @@ import {
 import { useTheme } from "../../../context/ThemeContext"; 
 import jsPDF from "jspdf";
 import "jspdf-autotable";
+import { getCurrentUserRole } from "../../../utils/getCurrentUserRole";
 
 const LogsModal = ({ isOpen, onClose }) => {
   const { theme } = useTheme(); 
@@ -25,10 +26,11 @@ const LogsModal = ({ isOpen, onClose }) => {
       const response = await fetch("http://localhost/api/get_logs.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          type: "all", 
-          dateFrom: dateRange.from, 
-          dateTo: dateRange.to 
+        body: JSON.stringify({
+          type: "all",
+          dateFrom: dateRange.from,
+          dateTo: dateRange.to,
+          role: getCurrentUserRole(),
         }),
       });
       const result = await response.json();

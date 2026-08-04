@@ -27,7 +27,6 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "../../context/ThemeContext";
 import { useNavigate } from "react-router-dom";
-import useCurrentUserPermissions from "../../hooks/useCurrentUserPermissions";
 
 // Import Components
 import PosMyAccount from "./PosSettingsModal/PosMyAccount";
@@ -64,7 +63,6 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
   const isDark = theme === "dark";
-  const { permissions: userPermissions } = useCurrentUserPermissions();
 
   const adaptivePalette = [
     { name: "Crimson", light: "#ef4444", dark: "#fca5a5" },
@@ -132,34 +130,10 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
     String(localStorage.getItem("username") || "").trim().toLowerCase() ===
     UNGATED_USERNAME;
 
-  // Per-user function permissions (tbl_pos_user_permissions, set from the
-  // User Roles tab). Tabs stay visible either way -- this only decides
-  // whether clicking one opens the real content or the Oops screen.
-  const canAccessTab = (navId) => {
-    if (isUngatedUser) return true;
-    if (navId === "My Account") return true;
-
-    // Fallback lock: only applies when the user has no broader Settings
-    // access. If open_settings is granted, it wins even alongside this flag.
-    if (
-      userPermissions.settings_my_account_only &&
-      !userPermissions.open_settings
-    ) {
-      return false;
-    }
-
-    if (navId === "User Accounts" || navId === "User Roles") {
-      return Boolean(
-        userPermissions.create_user || userPermissions.edit_delete_user,
-      );
-    }
-
-    if (navId === "Email Reports") {
-      return Boolean(userPermissions.view_reports);
-    }
-
-    return Boolean(userPermissions.open_settings);
-  };
+  // Permission-based restriction removed -- all accounts now have access to
+  // every Settings tab. Protected tabs (PROTECTED_TABS) still require the
+  // master password gate below.
+  const canAccessTab = () => true;
 
   const handleNavClick = (nav) => {
     if (nav.route) {

@@ -22,6 +22,7 @@ import {
 } from "react-icons/fa";
 import { useTheme } from "../../context/ThemeContext";
 import useApiHost from "../../hooks/useApiHost";
+import { getCurrentUserRole } from "../../utils/getCurrentUserRole";
 
 // Modals
 import DashboardModal from "../MainComponents/ReportsModal/DashboardModal";
@@ -150,6 +151,7 @@ const PosReports = ({
           categoryCode: localStorage.getItem("posBusinessCategoryCode") || "",
           unitCode: localStorage.getItem("posBusinessUnitCode") || "",
           terminalNumber: localStorage.getItem("posTerminalNumber") || "1",
+          role: getCurrentUserRole(),
         }),
       });
 
@@ -197,6 +199,7 @@ const PosReports = ({
           categoryCode: localStorage.getItem("posBusinessCategoryCode") || "",
           unitCode: localStorage.getItem("posBusinessUnitCode") || "",
           terminalNumber: localStorage.getItem("posTerminalNumber") || "1",
+          role: getCurrentUserRole(),
         }),
       });
 
@@ -259,6 +262,7 @@ const PosReports = ({
           categoryCode: localStorage.getItem("posBusinessCategoryCode") || "",
           unitCode: localStorage.getItem("posBusinessUnitCode") || "",
           terminalNumber: localStorage.getItem("posTerminalNumber") || "1",
+          role: getCurrentUserRole(),
         }),
       });
 

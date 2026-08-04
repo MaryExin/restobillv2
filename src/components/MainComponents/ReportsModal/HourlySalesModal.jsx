@@ -14,6 +14,7 @@ import {
   FaBox,
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
+import { getCurrentUserRole } from "../../../utils/getCurrentUserRole";
 
 const peso = (value) =>
   `₱${Number(value || 0).toLocaleString(undefined, {
@@ -231,6 +232,7 @@ const HourlySalesModal = ({ isOpen, onClose }) => {
           datefrom: dateFrom,
           dateto: dateTo,
           includeVoided: false,
+          role: getCurrentUserRole(),
         }),
       });
 

@@ -316,6 +316,7 @@ try {
         "userid" => $userId,
         "username" => $resolvedUsername,
         "userrole" => $formattedUserRole,
+        "classification" => $user["classification"] ?? "",
         "email" => $userEmail,
         "profile_pic" => $userProfilePic,
         "reading_database_scope" => $readingDatabaseScope,

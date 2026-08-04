@@ -6,6 +6,7 @@ import {
 import * as XLSX from "xlsx";
 import { useTheme } from "../../../context/ThemeContext";
 import useApiHost from "../../../hooks/useApiHost";
+import { getCurrentUserRole } from "../../../utils/getCurrentUserRole";
 
 const peso = (v) =>
   `₱${Number(v || 0).toLocaleString(undefined, {
@@ -104,6 +105,7 @@ const MonthlySalesModal = ({ isOpen, onClose }) => {
           dateto: dateTo,
           includeVoided: status === "All" || status === "Voided",
           voidOnly: status === "Voided",
+          role: getCurrentUserRole(),
         }),
       });
       const result = await res.json();

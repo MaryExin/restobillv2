@@ -10,6 +10,7 @@ import {
 } from "react-icons/fa";
 import { useTheme } from "../../context/ThemeContext";
 import useApiHost from "../../hooks/useApiHost";
+import { getCurrentUserRole } from "../../utils/getCurrentUserRole";
 
 const peso = (value) => {
   const num = Number(value || 0);
@@ -317,6 +318,7 @@ export default function ModalXml({ isOpen, onClose }) {
           reportDate,
           tenantId: form.tenantId,
           tenantKey: form.tenantKey,
+          role: getCurrentUserRole(),
         }),
       });
 

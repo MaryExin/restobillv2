@@ -11,20 +11,22 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
     exit;
 }
 
+$raw = file_get_contents("php://input");
+$input = json_decode($raw, true);
+
+if (!$input || !is_array($input)) {
+    $input = $_POST;
+}
+
+if ($_SERVER["REQUEST_METHOD"] === "GET") {
+    $input = array_merge($input ?: [], $_GET);
+}
+
+$role = $input["role"] ?? $input["user_role"] ?? "";
+
 require __DIR__ . "/pdo.php";
 
 try {
-    $raw = file_get_contents("php://input");
-    $input = json_decode($raw, true);
-
-    if (!$input || !is_array($input)) {
-        $input = $_POST;
-    }
-
-    if ($_SERVER["REQUEST_METHOD"] === "GET") {
-        $input = array_merge($input ?: [], $_GET);
-    }
-
     $dateFrom = isset($input["dateFrom"]) ? trim((string)$input["dateFrom"]) : "";
     $dateTo   = isset($input["dateTo"]) ? trim((string)$input["dateTo"]) : "";
 

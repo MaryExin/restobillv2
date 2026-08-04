@@ -9,16 +9,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-$config = require_once('config.php');
-
-$conn = new mysqli($config['host'], $config['user'], $config['pass'], $config['db']);
-if ($conn->connect_error) {
-    die(json_encode(["error" => "Connection failed"]));
-}
-$conn->set_charset($config['charset']);
+require_once __DIR__ . '/report_db.php';
 
 $input = file_get_contents("php://input");
 $data = json_decode($input);
+
+$conn = getReportMysqli($data->role ?? $data->user_role ?? null);
 
 if (isset($data->type) && isset($data->dateFrom) && isset($data->dateTo)) {
     $type = $data->type; 
