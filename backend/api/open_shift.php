@@ -59,6 +59,132 @@ function releaseLockSafely(PDO $pdo, string $lockName): void
     }
 }
 
+function requireMysqlIdentifier($value, string $label): string
+{
+    $identifier = trim((string)$value);
+
+    if ($identifier === "" || !preg_match('/^[A-Za-z0-9_]+$/', $identifier)) {
+        throw new InvalidArgumentException("Invalid {$label} configured.");
+    }
+
+    return $identifier;
+}
+
+function quoteMysqlIdentifier(string $identifier): string
+{
+    return "`" . str_replace("`", "``", $identifier) . "`";
+}
+
+function qualifiedTableName(string $databaseName, string $tableName): string
+{
+    return quoteMysqlIdentifier($databaseName) . "." . quoteMysqlIdentifier($tableName);
+}
+
+function assertNoOpenShift(
+    PDO $pdo,
+    string $shiftTable,
+    string $unitCode,
+    string $terminalNumber,
+    string $databaseLabel
+): void {
+    $stmt = $pdo->prepare("
+        SELECT COUNT(*)
+        FROM {$shiftTable}
+        WHERE Unit_Code = ?
+          AND terminal_number = ?
+          AND Shift_Status = 'Open'
+        FOR UPDATE
+    ");
+    $stmt->execute([$unitCode, $terminalNumber]);
+
+    if ((int)$stmt->fetchColumn() > 0) {
+        throw new Exception("{$databaseLabel} already has an active open shift.");
+    }
+}
+
+function assertNoDuplicateShiftDate(
+    PDO $pdo,
+    string $shiftTable,
+    string $unitCode,
+    string $terminalNumber,
+    string $checkDate,
+    string $databaseLabel
+): void {
+    $stmt = $pdo->prepare("
+        SELECT COUNT(*)
+        FROM {$shiftTable}
+        WHERE Unit_Code = ?
+          AND terminal_number = ?
+          AND DATE(Opening_DateTime) = ?
+        FOR UPDATE
+    ");
+    $stmt->execute([$unitCode, $terminalNumber, $checkDate]);
+
+    if ((int)$stmt->fetchColumn() > 0) {
+        throw new Exception("A shift record for this date already exists in {$databaseLabel}.");
+    }
+}
+
+function assertNoDuplicateShiftId(
+    PDO $pdo,
+    string $shiftTable,
+    string $unitCode,
+    string $terminalNumber,
+    int $shiftId,
+    string $databaseLabel
+): void {
+    $stmt = $pdo->prepare("
+        SELECT COUNT(*)
+        FROM {$shiftTable}
+        WHERE Unit_Code = ?
+          AND terminal_number = ?
+          AND Shift_ID = ?
+        FOR UPDATE
+    ");
+    $stmt->execute([$unitCode, $terminalNumber, $shiftId]);
+
+    if ((int)$stmt->fetchColumn() > 0) {
+        throw new Exception("Shift ID {$shiftId} already exists in {$databaseLabel}.");
+    }
+}
+
+function insertShiftRecord(PDO $pdo, string $shiftTable, array $shiftRecord): void
+{
+    $stmt = $pdo->prepare("
+        INSERT INTO {$shiftTable} (
+            Category_Code,
+            Unit_Code,
+            Shift_ID,
+            terminal_number,
+            Opening_User_ID,
+            Opening_DateTime,
+            Opening_Cash_Count,
+            Closing_User_ID,
+            Closing_DateTime,
+            Closing_Cash_Count,
+            Shift_Status,
+            Status,
+            Date_Recorded
+        ) VALUES (
+            :Category_Code,
+            :Unit_Code,
+            :Shift_ID,
+            :terminal_number,
+            :Opening_User_ID,
+            :Opening_DateTime,
+            :Opening_Cash_Count,
+            '0',
+            '',
+            '0',
+            'Open',
+            'Active',
+            NOW()
+        )
+    ");
+
+    $stmt->execute($shiftRecord);
+}
+
 /*
 |--------------------------------------------------------------------------
 | Load Config
@@ -81,7 +207,14 @@ $config = require $configPath;
 |--------------------------------------------------------------------------
 */
 try {
-    $dsn = "mysql:host={$config['host']};dbname={$config['db']};charset={$config['charset']}";
+    $posDbName = requireMysqlIdentifier($config['db'] ?? "db_cnc_pos", "POS database name");
+    $reportDbName = requireMysqlIdentifier($config['report_db'] ?? "reports_database", "report database name");
+    $charset = requireMysqlIdentifier($config['charset'] ?? "utf8mb4", "database charset");
+    $posShiftTable = qualifiedTableName($posDbName, "tbl_pos_shifting_records");
+    $reportShiftTable = qualifiedTableName($reportDbName, "tbl_pos_shifting_records");
+    $mirrorReportShift = strcasecmp($posDbName, $reportDbName) !== 0;
+
+    $dsn = "mysql:host={$config['host']};dbname={$posDbName};charset={$charset}";
     $pdo = new PDO(
         $dsn,
         $config['user'],
@@ -91,7 +224,7 @@ try {
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         ]
     );
-} catch (PDOException $e) {
+} catch (Throwable $e) {
     respondJson(500, [
         "status"  => "error",
         "message" => "Database connection failed.",
@@ -207,19 +340,10 @@ try {
     | Check Existing Open Shift
     |--------------------------------------------------------------------------
     */
-    $sqlCheckOpen = "
-        SELECT COUNT(*) 
-        FROM tbl_pos_shifting_records
-        WHERE Unit_Code = ?
-          AND terminal_number = ?
-          AND Shift_Status = 'Open'
-        FOR UPDATE
-    ";
-    $stmtCheckOpen = $pdo->prepare($sqlCheckOpen);
-    $stmtCheckOpen->execute([$unit_code, $terminal_number]);
+    assertNoOpenShift($pdo, $posShiftTable, $unit_code, $terminal_number, "POS database");
 
-    if ((int)$stmtCheckOpen->fetchColumn() > 0) {
-        throw new Exception("This terminal already has an active open shift.");
+    if ($mirrorReportShift) {
+        assertNoOpenShift($pdo, $reportShiftTable, $unit_code, $terminal_number, "report database");
     }
 
     /*
@@ -229,7 +353,7 @@ try {
     */
     $sqlCheckPendingSync = "
         SELECT COUNT(*)
-        FROM tbl_pos_shifting_records
+        FROM {$posShiftTable}
         WHERE Unit_Code = ?
           AND terminal_number = ?
           AND Shift_Status = 'Closed'
@@ -248,19 +372,17 @@ try {
     | Check Duplicate Date Record
     |--------------------------------------------------------------------------
     */
-    $sqlCheckDate = "
-        SELECT COUNT(*)
-        FROM tbl_pos_shifting_records
-        WHERE Unit_Code = ?
-          AND terminal_number = ?
-          AND DATE(Opening_DateTime) = ?
-        FOR UPDATE
-    ";
-    $stmtCheckDate = $pdo->prepare($sqlCheckDate);
-    $stmtCheckDate->execute([$unit_code, $terminal_number, $checkDate]);
+    assertNoDuplicateShiftDate($pdo, $posShiftTable, $unit_code, $terminal_number, $checkDate, "POS database");
 
-    if ((int)$stmtCheckDate->fetchColumn() > 0) {
-        throw new Exception("A shift record for this date already exists.");
+    if ($mirrorReportShift) {
+        assertNoDuplicateShiftDate(
+            $pdo,
+            $reportShiftTable,
+            $unit_code,
+            $terminal_number,
+            $checkDate,
+            "report database"
+        );
     }
 
     /*
@@ -270,7 +392,7 @@ try {
     */
     $sqlShiftId = "
         SELECT COALESCE(MAX(Shift_ID), 0) + 1
-        FROM tbl_pos_shifting_records
+        FROM {$posShiftTable}
         WHERE Unit_Code = ?
           AND terminal_number = ?
         FOR UPDATE
@@ -284,45 +406,23 @@ try {
         throw new Exception("Failed to generate shift id.");
     }
 
+    if ($mirrorReportShift) {
+        assertNoDuplicateShiftId(
+            $pdo,
+            $reportShiftTable,
+            $unit_code,
+            $terminal_number,
+            $next_shift_id,
+            "report database"
+        );
+    }
+
     /*
     |--------------------------------------------------------------------------
-    | Insert Shift Record
+    | Insert Shift Record To Both Databases
     |--------------------------------------------------------------------------
     */
-    $sqlInsert = "
-        INSERT INTO tbl_pos_shifting_records (
-            Category_Code,
-            Unit_Code,
-            Shift_ID,
-            terminal_number,
-            Opening_User_ID,
-            Opening_DateTime,
-            Opening_Cash_Count,
-            Closing_User_ID,
-            Closing_DateTime,
-            Closing_Cash_Count,
-            Shift_Status,
-            Status,
-            Date_Recorded
-        ) VALUES (
-            :Category_Code,
-            :Unit_Code,
-            :Shift_ID,
-            :terminal_number,
-            :Opening_User_ID,
-            :Opening_DateTime,
-            :Opening_Cash_Count,
-            '0',
-            '',
-            '0',
-            'Open',
-            'Active',
-            NOW()
-        )
-    ";
-
-    $stmtInsert = $pdo->prepare($sqlInsert);
-    $stmtInsert->execute([
+    $shiftRecord = [
         ":Category_Code"     => $category_code,
         ":Unit_Code"         => $unit_code,
         ":Shift_ID"          => $next_shift_id,
@@ -330,7 +430,13 @@ try {
         ":Opening_User_ID"   => $user_id,
         ":Opening_DateTime"  => $openNewDateTime,
         ":Opening_Cash_Count"=> (float)$opening_cash
-    ]);
+    ];
+
+    insertShiftRecord($pdo, $posShiftTable, $shiftRecord);
+
+    if ($mirrorReportShift) {
+        insertShiftRecord($pdo, $reportShiftTable, $shiftRecord);
+    }
 
     /*
     |--------------------------------------------------------------------------
@@ -354,6 +460,7 @@ try {
             "terminal_number"             => $terminal_number,
             "category_code"               => $category_code,
             "unit_code"                   => $unit_code,
+            "report_database"             => $mirrorReportShift ? $reportDbName : $posDbName,
             "status"                      => "Open"
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
@@ -453,11 +560,15 @@ try {
 
     respondJson(200, [
         "status"  => "success",
-        "message" => "New shift has been opened successfully.",
+        "message" => $mirrorReportShift
+            ? "New shift has been opened successfully in POS and report database."
+            : "New shift has been opened successfully.",
         "data"    => [
             "shift_id"      => $next_shift_id,
             "opening_time"  => $openNewDateTime,
-            "opening_cash"  => (float)$opening_cash
+            "opening_cash"  => (float)$opening_cash,
+            "pos_database"  => $posDbName,
+            "report_database" => $mirrorReportShift ? $reportDbName : null
         ]
     ]);
 } catch (Throwable $e) {

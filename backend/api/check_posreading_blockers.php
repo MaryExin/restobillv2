@@ -8,10 +8,55 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
     exit;
 }
 
-require __DIR__ . "/pdo.php";
+function requireMysqlIdentifier($value, string $label): string
+{
+    $identifier = trim((string)$value);
+
+    if ($identifier === "" || !preg_match('/^[A-Za-z0-9_]+$/', $identifier)) {
+        throw new InvalidArgumentException("Invalid {$label} configured.");
+    }
+
+    return $identifier;
+}
+
+function resolveReadingDatabaseName(array $input, string $posDbName, string $reportDbName): array
+{
+    $scope = strtolower(trim((string)(
+        $input["readingDatabaseScope"] ??
+        $input["reading_database_scope"] ??
+        "cnc"
+    )));
+
+    if ($scope === "report") {
+        return [$reportDbName, "report"];
+    }
+
+    return [$posDbName, "cnc"];
+}
 
 try {
     $input = json_decode(file_get_contents("php://input"), true);
+
+    if (!is_array($input)) {
+        $input = $_POST;
+    }
+
+    $config = require __DIR__ . "/config.php";
+    $posDbName = requireMysqlIdentifier($config["db"] ?? "db_cnc_pos", "POS database name");
+    $reportDbName = requireMysqlIdentifier($config["report_db"] ?? "reports_database", "report database name");
+    $charset = requireMysqlIdentifier($config["charset"] ?? "utf8mb4", "database charset");
+    [$readingDbName, $readingDatabaseScope] = resolveReadingDatabaseName($input, $posDbName, $reportDbName);
+
+    $pdo = new PDO(
+        "mysql:host={$config['host']};dbname={$readingDbName};charset={$charset}",
+        $config["user"],
+        $config["pass"],
+        [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES => false,
+        ]
+    );
 
     $transactionDate = isset($input["transaction_date"])
         ? trim((string) $input["transaction_date"])
@@ -99,11 +144,13 @@ try {
             ? "POS Reading is blocked because there are still transactions with remarks Pending for Payment or Billed."
             : "No blocking transactions found.",
         "transactionDate" => $transactionDate,
+        "readingDatabaseScope" => $readingDatabaseScope,
+        "readingDatabase" => $readingDbName,
         "totalTransactions" => count($data),
         "totalAmountDue" => $totalAmountDue,
         "data" => $data
     ]);
-} catch (PDOException $e) {
+} catch (Throwable $e) {
     http_response_code(500);
     echo json_encode([
         "success" => false,

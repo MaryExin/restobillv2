@@ -10,6 +10,7 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
 }
 
 require __DIR__ . "/pdo.php";
+require_once __DIR__ . "/pos_report_mirror.php";
 
 function respond(bool $success, string $message, int $status = 200, array $extra = []): void {
     http_response_code($status);
@@ -100,6 +101,8 @@ try {
         SET next_refund_id = next_refund_id + 1
         WHERE Category_Code = :cat AND Unit_Code = :unit
     ")->execute([":cat" => $categoryCode, ":unit" => $unitCode]);
+
+    mirrorPosTransactionToReport($pdo, $config, $transactionId, $categoryCode, $unitCode);
 
     $pdo->commit();
 

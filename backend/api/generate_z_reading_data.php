@@ -13,9 +13,129 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
 
 $config = require __DIR__ . "/config.php";
 
+function requireMysqlIdentifier($value, string $label): string
+{
+    $identifier = trim((string)$value);
+
+    if ($identifier === "" || !preg_match('/^[A-Za-z0-9_]+$/', $identifier)) {
+        throw new InvalidArgumentException("Invalid {$label} configured.");
+    }
+
+    return $identifier;
+}
+
+function quoteMysqlIdentifier(string $identifier): string
+{
+    return "`" . str_replace("`", "``", $identifier) . "`";
+}
+
+function qualifiedTableName(string $databaseName, string $tableName): string
+{
+    return quoteMysqlIdentifier($databaseName) . "." . quoteMysqlIdentifier($tableName);
+}
+
+function resolveReadingDatabaseName(array $input, string $posDbName, string $reportDbName): array
+{
+    $scope = strtolower(trim((string)(
+        $input["readingDatabaseScope"] ??
+        $input["reading_database_scope"] ??
+        "cnc"
+    )));
+
+    if ($scope === "report") {
+        return [$reportDbName, "report"];
+    }
+
+    return [$posDbName, "cnc"];
+}
+
+function executeCloseShiftStatement(
+    PDO $pdo,
+    string $shiftTable,
+    $closingUserId,
+    string $closingDateTime,
+    float $cashDrawerAmount,
+    float $begOR,
+    float $endOR,
+    float $begVoidNo,
+    float $endVoidNo,
+    float $begRefundNo,
+    float $endRefundNo,
+    float $zCounterNo,
+    float $grandAccumSales,
+    string $shiftId,
+    string $categoryCode,
+    string $unitCode,
+    string $terminalNumber
+): int {
+    $stmt = $pdo->prepare("
+        UPDATE {$shiftTable}
+        SET
+            Closing_User_ID = ?,
+            Closing_DateTime = ?,
+            Closing_Cash_Count = ?,
+            Beg_OR = ?,
+            End_OR = ?,
+            Beg_VoidNo = ?,
+            End_VoidNo = ?,
+            Beg_RefundNo = ?,
+            End_RefundNo = ?,
+            Z_Counter_No = ?,
+            Grand_Accum_Sales = ?,
+            Shift_Status = 'Closed'
+        WHERE Shift_ID = ?
+          AND Category_Code = ?
+          AND Unit_Code = ?
+          AND terminal_number = ?
+          AND Shift_Status = 'Open'
+    ");
+
+    $stmt->execute([
+        $closingUserId,
+        $closingDateTime,
+        $cashDrawerAmount,
+        $begOR,
+        $endOR,
+        $begVoidNo,
+        $endVoidNo,
+        $begRefundNo,
+        $endRefundNo,
+        $zCounterNo,
+        $grandAccumSales,
+        $shiftId,
+        $categoryCode,
+        $unitCode,
+        $terminalNumber,
+    ]);
+
+    return $stmt->rowCount();
+}
+
 try {
+    $posDbName = requireMysqlIdentifier($config["db"] ?? "db_cnc_pos", "POS database name");
+    $reportDbName = requireMysqlIdentifier($config["report_db"] ?? "reports_database", "report database name");
+    $charset = requireMysqlIdentifier($config["charset"] ?? "utf8mb4", "database charset");
+    $raw = file_get_contents("php://input");
+    $input = json_decode($raw, true);
+
+    if (!$input || !is_array($input)) {
+        $input = $_POST;
+    }
+
+    [$readingDbName, $readingDatabaseScope] = resolveReadingDatabaseName($input, $posDbName, $reportDbName);
+    $readingShiftTable = qualifiedTableName($readingDbName, "tbl_pos_shifting_records");
+    $posShiftTable = qualifiedTableName($posDbName, "tbl_pos_shifting_records");
+    $reportShiftTable = qualifiedTableName($reportDbName, "tbl_pos_shifting_records");
+    $mirrorReportShift = strcasecmp($posDbName, $reportDbName) !== 0;
+    $mirrorShiftTable = strcasecmp($readingDbName, $reportDbName) === 0
+        ? $posShiftTable
+        : $reportShiftTable;
+    $readingDatabaseLabel = $readingDatabaseScope === "report"
+        ? "report database"
+        : "POS database";
+
     $pdo = new PDO(
-        "mysql:host={$config['host']};dbname={$config['db']};charset=utf8mb4",
+        "mysql:host={$config['host']};dbname={$readingDbName};charset={$charset}",
         $config["user"],
         $config["pass"],
         [
@@ -23,13 +143,6 @@ try {
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         ]
     );
-
-    $raw = file_get_contents("php://input");
-    $input = json_decode($raw, true);
-
-    if (!$input || !is_array($input)) {
-        $input = $_POST;
-    }
 
     $selectedCashier = isset($input["selectedCashier"])
         ? trim((string)$input["selectedCashier"])
@@ -306,29 +419,9 @@ try {
 
     $pdo->beginTransaction();
 
-    $stmtUpdateShift = $pdo->prepare("
-        UPDATE tbl_pos_shifting_records
-        SET
-            Closing_User_ID = ?,
-            Closing_DateTime = ?,
-            Closing_Cash_Count = ?,
-            Beg_OR = ?,
-            End_OR = ?,
-            Beg_VoidNo = ?,
-            End_VoidNo = ?,
-            Beg_RefundNo = ?,
-            End_RefundNo = ?,
-            Z_Counter_No = ?,
-            Grand_Accum_Sales = ?,
-            Shift_Status = 'Closed'
-        WHERE Shift_ID = ?
-          AND Category_Code = ?
-          AND Unit_Code = ?
-          AND terminal_number = ?
-          AND Shift_Status = 'Open'
-    ");
-
-    $stmtUpdateShift->execute([
+    $closedPosRows = executeCloseShiftStatement(
+        $pdo,
+        $readingShiftTable,
         $closingUserId,
         $closingDateTime,
         $cashDrawerAmount,
@@ -343,12 +436,39 @@ try {
         $shiftId,
         $categoryCode,
         $unitCode,
-        $terminalNumber,
-    ]);
+        $terminalNumber
+    );
 
-    if ($stmtUpdateShift->rowCount() <= 0) {
+    if ($closedPosRows <= 0) {
         $pdo->rollBack();
-        throw new Exception("Failed to close the shifting record.");
+        throw new Exception("Failed to close the {$readingDatabaseLabel} shifting record.");
+    }
+
+    if ($mirrorReportShift) {
+        $closedReportRows = executeCloseShiftStatement(
+            $pdo,
+            $mirrorShiftTable,
+            $closingUserId,
+            $closingDateTime,
+            $cashDrawerAmount,
+            $begOR,
+            $endOR,
+            $begVoidNo,
+            $endVoidNo,
+            $begRefundNo,
+            $endRefundNo,
+            $zCounterNo,
+            $grandAccumSales,
+            $shiftId,
+            $categoryCode,
+            $unitCode,
+            $terminalNumber
+        );
+
+        if ($closedReportRows <= 0) {
+            $pdo->rollBack();
+            throw new Exception("Failed to close the matching shift record in the other database.");
+        }
     }
 
     $sql = "
@@ -646,6 +766,8 @@ try {
         $valuesOfData = json_encode([
             "shift_id" => $shiftId,
             "selected_cashier" => $selectedCashier,
+            "reading_database_scope" => $readingDatabaseScope,
+            "reading_database" => $readingDbName,
             "terminal_number" => $terminalNumber,
             "report_date" => $reportDate,
             "opening_datetime" => $openingDateTime,
@@ -780,6 +902,8 @@ try {
         "message" => "Current shift has been closed and Z-Reading data loaded successfully.",
         "data" => [
             "shiftId" => $shiftId,
+            "readingDatabaseScope" => $readingDatabaseScope,
+            "readingDatabase" => $readingDbName,
             "selectedCashier" => $selectedCashier,
             "reportDate" => $parReportDate,
             "reportTime" => $parReportTime,

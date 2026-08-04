@@ -93,6 +93,11 @@ export default function PosReadingModal({
     return String(shiftingDate || "").split(" ")[0];
   }, [shiftingDate]);
 
+  const readingDatabaseScope = () =>
+    localStorage.getItem("posReadingDatabaseScope") === "report"
+      ? "report"
+      : "cnc";
+
   const resetForm = () => {
     setValues({
       cashDrawerAmount: "",
@@ -145,6 +150,7 @@ export default function PosReadingModal({
           category_code: categoryCode || "",
           unit_code: unitCode || "",
           terminal_number: localStorage.getItem("posTerminalNumber") || "1",
+          readingDatabaseScope: readingDatabaseScope(),
         }),
       },
     );
@@ -575,85 +581,127 @@ export default function PosReadingModal({
     return result;
   };
 
-  const handlePrint = async () => {
-    if (!validate()) return;
+  const ensureReadingReady = () => {
+    if (!validate()) return false;
 
     if (isBusInfoLoading) {
       openBlockerModal(
         "Business Info Loading",
         "Business information is still loading.",
       );
-      return;
+      return false;
     }
 
     if (businessInfoError) {
       openBlockerModal("Business Info Error", businessInfoError);
-      return;
+      return false;
     }
+
+    return true;
+  };
+
+  const buildReadingRequestBody = (isZReading) => ({
+    readingType: isZReading ? "Z" : "X",
+    selectedCashier,
+    cashDrawerAmount: Number(values.cashDrawerAmount || 0),
+    verifyAmount: Number(values.verifyAmount || 0),
+    categoryCode: categoryCode || "",
+    unitCode: unitCode || "",
+    terminalNumber: localStorage.getItem("posTerminalNumber") || "1",
+    corpName: businessInfo.corpName || "",
+    shiftingDate: normalizedShiftDate,
+    machineNumber: businessInfo.machineNumber || "",
+    serialNumber: businessInfo.serialNumber || "",
+    ptuNumber: businessInfo.posProviderPTUNo || "",
+    ptuDateIssued: businessInfo.posProviderPTUDateIssued || "",
+    readingDatabaseScope: readingDatabaseScope(),
+    user_id: localStorage.getItem("user_id") || "",
+    user_name: localStorage.getItem("Cashier") || "Store Crew",
+    cashier_name: localStorage.getItem("username") || "Store Crew",
+  });
+
+  const buildReadingPayload = (results) => ({
+    ...results.data,
+    companyName: businessInfo.companyName || "",
+    storeName: businessInfo.storeName || "",
+    corpName: businessInfo.corpName || "",
+    address: businessInfo.address || "",
+    tin: businessInfo.tin || "",
+    machineNumber: businessInfo.machineNumber || "",
+    serialNumber: businessInfo.serialNumber || "",
+    terminalNumber: localStorage.getItem("posTerminalNumber") || "1",
+    ptuNumber: businessInfo.posProviderPTUNo || "",
+    ptuDateIssued: businessInfo.posProviderPTUDateIssued || "",
+    posProviderName: businessInfo.posProviderName || "",
+    posProviderAddress: businessInfo.posProviderAddress || "",
+    posProviderTin: businessInfo.posProviderTin || "",
+    posProviderBirAccreNo: businessInfo.posProviderBirAccreNo || "",
+    posProviderAccreDateIssued:
+      businessInfo.posProviderAccreDateIssued || "",
+    summaryCashInDrawer: Number(values.cashDrawerAmount || 0),
+    cashInDrawer: Number(values.cashDrawerAmount || 0),
+    vatExemption:
+      results.data?.vatExemption ??
+      results.data?.lessVatExemption ??
+      results.data?.vatExemptVat ??
+      0,
+  });
+
+  const loadReadingPayload = async (isZReading) => {
+    const endpoint = isZReading ? zEndpoint : xEndpoint;
+    const response = await fetch(`${apiHost}${endpoint}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(buildReadingRequestBody(isZReading)),
+    });
+
+    const results = await response.json();
+
+    if (!response.ok || !results.success) {
+      throw new Error(results.message || "Failed to load reading data.");
+    }
+
+    return buildReadingPayload(results);
+  };
+
+  const refreshAfterZReading = async () => {
+    setActiveType(null);
+    resetForm();
+    onClose();
+
+    try {
+      await onZReadingPrinted();
+
+      if (window.refreshOpenNewDayShift) {
+        await window.refreshOpenNewDayShift();
+      }
+
+      if (window.refreshShiftPanel) {
+        await window.refreshShiftPanel();
+      }
+
+      if (window.refreshLayoutShift) {
+        await window.refreshLayoutShift();
+      }
+
+      if (window.refreshSwitchUserShift) {
+        await window.refreshSwitchUserShift();
+      }
+    } catch (refreshError) {
+      console.error("Shift refresh error:", refreshError);
+    }
+  };
+
+  const handlePrint = async () => {
+    if (!ensureReadingReady()) return;
 
     try {
       setIsPrinting(true);
 
       const isZReading = activeType === "z";
-      const endpoint = isZReading ? zEndpoint : xEndpoint;
-
-      const response = await fetch(`${apiHost}${endpoint}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          readingType: isZReading ? "Z" : "X",
-          selectedCashier,
-          cashDrawerAmount: Number(values.cashDrawerAmount || 0),
-          verifyAmount: Number(values.verifyAmount || 0),
-          categoryCode: categoryCode || "",
-          unitCode: unitCode || "",
-          terminalNumber: localStorage.getItem("posTerminalNumber") || "1",
-          corpName: businessInfo.corpName || "",
-          shiftingDate: normalizedShiftDate,
-          machineNumber: businessInfo.machineNumber || "",
-          serialNumber: businessInfo.serialNumber || "",
-          ptuNumber: businessInfo.posProviderPTUNo || "",
-          ptuDateIssued: businessInfo.posProviderPTUDateIssued || "",
-          user_id: localStorage.getItem("user_id") || "",
-          user_name: localStorage.getItem("Cashier") || "Store Crew",
-          cashier_name: localStorage.getItem("username") || "Store Crew",
-        }),
-      });
-
-      const results = await response.json();
-
-      if (!response.ok || !results.success) {
-        throw new Error(results.message || "Failed to load reading data.");
-      }
-
-      const payload = {
-        ...results.data,
-        companyName: businessInfo.companyName || "",
-        storeName: businessInfo.storeName || "",
-        corpName: businessInfo.corpName || "",
-        address: businessInfo.address || "",
-        tin: businessInfo.tin || "",
-        machineNumber: businessInfo.machineNumber || "",
-        serialNumber: businessInfo.serialNumber || "",
-        terminalNumber: localStorage.getItem("posTerminalNumber") || "1",
-        ptuNumber: businessInfo.posProviderPTUNo || "",
-        ptuDateIssued: businessInfo.posProviderPTUDateIssued || "",
-        posProviderName: businessInfo.posProviderName || "",
-        posProviderAddress: businessInfo.posProviderAddress || "",
-        posProviderTin: businessInfo.posProviderTin || "",
-        posProviderBirAccreNo: businessInfo.posProviderBirAccreNo || "",
-        posProviderAccreDateIssued:
-          businessInfo.posProviderAccreDateIssued || "",
-        summaryCashInDrawer: Number(values.cashDrawerAmount || 0),
-        cashInDrawer: Number(values.cashDrawerAmount || 0),
-        vatExemption:
-          results.data?.vatExemption ??
-          results.data?.lessVatExemption ??
-          results.data?.vatExemptVat ??
-          0,
-      };
+      const payload = await loadReadingPayload(isZReading);
 
       const result = await window.electronAPI.printEscposXzReading({
         payload,
@@ -666,31 +714,7 @@ export default function PosReadingModal({
       }
 
       if (isZReading) {
-        setActiveType(null);
-        resetForm();
-        onClose();
-
-        try {
-          await onZReadingPrinted();
-
-          if (window.refreshOpenNewDayShift) {
-            await window.refreshOpenNewDayShift();
-          }
-
-          if (window.refreshShiftPanel) {
-            await window.refreshShiftPanel();
-          }
-
-          if (window.refreshLayoutShift) {
-            await window.refreshLayoutShift();
-          }
-
-          if (window.refreshSwitchUserShift) {
-            await window.refreshSwitchUserShift();
-          }
-        } catch (refreshError) {
-          console.error("Shift refresh error:", refreshError);
-        }
+        await refreshAfterZReading();
       }
     } catch (error) {
       console.error(error);
@@ -802,8 +826,7 @@ export default function PosReadingModal({
                         {activeType === "x" ? "X-Reading" : "Z-Reading"}
                       </h3>
                       <p className="mt-2 text-sm text-zinc-500">
-                        Enter the cash drawer amount and verify it before
-                        printing.
+                        Enter the cash drawer amount and verify it first.
                       </p>
                     </div>
 
@@ -828,6 +851,7 @@ export default function PosReadingModal({
                       value={values.cashDrawerAmount}
                       onChange={handleChange}
                       error={errors.cashDrawerAmount}
+                      disabled={isPrinting}
                     />
 
                     <AmountField
@@ -836,6 +860,7 @@ export default function PosReadingModal({
                       value={values.verifyAmount}
                       onChange={handleChange}
                       error={errors.verifyAmount}
+                      disabled={isPrinting}
                     />
                   </div>
 
@@ -998,7 +1023,7 @@ function ReadingCard({ title, onClick, iconClassName = "", disabled = false }) {
   );
 }
 
-function AmountField({ label, name, value, onChange, error }) {
+function AmountField({ label, name, value, onChange, error, disabled = false }) {
   return (
     <div>
       <label className="mb-2 block text-sm font-semibold text-zinc-700">
@@ -1015,8 +1040,9 @@ function AmountField({ label, name, value, onChange, error }) {
           inputMode="decimal"
           value={value}
           onChange={(e) => onChange(name, e.target.value)}
+          disabled={disabled}
           placeholder="0.00"
-          className={`h-14 w-full rounded-2xl border bg-white pl-10 pr-4 text-base text-zinc-800 outline-none transition ${
+          className={`h-14 w-full rounded-2xl border bg-white pl-10 pr-4 text-base text-zinc-800 outline-none transition disabled:cursor-not-allowed disabled:opacity-60 ${
             error
               ? "border-rose-400 focus:border-rose-500"
               : "border-zinc-200 focus:border-sky-400"

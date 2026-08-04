@@ -203,6 +203,8 @@ const SwitchUser = () => {
       const nextUsername = selectedUser?.name || result?.username || "";
       const nextEmail = selectedUser?.email || result?.email || loginEmail;
       const nextProfilePic = result?.profile_pic ?? "";
+      const nextReadingDatabaseScope =
+        result?.reading_database_scope === "report" ? "report" : "cnc";
 
       let nextRole = result?.userrole ?? "";
       if (Array.isArray(nextRole)) {
@@ -221,6 +223,10 @@ const SwitchUser = () => {
       localStorage.setItem("user_id", nextUserId);
       localStorage.setItem("username", nextUsername);
       localStorage.setItem("email", nextEmail);
+      localStorage.setItem(
+        "posReadingDatabaseScope",
+        nextReadingDatabaseScope,
+      );
       localStorage.setItem(
         "user_role",
         Array.isArray(result?.userrole)
