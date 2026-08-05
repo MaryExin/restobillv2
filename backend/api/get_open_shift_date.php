@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . "/cors.php";
+
 // api/get_open_shift_date.php
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS");

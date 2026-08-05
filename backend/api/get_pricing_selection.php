@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . "/cors.php";
+
 /**
  * PRICING SELECTION API
  * Gets sales type ID, pricing category, and priced products
