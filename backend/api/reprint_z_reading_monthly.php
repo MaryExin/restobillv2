@@ -25,8 +25,6 @@ try {
         $input = array_merge($input ?: [], $_GET);
     }
 
-    $pdo = getReportPdo($input["role"] ?? $input["user_role"] ?? null);
-
     $dateFrom = isset($input["dateFrom"])
         ? trim((string)$input["dateFrom"])
         : (isset($input["date_from"]) ? trim((string)$input["date_from"]) : "");
@@ -34,6 +32,8 @@ try {
     $dateTo = isset($input["dateTo"])
         ? trim((string)$input["dateTo"])
         : (isset($input["date_to"]) ? trim((string)$input["date_to"]) : "");
+
+    $pdo = getReportPdo($dateFrom, $dateTo);
 
     $categoryCode = "";
     if (isset($input["categoryCode"])) {

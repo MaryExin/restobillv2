@@ -1,18 +1,43 @@
 <?php
-// Picks which DB config a report endpoint should read from:
-// - superadmin -> archive_db (db_mark)
-// - everyone else (cashier, etc.) -> main_db (db_cnc_pos)
+// Picks which DB config a report endpoint should read from, based on the
+// report date(s) being requested:
+// - any requested date before today -> report_db (backup archive db)
+// - dates that are all today (or no date given)  -> db (live db)
 
-function resolveReportDbConfig(array $config, ?string $role): array
+function reportDbShouldUseArchive(?string $dateFrom, ?string $dateTo = null): bool
 {
-    $role = strtolower(trim((string)$role));
-    return $role === "superadmin" ? $config["archive_db"] : $config["main_db"];
+    $today = date("Y-m-d");
+    $dateFrom = trim((string)$dateFrom);
+    $dateTo = trim((string)$dateTo);
+
+    if ($dateFrom === "" && $dateTo === "") {
+        return false;
+    }
+    if ($dateFrom === "") {
+        $dateFrom = $dateTo;
+    }
+    if ($dateTo === "") {
+        $dateTo = $dateFrom;
+    }
+
+    return $dateFrom < $today || $dateTo < $today;
 }
 
-function getReportPdo(?string $role): PDO
+function resolveReportDbConfig(array $config, ?string $dateFrom, ?string $dateTo = null): array
+{
+    $dbConfig = $config;
+
+    if (reportDbShouldUseArchive($dateFrom, $dateTo)) {
+        $dbConfig["db"] = $config["report_db"] ?? $config["db"];
+    }
+
+    return $dbConfig;
+}
+
+function getReportPdo(?string $dateFrom, ?string $dateTo = null): PDO
 {
     $config = require __DIR__ . "/config.php";
-    $dbConfig = resolveReportDbConfig($config, $role);
+    $dbConfig = resolveReportDbConfig($config, $dateFrom, $dateTo);
 
     $dsn = "mysql:host={$dbConfig['host']};dbname={$dbConfig['db']};charset={$dbConfig['charset']}";
     $options = [
@@ -31,10 +56,10 @@ function getReportPdo(?string $role): PDO
     }
 }
 
-function getReportMysqli(?string $role): mysqli
+function getReportMysqli(?string $dateFrom, ?string $dateTo = null): mysqli
 {
     $config = require __DIR__ . "/config.php";
-    $dbConfig = resolveReportDbConfig($config, $role);
+    $dbConfig = resolveReportDbConfig($config, $dateFrom, $dateTo);
 
     $conn = new mysqli($dbConfig["host"], $dbConfig["user"], $dbConfig["pass"], $dbConfig["db"]);
     if ($conn->connect_error) {

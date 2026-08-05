@@ -9,12 +9,14 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") { exit; }
 
 $raw = file_get_contents("php://input");
 $body = json_decode($raw, true) ?: [];
-$role = $body["role"] ?? $body["user_role"] ?? ($_GET["role"] ?? "");
-
-require __DIR__ . "/pdo.php";
 
 $datefrom = $body["datefrom"] ?? date("Y-m-d");
 $dateto   = $body["dateto"] ?? date("Y-m-d");
+
+$reportDateFrom = $datefrom;
+$reportDateTo   = $dateto;
+
+require __DIR__ . "/pdo.php";
 
 $graph_datefrom = $body["graph_datefrom"] ?? $datefrom;
 $graph_dateto   = $body["graph_dateto"] ?? $datefrom;

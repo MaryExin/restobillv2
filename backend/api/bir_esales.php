@@ -10,10 +10,10 @@ require __DIR__ . '/report_db.php';
 
 try {
     $input = json_decode(file_get_contents("php://input"), true);
-    $conn = getReportPdo($input['role'] ?? $input['user_role'] ?? null);
     $activeTab = $input['tab'] ?? 'E1';
     $dateFrom = $input['dateFrom'] ?? date('Y-m-d');
     $dateTo = $input['dateTo'] ?? date('Y-m-d');
+    $conn = getReportPdo($dateFrom, $dateTo);
 
     $resultData = [];
 

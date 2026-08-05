@@ -4,7 +4,6 @@ header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
 
-require __DIR__ . "/pdo.php";
 require dirname(__DIR__) . "/vendor/autoload.php";
 
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -17,6 +16,11 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") { exit; }
 $report = $_GET["report"] ?? "daily";
 $datefrom = $_GET["datefrom"] ?? date("Y-m-d");
 $dateto   = $_GET["dateto"] ?? date("Y-m-d");
+
+$reportDateFrom = $datefrom;
+$reportDateTo   = $dateto;
+
+require __DIR__ . "/pdo.php";
 $includeVoided = !empty($_GET["includeVoided"]);
 $voidOnly = !empty($_GET["voidOnly"]);
 $year = $_GET["year"] ?? date("Y");

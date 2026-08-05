@@ -89,12 +89,12 @@ try {
     $json = json_decode($raw, true);
     $input = is_array($json) ? $json : $_POST;
 
-    $pdo = getReportPdo($input["role"] ?? $input["user_role"] ?? null);
-
     $categoryCode = trim((string)($input["categoryCode"] ?? $input["category_code"] ?? ""));
     $unitCode = trim((string)($input["unitCode"] ?? $input["unit_code"] ?? ""));
     $terminalNumber = trim((string)($input["terminalNumber"] ?? $input["terminal_number"] ?? "1"));
     $reportDate = trim((string)($input["reportDate"] ?? $input["report_date"] ?? date("Y-m-d")));
+
+    $pdo = getReportPdo($reportDate);
     $tenantId = trim((string)($input["tenantId"] ?? "19092784"));
     $tenantKey = trim((string)($input["tenantKey"] ?? "K9BRJGJS"));
 

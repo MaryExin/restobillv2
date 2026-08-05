@@ -6,7 +6,7 @@ header("Access-Control-Allow-Methods: GET");
 require __DIR__ . '/report_db.php';
 
 try {
-    $pdo = getReportPdo($_GET['role'] ?? $_GET['user_role'] ?? null);
+    $pdo = getReportPdo($_GET['date'] ?? null);
 
     // 3. Check if 'id' is provided
     if (isset($_GET['id'])) {
