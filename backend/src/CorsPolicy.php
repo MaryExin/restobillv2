@@ -16,6 +16,7 @@ class CorsPolicy
             header("Access-Control-Allow-Origin: {$_SERVER['HTTP_ORIGIN']}");
             //header("Access-Control-Allow-Origin: https://www.Exinnovphretail.com");
             header('Access-Control-Allow-Credentials: true');
+            header('Access-Control-Allow-Private-Network: true');
             header('Access-Control-Max-Age: 86400'); // cache for 1 day
         }
 
@@ -25,7 +26,7 @@ class CorsPolicy
             if (isset($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_METHOD']))
             // may also be using PUT, PATCH, HEAD etc
             {
-                header("Access-Control-Allow-Methods: GET, POST, PATCH, DELETE");
+                header("Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS");
             }
 
             if (isset($_SERVER['HTTP_ACCESS_CONTROL_REQUEST_HEADERS'])) {

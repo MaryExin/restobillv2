@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . "/cors.php";
+
 /**
  * NEW TRANSACTION API
  * Loads business info, inventory types, sales types, and item categories

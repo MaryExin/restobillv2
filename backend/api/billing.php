@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . "/cors.php";
+
 /**
  * BILLING / TRANSACTION SAVING API (SAFE - NO DUPLICATES)
  * WITH DISCOUNT BREAKDOWN SYNC TO tbl_pos_transactions_discounts

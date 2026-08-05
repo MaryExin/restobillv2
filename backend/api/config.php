@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . "/cors.php";
+
 return [
     "host" => "localhost",
     "user" => "root",
