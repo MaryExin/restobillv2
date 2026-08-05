@@ -27,29 +27,24 @@ try {
 
     $pdo = new PDO($dsn, $config['user'], $config['pass'], $options);
 
-    $user_id = $_GET['user_id'] ?? "";
-
-    if (empty($user_id)) {
-        http_response_code(400);
-        echo json_encode([
-            "message" => "User ID missing."
-        ]);
-        exit;
-    }
+    $user_id = trim($_GET['user_id'] ?? "");
 
     // --- Query 1: Current User Details ---
-    $sql_user = "
-        SELECT 
-            CONCAT(firstname, ' ', lastname) AS full_name,
-            classification AS User_Role
-        FROM tbl_users_global_assignment
-        WHERE uuid = :user_id
-        LIMIT 1
-    ";
-    $stmt_user = $pdo->prepare($sql_user);
-    $stmt_user->bindValue(':user_id', $user_id, PDO::PARAM_STR);
-    $stmt_user->execute();
-    $user_data = $stmt_user->fetch();
+    $user_data = null;
+    if ($user_id !== "") {
+        $sql_user = "
+            SELECT 
+                CONCAT(firstname, ' ', lastname) AS full_name,
+                classification AS User_Role
+            FROM tbl_users_global_assignment
+            WHERE uuid = :user_id
+            LIMIT 1
+        ";
+        $stmt_user = $pdo->prepare($sql_user);
+        $stmt_user->bindValue(':user_id', $user_id, PDO::PARAM_STR);
+        $stmt_user->execute();
+        $user_data = $stmt_user->fetch();
+    }
 
     // --- Query 2: Business Unit Info ---
     $sql_unit = "
@@ -73,6 +68,7 @@ try {
         SELECT 
             T1.Shift_Status, 
             T1.Shift_ID, 
+            T1.terminal_number,
             T1.Opening_DateTime, 
             T1.Closing_DateTime,
             CONCAT(T2.firstname, ' ', T2.lastname) AS opened_by_name,
@@ -86,7 +82,7 @@ try {
             ON T1.Opening_User_ID = T2.uuid
         LEFT JOIN tbl_users_global_assignment AS T3
             ON T1.Closing_User_ID = T3.uuid
-        ORDER BY T1.Opening_DateTime DESC
+        ORDER BY (T1.Shift_Status = 'Open') DESC, T1.Opening_DateTime DESC
         LIMIT 1
     ";
     $stmt_shift = $pdo->prepare($sql_shift);
@@ -146,12 +142,17 @@ $formattedAccounts = array_map(function ($row) {
         : date("Y-m-d", strtotime("yesterday"));
 
     // --- Final Response ---
+    $defaultUserName = trim($lastRecord['opened_by_name'] ?? "") !== ""
+        ? trim($lastRecord['opened_by_name'])
+        : "POS User";
+
     $response = [
-        "Category_Code"    => $unit_data['Category_Code'] ?? null,
-        "Unit_Code"        => $unit_data['Unit_Code'] ?? null,
+        "Category_Code"    => $unit_data['Category_Code'] ?? ($terminal['categoryCode'] ?? null),
+        "Unit_Code"        => $unit_data['Unit_Code'] ?? ($terminal['unitCode'] ?? null),
         "selectedDate"     => $finalDate,
         "Shift_Status"     => $lastRecord['Shift_Status'] ?? "Closed",
         "Shift_ID"         => $lastRecord['Shift_ID'] ?? "N/A",
+        "terminal_number"  => $lastRecord['terminal_number'] ?? ($terminal['terminalNumber'] ?? "1"),
         "Opening_DateTime" => $lastRecord['Opening_DateTime'] ?? null,
         "Closing_DateTime" => $lastRecord['Closing_DateTime'] ?? null,
         "opened_by_name"   => $lastRecord['opened_by_name'] ?? "N/A",
@@ -159,8 +160,9 @@ $formattedAccounts = array_map(function ($row) {
         "Business_Type"    => $unit_data['Business_Type'] ?? "N/A",
         "Unit_TIN"        => $unit_data['Unit_TIN'] ?? "N/A",
         "Unit_Address"    => $unit_data['Unit_Address'] ?? "N/A",
-        "Unit_Name"        => $unit_data['Unit_Name'] ?? "N/A",
-        "userName"         => $user_data['full_name'] ?? "Unknown",
+        "Unit_Name"        => $unit_data['Unit_Name'] ?? ($terminal['businessUnitName'] ?? "N/A"),
+        "Corp_Name"        => $terminal['corpName'] ?? "N/A",
+        "userName"         => $user_data['full_name'] ?? $defaultUserName,
         "userRole"         => $user_data['User_Role'] ?? null,
         "accounts"         => $formattedAccounts,
         "terminal"         => $terminal
