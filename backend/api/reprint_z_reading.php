@@ -25,11 +25,11 @@ try {
         $input = array_merge($input ?: [], $_GET);
     }
 
-    $pdo = getReportPdo($input["role"] ?? $input["user_role"] ?? null);
-
     $selectedDate = isset($input["selectedDate"])
         ? trim((string)$input["selectedDate"])
         : (isset($input["selected_date"]) ? trim((string)$input["selected_date"]) : "");
+
+    $pdo = getReportPdo($selectedDate);
 
     $categoryCode = "";
     if (isset($input["categoryCode"])) {

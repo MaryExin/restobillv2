@@ -10,10 +10,10 @@ require_once __DIR__ . '/report_db.php';
 
 try {
     $data = json_decode(file_get_contents("php://input"), true);
-    $conn = getReportPdo($data['role'] ?? $data['user_role'] ?? null);
     $type = $data['type'] ?? 'activity';
     $dateFrom = $data['dateFrom'] ?? date('Y-m-d');
     $dateTo = $data['dateTo'] ?? date('Y-m-d');
+    $conn = getReportPdo($dateFrom, $dateTo);
 
     if ($type === 'customers') {
         // SQL para sa Customers base sa tbl_pos_transactions_discounts

@@ -8,12 +8,13 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
     exit;
 }
 
-$role = $_GET["role"] ?? $_GET["user_role"] ?? "";
-
-require __DIR__ . "/pdo.php";
-
 $dateFrom     = isset($_GET["dateFrom"]) ? trim($_GET["dateFrom"]) : null;
 $dateTo       = isset($_GET["dateTo"]) ? trim($_GET["dateTo"]) : null;
+
+$reportDateFrom = $dateFrom;
+$reportDateTo   = $dateTo;
+
+require __DIR__ . "/pdo.php";
 $search       = isset($_GET["search"]) ? trim($_GET["search"]) : "";
 $cashier      = isset($_GET["cashier"]) ? trim($_GET["cashier"]) : "";
 $recordStatus = isset($_GET["recordStatus"]) ? trim($_GET["recordStatus"]) : "";

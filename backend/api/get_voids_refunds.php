@@ -14,7 +14,7 @@ require_once __DIR__ . '/report_db.php';
 $input = file_get_contents("php://input");
 $data = json_decode($input);
 
-$conn = getReportMysqli($data->role ?? $data->user_role ?? null);
+$conn = getReportMysqli($data->dateFrom ?? null, $data->dateTo ?? null);
 
 if (isset($data->type) && isset($data->dateFrom) && isset($data->dateTo)) {
     $type = $data->type; 

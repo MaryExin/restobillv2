@@ -135,7 +135,7 @@ const DetailsModal = ({ transaction, isOpen, onClose, isDark }) => {
   useEffect(() => {
     if (isOpen && transaction) {
       setLoading(true);
-      fetch(`http://localhost/api/get_transaction_items.php?id=${transaction.transaction_id}&role=${getCurrentUserRole()}`)
+      fetch(`http://localhost/api/get_transaction_items.php?id=${transaction.transaction_id}&date=${transaction.transaction_date}&role=${getCurrentUserRole()}`)
         .then((res) => res.json())
         .then((res) => {
           if (res.success) {

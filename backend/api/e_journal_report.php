@@ -22,13 +22,15 @@ if ($_SERVER["REQUEST_METHOD"] === "GET") {
     $input = array_merge($input ?: [], $_GET);
 }
 
-$role = $input["role"] ?? $input["user_role"] ?? "";
+$dateFrom = isset($input["dateFrom"]) ? trim((string)$input["dateFrom"]) : "";
+$dateTo   = isset($input["dateTo"]) ? trim((string)$input["dateTo"]) : "";
+
+$reportDateFrom = $dateFrom;
+$reportDateTo   = $dateTo;
 
 require __DIR__ . "/pdo.php";
 
 try {
-    $dateFrom = isset($input["dateFrom"]) ? trim((string)$input["dateFrom"]) : "";
-    $dateTo   = isset($input["dateTo"]) ? trim((string)$input["dateTo"]) : "";
 
     $transactionId = isset($input["transactionId"]) ? trim((string)$input["transactionId"]) : "";
     $invoiceNo     = isset($input["invoiceNo"]) ? trim((string)$input["invoiceNo"]) : "";
