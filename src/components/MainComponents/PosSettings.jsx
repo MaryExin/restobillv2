@@ -27,6 +27,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "../../context/ThemeContext";
 import { useNavigate } from "react-router-dom";
+import { getCurrentUserRole } from "../../utils/getCurrentUserRole";
 
 // Import Components
 import PosMyAccount from "./PosSettingsModal/PosMyAccount";
@@ -58,6 +59,16 @@ const PROTECTED_TABS = new Set(["Mode of Payment", "Discount Mode", "Layout Mode
 // LightemAdmin is a trusted POS account -- skip the password gate on
 // protected settings tabs entirely for this user.
 const UNGATED_USERNAME = "lightemadmin";
+// Cashier accounts only need account/payment/printer/pricing basics --
+// everything else (user management, discounts, reports, etc.) is hidden.
+const CASHIER_ALLOWED_TABS = new Set([
+  "My Account",
+  "Mode of Payment",
+  "Printer Settings",
+  "Print Options",
+  "Picture Settings",
+  "Pricing Engine",
+]);
 
 const PosSettings = ({ isOpen, onClose, branchInfo }) => {
   const { theme, setTheme } = useTheme();
@@ -99,7 +110,9 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
 
   if (!isOpen) return null;
 
-  const navItems = [
+  const isCashier = getCurrentUserRole() === "cashier";
+
+  const allNavItems = [
     { id: "My Account", icon: FiUser },
     { id: "User Accounts", icon: FiUsers },
     { id: "User Approval", icon: FiUsers, route: "/usersqueu" },
@@ -125,6 +138,10 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
     { id: "Layout Mode", icon: FiMonitor },
     { id: "Second Screen", icon: FiMonitor },
   ];
+
+  const navItems = isCashier
+    ? allNavItems.filter((nav) => CASHIER_ALLOWED_TABS.has(nav.id))
+    : allNavItems;
 
   const isUngatedUser =
     String(localStorage.getItem("username") || "").trim().toLowerCase() ===
