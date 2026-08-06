@@ -111,7 +111,9 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
 
   if (!isOpen) return null;
 
-  const isCashier = getCurrentUserRole() === "cashier";
+  const currentUserRole = getCurrentUserRole();
+  const isCashier = currentUserRole === "cashier";
+  const isSuperAdmin = currentUserRole === "superadmin";
 
   const allNavItems = [
     { id: "Report Database", icon: FiDatabase },
@@ -141,9 +143,9 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
     { id: "Second Screen", icon: FiMonitor },
   ];
 
-  const navItems = isCashier
-    ? allNavItems.filter((nav) => CASHIER_ALLOWED_TABS.has(nav.id))
-    : allNavItems;
+  const navItems = allNavItems
+    .filter((nav) => nav.id !== "Report Database" || isSuperAdmin)
+    .filter((nav) => !isCashier || CASHIER_ALLOWED_TABS.has(nav.id));
 
   const isUngatedUser =
     String(localStorage.getItem("username") || "").trim().toLowerCase() ===
