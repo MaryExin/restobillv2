@@ -83,7 +83,11 @@ const SwitchUser = () => {
 
   const users = useMemo(() => {
     if (!Array.isArray(dateselection?.accounts)) return [];
-    return dateselection.accounts.filter((item) => item?.uuid !== userId);
+    return dateselection.accounts.filter(
+      (item) =>
+        item?.uuid !== userId &&
+        String(item?.userRole ?? "").trim().toLowerCase() === "cashier",
+    );
   }, [dateselection, userId]);
 
   const filteredUsers = useMemo(() => {

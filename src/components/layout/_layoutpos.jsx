@@ -28,6 +28,7 @@ import Billing from "../../assets/Billing.jpg";
 import PosQuickActionTile from "../MainComponents/Common/PosQuickActionTile";
 
 import useZustandLoginCred from "../../context/useZustandLoginCred";
+import { getCurrentUserRole } from "../../utils/getCurrentUserRole";
 import useApiHost from "../../hooks/useApiHost";
 import useBillingEnabled from "../../hooks/useBillingEnabled";
 import useVersionLabel from "../../hooks/useVersionLabel";
@@ -207,6 +208,8 @@ const LayoutPos = ({ children }) => {
 
   const isClosed = branchInfo.shiftStatus?.toLowerCase() !== "open";
 
+  const isCashier = useMemo(() => getCurrentUserRole() === "cashier", []);
+
   const handleClose = () => {
     setIsLogoutConfirmOpen(true);
   };
@@ -295,12 +298,14 @@ const LayoutPos = ({ children }) => {
         onClick={() => navigate("/pricesyncing")}
       />
 
-      <PosQuickActionTile
-        label="Sales Record Syncing"
-        icon={<FaCloudUploadAlt className="text-[28px] sm:text-[30px]" />}
-        color="violet"
-        onClick={() => navigate("/salesrecordssyncing")}
-      />
+      {!isCashier && (
+        <PosQuickActionTile
+          label="Sales Record Syncing"
+          icon={<FaCloudUploadAlt className="text-[28px] sm:text-[30px]" />}
+          color="violet"
+          onClick={() => navigate("/salesrecordssyncing")}
+        />
+      )}
 
       <OpenNewDay />
 
@@ -347,14 +352,17 @@ const LayoutPos = ({ children }) => {
         onClick={() => setIsPosReadingOpen(true)}
       />
 
-      <PosQuickActionTile
-        label="POS Reports"
-        icon={<FaChartPie className="text-[28px] sm:text-[30px]" />}
-        color="indigo"
-        onClick={() => setIsReportsOpen(true)}
-      />
+      {!isCashier && (
+        <PosQuickActionTile
+          label="POS Reports"
+          icon={<FaChartPie className="text-[28px] sm:text-[30px]" />}
+          color="indigo"
+          onClick={() => setIsReportsOpen(true)}
+        />
+      )}
 
       {menuOptions.map((item) => {
+        if (isCashier && item.id === "salesdashboard") return null;
         const disabled =
           item.id !== "salesdashboard" &&
           (item.id === "ordering" ||
