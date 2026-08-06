@@ -726,10 +726,6 @@ const PosSelectBusunitComponent = () => {
 
     setReturnmessage("Selected");
     setshowhidesuccess(true);
-
-    setTimeout(() => {
-      navigate("/poscorehomescreen");
-    }, 250);
   };
 
   const handleClose = () => {
@@ -806,6 +802,7 @@ const PosSelectBusunitComponent = () => {
           message="Business unit selected successfully"
           button="OK"
           setIsModalOpen={setshowhidesuccess}
+          resetForm={() => navigate("/poscorehomescreen")}
         />
       )}
 
