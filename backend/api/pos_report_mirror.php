@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+const POS_REPORT_MIRROR_SETTINGS_CATEGORY = "Report";
+const POS_REPORT_MIRROR_SKIP_INTERVAL_DESCRIPTION = "Report DB Skip Transaction Interval";
+const POS_REPORT_MIRROR_DEFAULT_SKIP_INTERVAL = 3;
+
 function posReportMirrorIdentifier($value, string $label): string
 {
     $identifier = trim((string)$value);
@@ -21,6 +25,75 @@ function posReportMirrorQuote(string $identifier): string
 function posReportMirrorTable(string $databaseName, string $tableName): string
 {
     return posReportMirrorQuote($databaseName) . "." . posReportMirrorQuote($tableName);
+}
+
+function posReportMirrorNormalizeSkipInterval($value): int
+{
+    $value = trim((string)($value ?? ""));
+
+    if ($value === "" || !preg_match('/^-?\d+$/', $value)) {
+        return POS_REPORT_MIRROR_DEFAULT_SKIP_INTERVAL;
+    }
+
+    $skipInterval = (int)$value;
+
+    if ($skipInterval <= 0) {
+        return 0;
+    }
+
+    return max(2, min($skipInterval, 1000000));
+}
+
+function posReportMirrorFetchSkipIntervalFromSettings(PDO $pdo, string $databaseName): ?int
+{
+    try {
+        $settingsTable = posReportMirrorTable($databaseName, "tbl_pos_settings");
+        $stmt = $pdo->prepare("
+            SELECT `value`
+            FROM {$settingsTable}
+            WHERE `category` = ?
+              AND `description` = ?
+            ORDER BY `ID` DESC
+            LIMIT 1
+        ");
+        $stmt->execute([
+            POS_REPORT_MIRROR_SETTINGS_CATEGORY,
+            POS_REPORT_MIRROR_SKIP_INTERVAL_DESCRIPTION,
+        ]);
+        $value = $stmt->fetchColumn();
+
+        return $value === false || $value === null
+            ? null
+            : posReportMirrorNormalizeSkipInterval($value);
+    } catch (Throwable $e) {
+        return null;
+    }
+}
+
+function posReportMirrorGetSkipInterval(PDO $pdo, string $posDbName, ?string $reportDbName = null): int
+{
+    $databaseNames = [];
+
+    if ($reportDbName !== null && trim($reportDbName) !== "") {
+        $databaseNames[] = $reportDbName;
+    }
+
+    $databaseNames[] = $posDbName;
+
+    foreach (array_unique($databaseNames) as $databaseName) {
+        $skipInterval = posReportMirrorFetchSkipIntervalFromSettings($pdo, $databaseName);
+
+        if ($skipInterval !== null) {
+            return $skipInterval;
+        }
+    }
+
+    return POS_REPORT_MIRROR_DEFAULT_SKIP_INTERVAL;
+}
+
+function posReportMirrorShouldSkipSourceRank(int $sourceRank, int $skipInterval): bool
+{
+    return $sourceRank > 0 && $skipInterval > 0 && $sourceRank % $skipInterval === 0;
 }
 
 function posReportMirrorColumnList(array $columns): string
@@ -234,11 +307,13 @@ function posReportMirrorGetSourceTransactionRank(
 function posReportMirrorShouldPostTransactionToReport(
     PDO $pdo,
     string $posDbName,
-    string $sourceId
+    string $sourceId,
+    ?string $reportDbName = null
 ): bool {
     $transactionRank = posReportMirrorGetSourceTransactionRank($pdo, $posDbName, $sourceId);
+    $skipInterval = posReportMirrorGetSkipInterval($pdo, $posDbName, $reportDbName);
 
-    return $transactionRank <= 0 || $transactionRank % 3 !== 0;
+    return !posReportMirrorShouldSkipSourceRank($transactionRank, $skipInterval);
 }
 
 function posReportMirrorFetchSourceTransaction(
@@ -836,7 +911,13 @@ function mirrorPosTransactionToReport(
         $sourceTransaction["Unit_Code"] ?? $unitCode
     );
 
-    if ($sourceRank > 0 && $sourceRank % 3 === 0) {
+    $skipInterval = posReportMirrorGetSkipInterval($pdo, $posDbName, $reportDbName);
+    $existingReportStatus = trim((string)($mapRow["report_status"] ?? ""));
+    $shouldSkipTransaction = in_array($existingReportStatus, ["0", "1"], true)
+        ? $existingReportStatus === "1"
+        : posReportMirrorShouldSkipSourceRank($sourceRank, $skipInterval);
+
+    if ($shouldSkipTransaction) {
         posReportMirrorDeleteTransactionFromReport(
             $pdo,
             $posDbName,
@@ -1114,6 +1195,13 @@ function mirrorRecentPosTransactionsToReport(PDO $pdo, array $config, int $limit
     $sourceMainTable = posReportMirrorTable($posDbName, "tbl_pos_transactions");
     $targetMainTable = posReportMirrorTable($reportDbName, "tbl_pos_transactions");
     $mapTable = posReportMirrorMapTable($reportDbName);
+    $skipInterval = posReportMirrorGetSkipInterval($pdo, $posDbName, $reportDbName);
+    $skippedRankSql = $skipInterval > 0
+        ? "MOD(p.source_rank, {$skipInterval}) = 0"
+        : "0 = 1";
+    $postedRankSql = $skipInterval > 0
+        ? "MOD(p.source_rank, {$skipInterval}) <> 0"
+        : "1 = 1";
     $childCountChecks = [];
     $childCountMappings = [
         [
@@ -1202,7 +1290,10 @@ function mirrorRecentPosTransactionsToReport(PDO $pdo, array $config, int $limit
            AND r.`Category_Code` <=> p.`Category_Code`
            AND r.`Unit_Code` <=> p.`Unit_Code`
         WHERE (
-                MOD(p.source_rank, 3) = 0
+                (
+                    (m.`id` IS NULL AND {$skippedRankSql})
+                 OR (m.`id` IS NOT NULL AND COALESCE(m.`report_status`, -1) = 1)
+                )
             AND (
                    m.`id` IS NULL
                 OR COALESCE(m.`source_rank`, 0) <> COALESCE(p.source_rank, 0)
@@ -1218,7 +1309,10 @@ function mirrorRecentPosTransactionsToReport(PDO $pdo, array $config, int $limit
             )
         )
         OR (
-                MOD(p.source_rank, 3) <> 0
+                (
+                    (m.`id` IS NULL AND {$postedRankSql})
+                 OR (m.`id` IS NOT NULL AND COALESCE(m.`report_status`, -1) = 0)
+                )
             AND (
                    m.`id` IS NULL
                 OR COALESCE(m.`source_rank`, 0) <> COALESCE(p.source_rank, 0)

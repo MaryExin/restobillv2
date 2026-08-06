@@ -53,6 +53,7 @@ import PosSecondScreen from "./PosSettingsModal/PosSecondScreen";
 import PosTableLayout from "./PosSettingsModal/PosTableLayout";
 import PosLoyaltyConfig from "./PosSettingsModal/PosLoyaltyConfig";
 import PosSalesTypeOrder from "./PosSettingsModal/PosSalesTypeOrder";
+import PosReportMirrorSettings from "./PosSettingsModal/PosReportMirrorSettings";
 
 const MASTER_PASS    = "LESI_POSPASS@2023";
 const PROTECTED_TABS = new Set(["Mode of Payment", "Discount Mode", "Layout Mode"]);
@@ -113,6 +114,7 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
   const isCashier = getCurrentUserRole() === "cashier";
 
   const allNavItems = [
+    { id: "Report Database", icon: FiDatabase },
     { id: "My Account", icon: FiUser },
     { id: "User Accounts", icon: FiUsers },
     { id: "User Approval", icon: FiUsers, route: "/usersqueu" },
@@ -228,6 +230,10 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
           branchInfo={branchInfo}
         />
       );
+    }
+
+    if (activeTab === "Report Database") {
+      return <PosReportMirrorSettings isDark={isDark} accent={accentColor} />;
     }
 
     if (activeTab === "User Accounts") {

@@ -140,6 +140,7 @@ const PosDataSecurity = ({ isDark, accent, getContrastText }) => {
           {activeSubTab === "backup-security" && (
             <PosBackupModal isDark={isDark} accent={accent} />
           )}
+
         </motion.div>
       </AnimatePresence>
     </div>
