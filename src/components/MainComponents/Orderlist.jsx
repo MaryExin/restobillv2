@@ -2696,7 +2696,7 @@ const Orderlist = ({
   }) => {
     const formData = new FormData();
 
-    formData.append("Category_Code", "Crab & Crack");
+    formData.append("Category_Code", category_code);
     formData.append("Unit_Code", unit_code);
 
     formData.append("source_transaction_id", source_transaction_id);

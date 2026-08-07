@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/cors.php";
+require_once __DIR__ . "/pos_report_mirror.php";
 
 
 header("Access-Control-Allow-Origin: *");
@@ -580,6 +581,31 @@ try {
         throw new Exception("Commit failed: " . $conn->error);
     }
 
+    $reportMirrorWarnings = [];
+    try {
+        $dsn = "mysql:host={$config['host']};dbname={$config['db']};charset={$config['charset']}";
+        $mirrorPdo = new PDO($dsn, $config["user"], $config["pass"], [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        ]);
+
+        try {
+            mirrorPosTransactionToReport($mirrorPdo, $config, (string)$source_transaction_id, $Category_Code, $Unit_Code);
+        } catch (Throwable $sourceMirrorError) {
+            $reportMirrorWarnings[] = "Source transaction: " . $sourceMirrorError->getMessage();
+        }
+
+        try {
+            mirrorPosTransactionToReport($mirrorPdo, $config, (string)$destination_transaction_id, $Category_Code, $Unit_Code);
+        } catch (Throwable $destinationMirrorError) {
+            $reportMirrorWarnings[] = "Destination transaction: " . $destinationMirrorError->getMessage();
+        }
+    } catch (Throwable $mirrorConnectionError) {
+        $reportMirrorWarnings[] = $mirrorConnectionError->getMessage();
+    }
+
+    $reportMirrorWarning = implode(" | ", $reportMirrorWarnings);
+
     echo json_encode([
         "status" => "success",
         "message" => "Products transferred successfully.",
@@ -588,7 +614,9 @@ try {
         "source_table_number" => $source_table_number,
         "destination_table_number" => $destination_table_number,
         "source_total" => $sourceTotal,
-        "destination_total" => $destinationTotal
+        "destination_total" => $destinationTotal,
+        "report_mirror_synced" => $reportMirrorWarning === "",
+        "report_mirror_warning" => $reportMirrorWarning
     ]);
 } catch (Throwable $e) {
     try {

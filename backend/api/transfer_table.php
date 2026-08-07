@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/cors.php";
+require_once __DIR__ . "/pos_report_mirror.php";
 
 
 header("Access-Control-Allow-Origin: *");
@@ -249,12 +250,26 @@ try {
         throw new Exception("Commit failed: " . $conn->error);
     }
 
+    $reportMirrorWarning = "";
+    try {
+        $dsn = "mysql:host={$config['host']};dbname={$config['db']};charset={$config['charset']}";
+        $mirrorPdo = new PDO($dsn, $config["user"], $config["pass"], [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        ]);
+        mirrorPosTransactionToReport($mirrorPdo, $config, (string)$transaction_id, $Category_Code, $Unit_Code);
+    } catch (Throwable $mirrorError) {
+        $reportMirrorWarning = $mirrorError->getMessage();
+    }
+
     echo json_encode([
         "status" => "success",
         "message" => "Table transferred successfully",
         "transaction_id" => $transaction_id,
         "old_table_number" => $old_table_number,
-        "new_table_number" => $new_table_number
+        "new_table_number" => $new_table_number,
+        "report_mirror_synced" => $reportMirrorWarning === "",
+        "report_mirror_warning" => $reportMirrorWarning
     ]);
 } catch (Throwable $e) {
     try {
