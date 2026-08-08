@@ -164,7 +164,16 @@ function insertShiftRecord(PDO $pdo, string $shiftTable, array $shiftRecord): vo
             Closing_User_ID,
             Closing_DateTime,
             Closing_Cash_Count,
+            Beg_OR,
+            End_OR,
+            Beg_VoidNo,
+            End_VoidNo,
+            Beg_RefundNo,
+            End_RefundNo,
+            Z_Counter_No,
+            Grand_Accum_Sales,
             Shift_Status,
+            Remarks,
             Status,
             Date_Recorded
         ) VALUES (
@@ -178,7 +187,16 @@ function insertShiftRecord(PDO $pdo, string $shiftTable, array $shiftRecord): vo
             '0',
             '',
             '0',
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
             'Open',
+            '',
             'Active',
             NOW()
         )
