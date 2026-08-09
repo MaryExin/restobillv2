@@ -45,6 +45,9 @@ class ShiftSalesSyncLocalReadGateway
                     'discounts' => 0,
                     'payments' => 0,
                     'other_charges' => 0,
+                    'customers' => 0,
+                    'discounts_per_product' => 0,
+                    'loyalty_discounts' => 0,
                 ];
 
                 if ($opening !== '' && $closing !== '') {
@@ -80,6 +83,9 @@ class ShiftSalesSyncLocalReadGateway
                     'count_discounts' => $counts['discounts'],
                     'count_payments' => $counts['payments'],
                     'count_other_charges' => $counts['other_charges'],
+                    'count_customers' => $counts['customers'],
+                    'count_discounts_per_product' => $counts['discounts_per_product'],
+                    'count_loyalty_discounts' => $counts['loyalty_discounts'],
                     'remarks' => (string) ($shift['Remarks'] ?? ''),
                     'status' => (string) ($shift['Status'] ?? ''),
                 ];
@@ -231,8 +237,17 @@ class ShiftSalesSyncLocalReadGateway
                 'discounts' => 0,
                 'payments' => 0,
                 'other_charges' => 0,
+                'customers' => 0,
+                'discounts_per_product' => 0,
+                'loyalty_discounts' => 0,
             ];
         }
+
+        $discountsPerProductScope = $this->buildScopedTransactionWhere(
+            $transactionRefs,
+            'category_code',
+            'unit_code'
+        );
 
         return [
             'transactions' => $this->countRows(
@@ -250,6 +265,18 @@ class ShiftSalesSyncLocalReadGateway
             ),
             'other_charges' => $this->countRows(
                 "SELECT COUNT(*) FROM tbl_pos_transactions_other_charges WHERE {$scope['where']}",
+                $scope['values']
+            ),
+            'customers' => $this->countRows(
+                "SELECT COUNT(*) FROM tbl_pos_transactions_customers WHERE {$scope['where']}",
+                $scope['values']
+            ),
+            'discounts_per_product' => $this->countRows(
+                "SELECT COUNT(*) FROM tbl_pos_transactions_discounts_per_product WHERE {$discountsPerProductScope['where']}",
+                $discountsPerProductScope['values']
+            ),
+            'loyalty_discounts' => $this->countRows(
+                "SELECT COUNT(*) FROM tbl_pos_loyalty_discounts WHERE {$scope['where']}",
                 $scope['values']
             ),
         ];
