@@ -1,0 +1,1 @@
+singleton_id,subject_id,username,password_hash,display_name,email,is_enabled,credential_version,created_at,updated_at

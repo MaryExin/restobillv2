@@ -15,9 +15,9 @@
  * On failure, Auth has already emitted a 400/401 JSON error and this script
  * exits before returning to the caller.
  *
- * IMPORTANT: JWT validation is signature-only and does not need a database
- * gateway. Endpoints load their own PDO/config after this guard, then perform
- * the account-status and permission checks appropriate to that operation.
+ * Ordinary JWT validation does not need a database gateway. Developer tokens
+ * additionally verify the protected singleton credential record before the
+ * request is allowed to continue.
  */
 
 require_once __DIR__ . '/bootstrap.php';

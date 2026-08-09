@@ -43,7 +43,7 @@ try {
             http_response_code(403);
             echo json_encode([
                 "success" => false,
-                "message" => "Developer credentials are managed in the server environment."
+                "message" => "Developer credentials are managed in the protected database record."
             ]);
             exit;
         }

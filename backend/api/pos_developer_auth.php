@@ -2,86 +2,8 @@
 
 declare(strict_types=1);
 
-/**
- * Resolve the private Developer credential file.
- *
- * POS_DEVELOPER_CONFIG_FILE may point at a deployment-specific file. The
- * default intentionally resolves outside XAMPP's htdocs directory when this
- * API folder is deployed at <xampp>/htdocs/api.
- */
-function posDeveloperPrivateConfigPath(): string
-{
-    $configuredPath = trim((string)(
-        $_ENV["POS_DEVELOPER_CONFIG_FILE"] ??
-        (getenv("POS_DEVELOPER_CONFIG_FILE") ?: "")
-    ));
-
-    if ($configuredPath !== "") {
-        return $configuredPath;
-    }
-
-    return dirname(dirname(__DIR__)) . "/etc/restobill-pos-developer.env";
-}
-
-/**
- * Load only the Developer settings that are safe to source from the private
- * file. SECRET_KEY remains owned by the application's normal server env.
- */
-function posDeveloperLoadPrivateConfig(): void
-{
-    static $loaded = false;
-
-    if ($loaded) {
-        return;
-    }
-
-    $loaded = true;
-    $configPath = posDeveloperPrivateConfigPath();
-
-    if (!is_file($configPath)) {
-        return;
-    }
-
-    $config = @parse_ini_file($configPath, false, INI_SCANNER_RAW);
-    if (!is_array($config)) {
-        error_log("Unable to parse the private POS developer configuration.");
-        return;
-    }
-
-    $allowedKeys = [
-        "POS_DEVELOPER_LOGIN_ENABLED",
-        "POS_DEVELOPER_USERNAME",
-        "POS_DEVELOPER_PASSWORD_HASH",
-        "POS_DEVELOPER_ALLOWED_IPS",
-        "POS_DEVELOPER_SUBJECT",
-        "POS_DEVELOPER_DISPLAY_NAME",
-        "POS_DEVELOPER_EMAIL",
-    ];
-
-    foreach ($allowedKeys as $key) {
-        if (!array_key_exists($key, $config) || isset($_ENV[$key])) {
-            continue;
-        }
-
-        $value = trim((string)$config[$key]);
-        if (
-            strlen($value) >= 2 &&
-            (
-                ($value[0] === "'" && $value[strlen($value) - 1] === "'") ||
-                ($value[0] === '"' && $value[strlen($value) - 1] === '"')
-            )
-        ) {
-            $value = substr($value, 1, -1);
-        }
-
-        $_ENV[$key] = $value;
-    }
-}
-
 function posDeveloperEnv(string $key, string $default = ""): string
 {
-    posDeveloperLoadPrivateConfig();
-
     if (isset($_ENV[$key]) && $_ENV[$key] !== "") {
         return trim((string)$_ENV[$key]);
     }
@@ -92,26 +14,111 @@ function posDeveloperEnv(string $key, string $default = ""): string
         : $default;
 }
 
+/**
+ * Developer credentials live in a dedicated singleton table. Keeping this
+ * identity outside tbl_users_global_assignment prevents it from appearing in
+ * or being mutated through the ordinary User Accounts feature.
+ */
+function posDeveloperDatabaseConnection(): ?PDO
+{
+    static $connectionAttempted = false;
+    static $connection = null;
+
+    if ($connectionAttempted) {
+        return $connection;
+    }
+    $connectionAttempted = true;
+
+    $host = posDeveloperEnv("DB_HOST");
+    $database = posDeveloperEnv("DB_NAME");
+    $username = posDeveloperEnv("DB_USER");
+    $password = posDeveloperEnv("DB_PASS");
+
+    if ($host === "" || $database === "" || $username === "") {
+        return null;
+    }
+
+    try {
+        $connection = new PDO(
+            "mysql:host={$host};dbname={$database};charset=utf8mb4",
+            $username,
+            $password,
+            [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_EMULATE_PREPARES => false,
+            ]
+        );
+    } catch (Throwable $error) {
+        error_log("Unable to connect to the POS Developer credential database.");
+        $connection = null;
+    }
+
+    return $connection;
+}
+
+function posDeveloperDatabaseRecord(): ?array
+{
+    static $recordLoaded = false;
+    static $record = null;
+
+    if ($recordLoaded) {
+        return $record;
+    }
+    $recordLoaded = true;
+
+    $pdo = posDeveloperDatabaseConnection();
+    if (!$pdo instanceof PDO) {
+        return null;
+    }
+
+    try {
+        $stmt = $pdo->prepare("
+            SELECT
+                d.singleton_id,
+                d.subject_id,
+                d.username,
+                d.password_hash,
+                d.display_name,
+                d.email,
+                d.is_enabled,
+                d.credential_version,
+                EXISTS (
+                    SELECT 1
+                    FROM tbl_users_global_assignment u
+                    WHERE u.uuid = CAST(d.subject_id AS CHAR)
+                ) AS subject_collision
+            FROM tbl_pos_developer_account d
+            WHERE d.singleton_id = :singleton_id
+            LIMIT 1
+        ");
+        $stmt->execute([":singleton_id" => 1]);
+        $candidate = $stmt->fetch(PDO::FETCH_ASSOC);
+        $record = is_array($candidate) ? $candidate : null;
+    } catch (Throwable $error) {
+        error_log("Unable to load the POS Developer credential record.");
+        $record = null;
+    }
+
+    return $record;
+}
+
 function posDeveloperEnabled(): bool
 {
-    return in_array(
-        strtolower(posDeveloperEnv("POS_DEVELOPER_LOGIN_ENABLED")),
-        ["1", "true", "yes", "on"],
-        true
-    );
+    $record = posDeveloperDatabaseRecord();
+    return is_array($record) && (int)($record["is_enabled"] ?? 0) === 1;
 }
 
 function posDeveloperUsername(): string
 {
-    return posDeveloperEnv("POS_DEVELOPER_USERNAME");
+    return trim((string)(posDeveloperDatabaseRecord()["username"] ?? ""));
 }
 
 function posDeveloperSubject(): string
 {
-    $configured = posDeveloperEnv(
-        "POS_DEVELOPER_SUBJECT",
-        "2147483646"
-    );
+    $configured = trim((string)(
+        posDeveloperDatabaseRecord()["subject_id"] ?? ""
+    ));
 
     if (!ctype_digit($configured)) {
         return "";
@@ -125,12 +132,17 @@ function posDeveloperSubject(): string
 
 function posDeveloperDisplayName(): string
 {
-    return posDeveloperEnv("POS_DEVELOPER_DISPLAY_NAME", "POS Developer");
+    $configured = trim((string)(
+        posDeveloperDatabaseRecord()["display_name"] ?? ""
+    ));
+    return $configured !== "" ? $configured : "POS Developer";
 }
 
 function posDeveloperEmail(): string
 {
-    $configured = posDeveloperEnv("POS_DEVELOPER_EMAIL");
+    $configured = trim((string)(
+        posDeveloperDatabaseRecord()["email"] ?? ""
+    ));
 
     return $configured !== ""
         ? $configured
@@ -144,68 +156,45 @@ function posDeveloperReadingScopes(): array
 
 function posDeveloperConfigured(): bool
 {
+    $record = posDeveloperDatabaseRecord();
+
     return posDeveloperEnabled() &&
+        is_array($record) &&
         posDeveloperUsername() !== "" &&
         posDeveloperSubject() !== "" &&
-        posDeveloperEnv("POS_DEVELOPER_PASSWORD_HASH") !== "" &&
-        posDeveloperEnv("POS_DEVELOPER_ALLOWED_IPS") !== "" &&
+        trim((string)($record["password_hash"] ?? "")) !== "" &&
+        (int)($record["subject_collision"] ?? 1) === 0 &&
         posDeveloperEnv("SECRET_KEY") !== "";
 }
 
 function posDeveloperUsernameMatches(string $username): bool
 {
-    if (!posDeveloperConfigured()) {
+    $configuredUsername = posDeveloperUsername();
+    if ($configuredUsername === "") {
         return false;
     }
 
     return hash_equals(
-        strtolower(posDeveloperUsername()),
+        strtolower($configuredUsername),
         strtolower(trim($username))
     );
-}
-
-function posDeveloperClientAllowed(?string $remoteAddress = null): bool
-{
-    $configured = posDeveloperEnv("POS_DEVELOPER_ALLOWED_IPS");
-    if ($configured === "") {
-        return false;
-    }
-
-    $remoteAddress = trim((string)(
-        $remoteAddress ?? ($_SERVER["REMOTE_ADDR"] ?? "")
-    ));
-
-    if (str_starts_with($remoteAddress, "::ffff:")) {
-        $remoteAddress = substr($remoteAddress, 7);
-    }
-
-    $allowed = preg_split('/[\s,]+/', $configured) ?: [];
-    foreach ($allowed as $candidate) {
-        $candidate = trim((string)$candidate);
-
-        if (str_starts_with($candidate, "::ffff:")) {
-            $candidate = substr($candidate, 7);
-        }
-
-        if ($candidate !== "" && hash_equals($candidate, $remoteAddress)) {
-            return true;
-        }
-    }
-
-    return false;
 }
 
 function posDeveloperAuthenticate(string $username, string $password): bool
 {
     if (
         !posDeveloperUsernameMatches($username) ||
-        !posDeveloperClientAllowed()
+        !posDeveloperConfigured()
     ) {
         return false;
     }
 
-    $passwordHash = posDeveloperEnv("POS_DEVELOPER_PASSWORD_HASH");
-    return $password !== "" && password_verify($password, $passwordHash);
+    $passwordHash = trim((string)(
+        posDeveloperDatabaseRecord()["password_hash"] ?? ""
+    ));
+    return $password !== "" &&
+        strlen($password) <= 72 &&
+        password_verify($password, $passwordHash);
 }
 
 function posDeveloperVirtualUser(): array
@@ -237,9 +226,27 @@ function posDeveloperVirtualAccount(): array
 
 function posDeveloperCredentialVersion(): string
 {
+    if (!posDeveloperConfigured()) {
+        return "";
+    }
+
+    $record = posDeveloperDatabaseRecord();
+    $versionMaterial = trim((string)($record["password_hash"] ?? ""));
+    $credentialVersion = max(
+        1,
+        (int)($record["credential_version"] ?? 1)
+    );
+
+    // Version 1 intentionally matches the former private-file token
+    // fingerprint so migrating the same bcrypt hash does not end live
+    // Developer sessions. Incrementing credential_version revokes them.
+    if ($credentialVersion > 1) {
+        $versionMaterial .= "\0" . (string)$credentialVersion;
+    }
+
     return substr(hash_hmac(
         "sha256",
-        posDeveloperEnv("POS_DEVELOPER_PASSWORD_HASH"),
+        $versionMaterial,
         posDeveloperEnv("SECRET_KEY")
     ), 0, 24);
 }
@@ -248,8 +255,7 @@ function posDeveloperTokenIsValid(array $payload): bool
 {
     if (
         ($payload["pos_developer_mode"] ?? false) !== true ||
-        !posDeveloperConfigured() ||
-        !posDeveloperClientAllowed()
+        !posDeveloperConfigured()
     ) {
         return false;
     }

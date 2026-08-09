@@ -137,7 +137,7 @@ const PosMyAccount = ({ isDark, accent }) => {
             </div>
             {developerMode ? (
               <p className={`mt-8 text-xs font-bold ${theme.textMuted}`}>
-                Developer credentials are managed in the private server environment.
+                Developer credentials are managed in a protected database record.
               </p>
             ) : (
               <button onClick={() => setIsModalOpen(true)} style={{ backgroundColor: accent }} className="mt-8 flex items-center gap-2 px-6 py-3 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-all shadow-lg active:scale-95">

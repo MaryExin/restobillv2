@@ -202,6 +202,17 @@ function validatePosManagePayload(array $data, bool $requirePassword): void
 
 function requireUniquePosManageEmail(PDO $pdo, string $email, string $excludeUuid = ""): void
 {
+    $reservedDeveloperUsername = posDeveloperUsername();
+    if (
+        $reservedDeveloperUsername !== "" &&
+        strcasecmp(trim($email), $reservedDeveloperUsername) === 0
+    ) {
+        respondPosManage([
+            "success" => false,
+            "error" => "That username is already registered.",
+        ], 409);
+    }
+
     $stmt = $pdo->prepare("
         SELECT uuid
         FROM tbl_users_global_assignment
