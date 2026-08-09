@@ -176,10 +176,10 @@ function readTextFileSafe(filePath) {
 function parsePrinterConfigMap(text) {
   const map = {};
   for (const line of String(text || "").split(/\r?\n/)) {
-    const idx = line.indexOf(": ");
+    const idx = line.indexOf(":");
     if (idx > 0) {
       const key = line.slice(0, idx).trim();
-      const val = line.slice(idx + 2).trim();
+      const val = line.slice(idx + 1).trim();
       if (key && val) map[key] = val;
     }
   }
@@ -4800,6 +4800,21 @@ app.whenReady().then(() => {
       return getIpConfigMap().WEB || "";
     } catch (error) {
       console.error("Failed to read WEB endpoint from ip.txt:", error);
+      return "";
+    }
+  });
+
+  ipcMain.handle("get-sales-sync-tenant", () => {
+    try {
+      const configuredTenant = getIpConfigMap().TENANT || "";
+      if (configuredTenant || !app.isPackaged) {
+        return configuredTenant;
+      }
+
+      const bundledIpPath = path.join(__dirname, "..", "dist", "ip.txt");
+      return parsePrinterConfigMap(readTextFileSafe(bundledIpPath)).TENANT || "";
+    } catch (error) {
+      console.error("Failed to read TENANT from ip.txt:", error);
       return "";
     }
   });

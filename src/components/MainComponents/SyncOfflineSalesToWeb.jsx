@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+} from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FixedSizeList as List } from "react-window";
 import {
@@ -20,6 +26,7 @@ import {
   FiInfo,
   FiCheckSquare,
   FiFilter,
+  FiDatabase,
 } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 
@@ -27,7 +34,8 @@ import { useTheme } from "../../context/ThemeContext";
 import useCustomQuery from "../../hooks/useCustomQuery";
 import { useCustomSecuredMutation } from "../../hooks/useCustomSecuredMutation";
 import useApiHost from "../../hooks/useApiHost";
-import useWebApiHost from "../../hooks/useWebApiHost";
+import { resolveCompanyTenant } from "../../utils/resolveCompanyTenant";
+import { parseIpConfigText } from "../../utils/parseIpConfig";
 
 import ModalYesNoReusable from "../Modals/ModalYesNoReusable";
 import ModalSuccessNavToSelf from "../Modals/ModalSuccessNavToSelf";
@@ -40,6 +48,36 @@ const normalize = (v) =>
 const TABLE_TEMPLATE =
   "minmax(90px,0.9fr) minmax(140px,1.2fr) minmax(80px,0.8fr) minmax(100px,0.9fr) minmax(150px,1.2fr) minmax(150px,1.2fr) minmax(70px,0.7fr) minmax(70px,0.7fr) minmax(70px,0.7fr) minmax(70px,0.7fr) minmax(70px,0.7fr) minmax(70px,0.7fr) minmax(80px,0.8fr) minmax(70px,0.7fr) minmax(150px,1.2fr) minmax(110px,0.9fr)";
 const TABLE_WIDTH = 1960;
+
+const normalizeCompanyCode = (value) =>
+  String(value || "")
+    .trim()
+    .toUpperCase();
+
+const readConfiguredSalesSyncTenant = async () => {
+  if (window.appConfig?.getSalesSyncTenant) {
+    try {
+      const electronTenant = normalizeCompanyCode(
+        await window.appConfig.getSalesSyncTenant(),
+      );
+
+      if (electronTenant) {
+        return electronTenant;
+      }
+    } catch (error) {
+      console.warn("Unable to read TENANT through Electron IPC:", error);
+    }
+  }
+
+  const ipConfigUrl = new URL("./ip.txt", window.location.href);
+  const response = await fetch(ipConfigUrl, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error("Unable to read ip.txt.");
+  }
+
+  const config = parseIpConfigText(await response.text());
+  return normalizeCompanyCode(config.TENANT || "");
+};
 
 const StatCard = ({
   title,
@@ -223,9 +261,9 @@ const SyncingOverlay = ({ isDark, open }) => {
             Syncing Main + Report WEB...
           </div>
           <div className="mt-3 text-sm md:text-base text-slate-500">
-            Exporting LIVE + REPORT OFFLINE data, uploading to Main WEB +
-            Report WEB tables, and finalizing both LOCAL sources. All actions
-            are temporarily disabled.
+            Exporting LIVE + REPORT OFFLINE data, uploading to Main WEB + Report
+            WEB tables, and finalizing both LOCAL sources. All actions are
+            temporarily disabled.
           </div>
         </div>
       </div>
@@ -356,9 +394,9 @@ const ShiftCard = ({ row, checked, onToggle, isDark, disabledAll = false }) => {
                         ? isDark
                           ? "bg-amber-500/10 border border-amber-500/20 text-amber-300"
                           : "bg-amber-50 border border-amber-200 text-amber-700"
-                      : isDark
-                        ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-300"
-                        : "bg-emerald-50 border border-emerald-200 text-emerald-700"
+                        : isDark
+                          ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-300"
+                          : "bg-emerald-50 border border-emerald-200 text-emerald-700"
                 }`}
               >
                 {row.shift_status === "Open"
@@ -374,22 +412,22 @@ const ShiftCard = ({ row, checked, onToggle, isDark, disabledAll = false }) => {
                             row.web_report_synced ? "Synced" : "Pending"
                           }). Retry will repair both destinations atomically.`
                         : `This sync will export this shift from LIVE + REPORT OFFLINE, then upload it to Main WEB + Report WEB with ${
-                        row.count_transactions || 0
-                      } transaction(s), ${
-                        row.count_detailed || 0
-                      } detailed row(s), ${
-                        row.count_discounts || 0
-                      } discount row(s), ${
-                        row.count_payments || 0
-                      } payment row(s), ${
-                        row.count_other_charges || 0
-                      } other charge row(s), ${
-                        row.count_customers || 0
-                      } customer row(s), ${
-                        row.count_discounts_per_product || 0
-                      } product discount row(s), and ${
-                        row.count_loyalty_discounts || 0
-                      } loyalty row(s) per available source dataset.`}
+                            row.count_transactions || 0
+                          } transaction(s), ${
+                            row.count_detailed || 0
+                          } detailed row(s), ${
+                            row.count_discounts || 0
+                          } discount row(s), ${
+                            row.count_payments || 0
+                          } payment row(s), ${
+                            row.count_other_charges || 0
+                          } other charge row(s), ${
+                            row.count_customers || 0
+                          } customer row(s), ${
+                            row.count_discounts_per_product || 0
+                          } product discount row(s), and ${
+                            row.count_loyalty_discounts || 0
+                          } loyalty row(s) per available source dataset.`}
               </div>
             </div>
           </div>
@@ -568,16 +606,16 @@ const VirtualRow = ({ index, style, data }) => {
                   ? "bg-amber-500/10 text-amber-300 border border-amber-500/20"
                   : "bg-amber-50 text-amber-700 border border-amber-200"
                 : row.ready_to_sync
-                ? isDark
-                  ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/20"
-                  : "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                : row.shift_status === "Open"
                   ? isDark
-                    ? "bg-rose-500/10 text-rose-300 border border-rose-500/20"
-                    : "bg-rose-50 text-rose-700 border border-rose-200"
-                  : isDark
-                    ? "bg-slate-500/10 text-slate-300 border border-slate-500/20"
-                    : "bg-slate-100 text-slate-700 border border-slate-200"
+                    ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/20"
+                    : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  : row.shift_status === "Open"
+                    ? isDark
+                      ? "bg-rose-500/10 text-rose-300 border border-rose-500/20"
+                      : "bg-rose-50 text-rose-700 border border-rose-200"
+                    : isDark
+                      ? "bg-slate-500/10 text-slate-300 border border-slate-500/20"
+                      : "bg-slate-100 text-slate-700 border border-slate-200"
             }`}
           >
             {readinessLabel(row)}
@@ -635,9 +673,14 @@ const SyncOfflineSalesToWeb = () => {
   const [isYesNoModalOpen, setYesNoModalOpen] = useState(false);
   const [showhidesuccess, setshowhidesuccess] = useState(false);
   const [returnmessage, setReturnmessage] = useState({ message: "" });
+  const [companyCode, setCompanyCode] = useState("");
+  const [resolvedCompanyCode, setResolvedCompanyCode] = useState("");
+  const [webApiHost, setWebApiHost] = useState("");
+  const [isResolvingTenant, setIsResolvingTenant] = useState(false);
+  const [tenantError, setTenantError] = useState("");
+  const [tenantReloadKey, setTenantReloadKey] = useState(0);
 
   const apiHost = useApiHost();
-  const webApiHost = useWebApiHost();
 
   const localReadUrl =
     apiHost + import.meta.env.VITE_SHIFT_SYNC_LOCAL_READ_ENDPOINT;
@@ -662,10 +705,79 @@ const SyncOfflineSalesToWeb = () => {
   const { mutate: localMarkSyncedMutate } =
     useCustomSecuredMutation(localMarkSyncedUrl);
 
-  const { mutate: webStatusMutate, data: webStatusData } =
-    useCustomSecuredMutation(webStatusUrl);
+  const {
+    mutate: webStatusMutate,
+    data: webStatusData,
+    reset: resetWebStatus,
+  } = useCustomSecuredMutation(webStatusUrl);
 
   const { mutate: webUploadMutate } = useCustomSecuredMutation(webUploadUrl);
+
+  const isTenantResolved = Boolean(webApiHost && resolvedCompanyCode);
+  const resetWebStatusRef = useRef(resetWebStatus);
+
+  useEffect(() => {
+    resetWebStatusRef.current = resetWebStatus;
+  }, [resetWebStatus]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const resolveConfiguredTenant = async () => {
+      setIsResolvingTenant(true);
+      setTenantError("");
+      setCompanyCode("");
+      setResolvedCompanyCode("");
+      setWebApiHost("");
+      resetWebStatusRef.current();
+
+      try {
+        const configuredCompanyCode = await readConfiguredSalesSyncTenant();
+
+        if (!configuredCompanyCode) {
+          throw new Error("TENANT is missing from ip.txt.");
+        }
+
+        if (cancelled) return;
+
+        setCompanyCode(configuredCompanyCode);
+
+        if (!isOnline) {
+          throw new Error(
+            "Connect to the internet to resolve the TENANT from ip.txt.",
+          );
+        }
+
+        await new Promise((resolve) => window.setTimeout(resolve, 800));
+        if (cancelled) return;
+
+        const resolvedTenant = await resolveCompanyTenant(
+          configuredCompanyCode,
+        );
+
+        if (cancelled) return;
+
+        setResolvedCompanyCode(resolvedTenant.companyCode);
+        setWebApiHost(resolvedTenant.apiEndpoint);
+      } catch (error) {
+        if (!cancelled) {
+          setTenantError(
+            error?.message || "Unable to resolve the TENANT from ip.txt.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setIsResolvingTenant(false);
+        }
+      }
+    };
+
+    void resolveConfiguredTenant();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOnline, tenantReloadKey]);
 
   const targetBusunitName =
     webStatusData?.busunit_names?.[localReadData?.target?.busunitcode] ||
@@ -699,7 +811,7 @@ const SyncOfflineSalesToWeb = () => {
 
   const runWebStatusCheck = useCallback(
     (rowsInput = []) => {
-      if (!webApiHost) return;
+      if (!isTenantResolved) return;
 
       const shifts = (rowsInput || [])
         .map((row) => ({
@@ -719,9 +831,12 @@ const SyncOfflineSalesToWeb = () => {
         );
 
       if (shifts.length === 0) return;
-      webStatusMutate({ shifts });
+      webStatusMutate({
+        companycode: resolvedCompanyCode,
+        shifts,
+      });
     },
-    [webApiHost, webStatusMutate],
+    [isTenantResolved, resolvedCompanyCode, webStatusMutate],
   );
 
   const runFullRefresh = useCallback(async () => {
@@ -732,6 +847,11 @@ const SyncOfflineSalesToWeb = () => {
     }
     return res;
   }, [refetch, runWebStatusCheck]);
+
+  const handleManualRefresh = useCallback(async () => {
+    setTenantReloadKey((current) => current + 1);
+    return runFullRefresh();
+  }, [runFullRefresh]);
 
   useEffect(() => {
     const localRows = localReadData?.rows || [];
@@ -904,10 +1024,10 @@ const SyncOfflineSalesToWeb = () => {
       return;
     }
 
-    if (!webApiHost) {
+    if (!isTenantResolved) {
       setReturnmessage({
         message:
-          "WEB API host is not loaded from ip.txt. The sync was not started.",
+          "The TENANT configured in ip.txt is not resolved. Check ip.txt and your internet connection.",
       });
       setshowhidesuccess(true);
       return;
@@ -962,107 +1082,113 @@ const SyncOfflineSalesToWeb = () => {
                       exportData?.missing_tables || []
                     ).join(", ")}. Nothing was uploaded.`
                   : exportData?.message === "SourceRowsMissing"
-                  ? `${sourceLabel} is missing one or more selected closed shifts. Nothing was uploaded.`
-                  : isLegacyPrimaryOnlyExport
-                  ? `The LOCAL export endpoint (${localExportUrl}) returned the old primary-only response without report_dataset. WEB upload was not called. Deploy the updated backend/api and backend/src sync files to the LOCAL API server, then retry.`
-                  : exportData?.error ||
-                    exportData?.message ||
-                    "Dual LOCAL export failed.",
+                    ? `${sourceLabel} is missing one or more selected closed shifts. Nothing was uploaded.`
+                    : isLegacyPrimaryOnlyExport
+                      ? `The LOCAL export endpoint (${localExportUrl}) returned the old primary-only response without report_dataset. WEB upload was not called. Deploy the updated backend/api and backend/src sync files to the LOCAL API server, then retry.`
+                      : exportData?.error ||
+                        exportData?.message ||
+                        "Dual LOCAL export failed.",
             });
             setshowhidesuccess(true);
             return;
           }
 
-          webUploadMutate(exportData, {
-            onSuccess: async (uploadData) => {
-              const primaryVerified =
-                uploadData?.target_summaries?.primary?.verified === true;
-              const reportVerified =
-                uploadData?.target_summaries?.report?.verified === true;
+          webUploadMutate(
+            {
+              ...exportData,
+              companycode: resolvedCompanyCode,
+            },
+            {
+              onSuccess: async (uploadData) => {
+                const primaryVerified =
+                  uploadData?.target_summaries?.primary?.verified === true;
+                const reportVerified =
+                  uploadData?.target_summaries?.report?.verified === true;
 
-              if (
-                uploadData?.message !== "Success" ||
-                !primaryVerified ||
-                !reportVerified
-              ) {
-                const verificationMessage =
-                  uploadData?.message === "Success"
-                    ? `The WEB endpoint did not verify the saved rows. Confirm that the updated webapi is deployed to ${webApiHost}. No LOCAL shift was marked as synced.`
-                    : null;
-                setIsSyncing(false);
-                setReturnmessage({
-                  message:
-                    uploadData?.error ||
-                    verificationMessage ||
-                    uploadData?.message ||
-                    "Main WEB + Report WEB upload did not complete.",
-                });
-                setshowhidesuccess(true);
-                return;
-              }
-
-              const syncedShiftRefs = selectedRows.map((row) => ({
-                unit_code: row.unit_code,
-                shift_id: row.shift_id,
-                terminal_number: row.terminal_number,
-                opening_datetime: row.opening_datetime,
-              }));
-
-              try {
-                const finalizeData = await new Promise((resolve, reject) => {
-                  localMarkSyncedMutate(
-                    { shifts: syncedShiftRefs },
-                    {
-                      onSuccess: resolve,
-                      onError: reject,
-                    },
-                  );
-                });
-
-                if (finalizeData?.message !== "Success") {
-                  throw new Error(
-                    finalizeData?.error || "LOCAL finalization failed.",
-                  );
+                if (
+                  uploadData?.message !== "Success" ||
+                  !primaryVerified ||
+                  !reportVerified
+                ) {
+                  const verificationMessage =
+                    uploadData?.message === "Success"
+                      ? `The WEB endpoint did not verify the saved rows. Confirm that the updated webapi is deployed to ${webApiHost}. No LOCAL shift was marked as synced.`
+                      : null;
+                  setIsSyncing(false);
+                  setReturnmessage({
+                    message:
+                      uploadData?.error ||
+                      verificationMessage ||
+                      uploadData?.message ||
+                      "Main WEB + Report WEB upload did not complete.",
+                  });
+                  setshowhidesuccess(true);
+                  return;
                 }
 
-                await runFullRefresh();
+                const syncedShiftRefs = selectedRows.map((row) => ({
+                  unit_code: row.unit_code,
+                  shift_id: row.shift_id,
+                  terminal_number: row.terminal_number,
+                  opening_datetime: row.opening_datetime,
+                }));
 
-                const completedKeys = new Set(
-                  selectedRows.map((row) => row.row_key),
-                );
-                setSelectedRowKeys((prev) =>
-                  prev.filter((key) => !completedKeys.has(key)),
-                );
+                try {
+                  const finalizeData = await new Promise((resolve, reject) => {
+                    localMarkSyncedMutate(
+                      { shifts: syncedShiftRefs },
+                      {
+                        onSuccess: resolve,
+                        onError: reject,
+                      },
+                    );
+                  });
 
+                  if (finalizeData?.message !== "Success") {
+                    throw new Error(
+                      finalizeData?.error || "LOCAL finalization failed.",
+                    );
+                  }
+
+                  await runFullRefresh();
+
+                  const completedKeys = new Set(
+                    selectedRows.map((row) => row.row_key),
+                  );
+                  setSelectedRowKeys((prev) =>
+                    prev.filter((key) => !completedKeys.has(key)),
+                  );
+
+                  setReturnmessage({
+                    message:
+                      uploadData?.summary_message ||
+                      `Uploaded ${uploadData?.synced_shifts || 0} shift(s) to Main WEB + Report WEB.`,
+                  });
+                } catch (err) {
+                  setReturnmessage({
+                    message: `Main WEB + Report WEB upload succeeded, but LOCAL finalization failed: ${
+                      err?.response?.data?.message ||
+                      err?.message ||
+                      "Unknown LOCAL error"
+                    }. The shift remains retryable; retrying is safe.`,
+                  });
+                } finally {
+                  setshowhidesuccess(true);
+                  setIsSyncing(false);
+                }
+              },
+              onError: (err) => {
+                setIsSyncing(false);
                 setReturnmessage({
                   message:
-                    uploadData?.summary_message ||
-                    `Uploaded ${uploadData?.synced_shifts || 0} shift(s) to Main WEB + Report WEB.`,
-                });
-              } catch (err) {
-                setReturnmessage({
-                  message: `Main WEB + Report WEB upload succeeded, but LOCAL finalization failed: ${
                     err?.response?.data?.message ||
                     err?.message ||
-                    "Unknown LOCAL error"
-                  }. The shift remains retryable; retrying is safe.`,
+                    "Main WEB + Report WEB upload failed and was rolled back.",
                 });
-              } finally {
                 setshowhidesuccess(true);
-                setIsSyncing(false);
-              }
+              },
             },
-            onError: (err) => {
-              setIsSyncing(false);
-              setReturnmessage({
-                message:
-                  err?.response?.data?.message ||
-                  err?.message ||
-                  "Main WEB + Report WEB upload failed and was rolled back.",
-              });
-              setshowhidesuccess(true);
-            },
-          });
+          );
         },
         onError: (err) => {
           setIsSyncing(false);
@@ -1115,6 +1241,9 @@ const SyncOfflineSalesToWeb = () => {
 
     return `Do you want to export ${shiftsCount} selected closed shift(s) from LIVE + REPORT OFFLINE and upload them to Main WEB + Report WEB?
 
+Online company: ${resolvedCompanyCode}
+Tenant API: ${webApiHost}
+
 Shifts: ${shiftsCount}
 Transactions: ${txns}
 Detailed rows: ${details}
@@ -1126,7 +1255,7 @@ Product discount rows: ${productDiscounts}
 Loyalty rows: ${loyaltyDiscounts}
 
 Both WEB shifting tables will be updated to Status = Synced atomically. Both LOCAL shifting records will be finalized only after the dual WEB upload succeeds.`;
-  }, [selectedRows]);
+  }, [resolvedCompanyCode, selectedRows, webApiHost]);
 
   const localReadMessage = localReadData?.message || "";
   const webStatusMessage = webStatusData?.message || "";
@@ -1231,10 +1360,10 @@ Both WEB shifting tables will be updated to Status = Synced atomically. Both LOC
             </div>
 
             <button
-              onClick={runFullRefresh}
-              disabled={isSyncing}
+              onClick={handleManualRefresh}
+              disabled={isSyncing || isResolvingTenant}
               className={`rounded-2xl px-4 py-3 font-bold transition-all flex items-center gap-2 ${
-                isSyncing
+                isSyncing || isResolvingTenant
                   ? isDark
                     ? "bg-slate-700/40 text-slate-500 cursor-not-allowed"
                     : "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
@@ -1262,6 +1391,62 @@ Both WEB shifting tables will be updated to Status = Synced atomically. Both LOC
               LIVE + REPORT data is read from LOCAL API. Main WEB + Report WEB
               synced state is checked through WEB API.
             </p>
+            {/*
+            <div
+              className={`mt-5 max-w-2xl rounded-3xl border p-4 ${
+                isDark
+                  ? "bg-slate-900/50 border-white/10"
+                  : "bg-white border-slate-200 shadow-sm"
+              }`}
+            >
+              <div className="mb-3 flex items-center gap-2">
+                <FiDatabase className="text-blue-500" size={18} />
+                <span
+                  className={`text-sm font-black uppercase tracking-wider ${
+                    isDark ? "text-white" : "text-slate-900"
+                  }`}
+                >
+                  Online Database Tenant
+                </span>
+              </div>
+
+              <div
+                className={`rounded-2xl border px-5 py-4 ${
+                  isDark
+                    ? "bg-slate-950/70 border-slate-700"
+                    : "bg-slate-50 border-slate-300"
+                }`}
+              >
+                <div className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-500">
+                  TENANT from ip.txt
+                </div>
+                <div
+                  className={`mt-1 text-xl font-black tracking-wider ${
+                    isDark ? "text-white" : "text-slate-900"
+                  }`}
+                >
+                  {companyCode || "Not configured"}
+                </div>
+              </div>
+
+              <div
+                className={`mt-3 break-all text-xs font-semibold ${
+                  tenantError
+                    ? "text-rose-500"
+                    : isTenantResolved
+                      ? "text-emerald-500"
+                      : "text-slate-500"
+                }`}
+              >
+                {isResolvingTenant
+                  ? "Resolving the configured tenant..."
+                  : tenantError
+                    ? tenantError
+                    : isTenantResolved
+                      ? `Resolved ${resolvedCompanyCode} to ${webApiHost}`
+                      : "Waiting for the TENANT configured in ip.txt."}
+              </div>
+            </div> */}
           </div>
 
           <div className="flex flex-col gap-3 lg:w-[700px]">
@@ -1475,7 +1660,9 @@ Both WEB shifting tables will be updated to Status = Synced atomically. Both LOC
                 onClick={openSyncConfirm}
                 disabled={
                   isSyncing ||
+                  isResolvingTenant ||
                   !isOnline ||
+                  !isTenantResolved ||
                   isLocalFailed ||
                   isWebFailed ||
                   noBusinessUnit ||
@@ -1483,7 +1670,9 @@ Both WEB shifting tables will be updated to Status = Synced atomically. Both LOC
                 }
                 className={`w-full rounded-2xl px-5 py-3 font-bold transition-all ${
                   isSyncing ||
+                  isResolvingTenant ||
                   !isOnline ||
+                  !isTenantResolved ||
                   isLocalFailed ||
                   isWebFailed ||
                   noBusinessUnit ||
@@ -1520,11 +1709,11 @@ Both WEB shifting tables will be updated to Status = Synced atomically. Both LOC
 
               <div
                 className={`rounded-2xl px-4 py-3 flex items-center gap-3 ${
-                  isLocalFailed || isWebFailed
+                  isLocalFailed || isWebFailed || tenantError
                     ? isDark
                       ? "bg-rose-500/10 border border-rose-500/20 text-rose-400"
                       : "bg-rose-50 border border-rose-200 text-rose-700"
-                    : noBusinessUnit
+                    : noBusinessUnit || !isTenantResolved
                       ? isDark
                         ? "bg-amber-500/10 border border-amber-500/20 text-amber-400"
                         : "bg-amber-50 border border-amber-200 text-amber-700"
@@ -1537,11 +1726,17 @@ Both WEB shifting tables will be updated to Status = Synced atomically. Both LOC
                 <span className="font-bold">
                   {isLocalFailed
                     ? "LOCAL API read failed"
-                    : isWebFailed
-                      ? "WEB API status check failed"
-                      : noBusinessUnit
-                        ? "No active local BU pricing mapping"
-                        : "Dual LOCAL + WEB reconciliation ready"}
+                    : isResolvingTenant
+                      ? "Resolving TENANT from ip.txt"
+                      : tenantError
+                        ? `TENANT error: ${tenantError}`
+                        : !isTenantResolved
+                          ? "Waiting for TENANT from ip.txt"
+                          : isWebFailed
+                            ? "WEB API status check failed"
+                            : noBusinessUnit
+                              ? "No active local BU pricing mapping"
+                              : "Dual LOCAL + WEB reconciliation ready"}
                 </span>
               </div>
             </div>
