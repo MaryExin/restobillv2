@@ -16,6 +16,9 @@ dist
 dist-ssr
 release
 *.local
+.env.pos-developer
+backend/.env.pos-developer
+/etc/restobill-pos-developer.env
 
 # Editor directories and files
 .vscode/*

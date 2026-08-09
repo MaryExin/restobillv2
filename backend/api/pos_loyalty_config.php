@@ -9,7 +9,16 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
     exit;
 }
 
+$method = $_SERVER["REQUEST_METHOD"];
+$requiresMutationAuthorization = $method === "POST";
+if ($requiresMutationAuthorization) {
+    require __DIR__ . "/secure_guard.php";
+}
+
 require __DIR__ . "/pdo.php";
+if ($requiresMutationAuthorization) {
+    require_once __DIR__ . "/pos_role_authorization.php";
+}
 
 const LOYALTY_CATEGORY = "Loyalty";
 const LOYALTY_EARNING_DESCRIPTION = "Loyalty Earning Rule (PHP per Point)";
@@ -161,7 +170,14 @@ function readLoyaltyConfig(PDO $pdo)
 }
 
 try {
-    $method = $_SERVER["REQUEST_METHOD"];
+    if ($requiresMutationAuthorization) {
+        posRoleAuthRequirePermission(
+            $pdo,
+            (string)($GLOBALS["pos_user_id"] ?? ""),
+            "settings",
+            "loyaltyConfiguration"
+        );
+    }
 
     if ($method === "GET") {
         respond(true, "Loyalty configuration loaded.", readLoyaltyConfig($pdo));
@@ -212,5 +228,6 @@ try {
 
     respond(true, "Loyalty configuration saved.", readLoyaltyConfig($pdo));
 } catch (Throwable $e) {
-    respond(false, $e->getMessage(), null, 500);
+    error_log("POS loyalty configuration error: " . $e->getMessage());
+    respond(false, "Unable to process loyalty configuration.", null, 500);
 }

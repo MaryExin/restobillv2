@@ -9,7 +9,16 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
     exit;
 }
 
+$method = $_SERVER["REQUEST_METHOD"];
+$requiresMutationAuthorization = in_array($method, ["POST", "DELETE"], true);
+if ($requiresMutationAuthorization) {
+    require __DIR__ . "/secure_guard.php";
+}
+
 require __DIR__ . "/pdo.php";
+if ($requiresMutationAuthorization) {
+    require_once __DIR__ . "/pos_role_authorization.php";
+}
 
 const LOYALTY_MEMBERS_TABLE = "lkp_loyalty_cs_name";
 
@@ -84,7 +93,14 @@ function listMembers(PDO $pdo, $search)
 }
 
 try {
-    $method = $_SERVER["REQUEST_METHOD"];
+    if ($requiresMutationAuthorization) {
+        posRoleAuthRequirePermission(
+            $pdo,
+            (string)($GLOBALS["pos_user_id"] ?? ""),
+            "settings",
+            "loyaltyConfiguration"
+        );
+    }
 
     if ($method === "GET") {
         $search = $_GET["search"] ?? "";
@@ -169,5 +185,6 @@ try {
 
     respond(true, "Customer registered.", mapMemberRow($newRow), 201);
 } catch (Throwable $e) {
-    respond(false, $e->getMessage(), null, 500);
+    error_log("POS loyalty members error: " . $e->getMessage());
+    respond(false, "Unable to process loyalty members.", null, 500);
 }

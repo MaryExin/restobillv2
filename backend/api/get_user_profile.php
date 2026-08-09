@@ -1,29 +1,103 @@
 <?php
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
-header("Content-Type: application/json; charset=UTF-8");
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { exit; }
+declare(strict_types=1);
+
+require __DIR__ . "/secure_guard.php";
+
+if (!in_array($_SERVER["REQUEST_METHOD"], ["GET", "POST"], true)) {
+    http_response_code(405);
+    header("Allow: GET, POST");
+    exit;
+}
+
+require __DIR__ . "/pdo.php";
+require_once __DIR__ . "/pos_role_authorization.php";
+
+function posProfileRoleLabel($value): string
+{
+    $role = strtoupper(trim((string)($value ?? "")));
+    if (in_array($role, ["0", "CASHIER"], true)) {
+        return "Cashier";
+    }
+    if (in_array($role, ["1", "ADMIN", "MANAGER", "SUPERVISOR"], true)) {
+        return "Admin";
+    }
+    if (in_array($role, ["2", "SUPER ADMIN", "SUPER_ADMIN", "SUPERADMIN"], true)) {
+        return "Super Admin";
+    }
+
+    return trim((string)($value ?? ""));
+}
 
 try {
-    $config = require_once './config.php'; 
+    $authenticatedUserId = (string)($GLOBALS["pos_user_id"] ?? "");
+    posRoleAuthRequirePermission(
+        $pdo,
+        $authenticatedUserId,
+        "settings",
+        "myAccount"
+    );
 
-    $dsn = "mysql:host={$config['host']};dbname={$config['db']};charset={$config['charset']}";
-    $pdo = new PDO($dsn, $config['user'], $config['pass'], [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
-    ]);
+    if (posRoleAuthIsDeveloperSession()) {
+        if ($_SERVER["REQUEST_METHOD"] === "POST") {
+            http_response_code(403);
+            echo json_encode([
+                "success" => false,
+                "message" => "Developer credentials are managed in the server environment."
+            ]);
+            exit;
+        }
+
+        $uuid = trim((string)($_GET["user_id"] ?? ""));
+        if ($uuid === "" || !hash_equals($authenticatedUserId, $uuid)) {
+            http_response_code(403);
+            echo json_encode(["error" => "You may only view your own profile."]);
+            exit;
+        }
+
+        $developer = posDeveloperVirtualUser();
+        $branchStmt = $pdo->query("SELECT Unit_Name FROM tbl_main_business_units LIMIT 1");
+        $branch = $branchStmt->fetch();
+        echo json_encode([
+            "uuid" => $developer["uuid"],
+            "firstname" => $developer["firstname"],
+            "lastname" => $developer["lastname"],
+            "email" => $developer["email"],
+            "department" => $developer["department"],
+            "classification" => "Developer",
+            "classification_value" => "DEVELOPER",
+            "branch_name" => $branch ? $branch["Unit_Name"] : "N/A",
+            "profile_pic_url" => null,
+            "is_developer_mode" => true,
+        ]);
+        exit;
+    }
 
     // --- PASSWORD UPDATE LOGIC (POST) ---
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $data = json_decode(file_get_contents("php://input"), true);
+        if (!is_array($data)) {
+            http_response_code(400);
+            echo json_encode(["success" => false, "message" => "Invalid JSON body."]);
+            exit;
+        }
         $uuid = $data['user_id'] ?? null;
         $currentPass = $data['current_password'] ?? null;
         $newPass = $data['new_password'] ?? null;
 
         if (!$uuid || !$currentPass || !$newPass) {
+            http_response_code(422);
             echo json_encode(["success" => false, "message" => "Incomplete data provided."]);
+            exit;
+        }
+        if (!hash_equals($authenticatedUserId, (string)$uuid)) {
+            http_response_code(403);
+            echo json_encode(["success" => false, "message" => "You may only update your own password."]);
+            exit;
+        }
+        if (strlen((string)$newPass) < 8 || strlen((string)$newPass) > 72) {
+            http_response_code(422);
+            echo json_encode(["success" => false, "message" => "New password must be 8 to 72 characters."]);
             exit;
         }
 
@@ -45,6 +119,7 @@ try {
                 echo json_encode(["success" => false, "message" => "Database update failed."]);
             }
         } else {
+            http_response_code(422);
             echo json_encode(["success" => false, "message" => "Incorrect current password."]);
         }
         exit;
@@ -53,7 +128,13 @@ try {
     // --- PROFILE FETCHING LOGIC (GET) ---
     $uuid = $_GET['user_id'] ?? null;
     if (!$uuid) {
+        http_response_code(400);
         echo json_encode(["error" => "No UUID provided"]);
+        exit;
+    }
+    if (!hash_equals($authenticatedUserId, (string)$uuid)) {
+        http_response_code(403);
+        echo json_encode(["error" => "You may only view your own profile."]);
         exit;
     }
 
@@ -89,14 +170,17 @@ try {
             "lastname" => $user['lastname'],
             "email" => $user['email'],
             "department" => $user['department'],
-            "classification" => $user['classification'],
+            "classification" => posProfileRoleLabel($user['classification']),
+            "classification_value" => $user['classification'],
             "branch_name" => $branch ? $branch['Unit_Name'] : "N/A",
             "profile_pic_url" => $finalImage 
         ]);
     } else {
+        http_response_code(404);
         echo json_encode(["error" => "User not found"]);
     }
-} catch (Exception $e) {
+} catch (Throwable $e) {
+    error_log("POS user profile error: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(["error" => $e->getMessage()]);
+    echo json_encode(["error" => "Unable to process the user profile request."]);
 }

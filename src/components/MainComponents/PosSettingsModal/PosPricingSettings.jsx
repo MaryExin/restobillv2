@@ -1,6 +1,7 @@
 "use client";
+/* eslint-disable react/prop-types */
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   FiDollarSign,
   FiFileText,
@@ -11,6 +12,17 @@ import {
   FiToggleRight,
 } from "react-icons/fi";
 import useApiHost from "../../../hooks/useApiHost";
+
+const ORDER_SLIP_SETTINGS_PATH =
+  import.meta.env.VITE_POS_ORDER_SLIP_SETTINGS_ENDPOINT ||
+  "/api/pos_order_slip_settings.php";
+
+const pricingSettingsAuthorizationHeaders = () => {
+  const headers = { "Content-Type": "application/json" };
+  const token = localStorage.getItem("access_token");
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+};
 
 const PosPricingSettings = ({ isDark, accent = "#3b82f6" }) => {
   const apiHost = useApiHost();
@@ -41,7 +53,7 @@ const PosPricingSettings = ({ isDark, accent = "#3b82f6" }) => {
       try {
         setIsLoading(true);
         setError("");
-        const res  = await fetch(`${apiHost}/api/pos_order_slip_settings.php`);
+        const res  = await fetch(`${apiHost}${ORDER_SLIP_SETTINGS_PATH}`);
         const json = await res.json();
         if (!res.ok || !json?.success) throw new Error(json?.message || "Failed to load.");
         if (!cancelled) {
@@ -69,9 +81,9 @@ const PosPricingSettings = ({ isDark, accent = "#3b82f6" }) => {
       setIsSaving(true);
       setError("");
       setMessage("");
-      const res  = await fetch(`${apiHost}/api/pos_order_slip_settings.php`, {
+      const res  = await fetch(`${apiHost}${ORDER_SLIP_SETTINGS_PATH}`, {
         method:  "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: pricingSettingsAuthorizationHeaders(),
         body:    JSON.stringify({ hide_price_on_os: noPriceOnOS, group_by_category: groupByCategory }),
       });
       const json = await res.json();

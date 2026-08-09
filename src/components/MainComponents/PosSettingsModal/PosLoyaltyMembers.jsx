@@ -1,6 +1,7 @@
 "use client";
+/* eslint-disable react/prop-types */
 
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FiX,
@@ -14,6 +15,13 @@ import {
   FiAlertTriangle,
 } from "react-icons/fi";
 import useApiHost from "../../../hooks/useApiHost";
+
+const mutationHeaders = (headers = {}) => {
+  const nextHeaders = { ...headers };
+  const token = window.localStorage.getItem("access_token");
+  if (token) nextHeaders.Authorization = `Bearer ${token}`;
+  return nextHeaders;
+};
 
 const PosLoyaltyMembers = ({ isOpen, onClose, isDark, accent = "#3b82f6" }) => {
   const apiHost = useApiHost();
@@ -121,7 +129,7 @@ const PosLoyaltyMembers = ({ isOpen, onClose, isDark, accent = "#3b82f6" }) => {
 
       const response = await fetch(`${apiHost}/api/pos_loyalty_members.php`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: mutationHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           customer_name: trimmedName,
           phone_number: trimmedPhone,
@@ -157,7 +165,7 @@ const PosLoyaltyMembers = ({ isOpen, onClose, isDark, accent = "#3b82f6" }) => {
 
       const response = await fetch(`${apiHost}/api/pos_loyalty_members.php`, {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
+        headers: mutationHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ id: member.id }),
       });
 

@@ -1,6 +1,7 @@
 "use client";
+/* eslint-disable react/prop-types */
 
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -10,6 +11,21 @@ import {
   FiTag, FiFileText, FiLayers,
 } from "react-icons/fi";
 import useApiHost from "../../../hooks/useApiHost";
+
+const PRICING_READ_PATH =
+  import.meta.env.VITE_POS_PRICING_READ_ENDPOINT || "/api/get_pricing.php";
+const PRICING_MUTATION_PATH =
+  import.meta.env.VITE_POS_PRICING_MUTATION_ENDPOINT || "/api/pricing_engine.php";
+const ORDER_SLIP_SETTINGS_PATH =
+  import.meta.env.VITE_POS_ORDER_SLIP_SETTINGS_ENDPOINT ||
+  "/api/pos_order_slip_settings.php";
+
+const pricingAuthorizationHeaders = (headers = {}) => {
+  const nextHeaders = { ...headers };
+  const token = localStorage.getItem("access_token");
+  if (token) nextHeaders.Authorization = `Bearer ${token}`;
+  return nextHeaders;
+};
 
 const PosPricingDashboard = ({ isDark, accent = "#3b82f6" }) => {
   const apiHost = useApiHost();
@@ -72,7 +88,9 @@ const PosPricingDashboard = ({ isDark, accent = "#3b82f6" }) => {
     if (!apiHost) return;
     try {
       setLoading(true);
-      const res = await axios.get(`${apiHost}/api/get_pricing.php`);
+      const res = await axios.get(`${apiHost}${PRICING_READ_PATH}`, {
+        headers: pricingAuthorizationHeaders(),
+      });
       const data = res.data;
       setProducts(data);
       setCacheKey(Date.now());
@@ -93,7 +111,7 @@ const PosPricingDashboard = ({ isDark, accent = "#3b82f6" }) => {
   useEffect(() => {
     if (!apiHost) return;
     let cancelled = false;
-    fetch(`${apiHost}/api/pos_order_slip_settings.php`)
+    fetch(`${apiHost}${ORDER_SLIP_SETTINGS_PATH}`)
       .then((r) => r.json())
       .then((d) => {
         if (!cancelled && d.success) {
@@ -131,9 +149,11 @@ const PosPricingDashboard = ({ isDark, accent = "#3b82f6" }) => {
     if (!apiHost || isSavingConfig) return;
     try {
       setIsSavingConfig(true); setConfigErr(""); setConfigMsg("");
-      const res = await fetch(`${apiHost}/api/pos_order_slip_settings.php`, {
+      const res = await fetch(`${apiHost}${ORDER_SLIP_SETTINGS_PATH}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: pricingAuthorizationHeaders({
+          "Content-Type": "application/json",
+        }),
         body: JSON.stringify({ hide_price_on_os: noPriceOnOS, group_by_category: groupByCategory }),
       });
       const json = await res.json();
@@ -157,21 +177,20 @@ const PosPricingDashboard = ({ isDark, accent = "#3b82f6" }) => {
     const form = new FormData();
     form.append("file", file); form.append("item_name", itemName); form.append("action", "upload_image");
     try {
-      const res = await axios.post(`${apiHost}/api/pricing_engine.php`, form, {
-        headers: { "Content-Type": "multipart/form-data" },
+      const res = await axios.post(`${apiHost}${PRICING_MUTATION_PATH}`, form, {
+        headers: pricingAuthorizationHeaders({
+          "Content-Type": "multipart/form-data",
+        }),
       });
       if (res.data.status === "success") { fetchPricingData(); triggerToast("Image updated."); }
     } catch { alert("Upload failed."); }
   };
 
   const generateInvCode = () =>
-    setNewProduct((p) => ({ ...p, inv_code: `BD-${Math.floor(1e9 + Math.random() * 9e9)}` }));
-
-  const handleOpenAddModal = () => {
-    generateInvCode();
-    setNewProduct((p) => ({ ...p, target_sales_type: selectedService, item_category: categories[0] || "" }));
-    setIsAddModalOpen(true);
-  };
+    setNewProduct((product) => ({
+      ...product,
+      inv_code: `BD-${Math.floor(1e9 + Math.random() * 9e9)}`,
+    }));
 
   const openEditModal = (item) => {
     setEditingItem(item); setNewPrice(item.srp);
@@ -179,11 +198,12 @@ const PosPricingDashboard = ({ isDark, accent = "#3b82f6" }) => {
   };
 
   const handleAddProduct = async () => {
-    const userId = localStorage.getItem("user_id") || "0";
     try {
-      const res = await axios.post(`${apiHost}/api/pricing_engine.php`, {
-        action: "add", ...newProduct, user_id: userId,
-      });
+      const res = await axios.post(
+        `${apiHost}${PRICING_MUTATION_PATH}`,
+        { action: "add", ...newProduct },
+        { headers: pricingAuthorizationHeaders() },
+      );
       if (res.data.status === "success") {
         setIsAddModalOpen(false); fetchPricingData(); triggerToast("Product added.");
       }
@@ -191,12 +211,17 @@ const PosPricingDashboard = ({ isDark, accent = "#3b82f6" }) => {
   };
 
   const executeUpdate = async () => {
-    const userId = localStorage.getItem("user_id") || "0";
     try {
-      const res = await axios.post(`${apiHost}/api/pricing_engine.php`, {
-        action: "update", inv_code: editingItem.inv_code,
-        new_price: parseFloat(newPrice), service_type: selectedService, user_id: userId,
-      });
+      const res = await axios.post(
+        `${apiHost}${PRICING_MUTATION_PATH}`,
+        {
+          action: "update",
+          inv_code: editingItem.inv_code,
+          new_price: parseFloat(newPrice),
+          service_type: selectedService,
+        },
+        { headers: pricingAuthorizationHeaders() },
+      );
       if (res.data.status === "success") {
         setIsModalOpen(false); fetchPricingData(); triggerToast("Price updated.");
       }

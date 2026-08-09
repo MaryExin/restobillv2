@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+/* eslint-disable react/prop-types */
+import { useCallback, useEffect, useState } from "react";
 import {
   FiShield,
   FiDownload,
@@ -24,9 +25,33 @@ import {
   FiDatabase,
 } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
+import useApiHost from "../../../hooks/useApiHost";
+import { usePosDeveloperSession } from "../../../hooks/usePosRoleAccessConfig";
+
+const DB_BACKUP_PATH =
+  import.meta.env.VITE_POS_DB_BACKUP_ENDPOINT || "/api/pos_db_backup_api.php";
+const DB_RESET_PATH =
+  import.meta.env.VITE_POS_DB_RESET_ENDPOINT || "/api/pos_db_reset_api.php";
+const BACKUP_FREQUENCIES = {
+  "1m": 60,
+  "30m": 1800,
+  "1h": 3600,
+  "2h": 7200,
+};
+
+const dataSecurityFetch = (url, options = {}) => {
+  const headers = new Headers(options.headers || {});
+  headers.set("Accept", "application/json");
+  const token = localStorage.getItem("access_token");
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  return fetch(url, { ...options, headers });
+};
 
 const PosBackupModal = ({ isDark, accent = "#3b82f6" }) => {
+  const apiHost = useApiHost();
+  const developerMode = usePosDeveloperSession();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const hasAccess = isAuthenticated || developerMode;
   const [passwordInput, setPasswordInput] = useState("");
   const [authError, setAuthError] = useState(false);
 
@@ -44,7 +69,6 @@ const PosBackupModal = ({ isDark, accent = "#3b82f6" }) => {
   const [showSavedToast, setShowSavedToast] = useState(false);
   const [lastBackupTime, setLastBackupTime] = useState("Never");
 
-  const freqMap = { "1m": 60, "30m": 1800, "1h": 3600, "2h": 7200 };
   const MASTER_PASSWORD = "LESI_POSPASS@2023";
 
   const theme = {
@@ -62,19 +86,19 @@ const PosBackupModal = ({ isDark, accent = "#3b82f6" }) => {
     textSoft: isDark ? "text-slate-500" : "text-slate-400",
   };
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
-      const settingsRes = await fetch(
-        "http://localhost/api/pos_db_backup_api.php?action=get_settings",
+      const settingsRes = await dataSecurityFetch(
+        `${apiHost}${DB_BACKUP_PATH}?action=get_settings`,
       );
       const sData = await settingsRes.json();
       if (sData.status === "success") {
         setSyncFrequency(sData.frequency);
-        setTimeLeft(freqMap[sData.frequency] || 3600);
+        setTimeLeft(BACKUP_FREQUENCIES[sData.frequency] || 3600);
       }
 
-      const terminalRes = await fetch(
-        "http://localhost/api/get_terminal_config.php",
+      const terminalRes = await dataSecurityFetch(
+        `${apiHost}/api/get_terminal_config.php`,
       );
       const tData = await terminalRes.json();
       if (tData.status === "success") {
@@ -84,15 +108,17 @@ const PosBackupModal = ({ isDark, accent = "#3b82f6" }) => {
     } catch (err) {
       console.error("System Error", err);
     }
-  };
+  }, [apiHost]);
 
   useEffect(() => {
-    if (isAuthenticated) fetchData();
-  }, [isAuthenticated]);
+    if (hasAccess) fetchData();
+  }, [fetchData, hasAccess]);
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setTimeLeft((prev) => (prev <= 1 ? freqMap[syncFrequency] : prev - 1));
+      setTimeLeft((prev) =>
+        prev <= 1 ? BACKUP_FREQUENCIES[syncFrequency] : prev - 1,
+      );
     }, 1000);
 
     return () => clearInterval(timer);
@@ -115,8 +141,8 @@ const PosBackupModal = ({ isDark, accent = "#3b82f6" }) => {
     setIsUpdating(true);
 
     try {
-      const res = await fetch(
-        "http://localhost/api/update_terminal_config.php",
+      const res = await dataSecurityFetch(
+        `${apiHost}/api/update_terminal_config.php`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -143,8 +169,8 @@ const PosBackupModal = ({ isDark, accent = "#3b82f6" }) => {
     setIsSavingFreq(true);
 
     try {
-      const res = await fetch(
-        "http://localhost/api/pos_db_backup_api.php?action=update_frequency",
+      const res = await dataSecurityFetch(
+        `${apiHost}${DB_BACKUP_PATH}?action=update_frequency`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -157,7 +183,7 @@ const PosBackupModal = ({ isDark, accent = "#3b82f6" }) => {
       if (data.status === "success") {
         setShowSavedToast(true);
         setTimeout(() => setShowSavedToast(false), 3000);
-        setTimeLeft(freqMap[syncFrequency]);
+        setTimeLeft(BACKUP_FREQUENCIES[syncFrequency]);
       }
     } finally {
       setIsSavingFreq(false);
@@ -168,16 +194,29 @@ const PosBackupModal = ({ isDark, accent = "#3b82f6" }) => {
     setIsSyncing(true);
 
     try {
-      const response = await fetch(
-        "http://localhost/api/pos_db_backup_api.php?action=immediate_export",
+      const response = await dataSecurityFetch(
+        `${apiHost}${DB_BACKUP_PATH}?action=immediate_export`,
+        { method: "POST" },
       );
-      const data = await response.json();
-
-      if (data.status === "success") {
-        setLastBackupTime(new Date().toLocaleTimeString());
-        window.location.href = `http://localhost/${data.download_url}?t=${Date.now()}`;
-        setTimeLeft(freqMap[syncFrequency]);
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.message || "Database export failed.");
       }
+
+      const backupBlob = await response.blob();
+      const downloadUrl = URL.createObjectURL(backupBlob);
+      const disposition = response.headers.get("Content-Disposition") || "";
+      const filenameMatch = disposition.match(/filename="?([^";]+)"?/i);
+      const download = document.createElement("a");
+      download.href = downloadUrl;
+      download.download = filenameMatch?.[1] || "B1T1_Backup.sql";
+      document.body.appendChild(download);
+      download.click();
+      download.remove();
+      URL.revokeObjectURL(downloadUrl);
+
+      setLastBackupTime(new Date().toLocaleTimeString());
+      setTimeLeft(BACKUP_FREQUENCIES[syncFrequency]);
     } finally {
       setIsSyncing(false);
     }
@@ -187,11 +226,12 @@ const PosBackupModal = ({ isDark, accent = "#3b82f6" }) => {
     setIsResetting(true);
 
     try {
-      const response = await fetch(
-        "http://localhost/api/pos_db_reset_api.php",
+      const response = await dataSecurityFetch(
+        `${apiHost}${DB_RESET_PATH}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirmation: "RESET POS DATA" }),
         },
       );
 
@@ -271,7 +311,7 @@ const PosBackupModal = ({ isDark, accent = "#3b82f6" }) => {
     },
   ];
 
-  if (!isAuthenticated) {
+  if (!hasAccess) {
     return (
       <div className="max-w-3xl mx-auto">
         <div
@@ -500,7 +540,7 @@ const PosBackupModal = ({ isDark, accent = "#3b82f6" }) => {
             <div
               className={`grid grid-cols-2 gap-3 rounded-[24px] border p-3 ${theme.panelSoft}`}
             >
-              {Object.keys(freqMap).map((f) => {
+              {Object.keys(BACKUP_FREQUENCIES).map((f) => {
                 const active = syncFrequency === f;
 
                 return (

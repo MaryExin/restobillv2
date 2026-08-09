@@ -1,7 +1,11 @@
 <?php
+require_once __DIR__ . "/bootstrap.php";
+require_once __DIR__ . "/pos_developer_auth.php";
+require_once __DIR__ . "/pos_role_authorization.php";
+
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type");
+header("Access-Control-Allow-Headers: Content-Type, Authorization");
 header("Content-Type: application/json");
 
 date_default_timezone_set('Asia/Manila');
@@ -46,7 +50,11 @@ function resolveReadingDatabaseName(array $input, string $posDbName, string $rep
         return [$reportDbName, "report"];
     }
 
-    return [$posDbName, "cnc"];
+    if ($scope === "cnc") {
+        return [$posDbName, "cnc"];
+    }
+
+    throw new InvalidArgumentException("Invalid reading database scope.");
 }
 
 function executeCloseShiftStatement(
@@ -123,6 +131,20 @@ try {
     }
 
     [$readingDbName, $readingDatabaseScope] = resolveReadingDatabaseName($input, $posDbName, $reportDbName);
+
+    $developerPreviewRequested = false;
+    if (array_key_exists("developerPreview", $input)) {
+        $developerPreviewRequested = filter_var(
+            $input["developerPreview"],
+            FILTER_VALIDATE_BOOLEAN
+        );
+    } elseif (array_key_exists("developer_preview", $input)) {
+        $developerPreviewRequested = filter_var(
+            $input["developer_preview"],
+            FILTER_VALIDATE_BOOLEAN
+        );
+    }
+
     $readingShiftTable = qualifiedTableName($readingDbName, "tbl_pos_shifting_records");
     $posShiftTable = qualifiedTableName($posDbName, "tbl_pos_shifting_records");
     $reportShiftTable = qualifiedTableName($reportDbName, "tbl_pos_shifting_records");
@@ -144,6 +166,43 @@ try {
         ]
     );
 
+    $readingAccess = posDeveloperReadingAccess(
+        $readingDatabaseScope,
+        $developerPreviewRequested,
+        $pdo
+    );
+    if (!$readingAccess["authorized"]) {
+        http_response_code(401);
+        echo json_encode([
+            "success" => false,
+            "message" => "A valid POS access token is required. Report and preview modes require a Developer session."
+        ]);
+        exit;
+    }
+
+    $isDeveloper = (bool)$readingAccess["is_developer"];
+    $developerPreview = (bool)($readingAccess["developer_preview"] ?? false);
+    $readOnly = (bool)($readingAccess["read_only"] ?? false);
+
+    if (!$isDeveloper) {
+        $readingToken = $readingAccess["token"] ?? [];
+        posRoleAuthRequirePermission(
+            $pdo,
+            trim((string)($readingToken["sub"] ?? "")),
+            "reading",
+            "zReading"
+        );
+    }
+
+    // Report data is an audit preview only. It may never close or mirror a
+    // shift because its intentionally incomplete transaction set is not a
+    // compliant source for operational shift closure.
+    $closeShift = $readingDatabaseScope === "cnc" && !$developerPreview;
+
+    if ($readOnly) {
+        posDeveloperMakePdoReadOnly($pdo);
+    }
+
     $selectedCashier = isset($input["selectedCashier"])
         ? trim((string)$input["selectedCashier"])
         : (isset($input["selected_cashier"]) ? trim((string)$input["selected_cashier"]) : "All Cashiers");
@@ -156,22 +215,43 @@ try {
         ? (float)$input["verifyAmount"]
         : (isset($input["verify_amount"]) ? (float)$input["verify_amount"] : 0);
 
-    $closingUserId = null;
-    if (isset($input["closingUserId"])) {
-        $closingUserId = trim((string)$input["closingUserId"]);
-    } elseif (isset($input["closing_user_id"])) {
-        $closingUserId = trim((string)$input["closing_user_id"]);
-    } elseif (isset($input["userId"])) {
-        $closingUserId = trim((string)$input["userId"]);
-    } elseif (isset($input["user_id"])) {
-        $closingUserId = trim((string)$input["user_id"]);
-    }
+    // Shift closure and audit identity always come from the authenticated
+    // access-token account, never from request identity fields.
+    $authenticatedToken = $readingAccess["token"];
+    $closingUserId = (string)$authenticatedToken["sub"];
+    $userId = (string)$authenticatedToken["sub"];
 
-    $userId = isset($input["user_id"]) ? trim((string)$input["user_id"]) : (string)$closingUserId;
-    $userName = isset($input["user_name"]) ? trim((string)$input["user_name"]) : "";
-    $cashierName = isset($input["cashier_name"])
-        ? trim((string)$input["cashier_name"])
-        : $userName;
+    if ($isDeveloper) {
+        $userName = posDeveloperDisplayName();
+        $cashierName = posDeveloperDisplayName();
+    } else {
+        $authenticatedUser = $readingAccess["user"];
+        $authenticatedFullName = trim(implode(" ", array_filter([
+            trim((string)($authenticatedUser["firstname"] ?? "")),
+            trim((string)($authenticatedUser["lastname"] ?? "")),
+        ], static fn($part) => $part !== "")));
+        $userName = "";
+
+        foreach ([
+            $authenticatedUser["User_Name"] ?? "",
+            $authenticatedUser["username"] ?? "",
+            $authenticatedUser["name"] ?? "",
+            $authenticatedFullName,
+            $authenticatedUser["email"] ?? "",
+        ] as $identityCandidate) {
+            $identityCandidate = trim((string)$identityCandidate);
+            if ($identityCandidate !== "") {
+                $userName = $identityCandidate;
+                break;
+            }
+        }
+
+        if ($userName === "") {
+            $userName = "User " . $userId;
+        }
+
+        $cashierName = $userName;
+    }
 
     $categoryCode = "";
     if (isset($input["categoryCode"])) {
@@ -419,35 +499,10 @@ try {
 
     $pdo->beginTransaction();
 
-    $closedPosRows = executeCloseShiftStatement(
-        $pdo,
-        $readingShiftTable,
-        $closingUserId,
-        $closingDateTime,
-        $cashDrawerAmount,
-        $begOR,
-        $endOR,
-        $begVoidNo,
-        $endVoidNo,
-        $begRefundNo,
-        $endRefundNo,
-        $zCounterNo,
-        $grandAccumSales,
-        $shiftId,
-        $categoryCode,
-        $unitCode,
-        $terminalNumber
-    );
-
-    if ($closedPosRows <= 0) {
-        $pdo->rollBack();
-        throw new Exception("Failed to close the {$readingDatabaseLabel} shifting record.");
-    }
-
-    if ($mirrorReportShift) {
-        $closedReportRows = executeCloseShiftStatement(
+    if ($closeShift) {
+        $closedPosRows = executeCloseShiftStatement(
             $pdo,
-            $mirrorShiftTable,
+            $readingShiftTable,
             $closingUserId,
             $closingDateTime,
             $cashDrawerAmount,
@@ -465,9 +520,36 @@ try {
             $terminalNumber
         );
 
-        if ($closedReportRows <= 0) {
+        if ($closedPosRows <= 0) {
             $pdo->rollBack();
-            throw new Exception("Failed to close the matching shift record in the other database.");
+            throw new Exception("Failed to close the {$readingDatabaseLabel} shifting record.");
+        }
+
+        if ($mirrorReportShift) {
+            $closedReportRows = executeCloseShiftStatement(
+                $pdo,
+                $mirrorShiftTable,
+                $closingUserId,
+                $closingDateTime,
+                $cashDrawerAmount,
+                $begOR,
+                $endOR,
+                $begVoidNo,
+                $endVoidNo,
+                $begRefundNo,
+                $endRefundNo,
+                $zCounterNo,
+                $grandAccumSales,
+                $shiftId,
+                $categoryCode,
+                $unitCode,
+                $terminalNumber
+            );
+
+            if ($closedReportRows <= 0) {
+                $pdo->rollBack();
+                throw new Exception("Failed to close the matching shift record in the other database.");
+            }
         }
     }
 
@@ -727,6 +809,13 @@ try {
     $parReportTime = date("h:i A", strtotime($row["Closing_DateTime"] ?: $closingDateTime));
     $parStartDateTime = date("m/d/y g:i A", strtotime($row["Opening_DateTime"]));
     $parEndDateTime = date("m/d/y g:i A", strtotime($row["Closing_DateTime"] ?: $closingDateTime));
+    $displayBegOR = $closeShift ? (float)$row["Beg_OR"] : $begOR;
+    $displayEndOR = $closeShift ? (float)$row["End_OR"] : $endOR;
+    $displayBegVoidNo = $closeShift ? (float)$row["Beg_VoidNo"] : $begVoidNo;
+    $displayEndVoidNo = $closeShift ? (float)$row["End_VoidNo"] : $endVoidNo;
+    $displayBegRefundNo = $closeShift ? (float)$row["Beg_RefundNo"] : $begRefundNo;
+    $displayEndRefundNo = $closeShift ? (float)$row["End_RefundNo"] : $endRefundNo;
+    $displayZCounterNo = $closeShift ? (float)$row["Z_Counter_No"] : $zCounterNo;
 
     $grossAmount = (float)$row["Gross_Amount"];
     $lessDiscount = (float)$row["Discount"];
@@ -762,10 +851,12 @@ try {
     $presentAccumSales = (float)($row["Present_Accum_Sales"] ?? 0);
     $salesForTheDay = (float)($row["Sales_For_The_Day"] ?? 0);
 
+    if ($closeShift) {
     try {
         $valuesOfData = json_encode([
             "shift_id" => $shiftId,
             "selected_cashier" => $selectedCashier,
+            "close_shift" => $closeShift,
             "reading_database_scope" => $readingDatabaseScope,
             "reading_database" => $readingDbName,
             "terminal_number" => $terminalNumber,
@@ -775,13 +866,13 @@ try {
             "opening_fund" => $openingFund,
             "cash_drawer_amount" => $cashDrawerAmount,
             "verify_amount" => $verifyAmount,
-            "beg_or" => (float)$row["Beg_OR"],
-            "end_or" => (float)$row["End_OR"],
-            "beg_void" => (float)$row["Beg_VoidNo"],
-            "end_void" => (float)$row["End_VoidNo"],
-            "beg_refund" => (float)$row["Beg_RefundNo"],
-            "end_refund" => (float)$row["End_RefundNo"],
-            "z_counter_no" => (float)$row["Z_Counter_No"],
+            "beg_or" => $displayBegOR,
+            "end_or" => $displayEndOR,
+            "beg_void" => $displayBegVoidNo,
+            "end_void" => $displayEndVoidNo,
+            "beg_refund" => $displayBegRefundNo,
+            "end_refund" => $displayEndRefundNo,
+            "z_counter_no" => $displayZCounterNo,
             "present_accumulated_sales" => (float)$row["Present_Accum_Sales"],
             "previous_accumulated_sales" => $presentAccumSales - $salesForTheDay,
             "sales_for_the_day" => (float)$row["Sales_For_The_Day"],
@@ -841,7 +932,9 @@ try {
     } catch (Throwable $activityLogError) {
         // ignore logging failure
     }
+    }
 
+    if ($closeShift) {
     try {
         $referenceNo = $shiftId !== "" ? $shiftId : ($terminalNumber . "-" . $reportDate);
 
@@ -894,30 +987,36 @@ try {
     } catch (Throwable $transactionLogError) {
         // ignore logging failure
     }
+    }
 
     $pdo->commit();
 
     echo json_encode([
         "success" => true,
-        "message" => "Current shift has been closed and Z-Reading data loaded successfully.",
+        "message" => $closeShift
+            ? "Current shift has been closed and Z-Reading data loaded successfully."
+            : "Developer Z-Reading data loaded successfully. Shift was not closed.",
         "data" => [
             "shiftId" => $shiftId,
             "readingDatabaseScope" => $readingDatabaseScope,
             "readingDatabase" => $readingDbName,
+            "closeShift" => $closeShift,
+            "developerPreview" => $developerPreview,
+            "readOnly" => $readOnly,
             "selectedCashier" => $selectedCashier,
             "reportDate" => $parReportDate,
             "reportTime" => $parReportTime,
             "startDateTime" => $parStartDateTime,
             "endDateTime" => $parEndDateTime,
 
-            "begSI" => (float)$row["Beg_OR"],
-            "endSI" => (float)$row["End_OR"],
-            "begVoid" => (float)$row["Beg_VoidNo"],
-            "endVoid" => (float)$row["End_VoidNo"],
-            "begReturn" => (float)$row["Beg_RefundNo"],
-            "endReturn" => (float)$row["End_RefundNo"],
+            "begSI" => $displayBegOR,
+            "endSI" => $displayEndOR,
+            "begVoid" => $displayBegVoidNo,
+            "endVoid" => $displayEndVoidNo,
+            "begReturn" => $displayBegRefundNo,
+            "endReturn" => $displayEndRefundNo,
             "resetCounterNo" => 0,
-            "zCounterNo" => (float)$row["Z_Counter_No"],
+            "zCounterNo" => $displayZCounterNo,
 
             "presentAccumulatedSales" => (float)$row["Present_Accum_Sales"],
             "previousAccumulatedSales" => (float)$row["Present_Accum_Sales"] - (float)$row["Sales_For_The_Day"],
@@ -989,4 +1088,3 @@ try {
         "message" => $e->getMessage(),
     ]);
 }
-

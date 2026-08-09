@@ -1,7 +1,7 @@
 <?php
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type");
+header("Access-Control-Allow-Headers: Content-Type, Authorization");
 header("Content-Type: application/json; charset=UTF-8");
 
 date_default_timezone_set('Asia/Manila');
@@ -11,7 +11,12 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
     exit;
 }
 
+if ($_SERVER["REQUEST_METHOD"] !== "GET") {
+    require __DIR__ . "/secure_guard.php";
+}
+
 $config = require __DIR__ . "/config.php";
+require_once __DIR__ . "/pos_role_authorization.php";
 
 function respond($success, $message, $data = null, $statusCode = 200)
 {
@@ -144,6 +149,15 @@ try {
 
     $method = $_SERVER["REQUEST_METHOD"];
     $settingKey = "default";
+
+    if ($method !== "GET") {
+        posRoleAuthRequirePermission(
+            $pdo,
+            (string)($GLOBALS["pos_user_id"] ?? ""),
+            "settings",
+            "appearance"
+        );
+    }
 
     if ($method === "GET") {
         $stmt = $pdo->prepare("
@@ -411,5 +425,6 @@ try {
     respond(false, "Method not allowed. Use GET or POST.", null, 405);
 
 } catch (Throwable $e) {
-    respond(false, $e->getMessage(), null, 500);
+    error_log("POS theme settings error: " . $e->getMessage());
+    respond(false, "Unable to process appearance settings.", null, 500);
 }

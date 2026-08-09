@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+/* eslint-disable react/prop-types */
+import { useEffect, useState } from "react";
 import { FiLoader, FiPrinter, FiSave, FiToggleLeft, FiToggleRight } from "react-icons/fi";
 import useApiHost from "../../../hooks/useApiHost";
+import { securedPosFetch } from "../../../utils/posRoleFetch";
 
 const PosPrintSettings = ({ isDark, accent = "#3b82f6" }) => {
   const apiHost = useApiHost();
@@ -59,7 +61,7 @@ const PosPrintSettings = ({ isDark, accent = "#3b82f6" }) => {
       setIsSaving(true);
       setError("");
       setMessage("");
-      const res = await fetch(`${apiHost}/api/pos_print_settings.php`, {
+      const res = await securedPosFetch(`${apiHost}/api/pos_print_settings.php`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ print_void_enabled: printVoid, print_refund_enabled: printRefund }),

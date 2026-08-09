@@ -5,6 +5,8 @@
 declare (strict_types = 1);
 
 require __DIR__ . "/bootstrap.php";
+require_once __DIR__ . "/pos_role_authorization.php";
+require_once __DIR__ . "/pos_developer_auth.php";
 
 $corsPolicy = new CorsPolicy();
 
@@ -48,6 +50,14 @@ if (!$auth->authenticateAccessToken()) {
 }
 
 $user_id = $auth->getUserID();
+$tokenData = $auth->getTokenData();
+$pos_developer_mode = posDeveloperFullAccessTokenIsValid($tokenData);
+posRoleAuthRequirePermission(
+    $database->getConnection(),
+    (string)$user_id,
+    "settings",
+    "userApproval"
+);
 
 // //Initialize Task Database CRUD
 $members_approval_gateway = new MembersApprovalGateway($database);

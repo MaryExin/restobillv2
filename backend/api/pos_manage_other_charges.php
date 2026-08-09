@@ -9,7 +9,16 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
     exit;
 }
 
+$method = $_SERVER["REQUEST_METHOD"];
+$requiresMutationAuthorization = in_array($method, ["POST", "PUT", "DELETE"], true);
+if ($requiresMutationAuthorization) {
+    require __DIR__ . "/secure_guard.php";
+}
+
 require __DIR__ . "/pdo.php";
+if ($requiresMutationAuthorization) {
+    require_once __DIR__ . "/pos_role_authorization.php";
+}
 
 function fetchCharges(PDO $pdo): array {
     $stmt = $pdo->query("
@@ -37,7 +46,14 @@ function respond(bool $success, string $message, array $charges = [], int $statu
 }
 
 try {
-    $method = $_SERVER["REQUEST_METHOD"];
+    if ($requiresMutationAuthorization) {
+        posRoleAuthRequirePermission(
+            $pdo,
+            (string)($GLOBALS["pos_user_id"] ?? ""),
+            "settings",
+            "serviceCharge"
+        );
+    }
 
     // GET — list all
     if ($method === "GET") {
@@ -110,5 +126,6 @@ try {
     respond(false, "Method not allowed.", [], 405);
 
 } catch (Throwable $e) {
-    respond(false, $e->getMessage(), [], 500);
+    error_log("POS other charges error: " . $e->getMessage());
+    respond(false, "Unable to process other charge settings.", [], 500);
 }

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+/* eslint-disable react/prop-types */
+import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -6,6 +7,21 @@ import {
   AlertCircle, Tag, ShoppingBag, Plus, RefreshCw, CheckCircle2,
 } from 'lucide-react';
 import useApiHost from '../../../hooks/useApiHost';
+
+const PRICING_READ_PATH =
+  import.meta.env.VITE_POS_PRICING_READ_ENDPOINT || '/api/get_pricing.php';
+const PRICING_MUTATION_PATH =
+  import.meta.env.VITE_POS_PRICING_MUTATION_ENDPOINT || '/api/pricing_engine.php';
+const ORDER_SLIP_SETTINGS_PATH =
+  import.meta.env.VITE_POS_ORDER_SLIP_SETTINGS_ENDPOINT ||
+  '/api/pos_order_slip_settings.php';
+
+const pricingAuthorizationHeaders = (headers = {}) => {
+  const nextHeaders = { ...headers };
+  const token = localStorage.getItem('access_token');
+  if (token) nextHeaders.Authorization = `Bearer ${token}`;
+  return nextHeaders;
+};
 
 const COLORS = {
   brand: "#2563eb",
@@ -51,7 +67,9 @@ const PricingDashboard = ({ isOpen, onClose }) => {
     if (!apiHost) return;
     try {
       setLoading(true);
-      const response = await axios.get(`${apiHost}/api/get_pricing.php`);
+      const response = await axios.get(`${apiHost}${PRICING_READ_PATH}`, {
+        headers: pricingAuthorizationHeaders(),
+      });
       setProducts(response.data);
       if (response.data.length > 0) {
         if (!selectedService) setSelectedService(response.data[0].service_type || 'DINE-IN');
@@ -72,7 +90,7 @@ const PricingDashboard = ({ isOpen, onClose }) => {
   useEffect(() => {
     if (!apiHost || !isOpen) return;
     let cancelled = false;
-    fetch(`${apiHost}/api/pos_order_slip_settings.php`)
+    fetch(`${apiHost}${ORDER_SLIP_SETTINGS_PATH}`)
       .then((r) => r.json())
       .then((data) => {
         if (!cancelled && data.success) {
@@ -113,8 +131,10 @@ const PricingDashboard = ({ isOpen, onClose }) => {
     formData.append('item_name', itemName);
     formData.append('action', 'upload_image');
     try {
-      const response = await axios.post(`${apiHost}/api/pricing_engine.php`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+      const response = await axios.post(`${apiHost}${PRICING_MUTATION_PATH}`, formData, {
+        headers: pricingAuthorizationHeaders({
+          'Content-Type': 'multipart/form-data',
+        }),
       });
       if (response.data.status === 'success') {
         fetchPricingData();
@@ -146,11 +166,12 @@ const PricingDashboard = ({ isOpen, onClose }) => {
   };
 
   const handleAddProduct = async () => {
-    const userId = localStorage.getItem('user_id') || '0';
     try {
-      const response = await axios.post(`${apiHost}/api/pricing_engine.php`, {
-        action: 'add', ...newProduct, user_id: userId,
-      });
+      const response = await axios.post(
+        `${apiHost}${PRICING_MUTATION_PATH}`,
+        { action: 'add', ...newProduct },
+        { headers: pricingAuthorizationHeaders() },
+      );
       if (response.data.status === 'success') {
         setIsAddModalOpen(false);
         fetchPricingData();
@@ -160,12 +181,17 @@ const PricingDashboard = ({ isOpen, onClose }) => {
   };
 
   const executeUpdate = async () => {
-    const userId = localStorage.getItem('user_id') || '0';
     try {
-      const response = await axios.post(`${apiHost}/api/pricing_engine.php`, {
-        action: 'update', inv_code: editingItem.inv_code,
-        new_price: parseFloat(newPrice), service_type: selectedService, user_id: userId,
-      });
+      const response = await axios.post(
+        `${apiHost}${PRICING_MUTATION_PATH}`,
+        {
+          action: 'update',
+          inv_code: editingItem.inv_code,
+          new_price: parseFloat(newPrice),
+          service_type: selectedService,
+        },
+        { headers: pricingAuthorizationHeaders() },
+      );
       if (response.data.status === 'success') {
         setIsModalOpen(false);
         fetchPricingData();

@@ -9,7 +9,21 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
     exit;
 }
 
+if ($_SERVER["REQUEST_METHOD"] !== "GET") {
+    require __DIR__ . "/secure_guard.php";
+}
+
 require __DIR__ . "/pdo.php";
+require_once __DIR__ . "/pos_role_authorization.php";
+
+if ($_SERVER["REQUEST_METHOD"] !== "GET") {
+    posRoleAuthRequirePermission(
+        $pdo,
+        (string)($GLOBALS["pos_user_id"] ?? ""),
+        "settings",
+        "pictureSettings"
+    );
+}
 
 const PICTURES_CATEGORY    = "Display";
 const PICTURES_DESCRIPTION = "Enable Pictures";
@@ -80,5 +94,6 @@ try {
 
     respond(true, "Picture settings saved.", ["enable_pictures" => readSetting($pdo)]);
 } catch (Throwable $e) {
-    respond(false, $e->getMessage(), null, 500);
+    error_log("POS picture settings error: " . $e->getMessage());
+    respond(false, "Unable to process picture settings.", null, 500);
 }

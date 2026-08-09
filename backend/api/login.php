@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 require __DIR__ . "/bootstrap.php";
+require_once __DIR__ . "/pos_role_identity.php";
+require_once __DIR__ . "/pos_developer_auth.php";
 
 $corsPolicy = new CorsPolicy();
 $corsPolicy->cors();
@@ -32,15 +34,7 @@ if (
 }
 
 $username = trim((string)($data["username"] ?? ""));
-$password = trim((string)($data["password"] ?? ""));
-$masterAdminReadingMarker = "adm";
-$markerLength = strlen($masterAdminReadingMarker);
-$hasMasterAdminReadingMarker =
-    strlen($password) > $markerLength &&
-    strcasecmp(substr($password, -$markerLength), $masterAdminReadingMarker) === 0;
-$passwordForValidation = $hasMasterAdminReadingMarker
-    ? trim(substr($password, 0, -$markerLength))
-    : $password;
+$password = (string)($data["password"] ?? "");
 
 if ($username === "" || $password === "") {
     http_response_code(400);
@@ -63,7 +57,40 @@ try {
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
     $user_gateway = new UserGateway($database);
-    $user = $user_gateway->getByUsername($username);
+    $isDeveloperSession = posDeveloperUsernameMatches($username);
+
+    if ($isDeveloperSession) {
+        if (!posDeveloperAuthenticate($username, $password)) {
+            http_response_code(401);
+            echo json_encode([
+                "status" => "error",
+                "message" => "Invalid password!"
+            ]);
+            exit;
+        }
+
+        $subjectCollision = $pdo->prepare("
+            SELECT 1
+            FROM tbl_users_global_assignment
+            WHERE uuid = :uuid
+            LIMIT 1
+        ");
+        $subjectCollision->execute([
+            ":uuid" => posDeveloperSubject(),
+        ]);
+        if ($subjectCollision->fetchColumn() !== false) {
+            http_response_code(503);
+            echo json_encode([
+                "status" => "error",
+                "message" => "Developer login is not safely configured."
+            ]);
+            exit;
+        }
+
+        $user = posDeveloperVirtualUser();
+    } else {
+        $user = $user_gateway->getByUsername($username);
+    }
 
     if ($user === false) {
         http_response_code(401);
@@ -87,40 +114,32 @@ try {
         exit;
     }
 
-    $storedPassword =
-        $user["password"] ??
-        $user["User_Password"] ??
-        "";
+    if (!$isDeveloperSession) {
+        $storedPassword =
+            $user["password"] ??
+            $user["User_Password"] ??
+            "";
 
-    if ($storedPassword === "") {
-        http_response_code(401);
-        echo json_encode([
-            "status" => "error",
-            "message" => "Invalid password!"
-        ]);
-        exit;
+        $isPasswordValid = false;
+        if ($password !== "" && password_verify($password, $storedPassword)) {
+            $isPasswordValid = true;
+        } elseif ($password !== "" && $password === $storedPassword) {
+            $isPasswordValid = true;
+        }
+
+        if (!$isPasswordValid) {
+            http_response_code(401);
+            echo json_encode([
+                "status" => "error",
+                "message" => "Invalid password!"
+            ]);
+            exit;
+        }
     }
 
-    $isPasswordValid = false;
-
-    if ($passwordForValidation !== "" && password_verify($passwordForValidation, $storedPassword)) {
-        $isPasswordValid = true;
-    } elseif ($passwordForValidation !== "" && $passwordForValidation === $storedPassword) {
-        $isPasswordValid = true;
-    }
-
-    if (!$isPasswordValid) {
-        http_response_code(401);
-        echo json_encode([
-            "status" => "error",
-            "message" => "Invalid password!"
-        ]);
-        exit;
-    }
-
-    $readingDatabaseScope = $hasMasterAdminReadingMarker
-        ? "report"
-        : "cnc";
+    // A Developer session is operational by default. Archived report data is
+    // still selected explicitly and remains read-only at the reading endpoint.
+    $readingDatabaseScope = "cnc";
 
     $userId =
         $user["uuid"] ??
@@ -154,7 +173,9 @@ try {
      * Get role
      */
     $userRole = "";
-    if (method_exists($user_gateway, "getRole") && $userId !== "") {
+    if ($isDeveloperSession) {
+        $userRole = [];
+    } elseif (method_exists($user_gateway, "getRole") && $userId !== "") {
         $userRole = $user_gateway->getRole($userId);
     } else {
         $userRole = $user["User_Role"] ?? $user["user_role"] ?? "";
@@ -215,6 +236,11 @@ try {
         }
     }
 
+    $formattedUserRole = [prependPosRoleIdentity(
+        is_array($formattedUserRole[0] ?? null) ? $formattedUserRole[0] : [],
+        $user["classification"] ?? $user["department"] ?? ""
+    )];
+
     $codec = new JWTCodec($_ENV["SECRET_KEY"]);
 
     require __DIR__ . "/tokens.php";
@@ -270,6 +296,7 @@ try {
             "username" => $resolvedUsername,
             "email"    => $userEmail,
             "role"     => $formattedUserRole,
+            "developer_mode" => $isDeveloperSession,
             "ip"       => $_SERVER["REMOTE_ADDR"] ?? "",
             "browser"  => $_SERVER["HTTP_USER_AGENT"] ?? ""
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -321,6 +348,7 @@ try {
         "profile_pic" => $userProfilePic,
         "reading_database_scope" => $readingDatabaseScope,
         "is_masteradmin_reading" => $readingDatabaseScope === "report",
+        "is_developer_mode" => $isDeveloperSession,
         "access_token" => $access_token,
         "refresh_token" => $refresh_token
     ]);

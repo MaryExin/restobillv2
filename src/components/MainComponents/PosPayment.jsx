@@ -31,6 +31,8 @@ import ModalSuccessNavToSelf from "../Modals/ModalSuccessNavToSelf";
 import ButtonComponent from "./Common/ButtonComponent";
 import ModalYesNoReusable from "../Modals/ModalYesNoReusable";
 import { MdWarning } from "react-icons/md";
+import { posAuthenticatedFetch } from "../../utils/posAuthenticatedFetch";
+import { usePosDeveloperSession } from "../../hooks/usePosRoleAccessConfig";
 
 const KIOSK_DEFAULT_TABLE = "Table 01";
 
@@ -587,6 +589,7 @@ function ActionRemarksModal({
   activeRow,
   isSubmitting,
   remarksInputRef,
+  developerMode,
 }) {
   const [isYesNoModalOpen, setIsYesNoModalOpen] = useState(false);
   const [showAdminPassword, setShowAdminPassword] = useState(false);
@@ -705,6 +708,19 @@ function ActionRemarksModal({
           />
         </div>
 
+        {developerMode ? (
+          <div
+            className={`mt-5 rounded-[22px] border px-4 py-4 text-sm font-bold ${
+              isDark
+                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                : "border-emerald-200 bg-emerald-50 text-emerald-700"
+            }`}
+          >
+            Authorized by the signed private Developer session. No additional
+            admin password is required.
+          </div>
+        ) : (
+          <>
         <div className="mt-5">
           <label
             className={`mb-2 block text-sm font-bold ${
@@ -802,6 +818,8 @@ function ActionRemarksModal({
             </button>
           </div>
         </div>
+          </>
+        )}
 
         <div className="mt-6 flex flex-wrap justify-end gap-3">
           <ButtonComponent
@@ -1011,6 +1029,7 @@ function TransactionRow({ index, style, data }) {
 
 export default function PosPayment() {
   const apiHost = useApiHost();
+  const developerMode = usePosDeveloperSession();
   const themeContext = useTheme();
   const isDark =
     typeof themeContext?.isDark === "boolean"
@@ -1348,6 +1367,11 @@ export default function PosPayment() {
   );
 
   const fetchShiftAdmins = useCallback(async () => {
+    if (developerMode) {
+      setAdminAccounts([]);
+      return;
+    }
+
     if (!apiHost) {
       setAdminAccounts([]);
       return;
@@ -1367,7 +1391,7 @@ export default function PosPayment() {
     setIsLoadingAdmins(true);
 
     try {
-      const response = await fetch(
+      const response = await posAuthenticatedFetch(
         `${apiHost}/api/get_shift_details.php?user_id=${encodeURIComponent(currentUserId)}`,
       );
       const result = await safeReadJson(response, "Shift details API");
@@ -1378,8 +1402,22 @@ export default function PosPayment() {
 
       const accounts = Array.isArray(result?.accounts) ? result.accounts : [];
       const admins = accounts.filter((account) => {
-        const role = String(account?.userRole || "").toUpperCase();
-        return role.includes("ADMIN");
+        const role = String(
+          account?.userRoleValue ?? account?.userRole ?? "",
+        )
+          .trim()
+          .toUpperCase();
+        return [
+          "1",
+          "2",
+          "ADMIN",
+          "MANAGER",
+          "SUPERVISOR",
+          "ADMIN / SUPERVISOR",
+          "SUPERADMIN",
+          "SUPER_ADMIN",
+          "SUPER ADMIN",
+        ].includes(role);
       });
 
       setAdminAccounts(admins);
@@ -1389,7 +1427,7 @@ export default function PosPayment() {
     } finally {
       setIsLoadingAdmins(false);
     }
-  }, [apiHost]);
+  }, [apiHost, developerMode]);
 
   useEffect(() => {
     if (isActionModalOpen && remarksInputRef.current) {
@@ -1415,9 +1453,9 @@ export default function PosPayment() {
       setAdminPassword("");
       setSelectedAdminId("");
       setIsActionModalOpen(true);
-      fetchShiftAdmins();
+      if (!developerMode) fetchShiftAdmins();
     },
-    [fetchShiftAdmins],
+    [developerMode, fetchShiftAdmins],
   );
 
   const openRefundModal = useCallback(
@@ -1428,9 +1466,9 @@ export default function PosPayment() {
       setAdminPassword("");
       setSelectedAdminId("");
       setIsActionModalOpen(true);
-      fetchShiftAdmins();
+      if (!developerMode) fetchShiftAdmins();
     },
-    [fetchShiftAdmins],
+    [developerMode, fetchShiftAdmins],
   );
 
   const submitAction = useCallback(async () => {
@@ -1464,14 +1502,14 @@ export default function PosPayment() {
       return;
     }
 
-    if (!trimmedSelectedAdminId) {
+    if (!developerMode && !trimmedSelectedAdminId) {
       setFailureHeader("Admin Selection Required");
       setFailureMessage("Please select an admin account first.");
       setIsFailureModalOpen(true);
       return;
     }
 
-    if (!trimmedAdminPassword) {
+    if (!developerMode && !trimmedAdminPassword) {
       setFailureHeader("Admin Password Required");
       setFailureMessage("Please enter admin password to continue.");
       setIsFailureModalOpen(true);
@@ -1515,15 +1553,19 @@ export default function PosPayment() {
         activeRow.Unit_Code || activeRow.unit_code || "",
       ).trim(),
       user_id: String(userId).trim(),
-      admin_password: trimmedAdminPassword,
-      selected_admin_id: trimmedSelectedAdminId,
-      selected_admin_name: String(
-        selectedAdmin?.name ||
-          selectedAdmin?.username ||
-          selectedAdmin?.email ||
-          "",
-      ).trim(),
-      selected_admin_role: String(selectedAdmin?.userRole || "").trim(),
+      admin_password: developerMode ? "" : trimmedAdminPassword,
+      selected_admin_id: developerMode ? "" : trimmedSelectedAdminId,
+      selected_admin_name: developerMode
+        ? "POS Developer"
+        : String(
+            selectedAdmin?.name ||
+              selectedAdmin?.username ||
+              selectedAdmin?.email ||
+              "",
+          ).trim(),
+      selected_admin_role: developerMode
+        ? "Developer"
+        : String(selectedAdmin?.userRole || "").trim(),
     };
 
     setIsActionLoading(true);
@@ -1535,7 +1577,7 @@ export default function PosPayment() {
           ? `${apiHost}/api/pos_payment_refund.php`
           : `${apiHost}/api/pos_payment_void.php`;
 
-      const response = await fetch(endpoint, {
+      const response = await posAuthenticatedFetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1581,7 +1623,10 @@ export default function PosPayment() {
       const capturedActionType = actionType;
       const capturedRemarks    = trimmedRemarks;
       const capturedAdminName  = String(
-        selectedAdmin?.name || selectedAdmin?.username || selectedAdmin?.email || "",
+        result?.authorized_by ||
+          (developerMode
+            ? "POS Developer"
+            : selectedAdmin?.name || selectedAdmin?.username || selectedAdmin?.email || ""),
       ).trim();
       // Merge the server-generated void/refund number into the row for printing
       const capturedRow = {
@@ -1638,6 +1683,7 @@ export default function PosPayment() {
     adminPassword,
     selectedAdminId,
     adminAccounts,
+    developerMode,
     closeActionModal,
     fetchAll,
     printVoidRefundSlip,
@@ -1991,6 +2037,7 @@ export default function PosPayment() {
         activeRow={activeRow}
         isSubmitting={isActionLoading}
         remarksInputRef={remarksInputRef}
+        developerMode={developerMode}
       />
 
       {isSuccessModalOpen && (

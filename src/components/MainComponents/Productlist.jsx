@@ -16,6 +16,7 @@ import {
 } from "react-icons/fa";
 import { useTheme } from "../../context/ThemeContext";
 import useApiHost from "../../hooks/useApiHost";
+import { usePosDeveloperSession } from "../../hooks/usePosRoleAccessConfig";
 import ProductImage from "../Common/ProductImage";
 
 const ProductList = () => {
@@ -23,6 +24,7 @@ const ProductList = () => {
   const isDark = theme === "dark";
   const navigate = useNavigate();
   const apiHost = useApiHost();
+  const developerMode = usePosDeveloperSession();
 
   const imageBaseUrl = useMemo(() => {
     if (!apiHost) return "";
@@ -43,6 +45,7 @@ const ProductList = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
   const [passError, setPassError] = useState(false);
+  const hasProductListAccess = isAuthenticated || developerMode;
 
   const ADMIN_PASSWORD = "1";
 
@@ -58,7 +61,7 @@ const ProductList = () => {
   };
 
   const fetchProducts = useCallback(async () => {
-    if (!apiHost || !isAuthenticated) return;
+    if (!apiHost || !hasProductListAccess) return;
     setIsLoading(true);
     try {
       const response = await fetch(`${apiHost}/api/get_product_masterlist.php`);
@@ -71,13 +74,13 @@ const ProductList = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [apiHost, isAuthenticated]);
+  }, [apiHost, hasProductListAccess]);
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (hasProductListAccess) {
       fetchProducts();
     }
-  }, [isAuthenticated, fetchProducts]);
+  }, [hasProductListAccess, fetchProducts]);
 
   useEffect(() => {
     if (!apiHost) return;
@@ -227,7 +230,7 @@ const ProductList = () => {
     return categoryStats;
   }, [categoryStats, selectedCategory]);
 
-  if (!isAuthenticated) {
+  if (!hasProductListAccess) {
     return (
       <div
         className={`min-h-screen flex items-center justify-center p-6 ${

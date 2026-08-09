@@ -9,7 +9,16 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
     exit;
 }
 
+$method = $_SERVER["REQUEST_METHOD"];
+$requiresMutationAuthorization = $method === "POST";
+if ($requiresMutationAuthorization) {
+    require __DIR__ . "/secure_guard.php";
+}
+
 require __DIR__ . "/pdo.php";
+if ($requiresMutationAuthorization) {
+    require_once __DIR__ . "/pos_role_authorization.php";
+}
 
 const DISCOUNT_CEILING_CATEGORY = "Discount";
 const DISCOUNT_CEILING_DESCRIPTION = "Discount Ceiling Amount";
@@ -62,7 +71,14 @@ function readDiscountCeiling(PDO $pdo)
 }
 
 try {
-    $method = $_SERVER["REQUEST_METHOD"];
+    if ($requiresMutationAuthorization) {
+        posRoleAuthRequirePermission(
+            $pdo,
+            (string)($GLOBALS["pos_user_id"] ?? ""),
+            "settings",
+            "discountCeiling"
+        );
+    }
 
     if ($method === "GET") {
         respond(true, "Discount ceiling loaded.", readDiscountCeiling($pdo));
@@ -123,5 +139,6 @@ try {
 
     respond(true, "Discount ceiling saved.", readDiscountCeiling($pdo));
 } catch (Throwable $e) {
-    respond(false, $e->getMessage(), null, 500);
+    error_log("POS discount ceiling error: " . $e->getMessage());
+    respond(false, "Unable to process discount ceiling settings.", null, 500);
 }

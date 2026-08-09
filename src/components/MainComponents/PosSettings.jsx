@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   FiX,
   FiLayers,
@@ -27,7 +27,12 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "../../context/ThemeContext";
 import { useNavigate } from "react-router-dom";
-import { getCurrentUserRole } from "../../utils/getCurrentUserRole";
+import useZustandLoginCred from "../../context/useZustandLoginCred";
+import { hasPosSettingsAccess } from "../../utils/posRoleAccess";
+import {
+  usePosDeveloperSession,
+  usePosRoleAccessVersion,
+} from "../../hooks/usePosRoleAccessConfig";
 
 // Import Components
 import PosMyAccount from "./PosSettingsModal/PosMyAccount";
@@ -60,20 +65,48 @@ const PROTECTED_TABS = new Set(["Mode of Payment", "Discount Mode", "Layout Mode
 // LightemAdmin is a trusted POS account -- skip the password gate on
 // protected settings tabs entirely for this user.
 const UNGATED_USERNAME = "lightemadmin";
-// Cashier accounts only need account/payment/printer/pricing basics --
-// everything else (user management, discounts, reports, etc.) is hidden.
-const CASHIER_ALLOWED_TABS = new Set([
-  "My Account",
-  "Mode of Payment",
-  "Printer Settings",
-  "Print Options",
-  "Picture Settings",
-  "Pricing Engine",
-]);
+const ALL_NAV_ITEMS = [
+  { id: "Report Database", icon: FiDatabase },
+  { id: "My Account", icon: FiUser },
+  { id: "User Accounts", icon: FiUsers },
+  { id: "User Roles", icon: FiShield },
+  { id: "Registry Sales", icon: FiTrendingUp },
+  { id: "Expenses & Petty", icon: FiCreditCard },
+  { id: "Mode of Payment", icon: FiCreditCard },
+  { id: "Service Charge", icon: FiPercent },
+  { id: "Discount Ceiling", icon: FiPercent },
+  { id: "Discount Mode", icon: FiPercent },
+  { id: "Customer Info", icon: FiUsers },
+  { id: "Table Layout", icon: FiGrid },
+  { id: "Sales Type Order", icon: FiList },
+  { id: "Loyalty Configuration", icon: FiAward },
+  { id: "Email Reports", icon: FiMail },
+  { id: "Data & Security", icon: FiDatabase },
+  { id: "Appearance", icon: FiLayers },
+  { id: "Printer Settings", icon: FiPrinter },
+  { id: "Print Options", icon: FiPrinter },
+  { id: "Picture Settings", icon: FiImage },
+  { id: "Product Subcategories", icon: FiLayers },
+  { id: "Pricing Engine", icon: FiTag },
+  { id: "Layout Mode", icon: FiMonitor },
+  { id: "Second Screen", icon: FiMonitor },
+];
 
 const PosSettings = ({ isOpen, onClose, branchInfo }) => {
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
+  const { roles } = useZustandLoginCred();
+  const roleAccessVersion = usePosRoleAccessVersion();
+  const developerMode = usePosDeveloperSession();
+  const navItems = useMemo(
+    () =>
+      ALL_NAV_ITEMS.filter(
+        (nav) =>
+          (nav.id !== "User Roles" || developerMode) &&
+          hasPosSettingsAccess(roles, nav.id, developerMode),
+      ),
+    [roles, roleAccessVersion, developerMode],
+  );
   const isDark = theme === "dark";
 
   const adaptivePalette = [
@@ -97,11 +130,16 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
 
   useEffect(() => {
     if (isOpen) {
-      setActiveTab("My Account");
+      const firstContentTab = navItems.find((nav) => !nav.route) || navItems[0];
+      setActiveTab((current) =>
+        navItems.some((nav) => nav.id === current && !nav.route)
+          ? current
+          : firstContentTab?.id || "",
+      );
       setIsMobileMenuOpen(false);
       setDeniedTab(null);
     }
-  }, [isOpen]);
+  }, [isOpen, navItems]);
 
   const accentColor = "var(--branch-primary)";
   const accentSecondary = "var(--branch-secondary)";
@@ -111,50 +149,13 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
 
   if (!isOpen) return null;
 
-  const currentUserRole = getCurrentUserRole();
-  const isCashier = currentUserRole === "cashier";
-  const isSuperAdmin = currentUserRole === "superadmin";
-
-  const allNavItems = [
-    { id: "Report Database", icon: FiDatabase },
-    { id: "My Account", icon: FiUser },
-    { id: "User Accounts", icon: FiUsers },
-    { id: "User Approval", icon: FiUsers, route: "/usersqueu" },
-    { id: "User Roles", icon: FiShield },
-    { id: "Registry Sales", icon: FiTrendingUp },
-    { id: "Expenses & Petty", icon: FiCreditCard },
-    { id: "Mode of Payment", icon: FiCreditCard },
-    { id: "Service Charge", icon: FiPercent },
-    { id: "Discount Ceiling", icon: FiPercent },
-    { id: "Discount Mode", icon: FiPercent },
-    { id: "Customer Info", icon: FiUsers },
-    { id: "Table Layout", icon: FiGrid },
-    { id: "Sales Type Order", icon: FiList },
-    { id: "Loyalty Configuration", icon: FiAward },
-    { id: "Email Reports", icon: FiMail },
-    { id: "Data & Security", icon: FiDatabase },
-    { id: "Appearance", icon: FiLayers },
-    { id: "Printer Settings", icon: FiPrinter },
-    { id: "Print Options", icon: FiPrinter },
-    { id: "Picture Settings", icon: FiImage },
-    { id: "Product Subcategories", icon: FiLayers },
-    { id: "Pricing Engine", icon: FiTag },
-    { id: "Layout Mode", icon: FiMonitor },
-    { id: "Second Screen", icon: FiMonitor },
-  ];
-
-  const navItems = allNavItems
-    .filter((nav) => nav.id !== "Report Database" || isSuperAdmin)
-    .filter((nav) => !isCashier || CASHIER_ALLOWED_TABS.has(nav.id));
-
   const isUngatedUser =
+    developerMode ||
     String(localStorage.getItem("username") || "").trim().toLowerCase() ===
-    UNGATED_USERNAME;
+      UNGATED_USERNAME;
 
-  // Permission-based restriction removed -- all accounts now have access to
-  // every Settings tab. Protected tabs (PROTECTED_TABS) still require the
-  // master password gate below.
-  const canAccessTab = () => true;
+  const canAccessTab = (tabId) =>
+    hasPosSettingsAccess(roles, tabId, developerMode);
 
   const handleNavClick = (nav) => {
     if (nav.route) {
@@ -196,7 +197,7 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
     }
   };
 
-  const ActiveContent = () => {
+  const renderActiveContent = () => {
     if (deniedTab === activeTab) {
       return (
         <div className="flex flex-col items-center justify-center gap-5 py-16 text-center">
@@ -249,6 +250,7 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
     }
 
     if (activeTab === "User Roles") {
+      if (!developerMode) return null;
       return (
         <PosUserRoles
           isDark={isDark}
@@ -614,7 +616,7 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
                             exit={{ opacity: 0, y: -8 }}
                             transition={{ duration: 0.22 }}
                           >
-                            <ActiveContent />
+                            {renderActiveContent()}
                           </motion.div>
                         </AnimatePresence>
                       </div>

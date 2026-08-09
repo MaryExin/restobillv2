@@ -5,6 +5,8 @@
 declare (strict_types = 1);
 
 require __DIR__ . "/bootstrap.php";
+require_once __DIR__ . "/pos_role_identity.php";
+require_once __DIR__ . "/pos_developer_auth.php";
 
 $corsPolicy = new CorsPolicy();
 
@@ -30,8 +32,24 @@ if (!$auth->authenticateAccessToken()) {
 }
 
 $user_id = $auth->getUserID();
+$refreshTokenData = $auth->getTokenData();
+$requestedDeveloperSession =
+    ($refreshTokenData["pos_developer_mode"] ?? false) === true;
+$isDeveloperSession = posDeveloperFullAccessTokenIsValid($refreshTokenData);
 
-if (!preg_match("/^Bearer\s+(.*)$/", $_SERVER["HTTP_AUTHORIZATION"], $matches)) {
+if ($requestedDeveloperSession && !$isDeveloperSession) {
+    http_response_code(401);
+    echo json_encode(["message" => "invalid developer session"]);
+    exit;
+}
+
+$authorization = trim((string)(
+    $_SERVER["HTTP_AUTHORIZATION"] ??
+    $_SERVER["REDIRECT_HTTP_AUTHORIZATION"] ??
+    ""
+));
+
+if (!preg_match("/^Bearer\s+(.+)$/i", $authorization, $matches)) {
     http_response_code(400);
     echo json_encode(["message" => "invalidAuthorizationHeader"]);
     return false;
@@ -49,9 +67,12 @@ if ($refresh_token === false) {
 }
 
 try {
-    $conn = $database->getConnection();
+    if ($isDeveloperSession) {
+        $user = posDeveloperVirtualUser();
+    } else {
+        $conn = $database->getConnection();
 
-    $sql = "SELECT tbl_users_global_assignment.* , tbl_employees.image_filename
+        $sql = "SELECT tbl_users_global_assignment.* , tbl_employees.image_filename
 
                 FROM tbl_users_global_assignment
                 
@@ -61,13 +82,20 @@ try {
                 
                 AND tbl_users_global_assignment.deletestatus = 'Active'";
 
-    $stmt = $conn->prepare($sql);
+        $stmt = $conn->prepare($sql);
 
-    $stmt->bindValue(":userid", $user_id, PDO::PARAM_INT);
+        $stmt->bindValue(":userid", $user_id, PDO::PARAM_STR);
 
-    $stmt->execute();
+        $stmt->execute();
 
-    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
+    if (!is_array($user)) {
+        http_response_code(401);
+        echo json_encode(["message" => "invalid authentication"]);
+        exit;
+    }
 
     //Get User Role
 
@@ -77,7 +105,10 @@ try {
 
     $email = $user["email"];
 
-    $userRole = $user_gateway->getRole($userId);
+    $userRole = prependPosRoleIdentity(
+        $isDeveloperSession ? [] : $user_gateway->getRole($userId),
+        $user["classification"] ?? $user["department"] ?? ""
+    );
 
     // Initialize payload and refresh token, echo out jwt tokens in local storage
 

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require __DIR__ . "/bootstrap.php";
+require_once __DIR__ . "/pos_sync_account_guard.php";
 
 $corsPolicy = new CorsPolicy();
 $corsPolicy->cors();
@@ -34,6 +35,8 @@ $auth = new Auth($user_gateway, $codec);
 if (!$auth->authenticateAccessToken()) {
     exit;
 }
+
+posSyncRequireDedicatedAccount($auth);
 
 $user_id = $auth->getUserID();
 

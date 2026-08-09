@@ -9,7 +9,16 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
     exit;
 }
 
+$method = $_SERVER["REQUEST_METHOD"];
+$requiresMutationAuthorization = $method === "POST";
+if ($requiresMutationAuthorization) {
+    require __DIR__ . "/secure_guard.php";
+}
+
 require __DIR__ . "/pdo.php";
+if ($requiresMutationAuthorization) {
+    require_once __DIR__ . "/pos_role_authorization.php";
+}
 
 function respond($success, $message, $data = null, $statusCode = 200)
 {
@@ -91,7 +100,14 @@ function fetchActiveTypesForSalesType(PDO $pdo, $salesTypeId, $salesTypeDescript
 }
 
 try {
-    $method = $_SERVER["REQUEST_METHOD"];
+    if ($requiresMutationAuthorization) {
+        posRoleAuthRequirePermission(
+            $pdo,
+            (string)($GLOBALS["pos_user_id"] ?? ""),
+            "settings",
+            "discountMode"
+        );
+    }
 
     if ($method === "GET") {
         $salesTypeId = trim((string)($_GET["sales_type_id"] ?? ""));
@@ -249,7 +265,7 @@ try {
                 usertracker = VALUES(usertracker)
         ");
 
-        $usertracker = trim((string)($body["usertracker"] ?? ""));
+        $usertracker = trim((string)($GLOBALS["pos_user_id"] ?? ""));
 
         $pdo->beginTransaction();
         try {
@@ -269,7 +285,7 @@ try {
                     ":sales_type_id" => $salesTypeId,
                     ":is_active" => $isActive,
                     ":percent_value" => $percentValue,
-                    ":usertracker" => $usertracker !== "" ? $usertracker : null,
+                    ":usertracker" => $usertracker,
                 ]);
             }
             $pdo->commit();
@@ -283,5 +299,6 @@ try {
 
     respond(false, "Unknown action.", null, 400);
 } catch (Throwable $e) {
-    respond(false, $e->getMessage(), null, 500);
+    error_log("POS discount type error: " . $e->getMessage());
+    respond(false, "Unable to process discount type settings.", null, 500);
 }

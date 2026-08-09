@@ -1,8 +1,21 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+/* eslint-disable react/prop-types */
+import { useEffect, useMemo, useState } from "react";
 import { FiDatabase, FiLoader, FiSave } from "react-icons/fi";
 import useApiHost from "../../../hooks/useApiHost";
+
+const REPORT_MIRROR_SETTINGS_PATH =
+  import.meta.env.VITE_POS_REPORT_MIRROR_SETTINGS_ENDPOINT ||
+  "/api/pos_report_mirror_settings.php";
+
+const reportMirrorHeaders = (includeJson = false) => {
+  const headers = new Headers({ Accept: "application/json" });
+  const token = localStorage.getItem("access_token");
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  if (includeJson) headers.set("Content-Type", "application/json");
+  return headers;
+};
 
 const PosReportMirrorSettings = ({ isDark, accent = "#3b82f6" }) => {
   const apiHost = useApiHost();
@@ -46,8 +59,11 @@ const PosReportMirrorSettings = ({ isDark, accent = "#3b82f6" }) => {
         setMessage("");
 
         const response = await fetch(
-          `${apiHost}/api/pos_report_mirror_settings.php`,
-          { cache: "no-store" },
+          `${apiHost}${REPORT_MIRROR_SETTINGS_PATH}`,
+          {
+            cache: "no-store",
+            headers: reportMirrorHeaders(),
+          },
         );
         const result = await response.json();
 
@@ -114,10 +130,10 @@ const PosReportMirrorSettings = ({ isDark, accent = "#3b82f6" }) => {
       setMessage("");
 
       const response = await fetch(
-        `${apiHost}/api/pos_report_mirror_settings.php`,
+        `${apiHost}${REPORT_MIRROR_SETTINGS_PATH}`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: reportMirrorHeaders(true),
           body: JSON.stringify({
             skip_interval: Number.parseInt(skipInterval, 10),
           }),

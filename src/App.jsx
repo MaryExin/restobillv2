@@ -1,12 +1,12 @@
-import { BrowserRouter, Routes, Route, HashRouter } from "react-router-dom";
+import { Routes, Route, HashRouter } from "react-router-dom";
 import { useEffect } from "react";
-import HomePage from "./pages/Main/HomePage";
 import ViewOrdering from "./components/MainComponents/ViewOrdering";
 import PrintBilling from "./components/MainComponents/PrintBilling";
 import SalesDashboard from "./components/Dashboards/SalesDashboard";
 import TransactionRecords from "./components/Dashboards/TransactionRecords";
 import GlobalThemeToggle from "./components/common/GlobalThemeToggle";
 import GlobalSync from "./components/common/GlobalSync";
+import RoleAccessHydrator from "./components/common/RoleAccessHydrator";
 import PosReadingModal from "./components/MainComponents/PosReadingModal";
 import PosLogin from "./pages/PosCore/PosLogin";
 import PosSelectBusunit from "./pages/PosCore/PosSelectBusunit";
@@ -16,7 +16,6 @@ import ProductList from "./components/MainComponents/Productlist";
 import SyncProductsAndPricing from "./components/MainComponents/SyncProductsAndPricing";
 import PrivateRoute from "./routes/PrivateRoute";
 import SyncOfflineSalesToWeb from "./components/MainComponents/SyncOfflineSalesToWeb";
-import UserRoles from "./components/MainComponents/PosSettingsModal/UserRoles";
 import CmpEmployeeInfo from "./components/Hris/CmpEmployeeInfo";
 import MemberQueings from "../src/pages/Admin/MemberQueings";
 import MemberProfile from "./components/Hris/MemberProfile";
@@ -43,27 +42,59 @@ const App = () => {
       {}
       {/* Kiosk fullscreen enforcement — transparent, renders no UI unless gesture fallback needed */}
       <KioskFullscreenGuard />
+      <RoleAccessHydrator />
       <GlobalSync />
 
       <Routes>
         <Route exact path="/" element={<PosLogin />} />
-        <Route exact path="/ordering" element={<ViewOrdering />} />
-        <Route exact path="/printbilling" element={<PrintBilling />} />
-        <Route exact path="/salesdashboard" element={<SalesDashboard />} />
-        <Route exact path="/productlist" element={<ProductList />} />
         <Route
-          exact
+          path="/ordering"
+          element={<PrivateRoute routename="/ordering" />}
+        >
+          <Route path="/ordering" element={<ViewOrdering />} />
+        </Route>
+        <Route
+          path="/printbilling"
+          element={<PrivateRoute routename="/printbilling" />}
+        >
+          <Route path="/printbilling" element={<PrintBilling />} />
+        </Route>
+        <Route
+          path="/salesdashboard"
+          element={<PrivateRoute routename="/salesdashboard" />}
+        >
+          <Route path="/salesdashboard" element={<SalesDashboard />} />
+        </Route>
+        <Route
+          path="/productlist"
+          element={<PrivateRoute routename="/productlist" />}
+        >
+          <Route path="/productlist" element={<ProductList />} />
+        </Route>
+        <Route
           path="/transactionrecords"
-          element={<TransactionRecords />}
-        />
-        <Route exact path="/posreading" element={<PosReadingModal />} />
+          element={<PrivateRoute routename="/transactionrecords" />}
+        >
+          <Route path="/transactionrecords" element={<TransactionRecords />} />
+        </Route>
+        <Route
+          path="/posreading"
+          element={<PrivateRoute routename="/posreading" />}
+        >
+          <Route path="/posreading" element={<PosReadingModal />} />
+        </Route>
         <Route
           exact
           path="/poscoreselectbusunit"
           element={<PosSelectBusunit />}
         />
         <Route exact path="/poscorehomescreen" element={<PosHomeScreen />} />
-        <Route exact path="/payments" element={<PosPayment />} />
+        <Route
+          path="/payments"
+          element={<PrivateRoute routename="/payments" />}
+        >
+          <Route path="/payments" element={<PosPayment />} />
+        </Route>
         {/* Private Routes */}
         <Route
           path="/pricesyncing"
@@ -87,13 +118,6 @@ const App = () => {
           element={<PrivateRoute routename={"/employeeinfo"} />}
         >
           <Route path="/employeeinfo" element={<CmpEmployeeInfo />} />
-        </Route>
-
-        <Route
-          path="/userroles"
-          element={<PrivateRoute routename={"/userroles"} />}
-        >
-          <Route path="/userroles" element={<UserRoles />} />
         </Route>
 
         <Route

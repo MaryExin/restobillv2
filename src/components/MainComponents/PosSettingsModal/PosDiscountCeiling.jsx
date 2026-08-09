@@ -1,8 +1,16 @@
 "use client";
+/* eslint-disable react/prop-types */
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { FiPercent, FiSave, FiLoader } from "react-icons/fi";
 import useApiHost from "../../../hooks/useApiHost";
+
+const mutationHeaders = (headers = {}) => {
+  const nextHeaders = { ...headers };
+  const token = window.localStorage.getItem("access_token");
+  if (token) nextHeaders.Authorization = `Bearer ${token}`;
+  return nextHeaders;
+};
 
 const PosDiscountCeiling = ({ isDark, accent = "#3b82f6" }) => {
   const apiHost = useApiHost();
@@ -83,9 +91,9 @@ const PosDiscountCeiling = ({ isDark, accent = "#3b82f6" }) => {
 
       const response = await fetch(`${apiHost}/api/pos_discount_ceiling.php`, {
         method: "POST",
-        headers: {
+        headers: mutationHeaders({
           "Content-Type": "application/json",
-        },
+        }),
         body: JSON.stringify({
           discount_ceiling: normalizedAmount,
         }),

@@ -17,7 +17,6 @@ import {
   FaBook,
   FaUserCheck,
   FaUserEdit,
-  FaUserCog,
 } from "react-icons/fa";
 import {
   IoSettingsOutline,
@@ -437,8 +436,7 @@ const SidePanel = () => {
 
             {/* User Management */}
             {(roles[0]?.some((r) => r.rolename === "/hris") ||
-              roles[0]?.some((r) => r.rolename === "/usersqueu") ||
-              roles[0]?.some((r) => r.rolename === "/userroles")) && (
+              roles[0]?.some((r) => r.rolename === "/usersqueu")) && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -466,22 +464,11 @@ const SidePanel = () => {
                     hovered={hovered}
                   />
                 )}
-                {roles[0]?.some((r) => r.rolename === "/userroles") && (
-                  <MenuItem
-                    icon={<FaUserCog size={16} />}
-                    label="Roles"
-                    active={selectedMenu === "Roles"}
-                    onClick={() => handleClick("Roles", "/userroles")}
-                    onHover={setHovered}
-                    hovered={hovered}
-                  />
-                )}
               </motion.div>
             )}
 
             {(roles[0]?.some((r) => r.rolename === "/hris") ||
-              roles[0]?.some((r) => r.rolename === "/usersqueu") ||
-              roles[0]?.some((r) => r.rolename === "/userroles")) && (
+              roles[0]?.some((r) => r.rolename === "/usersqueu")) && (
               <Divider />
             )}
 

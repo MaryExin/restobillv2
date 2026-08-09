@@ -1,21 +1,24 @@
-import React, { useEffect, useState } from "react";
+import React, { useMemo } from "react";
 import { Link, Outlet } from "react-router-dom";
 import { motion } from "framer-motion";
 import useZustandLoginCred from "../context/useZustandLoginCred";
 import { FaBan } from "react-icons/fa";
+import { hasPosRouteAccess } from "../utils/posRoleAccess";
+import {
+  usePosDeveloperSession,
+  usePosRoleAccessVersion,
+} from "../hooks/usePosRoleAccessConfig";
 
 const PrivateRoute = ({ routename }) => {
   const { isAuthenticated, roles } = useZustandLoginCred();
-  const [role, setRole] = useState(null);
+  const roleAccessVersion = usePosRoleAccessVersion();
+  const developerMode = usePosDeveloperSession();
+  const canAccess = useMemo(
+    () => hasPosRouteAccess(roles, routename, developerMode),
+    [roles, routename, roleAccessVersion, developerMode],
+  );
 
-  useEffect(() => {
-    if (Array.isArray(roles[0])) {
-      const match = roles[0].find((r) => r.rolename === routename);
-      if (match) setRole(match.rolename);
-    }
-  }, [roles, routename]);
-
-  if (isAuthenticated && role === routename) {
+  if (isAuthenticated && canAccess) {
     return <Outlet />;
   }
 

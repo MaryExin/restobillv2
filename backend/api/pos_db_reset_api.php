@@ -1,25 +1,42 @@
 <?php
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST");
-header("Access-Control-Allow-Headers: Content-Type");
-header("Content-Type: application/json");
 
-// Load Configuration
-$config = require 'config.php';
+declare(strict_types=1);
+
+require __DIR__ . "/secure_guard.php";
+
+if ($_SERVER["REQUEST_METHOD"] !== "POST") {
+    http_response_code(405);
+    header("Allow: POST");
+    echo json_encode(["status" => "error", "message" => "Invalid request method."]);
+    exit;
+}
+
+require __DIR__ . "/pdo.php";
+require_once __DIR__ . "/pos_role_authorization.php";
 
 try {
-    $dsn = "mysql:host={$config['host']};dbname={$config['db']};charset={$config['charset']}";
-    $pdo = new PDO($dsn, $config['user'], $config['pass'], [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
-    ]);
+    posRoleAuthRequirePermission(
+        $pdo,
+        (string)($GLOBALS["pos_user_id"] ?? ""),
+        "settings",
+        "dataSecurity"
+    );
 
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        
-        try {
-            // Disable Foreign Key Checks to allow truncation of linked tables
-            $pdo->exec("SET FOREIGN_KEY_CHECKS = 0;");
+    $body = json_decode(file_get_contents("php://input"), true);
+    if (!is_array($body) || ($body["confirmation"] ?? "") !== "RESET POS DATA") {
+        http_response_code(422);
+        echo json_encode([
+            "status" => "error",
+            "message" => "Reset confirmation is required.",
+        ]);
+        exit;
+    }
 
-            $tables = [
+    try {
+        // Disable Foreign Key Checks to allow truncation of linked tables
+        $pdo->exec("SET FOREIGN_KEY_CHECKS = 0;");
+
+        $tables = [
                 'tbl_main_activity_logs',
                 'tbl_main_transaction_logs',
                 'tbl_pos_ledger',
@@ -32,15 +49,15 @@ try {
                 'tbl_pos_transactions_other_charges',
                 'tbl_pos_transactions_payments',
                 'tbl_pos_document_counters' // Eto yung nate-truncate kaya nawawalan ng laman
-            ];
+        ];
 
-            foreach ($tables as $table) {
-                $pdo->exec("TRUNCATE TABLE `$table`;");
-            }
+        foreach ($tables as $table) {
+            $pdo->exec("TRUNCATE TABLE `$table`;");
+        }
 
             // --- INSERT NEW COUNTER VALUES WITH CODES FROM BUSINESS UNITS ---
             // Gumamit ng SELECT para makuha ang Category_Code at Unit_Code
-            $sql = "INSERT INTO tbl_pos_document_counters (
+        $sql = "INSERT INTO tbl_pos_document_counters (
                         Category_Code,
                         Unit_Code,
                         next_billing_no, 
@@ -62,37 +79,37 @@ try {
                     FROM tbl_main_business_units 
                     LIMIT 1"; // LIMIT 1 kung isang row lang ang laman o kailangan mo
             
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute([
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([
                 ':billing'    => 3000000001,
                 ':invoice'    => 4000000001,
                 ':trans_id'   => 1000000001,
                 ':order_slip' => 2000000001,
                 ':refund_id'  => 9000000001,
                 ':void_id'    => 8000000001
-            ]);
-            
-            echo json_encode([
-                "status" => "success", 
-                "message" => "All tables truncated. Document counters reset with Category and Unit codes."
-            ]);
+        ]);
 
-        } catch (Exception $inner) {
-            echo json_encode([
-                "status" => "error", 
-                "message" => "Process failed: " . $inner->getMessage()
-            ]);
-        } finally {
-            // Siguradong magra-run ito kahit mag-error ang nasa itaas
+        echo json_encode([
+            "status" => "success",
+            "message" => "All tables truncated. Document counters reset with Category and Unit codes."
+        ]);
+
+    } catch (Throwable $inner) {
+        error_log("POS database reset error: " . $inner->getMessage());
+        http_response_code(500);
+        echo json_encode([
+            "status" => "error",
+            "message" => "Database reset failed."
+        ]);
+    } finally {
+        try {
             $pdo->exec("SET FOREIGN_KEY_CHECKS = 1;");
+        } catch (Throwable $restoreError) {
+            error_log("POS database reset FK restore error: " . $restoreError->getMessage());
         }
-
-    } else {
-        http_response_code(405);
-        echo json_encode(["status" => "error", "message" => "Invalid request method."]);
     }
-} catch (\PDOException $e) {
+} catch (Throwable $e) {
+    error_log("POS database reset request error: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(["status" => "error", "message" => "Database Connection Error: " . $e->getMessage()]);
+    echo json_encode(["status" => "error", "message" => "Unable to process the database reset request."]);
 }
-?>

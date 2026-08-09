@@ -1,8 +1,20 @@
 "use client";
 import { useEffect } from "react";
+import { normalizePosApiHost } from "../../utils/posRoleFetch";
+
+const backupHeaders = () => {
+  const headers = new Headers({ Accept: "application/json" });
+  const token = localStorage.getItem("access_token");
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  return headers;
+};
 
 const GlobalSync = () => {
   useEffect(() => {
+    let cancelled = false;
+    let backupTimer;
+    let retryTimer;
+
     // Mapping para sa milliseconds
     const freqMapMs = {
       "1m": 60000,
@@ -13,10 +25,12 @@ const GlobalSync = () => {
 
     const performSilentBackup = async () => {
       try {
-        const apiBase =
-          localStorage.getItem("apiendpoint") || "http://localhost";
+        const apiBase = normalizePosApiHost(
+          localStorage.getItem("apiendpoint") || "http://localhost",
+        );
         const res = await fetch(
-          `${apiBase}/api/pos_db_backup_api.php?action=immediate_export`,
+          `${apiBase}/api/pos_db_backup_api.php?action=scheduled_export`,
+          { method: "POST", headers: backupHeaders() },
         );
         const data = await res.json();
 
@@ -38,10 +52,12 @@ const GlobalSync = () => {
 
     const initSync = async () => {
       try {
-        const apiBase =
-          localStorage.getItem("apiendpoint") || "http://localhost";
+        const apiBase = normalizePosApiHost(
+          localStorage.getItem("apiendpoint") || "http://localhost",
+        );
         const res = await fetch(
           `${apiBase}/api/pos_db_backup_api.php?action=get_settings`,
+          { headers: backupHeaders() },
         );
         const data = await res.json();
 
@@ -51,15 +67,37 @@ const GlobalSync = () => {
             `🚀 Background Sync started. Frequency: ${data.frequency}`,
           );
 
-          const timer = setInterval(performSilentBackup, intervalMs);
-          return () => clearInterval(timer);
+          if (!cancelled) {
+            clearInterval(backupTimer);
+            backupTimer = setInterval(performSilentBackup, intervalMs);
+          }
+          return;
         }
       } catch (e) {
         console.error("Could not initialize sync settings.");
       }
+
+      if (!cancelled) {
+        clearTimeout(retryTimer);
+        retryTimer = setTimeout(initSync, 30_000);
+      }
+    };
+
+    const restartSync = () => {
+      clearInterval(backupTimer);
+      clearTimeout(retryTimer);
+      initSync();
     };
 
     initSync();
+    window.addEventListener("storage", restartSync);
+
+    return () => {
+      cancelled = true;
+      clearInterval(backupTimer);
+      clearTimeout(retryTimer);
+      window.removeEventListener("storage", restartSync);
+    };
   }, []);
 
   return null;

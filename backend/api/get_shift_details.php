@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . "/bootstrap.php";
+require_once __DIR__ . "/pos_developer_auth.php";
 require_once __DIR__ . "/cors.php";
 
 header("Access-Control-Allow-Origin: *");
@@ -17,6 +19,22 @@ if (!file_exists($configPath)) {
 
 $config = require_once $configPath;
 
+function posShiftRoleLabel($value): string
+{
+    $role = strtoupper(trim((string)($value ?? "")));
+    if (in_array($role, ["0", "CASHIER"], true)) {
+        return "Cashier";
+    }
+    if (in_array($role, ["1", "ADMIN", "MANAGER", "SUPERVISOR"], true)) {
+        return "Admin";
+    }
+    if (in_array($role, ["2", "SUPER ADMIN", "SUPER_ADMIN", "SUPERADMIN"], true)) {
+        return "Super Admin";
+    }
+
+    return trim((string)($value ?? ""));
+}
+
 try {
     $dsn = "mysql:host={$config['host']};dbname={$config['db']};charset={$config['charset']}";
     $options = [
@@ -28,16 +46,30 @@ try {
     $pdo = new PDO($dsn, $config['user'], $config['pass'], $options);
 
     $user_id = trim($_GET['user_id'] ?? "");
+    $developerToken = posDeveloperRequestTokenData();
+    $isDeveloperRequest =
+        is_array($developerToken) &&
+        hash_equals(
+            trim((string)($developerToken["sub"] ?? "")),
+            $user_id
+        );
 
     // --- Query 1: Current User Details ---
     $user_data = null;
-    if ($user_id !== "") {
+    if ($isDeveloperRequest) {
+        $user_data = [
+            "full_name" => posDeveloperDisplayName(),
+            "User_Role" => "2",
+        ];
+    } elseif ($user_id !== "") {
         $sql_user = "
             SELECT 
                 CONCAT(firstname, ' ', lastname) AS full_name,
                 classification AS User_Role
             FROM tbl_users_global_assignment
             WHERE uuid = :user_id
+              AND UPPER(TRIM(status)) = 'ACTIVE'
+              AND UPPER(TRIM(deletestatus)) = 'ACTIVE'
             LIMIT 1
         ";
         $stmt_user = $pdo->prepare($sql_user);
@@ -69,7 +101,9 @@ try {
             T1.Shift_Status, 
             T1.Shift_ID, 
             T1.terminal_number,
+            T1.Opening_User_ID,
             T1.Opening_DateTime, 
+            T1.Closing_User_ID,
             T1.Closing_DateTime,
             CONCAT(T2.firstname, ' ', T2.lastname) AS opened_by_name,
             CASE 
@@ -88,6 +122,34 @@ try {
     $stmt_shift = $pdo->prepare($sql_shift);
     $stmt_shift->execute();
     $lastRecord = $stmt_shift->fetch();
+
+    // The Developer is a private virtual account, so it has no row to satisfy
+    // the user-table joins above. Resolve its persisted shift audit IDs from
+    // the same server-side identity configuration used to validate its token.
+    if ($lastRecord) {
+        $developerSubject = posDeveloperSubject();
+        $developerDisplayName = posDeveloperDisplayName();
+
+        if (
+            $developerSubject !== "" &&
+            hash_equals(
+                $developerSubject,
+                trim((string)($lastRecord["Opening_User_ID"] ?? ""))
+            )
+        ) {
+            $lastRecord["opened_by_name"] = $developerDisplayName;
+        }
+
+        if (
+            $developerSubject !== "" &&
+            hash_equals(
+                $developerSubject,
+                trim((string)($lastRecord["Closing_User_ID"] ?? ""))
+            )
+        ) {
+            $lastRecord["closed_by_name"] = $developerDisplayName;
+        }
+    }
 
 // --- Query 4: All Accounts For Switch User ---
 $sql_accounts = "
@@ -111,6 +173,8 @@ $sql_accounts = "
     WHERE 
         (COALESCE(uga.firstname, '') <> '' OR COALESCE(uga.lastname, '') <> '')
         AND COALESCE(uga.email, '') <> ''
+        AND UPPER(TRIM(uga.status)) = 'ACTIVE'
+        AND UPPER(TRIM(uga.deletestatus)) = 'ACTIVE'
     ORDER BY full_name ASC
 ";
 $stmt_accounts = $pdo->prepare($sql_accounts);
@@ -126,13 +190,15 @@ $accounts = $stmt_accounts->fetchAll();
     $terminal = $stmt_terminal->fetch();
 
 $formattedAccounts = array_map(function ($row) {
+    $rawRole = $row["user_role"] ?? null;
     return [
         "id"       => $row["uuid"],
         "uuid"     => $row["uuid"],
         "username" => $row["email"] ?? "",
         "email"    => $row["email"] ?? "",
         "name"     => trim($row["full_name"]) !== "" ? trim($row["full_name"]) : "Unknown User",
-        "userRole" => $row["user_role"] ?? null,
+        "userRole" => posShiftRoleLabel($rawRole),
+        "userRoleValue" => $rawRole,
     ];
 }, $accounts);
 
@@ -163,7 +229,8 @@ $formattedAccounts = array_map(function ($row) {
         "Unit_Name"        => $unit_data['Unit_Name'] ?? ($terminal['businessUnitName'] ?? "N/A"),
         "Corp_Name"        => $terminal['corpName'] ?? "N/A",
         "userName"         => $user_data['full_name'] ?? $defaultUserName,
-        "userRole"         => $user_data['User_Role'] ?? null,
+        "userRole"         => posShiftRoleLabel($user_data['User_Role'] ?? null),
+        "userRoleValue"    => $user_data['User_Role'] ?? null,
         "accounts"         => $formattedAccounts,
         "terminal"         => $terminal
     ];

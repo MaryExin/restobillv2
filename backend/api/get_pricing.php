@@ -1,20 +1,28 @@
 <?php
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
-header("Content-Type: application/json; charset=UTF-8");
 
-$config = require 'config.php';
+declare(strict_types=1);
+
+require __DIR__ . "/secure_guard.php";
+
+if ($_SERVER["REQUEST_METHOD"] !== "GET") {
+    http_response_code(405);
+    header("Allow: GET");
+    echo json_encode(["error" => "Method not allowed."]);
+    exit;
+}
+
+require __DIR__ . "/pdo.php";
+require_once __DIR__ . "/pos_role_authorization.php";
 
 try {
-    $dsn = "mysql:host={$config['host']};dbname={$config['db']};charset={$config['charset']}";
-    $options = [
-        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_EMULATE_PREPARES   => false,
-    ];
-    
-    $pdo = new PDO($dsn, $config['user'], $config['pass'], $options);
+    posRoleAuthRequireAnyPermission(
+        $pdo,
+        (string)($GLOBALS["pos_user_id"] ?? ""),
+        [
+            ["settings", "pricingEngine"],
+            ["reports", "pricingManagement"],
+        ]
+    );
 
     // Query na may WHERE clause para sa Active status
     $sql = "SELECT 
@@ -37,10 +45,10 @@ try {
     $stmt = $pdo->query($sql);
     $data = $stmt->fetchAll();
 
-    echo json_encode($data);
+    echo json_encode($data, JSON_UNESCAPED_SLASHES);
 
-} catch (PDOException $e) {
+} catch (Throwable $e) {
+    error_log("POS pricing read error: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(["error" => $e->getMessage()]);
+    echo json_encode(["error" => "Unable to load pricing data."]);
 }
-?>

@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+/* eslint-disable react/prop-types */
+import { useState, useMemo, useEffect } from "react";
 import {
   FiSend,
   FiCheckCircle,
@@ -9,11 +10,44 @@ import {
   FiLoader,
   FiCalendar,
   FiMail,
-  FiLayers,
   FiInbox,
 } from "react-icons/fi";
 import { TbCurrencyPeso } from "react-icons/tb";
 import { motion, AnimatePresence } from "framer-motion";
+import useApiHost from "../../../hooks/useApiHost";
+
+const POS_DISPATCH_SENDER_PATH =
+  import.meta.env.VITE_POS_DISPATCH_SENDER_ENDPOINT ||
+  "/api/pos_dispatch_sender.php";
+
+const posDispatchHeaders = (includeJson = false) => {
+  const headers = new Headers({ Accept: "application/json" });
+  const token = localStorage.getItem("access_token");
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  if (includeJson) headers.set("Content-Type", "application/json");
+  return headers;
+};
+
+const REPORT_OPTIONS = [
+  {
+    id: "dailySales",
+    title: "Daily Sales Reports",
+    desc: "Overall revenue summary",
+    icon: FiTrendingUp,
+  },
+  {
+    id: "salesPerItem",
+    title: "Sales Per Item",
+    desc: "Individual SKU performance",
+    icon: FiList,
+  },
+  {
+    id: "expensesPetty",
+    title: "Expenses and Petty",
+    desc: "Ledger cash out movements",
+    icon: TbCurrencyPeso,
+  },
+];
 
 const Toggle = ({ isOn, onToggle, accent, isDark }) => (
   <button
@@ -36,6 +70,7 @@ const Toggle = ({ isOn, onToggle, accent, isDark }) => (
 );
 
 const PosReportingModal = ({ isDark, accent = "#2563eb" }) => {
+  const apiHost = useApiHost();
   const [status, setStatus] = useState("idle");
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split("T")[0],
@@ -49,40 +84,31 @@ const PosReportingModal = ({ isDark, accent = "#2563eb" }) => {
   });
 
   useEffect(() => {
-    fetch("http://localhost/api/pos_dispatch_sender.php")
-      .then((res) => res.json())
+    if (!apiHost) return undefined;
+
+    let cancelled = false;
+    fetch(`${apiHost}${POS_DISPATCH_SENDER_PATH}`, {
+      headers: posDispatchHeaders(),
+    })
+      .then(async (res) => {
+        const responseText = await res.text();
+        return responseText ? JSON.parse(responseText) : null;
+      })
       .then((data) => {
-        if (data.status === "success") {
+        if (!cancelled && data?.status === "success") {
           setSelectedDate(data.reporting_date);
           setShiftStart(data.shift_opened);
         }
       })
-      .catch((err) => console.error("Fetch Error:", err));
-  }, []);
+      .catch(() => {});
 
-  const reportOptions = [
-    {
-      id: "dailySales",
-      title: "Daily Sales Reports",
-      desc: "Overall revenue summary",
-      icon: FiTrendingUp,
-    },
-    {
-      id: "salesPerItem",
-      title: "Sales Per Item",
-      desc: "Individual SKU performance",
-      icon: FiList,
-    },
-    {
-      id: "expensesPetty",
-      title: "Expenses and Petty",
-      desc: "Ledger cash out movements",
-      icon: TbCurrencyPeso,
-    },
-  ];
+    return () => {
+      cancelled = true;
+    };
+  }, [apiHost]);
 
   const isAllSelected = useMemo(
-    () => reportOptions.every((rpt) => selectedReports[rpt.id]),
+    () => REPORT_OPTIONS.every((rpt) => selectedReports[rpt.id]),
     [selectedReports],
   );
 
@@ -94,7 +120,7 @@ const PosReportingModal = ({ isDark, accent = "#2563eb" }) => {
   const handleSelectAll = () => {
     const nextVal = !isAllSelected;
     const newState = {};
-    reportOptions.forEach((rpt) => {
+    REPORT_OPTIONS.forEach((rpt) => {
       newState[rpt.id] = nextVal;
     });
     setSelectedReports(newState);
@@ -108,16 +134,15 @@ const PosReportingModal = ({ isDark, accent = "#2563eb" }) => {
   };
 
   const handleTransmit = async () => {
+    if (!apiHost) return;
     setStatus("sending");
 
     try {
       const response = await fetch(
-        "http://localhost/api/pos_dispatch_sender.php",
+        `${apiHost}${POS_DISPATCH_SENDER_PATH}`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: posDispatchHeaders(true),
           body: JSON.stringify({
             shift_start: shiftStart,
             selected_date: selectedDate,
@@ -128,15 +153,15 @@ const PosReportingModal = ({ isDark, accent = "#2563eb" }) => {
 
       const resData = await response.json();
 
-      if (resData.status === "success") {
+      if (response.ok && resData.status === "success") {
         setStatus("success");
         setTimeout(() => setStatus("idle"), 3000);
       } else {
-        alert("Dispatch Error: " + resData.message);
+        alert(resData.message || "Unable to send the report email.");
         setStatus("idle");
       }
-    } catch (error) {
-      console.error("Dispatch Error:", error);
+    } catch {
+      alert("Unable to send the report email.");
       setStatus("idle");
     }
   };
@@ -229,7 +254,7 @@ const PosReportingModal = ({ isDark, accent = "#2563eb" }) => {
             </div>
 
             <div className="space-y-3">
-              {reportOptions.map((rpt) => {
+              {REPORT_OPTIONS.map((rpt) => {
                 const Icon = rpt.icon;
                 const isSelected = selectedReports[rpt.id];
 
@@ -393,7 +418,7 @@ const PosReportingModal = ({ isDark, accent = "#2563eb" }) => {
                           <span
                             className={`text-[11px] font-black uppercase tracking-[0.14em] truncate ${theme.textPrimary}`}
                           >
-                            {reportOptions.find((o) => o.id === id)?.title}
+                            {REPORT_OPTIONS.find((o) => o.id === id)?.title}
                           </span>
                         </motion.div>
                       ))}

@@ -13,7 +13,9 @@ import {
 import { FiSearch, FiX } from "react-icons/fi";
 
 import useApiHost from "../../hooks/useApiHost";
+import { getConfiguredRoleLabel } from "../../utils/posRoleAccessConfig";
 import { useTheme } from "../../context/ThemeContext";
+import { posAuthenticatedFetch } from "../../utils/posAuthenticatedFetch";
 
 import ModalYesNoReusable from "../Modals/ModalYesNoReusable";
 import ModalSuccessNavToSelf from "../Modals/ModalSuccessNavToSelf";
@@ -508,7 +510,7 @@ const PosSelectBusunitComponent = () => {
     setShiftError("");
 
     try {
-      const response = await fetch(
+      const response = await posAuthenticatedFetch(
         `${apiHost}/api/get_shift_details.php?user_id=${encodeURIComponent(userId)}`,
       );
 
@@ -640,7 +642,9 @@ const PosSelectBusunitComponent = () => {
       openedBy: shiftDetails?.opened_by_name || "N/A",
       closedBy: shiftDetails?.closed_by_name || "N/A",
       userName: shiftDetails?.userName || firstName || "-",
-      userRole: shiftDetails?.userRole || "-",
+      userRole: getConfiguredRoleLabel(
+        shiftDetails?.userRoleValue || shiftDetails?.userRole || "-",
+      ),
       selectedDate: shiftDetails?.selectedDate || "-",
       businessType:
         shiftDetails?.Business_Type ||

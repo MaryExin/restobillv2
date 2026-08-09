@@ -16,6 +16,7 @@ import ModalSuccessNavToSelf from "../../Modals/ModalSuccessNavToSelf";
 import useZustandLoginCred from "../../../context/useZustandLoginCred";
 import useApiHost from "../../../hooks/useApiHost";
 import { useTheme } from "../../../context/ThemeContext";
+import { posAuthenticatedFetch } from "../../../utils/posAuthenticatedFetch";
 
 const SwitchUser = () => {
   const { theme } = useTheme();
@@ -51,7 +52,7 @@ const SwitchUser = () => {
       if (!userId || !apiHost) return;
 
       try {
-        const response = await fetch(
+        const response = await posAuthenticatedFetch(
           `${apiHost}/api/get_shift_details.php?user_id=${encodeURIComponent(
             userId,
           )}`,
@@ -86,7 +87,11 @@ const SwitchUser = () => {
     return dateselection.accounts.filter(
       (item) =>
         item?.uuid !== userId &&
-        String(item?.userRole ?? "").trim().toLowerCase() === "cashier",
+        ["0", "cashier"].includes(
+          String(item?.userRoleValue ?? item?.userRole ?? "")
+            .trim()
+            .toLowerCase(),
+        ),
     );
   }, [dateselection, userId]);
 
@@ -131,6 +136,7 @@ const SwitchUser = () => {
       username: (user?.username ?? user?.email ?? "").trim(),
       name: user?.name ?? "",
       userRole: user?.userRole ?? "",
+      userRoleValue: user?.userRoleValue ?? "",
     };
 
     setSelectedUser(normalizedUser);

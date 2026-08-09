@@ -9,7 +9,16 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
     exit;
 }
 
+$method = $_SERVER["REQUEST_METHOD"];
+$requiresMutationAuthorization = $method === "POST";
+if ($requiresMutationAuthorization) {
+    require __DIR__ . "/secure_guard.php";
+}
+
 require __DIR__ . "/pdo.php";
+if ($requiresMutationAuthorization) {
+    require_once __DIR__ . "/pos_role_authorization.php";
+}
 
 const DISCOUNT_MODE_CATEGORY    = "Discount";
 const DISCOUNT_MODE_DESCRIPTION = "Discount Mode";
@@ -55,7 +64,14 @@ function respond(bool $success, string $message, ?array $data = null, int $statu
 }
 
 try {
-    $method = $_SERVER["REQUEST_METHOD"];
+    if ($requiresMutationAuthorization) {
+        posRoleAuthRequirePermission(
+            $pdo,
+            (string)($GLOBALS["pos_user_id"] ?? ""),
+            "settings",
+            "discountMode"
+        );
+    }
 
     if ($method === "GET") {
         respond(true, "OK", ["discount_mode" => readDiscountMode($pdo)]);
@@ -76,5 +92,6 @@ try {
     respond(true, "Discount mode saved.", ["discount_mode" => $mode]);
 
 } catch (Throwable $e) {
-    respond(false, $e->getMessage(), null, 500);
+    error_log("POS discount mode error: " . $e->getMessage());
+    respond(false, "Unable to process discount mode settings.", null, 500);
 }

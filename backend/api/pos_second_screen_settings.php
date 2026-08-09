@@ -1,7 +1,7 @@
 <?php
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type");
+header("Access-Control-Allow-Headers: Content-Type, Authorization");
 header("Content-Type: application/json; charset=UTF-8");
 
 if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
@@ -9,7 +9,16 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
     exit;
 }
 
+$method = $_SERVER["REQUEST_METHOD"];
+$requiresMutationAuthorization = $method === "POST";
+if ($requiresMutationAuthorization) {
+    require __DIR__ . "/secure_guard.php";
+}
+
 require __DIR__ . "/pdo.php";
+if ($requiresMutationAuthorization) {
+    require_once __DIR__ . "/pos_role_authorization.php";
+}
 
 const SS_SETTING_KEY = "announcement";
 const SS_DEFAULT     = "Welcome to our store! Happy to serve you.";
@@ -51,8 +60,6 @@ function saveAnnouncement(PDO $pdo, string $text): void
 }
 
 try {
-    $method = $_SERVER["REQUEST_METHOD"];
-
     // ── GET: read announcement ────────────────────────────────────────────────
     if ($method === "GET") {
         respond(true, "OK.", ["announcement" => readAnnouncement($pdo)]);
@@ -62,6 +69,13 @@ try {
 
         // ── QR code upload (multipart with qr_image + mop_name) ─────────────
         if (!empty($_FILES["qr_image"])) {
+            posRoleAuthRequirePermission(
+                $pdo,
+                (string)($GLOBALS["pos_user_id"] ?? ""),
+                "settings",
+                "modeOfPayment"
+            );
+
             $file    = $_FILES["qr_image"];
             $mopName = trim((string)($_POST["mop_name"] ?? ""));
 
@@ -93,6 +107,13 @@ try {
 
         // ── Display image upload (multipart with display_image) ───────────
         if (!empty($_FILES["display_image"])) {
+            posRoleAuthRequirePermission(
+                $pdo,
+                (string)($GLOBALS["pos_user_id"] ?? ""),
+                "settings",
+                "secondScreen"
+            );
+
             $file = $_FILES["display_image"];
 
             if ($file["error"] !== UPLOAD_ERR_OK) {
@@ -121,6 +142,13 @@ try {
         // ── Announcement save (JSON) ──────────────────────────────────────────
         $body = json_decode(file_get_contents("php://input"), true) ?? [];
         if (isset($body["announcement"])) {
+            posRoleAuthRequirePermission(
+                $pdo,
+                (string)($GLOBALS["pos_user_id"] ?? ""),
+                "settings",
+                "secondScreen"
+            );
+
             $text = trim((string)$body["announcement"]);
             if (mb_strlen($text) > 500) {
                 respond(false, "Announcement must be 500 characters or less.", null, 422);
@@ -135,5 +163,6 @@ try {
     respond(false, "Method not allowed.", null, 405);
 
 } catch (Throwable $e) {
-    respond(false, $e->getMessage(), null, 500);
+    error_log("POS second screen settings error: " . $e->getMessage());
+    respond(false, "Unable to process second screen settings.", null, 500);
 }

@@ -1,9 +1,17 @@
 "use client";
+/* eslint-disable react/prop-types */
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { FiAward, FiSave, FiLoader, FiTrendingUp, FiGift, FiLock, FiUsers, FiUserPlus } from "react-icons/fi";
 import useApiHost from "../../../hooks/useApiHost";
 import PosLoyaltyMembers from "./PosLoyaltyMembers";
+
+const mutationHeaders = (headers = {}) => {
+  const nextHeaders = { ...headers };
+  const token = window.localStorage.getItem("access_token");
+  if (token) nextHeaders.Authorization = `Bearer ${token}`;
+  return nextHeaders;
+};
 
 const PosLoyaltyConfig = ({ isDark, accent = "#3b82f6" }) => {
   const apiHost = useApiHost();
@@ -112,9 +120,9 @@ const PosLoyaltyConfig = ({ isDark, accent = "#3b82f6" }) => {
 
       const response = await fetch(`${apiHost}/api/pos_loyalty_config.php`, {
         method: "POST",
-        headers: {
+        headers: mutationHeaders({
           "Content-Type": "application/json",
-        },
+        }),
         body: JSON.stringify({
           earning_rule_amount: normalizedEarningRule,
           redemption_rule_value: normalizedRedemptionRule,

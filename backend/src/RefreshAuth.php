@@ -10,6 +10,7 @@ class RefreshAuth
 
 
     private $user_id;
+    private $token_data = [];
 
     public function __construct($user_gateway,
         $codec) {
@@ -22,9 +23,20 @@ class RefreshAuth
         return $this->user_id;
     }
 
+    public function getTokenData(): array
+    {
+        return $this->token_data;
+    }
+
     public function authenticateAccessToken()
     {
-        if (!preg_match("/^Bearer\s+(.*)$/", $_SERVER["HTTP_AUTHORIZATION"], $matches)) {
+        $authorization = trim((string)(
+            $_SERVER["HTTP_AUTHORIZATION"] ??
+            $_SERVER["REDIRECT_HTTP_AUTHORIZATION"] ??
+            ""
+        ));
+
+        if (!preg_match("/^Bearer\s+(.+)$/i", $authorization, $matches)) {
             http_response_code(400);
             echo json_encode(["message" => "incomplete authorization header"]);
             return false;
@@ -52,6 +64,35 @@ class RefreshAuth
             return false;
         }
 
+        if (
+            isset($data["token_type"]) &&
+            $data["token_type"] !== "refresh"
+        ) {
+            http_response_code(401);
+            echo json_encode(["message" => "invalid refresh token"]);
+            return false;
+        }
+
+        $requestedDeveloperSession =
+            ($data["pos_developer_mode"] ?? false) === true ||
+            ($data["pos_developer_full_access"] ?? false) === true ||
+            ($data["pos_developer_read_only"] ?? false) === true;
+
+        if ($requestedDeveloperSession) {
+            require_once dirname(__DIR__) . "/api/pos_developer_auth.php";
+            if (
+                ($data["token_type"] ?? "") !== "refresh" ||
+                !posDeveloperFullAccessTokenIsValid($data)
+            ) {
+                http_response_code(401);
+                echo json_encode([
+                    "message" => "invalid developer session; please log in again"
+                ]);
+                return false;
+            }
+        }
+
+        $this->token_data = $data;
         $this->user_id = $data["sub"];
 
         return true;

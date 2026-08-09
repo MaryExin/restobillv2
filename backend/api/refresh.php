@@ -3,6 +3,7 @@
 declare (strict_types = 1);
 
 require __DIR__ . "/bootstrap.php";
+require_once __DIR__ . "/pos_developer_auth.php";
 
 $corsPolicy = new CorsPolicy();
 
@@ -36,7 +37,20 @@ try {
     exit;
 }
 
-$user_id = $payload["sub"];
+$user_id = trim((string)($payload["sub"] ?? ""));
+$requestedDeveloperSession =
+    ($payload["pos_developer_mode"] ?? false) === true;
+$isDeveloperSession = posDeveloperFullAccessTokenIsValid($payload);
+
+if (
+    $user_id === "" ||
+    (isset($payload["token_type"]) && $payload["token_type"] !== "refresh") ||
+    ($requestedDeveloperSession && !$isDeveloperSession)
+) {
+    http_response_code(401);
+    echo json_encode(["message" => "invalid refresh token"]);
+    exit;
+}
 
 $database = new Database($_ENV["DB_HOST"],
     $_ENV["DB_NAME"],
@@ -56,7 +70,9 @@ if ($refresh_token === false) {
 
 $user_gateway = new UserGateway($database);
 
-$user = $user_gateway->getByID($user_id);
+$user = $isDeveloperSession
+    ? posDeveloperVirtualUser()
+    : $user_gateway->getByID($user_id);
 
 if ($user === false) {
 
@@ -70,3 +86,9 @@ require __DIR__ . "/tokens.php";
 $refresh_token_gateway->delete($data["token"]);
 
 $refresh_token_gateway->create($refresh_token, $refresh_token_expiry);
+
+echo json_encode([
+    "access_token" => $access_token,
+    "refresh_token" => $refresh_token,
+    "is_developer_mode" => $isDeveloperSession,
+]);

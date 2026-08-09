@@ -1,14 +1,29 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+/* eslint-disable react/prop-types */
+import { useState, useEffect } from "react";
 import {
   FiLoader, FiMail, FiHash, FiMapPin, FiBriefcase, FiUser,
-  FiLock, FiX, FiCheckCircle, FiEye, FiEyeOff,
+  FiLock, FiX, FiCheckCircle,
 } from "react-icons/fi";
 import useApiHost from "../../../hooks/useApiHost";
+import { usePosDeveloperSession } from "../../../hooks/usePosRoleAccessConfig";
+import { getConfiguredRoleLabel } from "../../../utils/posRoleAccessConfig";
+
+const USER_PROFILE_PATH =
+  import.meta.env.VITE_POS_USER_PROFILE_ENDPOINT || "/api/get_user_profile.php";
+
+const userProfileHeaders = (includeJson = false) => {
+  const headers = new Headers({ Accept: "application/json" });
+  const token = localStorage.getItem("access_token");
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  if (includeJson) headers.set("Content-Type", "application/json");
+  return headers;
+};
 
 const PosMyAccount = ({ isDark, accent }) => {
   const apiHost = useApiHost();
+  const developerMode = usePosDeveloperSession();
   const [isLoading, setIsLoading] = useState(true);
   const [profile, setProfile] = useState(null);
   const [imgError, setImgError] = useState(false);
@@ -24,7 +39,10 @@ const PosMyAccount = ({ isDark, accent }) => {
       const storedUuid = localStorage.getItem("user_id");
       if (!storedUuid || !apiHost) { setIsLoading(false); return; }
       try {
-        const response = await fetch(`${apiHost}/api/get_user_profile.php?user_id=${storedUuid}`);
+        const response = await fetch(
+          `${apiHost}${USER_PROFILE_PATH}?user_id=${encodeURIComponent(storedUuid)}`,
+          { headers: userProfileHeaders() },
+        );
         const data = await response.json();
         if (data && !data.error) setProfile(data);
       } catch (err) { console.error("Fetch Error:", err); } finally { setIsLoading(false); }
@@ -40,9 +58,9 @@ const PosMyAccount = ({ isDark, accent }) => {
     }
     setIsSubmitting(true);
     try {
-      const response = await fetch(`${apiHost}/api/get_user_profile.php`, {
+      const response = await fetch(`${apiHost}${USER_PROFILE_PATH}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: userProfileHeaders(true),
         body: JSON.stringify({
           user_id: localStorage.getItem("user_id"),
           current_password: passwords.current,
@@ -84,12 +102,15 @@ const PosMyAccount = ({ isDark, accent }) => {
 
   const fullName = `${profile.firstname || ""} ${profile.lastname || ""}`.trim();
   const profileImage = profile.profile_pic_url ? `${apiHost}/${profile.profile_pic_url}` : "";
+  const roleLabel = getConfiguredRoleLabel(
+    profile.classification_value || profile.classification,
+  );
 
   const infoCards = [
     { label: "User UUID", value: profile.uuid, icon: FiHash, valueClass: "font-mono break-all" },
     { label: "Username/Email", value: profile.email, icon: FiMail, valueClass: "font-bold break-all" },
-    { label: "Department", value: profile.department, icon: FiBriefcase, valueClass: "font-bold uppercase" },
-    { label: "Classification", value: profile.classification, icon: FiUser, valueClass: "font-bold uppercase" },
+    { label: "Department", value: roleLabel, icon: FiBriefcase, valueClass: "font-bold uppercase" },
+    { label: "Classification", value: roleLabel, icon: FiUser, valueClass: "font-bold uppercase" },
     { label: "Branch", value: profile.branch_name, icon: FiMapPin, valueClass: "font-bold uppercase" },
   ];
 
@@ -107,16 +128,22 @@ const PosMyAccount = ({ isDark, accent }) => {
           </div>
           <div className="flex-1 text-center lg:text-left">
             <span className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-[10px] font-black tracking-widest uppercase border ${isDark ? "bg-slate-950/70 border-slate-800" : "bg-white border-slate-200"}`} style={{ color: accent }}>
-              {profile.classification}
+              {roleLabel}
             </span>
             <h1 className={`mt-4 text-3xl lg:text-5xl font-black uppercase tracking-tight leading-tight ${theme.textPrimary}`}>{fullName}</h1>
             <div className={`mt-4 flex flex-wrap justify-center lg:justify-start gap-4 text-[11px] font-black uppercase ${theme.textMuted}`}>
                <div className="flex items-center gap-2"><FiMapPin style={{ color: accent }} /> {profile.branch_name}</div>
-               <div className="flex items-center gap-2"><FiBriefcase style={{ color: accent }} /> {profile.department}</div>
+               <div className="flex items-center gap-2"><FiBriefcase style={{ color: accent }} /> {roleLabel}</div>
             </div>
-            <button onClick={() => setIsModalOpen(true)} style={{ backgroundColor: accent }} className="mt-8 flex items-center gap-2 px-6 py-3 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-all shadow-lg active:scale-95">
-              <FiLock /> Update Password
-            </button>
+            {developerMode ? (
+              <p className={`mt-8 text-xs font-bold ${theme.textMuted}`}>
+                Developer credentials are managed in the private server environment.
+              </p>
+            ) : (
+              <button onClick={() => setIsModalOpen(true)} style={{ backgroundColor: accent }} className="mt-8 flex items-center gap-2 px-6 py-3 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-all shadow-lg active:scale-95">
+                <FiLock /> Update Password
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -140,7 +167,7 @@ const PosMyAccount = ({ isDark, accent }) => {
       <div className={`rounded-[32px] border p-8 ${theme.panelSoft}`}>
         <p className={`text-[10px] font-black tracking-widest uppercase ${theme.textSoft}`}>Account Overview</p>
         <div className="grid grid-cols-1 gap-4 mt-5 md:grid-cols-3">
-          {[{l: "Full Name", v: fullName}, {l: "Assigned Branch", v: profile.branch_name}, {l: "Department", v: profile.department}].map((x, i) => (
+          {[{l: "Full Name", v: fullName}, {l: "Assigned Branch", v: profile.branch_name}, {l: "Department", v: roleLabel}].map((x, i) => (
             <div key={i} className={`rounded-[24px] border p-5 ${isDark ? "bg-slate-900/50 border-slate-800" : "bg-white border-slate-200"}`}>
               <p className={`text-[10px] font-black uppercase tracking-widest ${theme.textSoft}`}>{x.l}</p>
               <p className={`mt-2 text-lg font-black uppercase ${theme.textPrimary}`}>{x.v || "—"}</p>
@@ -150,7 +177,7 @@ const PosMyAccount = ({ isDark, accent }) => {
       </div>
 
       {/* PASSWORD MODAL */}
-      {isModalOpen && (
+      {isModalOpen && !developerMode && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className={`w-full max-w-md rounded-[32px] border p-8 shadow-2xl ${theme.panel} animate-in zoom-in duration-200`}>
             

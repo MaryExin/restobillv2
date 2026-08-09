@@ -1,9 +1,17 @@
 "use client";
+/* eslint-disable react/prop-types */
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { FiUsers, FiSave, FiLoader, FiShoppingCart } from "react-icons/fi";
 import useApiHost from "../../../hooks/useApiHost";
 import PosDiscountTypeSettings from "./PosDiscountTypeSettings";
+
+const mutationHeaders = (headers = {}) => {
+  const nextHeaders = { ...headers };
+  const token = window.localStorage.getItem("access_token");
+  if (token) nextHeaders.Authorization = `Bearer ${token}`;
+  return nextHeaders;
+};
 
 const MODES = [
   {
@@ -84,7 +92,7 @@ const PosDiscountMode = ({ isDark, accent = "#3b82f6" }) => {
       setMessage("");
       const res = await fetch(`${apiHost}/api/pos_discount_mode.php`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: mutationHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ discount_mode: mode }),
       });
       const result = await res.json();

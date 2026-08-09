@@ -1,7 +1,11 @@
 <?php
+require_once __DIR__ . "/bootstrap.php";
+require_once __DIR__ . "/pos_developer_auth.php";
+require_once __DIR__ . "/pos_role_authorization.php";
+
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type");
+header("Access-Control-Allow-Headers: Content-Type, Authorization");
 header("Content-Type: application/json");
 
 date_default_timezone_set('Asia/Manila');
@@ -36,7 +40,11 @@ function resolveReadingDatabaseName(array $input, string $posDbName, string $rep
         return [$reportDbName, "report"];
     }
 
-    return [$posDbName, "cnc"];
+    if ($scope === "cnc") {
+        return [$posDbName, "cnc"];
+    }
+
+    throw new InvalidArgumentException("Invalid reading database scope.");
 }
 
 try {
@@ -52,6 +60,19 @@ try {
     $charset = requireMysqlIdentifier($config["charset"] ?? "utf8mb4", "database charset");
     [$readingDbName, $readingDatabaseScope] = resolveReadingDatabaseName($input, $posDbName, $reportDbName);
 
+    $developerPreviewRequested = false;
+    if (array_key_exists("developerPreview", $input)) {
+        $developerPreviewRequested = filter_var(
+            $input["developerPreview"],
+            FILTER_VALIDATE_BOOLEAN
+        );
+    } elseif (array_key_exists("developer_preview", $input)) {
+        $developerPreviewRequested = filter_var(
+            $input["developer_preview"],
+            FILTER_VALIDATE_BOOLEAN
+        );
+    }
+
     $pdo = new PDO(
         "mysql:host={$config['host']};dbname={$readingDbName};charset={$charset}",
         $config["user"],
@@ -61,6 +82,40 @@ try {
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
         ]
     );
+
+    $readingAccess = posDeveloperReadingAccess(
+        $readingDatabaseScope,
+        $developerPreviewRequested,
+        $pdo
+    );
+    if (!$readingAccess["authorized"]) {
+        http_response_code(401);
+        echo json_encode([
+            "success" => false,
+            "message" => "A valid POS access token is required. Report and preview modes require a Developer session."
+        ]);
+        exit;
+    }
+
+    // Developer requests against CNC are operational. Report-database and
+    // explicitly requested preview sessions remain read-only.
+    $isDeveloper = (bool)$readingAccess["is_developer"];
+    $developerPreview = (bool)($readingAccess["developer_preview"] ?? false);
+    $readOnly = (bool)($readingAccess["read_only"] ?? false);
+
+    if (!$isDeveloper) {
+        $readingToken = $readingAccess["token"] ?? [];
+        posRoleAuthRequirePermission(
+            $pdo,
+            trim((string)($readingToken["sub"] ?? "")),
+            "reading",
+            "xReading"
+        );
+    }
+
+    if ($readOnly) {
+        posDeveloperMakePdoReadOnly($pdo);
+    }
 
     $selectedCashier = isset($input["selectedCashier"])
         ? trim((string)$input["selectedCashier"])
@@ -74,17 +129,41 @@ try {
         ? (float)$input["verifyAmount"]
         : (isset($input["verify_amount"]) ? (float)$input["verify_amount"] : 0);
 
-    $userId = isset($input["user_id"])
-        ? trim((string)$input["user_id"])
-        : "";
+    // Bind audit identity to the validated token/account, not request data.
+    $authenticatedToken = $readingAccess["token"];
+    $userId = (string)$authenticatedToken["sub"];
 
-    $userName = isset($input["user_name"])
-        ? trim((string)$input["user_name"])
-        : "";
+    if ($isDeveloper) {
+        $userName = posDeveloperDisplayName();
+        $cashierName = posDeveloperDisplayName();
+    } else {
+        $authenticatedUser = $readingAccess["user"];
+        $authenticatedFullName = trim(implode(" ", array_filter([
+            trim((string)($authenticatedUser["firstname"] ?? "")),
+            trim((string)($authenticatedUser["lastname"] ?? "")),
+        ], static fn($part) => $part !== "")));
+        $userName = "";
 
-    $cashierName = isset($input["cashier_name"])
-        ? trim((string)$input["cashier_name"])
-        : $userName;
+        foreach ([
+            $authenticatedUser["User_Name"] ?? "",
+            $authenticatedUser["username"] ?? "",
+            $authenticatedUser["name"] ?? "",
+            $authenticatedFullName,
+            $authenticatedUser["email"] ?? "",
+        ] as $identityCandidate) {
+            $identityCandidate = trim((string)$identityCandidate);
+            if ($identityCandidate !== "") {
+                $userName = $identityCandidate;
+                break;
+            }
+        }
+
+        if ($userName === "") {
+            $userName = "User " . $userId;
+        }
+
+        $cashierName = $userName;
+    }
 
     $categoryCode = "";
     if (isset($input["categoryCode"])) {
@@ -670,6 +749,7 @@ try {
     $logTime = date("H:i:s");
     $resolvedUserName = $userName !== "" ? $userName : ($cashierName !== "" ? $cashierName : $selectedCashier);
 
+    if (!$readOnly) {
     try {
         $valuesOfData = json_encode([
             "selected_cashier" => $selectedCashier,
@@ -791,15 +871,20 @@ try {
     } catch (Throwable $transactionLogError) {
         // ignore logging failure
     }
+    }
 
     echo json_encode([
         "success" => true,
-        "message" => "X-Reading data loaded successfully.",
+        "message" => $developerPreview
+            ? "Developer X-Reading preview loaded successfully. No logs were written."
+            : "X-Reading data loaded successfully.",
         "data" => [
             "reportDate" => $parReportDate,
             "reportTime" => $parReportTime,
             "readingDatabaseScope" => $readingDatabaseScope,
             "readingDatabase" => $readingDbName,
+            "developerPreview" => $developerPreview,
+            "readOnly" => $readOnly,
             "startDateTime" => $parStartDateTime,
             "endDateTime" => $parEndDateTime,
             "cashier" => $selectedCashier,

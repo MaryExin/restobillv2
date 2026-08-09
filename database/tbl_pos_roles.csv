@@ -1,0 +1,4 @@
+id,role_key,role_value,role_name,role_tokens_json,is_system,is_active,sort_order,created_by,created_at,updated_at
+1,super_admin,2,Super Admin,"[""2"",""SUPER ADMIN"",""SUPER_ADMIN"",""SUPERADMIN""]",1,1,10,SYSTEM,2026-08-09 00:00:00,2026-08-09 00:00:00
+2,admin,1,Admin / Supervisor,"[""1"",""ADMIN / SUPERVISOR"",""ADMIN"",""MANAGER"",""SUPERVISOR""]",1,1,20,SYSTEM,2026-08-09 00:00:00,2026-08-09 00:00:00
+3,cashier,0,Cashier,"[""0"",""CASHIER""]",1,1,30,SYSTEM,2026-08-09 00:00:00,2026-08-09 00:00:00

@@ -2,17 +2,16 @@
 
 declare(strict_types=1);
 
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
-header("Content-Type: application/json; charset=UTF-8");
+require __DIR__ . "/secure_guard.php";
 
-if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
-    http_response_code(200);
+if (!in_array($_SERVER["REQUEST_METHOD"], ["GET", "POST"], true)) {
+    http_response_code(405);
+    header("Allow: GET, POST");
     exit;
 }
 
 require __DIR__ . "/pdo.php";
+require_once __DIR__ . "/pos_role_authorization.php";
 require_once __DIR__ . "/pos_report_mirror.php";
 
 function reportMirrorSettingsRespond(bool $success, string $message, $data = null, int $statusCode = 200): void
@@ -116,6 +115,12 @@ function reportMirrorSettingsRead(PDO $pdo, array $config): array
 }
 
 try {
+    posRoleAuthRequirePermission(
+        $pdo,
+        (string)($GLOBALS["pos_user_id"] ?? ""),
+        "settings",
+        "reportDatabase"
+    );
     $method = $_SERVER["REQUEST_METHOD"];
 
     if ($method === "GET") {
@@ -138,6 +143,9 @@ try {
     reportMirrorSettingsSaveSkipInterval($pdo, $reportDbName, $skipInterval);
 
     reportMirrorSettingsRespond(true, "Report mirror settings saved.", reportMirrorSettingsRead($pdo, $config));
+} catch (InvalidArgumentException $e) {
+    reportMirrorSettingsRespond(false, $e->getMessage(), null, 422);
 } catch (Throwable $e) {
-    reportMirrorSettingsRespond(false, $e->getMessage(), null, 500);
+    error_log("POS report mirror settings error: " . $e->getMessage());
+    reportMirrorSettingsRespond(false, "Unable to process report database settings.", null, 500);
 }

@@ -81,6 +81,15 @@ try {
         respond(false, "Method not allowed.", null, 405);
     }
 
+    require __DIR__ . "/secure_guard.php";
+    require_once __DIR__ . "/pos_role_authorization.php";
+    posRoleAuthRequirePermission(
+        $pdo,
+        (string)($GLOBALS["pos_user_id"] ?? ""),
+        "settings",
+        "pricingEngine"
+    );
+
     $body = json_decode(file_get_contents("php://input"), true) ?? [];
 
     if (array_key_exists("hide_price_on_os", $body)) {
@@ -92,5 +101,6 @@ try {
 
     respond(true, "Order slip settings saved.", readAllSettings($pdo));
 } catch (Throwable $e) {
-    respond(false, $e->getMessage(), null, 500);
+    error_log("POS order slip settings error: " . $e->getMessage());
+    respond(false, "Unable to process order slip settings.", null, 500);
 }

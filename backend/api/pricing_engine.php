@@ -1,12 +1,27 @@
 <?php
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type");
-header("Content-Type: application/json; charset=UTF-8");
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { exit; }
+declare(strict_types=1);
 
-$config = require 'config.php';
+require __DIR__ . "/secure_guard.php";
+
+if ($_SERVER["REQUEST_METHOD"] !== "POST") {
+    http_response_code(405);
+    header("Allow: POST");
+    echo json_encode(["status" => "error", "message" => "Method not allowed."]);
+    exit;
+}
+
+require __DIR__ . "/pdo.php";
+require_once __DIR__ . "/pos_role_authorization.php";
+
+posRoleAuthRequireAnyPermission(
+    $pdo,
+    (string)($GLOBALS["pos_user_id"] ?? ""),
+    [
+        ["settings", "pricingEngine"],
+        ["reports", "pricingManagement"],
+    ]
+);
 
 /**
  * FIXED LOGIC: 
@@ -20,21 +35,16 @@ $data = null;
 if (!$action) {
     $json = file_get_contents("php://input");
     $data = json_decode($json);
-    $action = $data->action ?? null;
+    $action = is_object($data) ? ($data->action ?? null) : null;
 }
 
 if (empty($action)) {
+    http_response_code(400);
     echo json_encode(["status" => "error", "message" => "Action parameter is required."]);
     exit;
 }
 
 try {
-    $dsn = "mysql:host={$config['host']};dbname={$config['db']};charset={$config['charset']}";
-    $pdo = new PDO($dsn, $config['user'], $config['pass'], [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
-    ]);
-
     // ==========================================
     // ACTION: UPLOAD PRODUCT IMAGE
     // ==========================================
@@ -58,8 +68,14 @@ try {
         exit;
     }
 
+    if (!in_array($action, ["add", "update"], true) || !is_object($data)) {
+        http_response_code(400);
+        echo json_encode(["status" => "error", "message" => "Invalid pricing action."]);
+        exit;
+    }
+
     $pdo->beginTransaction();
-    $user_id = $data->user_id ?? ($_POST['user_id'] ?? '0');
+    $user_id = (string)($GLOBALS["pos_user_id"] ?? "");
 
     // ==========================================
     // ACTION: ADD NEW PRODUCT
@@ -117,9 +133,9 @@ try {
         echo json_encode(["status" => "success"]);
     }
 
-} catch (Exception $e) {
+} catch (Throwable $e) {
     if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
+    error_log("POS pricing mutation error: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+    echo json_encode(["status" => "error", "message" => "Unable to process the pricing request."]);
 }
-?>

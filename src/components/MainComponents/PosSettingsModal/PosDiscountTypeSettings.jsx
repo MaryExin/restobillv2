@@ -1,6 +1,7 @@
 "use client";
+/* eslint-disable react/prop-types */
 
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   FiTag,
   FiSave,
@@ -12,6 +13,13 @@ import {
   FiChevronUp,
 } from "react-icons/fi";
 import useApiHost from "../../../hooks/useApiHost";
+
+const mutationHeaders = (headers = {}) => {
+  const nextHeaders = { ...headers };
+  const token = window.localStorage.getItem("access_token");
+  if (token) nextHeaders.Authorization = `Bearer ${token}`;
+  return nextHeaders;
+};
 
 const mappingKey = (discountTypeId, salesTypeId) =>
   `${discountTypeId}_${salesTypeId}`;
@@ -130,7 +138,7 @@ const PosDiscountTypeSettings = ({ isDark, accent = "#3b82f6" }) => {
 
       const res = await fetch(`${apiHost}/api/pos_discount_types.php`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: mutationHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           action: "update_type",
           id: type.id,
@@ -162,7 +170,7 @@ const PosDiscountTypeSettings = ({ isDark, accent = "#3b82f6" }) => {
       setError("");
       const res = await fetch(`${apiHost}/api/pos_discount_types.php`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: mutationHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ action: "delete_type", id: type.id }),
       });
       const result = await res.json();
@@ -186,7 +194,7 @@ const PosDiscountTypeSettings = ({ isDark, accent = "#3b82f6" }) => {
       setError("");
       const res = await fetch(`${apiHost}/api/pos_discount_types.php`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: mutationHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           action: "create_type",
           discount_name: newType.discount_name.trim(),
@@ -253,7 +261,7 @@ const PosDiscountTypeSettings = ({ isDark, accent = "#3b82f6" }) => {
 
       const res = await fetch(`${apiHost}/api/pos_discount_types.php`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: mutationHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           action: "save_mapping",
           discount_type_id: type.id,
@@ -299,7 +307,7 @@ const PosDiscountTypeSettings = ({ isDark, accent = "#3b82f6" }) => {
             <p className={`mt-2 max-w-2xl text-sm ${theme.textMuted}`}>
               Manage which discount types exist, what percent each gives by
               default, and per sales type (Dine In, Grab, Take Out, etc.)
-              whether it's active and what percent applies there.
+              whether it&apos;s active and what percent applies there.
             </p>
           </div>
 

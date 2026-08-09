@@ -1,8 +1,16 @@
 "use client";
+/* eslint-disable react/prop-types */
 
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { FiCreditCard, FiLoader, FiToggleLeft, FiToggleRight, FiBookmark, FiUpload, FiCheck } from "react-icons/fi";
 import useApiHost from "../../../hooks/useApiHost";
+
+const mutationHeaders = (headers = {}) => {
+  const nextHeaders = { ...headers };
+  const token = window.localStorage.getItem("access_token");
+  if (token) nextHeaders.Authorization = `Bearer ${token}`;
+  return nextHeaders;
+};
 
 const PosModeOfPayment = ({ isDark, accent = "#3b82f6" }) => {
   const apiHost = useApiHost();
@@ -86,7 +94,7 @@ const PosModeOfPayment = ({ isDark, accent = "#3b82f6" }) => {
     try {
       const res = await fetch(`${apiHost}/api/pos_manage_mode_of_payment.php`, {
         method:  "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: mutationHeaders({ "Content-Type": "application/json" }),
         body:    JSON.stringify({ mop_id: mopId, [field]: currentVal ? 0 : 1 }),
       });
       const result = await res.json();
@@ -161,7 +169,11 @@ const PosModeOfPayment = ({ isDark, accent = "#3b82f6" }) => {
     formData.append("mop_name", pendingQrMop.mop);
 
     try {
-      const res  = await fetch(`${apiHost}/api/pos_second_screen_settings.php`, { method: "POST", body: formData });
+      const res  = await fetch(`${apiHost}/api/pos_second_screen_settings.php`, {
+        method: "POST",
+        headers: mutationHeaders(),
+        body: formData,
+      });
       const data = await res.json();
       if (data?.success) {
         // Mark as existing immediately so UI reflects the new state

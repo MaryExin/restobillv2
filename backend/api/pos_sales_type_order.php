@@ -9,7 +9,21 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
     exit;
 }
 
+if ($_SERVER["REQUEST_METHOD"] !== "GET") {
+    require __DIR__ . "/secure_guard.php";
+}
+
 require __DIR__ . "/pdo.php";
+require_once __DIR__ . "/pos_role_authorization.php";
+
+if ($_SERVER["REQUEST_METHOD"] !== "GET") {
+    posRoleAuthRequirePermission(
+        $pdo,
+        (string)($GLOBALS["pos_user_id"] ?? ""),
+        "settings",
+        "salesTypeOrder"
+    );
+}
 
 const SALES_TYPE_ORDER_CATEGORY = "SalesType";
 const SALES_TYPE_ORDER_DESCRIPTION = "Sales Type Display Order";
@@ -165,5 +179,6 @@ try {
         "sales_types" => orderSalesTypes($salesTypes, $newOrder),
     ]);
 } catch (Throwable $e) {
-    respond(false, $e->getMessage(), null, 500);
+    error_log("POS sales type order error: " . $e->getMessage());
+    respond(false, "Unable to process sales type order settings.", null, 500);
 }

@@ -20,6 +20,7 @@ import BuildPosPaymentReceiptHtml from "../../utils/BuildPosPaymentReceiptHtml";
 import useGetDefaultPrinter from "../../hooks/useGetDefaultPrinter";
 import useBusinessInfo from "../../hooks/useBusinessInfo";
 import { resolveDiscountLineAmount } from "../../utils/discountLineMath";
+import { posAuthenticatedFetch } from "../../utils/posAuthenticatedFetch";
 
 // Read fresh from localStorage on every call so a mid-shift user switch
 // (SwitchUser) is reflected immediately, instead of a stale value captured
@@ -3044,7 +3045,7 @@ export default function TransactionPaymentModal({
 
     const fetchShiftDetails = async () => {
       try {
-        const response = await fetch(
+        const response = await posAuthenticatedFetch(
           `${apiHost}/api/get_shift_details.php?user_id=${encodeURIComponent(
             activeUserId,
           )}`,

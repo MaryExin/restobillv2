@@ -9,7 +9,16 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
     exit;
 }
 
+$method = $_SERVER["REQUEST_METHOD"];
+$requiresMutationAuthorization = $method === "PATCH";
+if ($requiresMutationAuthorization) {
+    require __DIR__ . "/secure_guard.php";
+}
+
 require __DIR__ . "/pdo.php";
+if ($requiresMutationAuthorization) {
+    require_once __DIR__ . "/pos_role_authorization.php";
+}
 
 function fetchMops(PDO $pdo): array {
     $stmt = $pdo->query("
@@ -36,7 +45,14 @@ function respond(bool $success, string $message, ?array $data = null, int $statu
 }
 
 try {
-    $method = $_SERVER["REQUEST_METHOD"];
+    if ($requiresMutationAuthorization) {
+        posRoleAuthRequirePermission(
+            $pdo,
+            (string)($GLOBALS["pos_user_id"] ?? ""),
+            "settings",
+            "modeOfPayment"
+        );
+    }
 
     if ($method === "GET") {
         respond(true, "OK", fetchMops($pdo));
@@ -85,5 +101,6 @@ try {
     respond(true, "Mode of payment updated.", fetchMops($pdo));
 
 } catch (Throwable $e) {
-    respond(false, $e->getMessage(), null, 500);
+    error_log("POS mode of payment error: " . $e->getMessage());
+    respond(false, "Unable to process mode of payment settings.", null, 500);
 }

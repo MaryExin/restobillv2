@@ -19,7 +19,6 @@ import {
   FaBook,
   FaUserCheck,
   FaUserEdit,
-  FaUserCog,
 } from "react-icons/fa";
 import { IoKey, IoSettingsOutline } from "react-icons/io5";
 import useZustandMobile from "../../context/useZustandMobile";
@@ -219,20 +218,6 @@ const SidePanel = () => {
               label="User Approval"
               active={selectedMenu === "User Approval"}
               onClick={() => handleClick("User Approval", "/usersqueu")}
-              onHover={setHovered}
-              hovered={hovered}
-            />
-            <Divider />
-          </>
-        )}
-
-        {roles[0]?.some((r) => r.rolename === "/userroles") && (
-          <>
-            <MenuItem
-              icon={<FaUserCog size={20} />}
-              label="Roles"
-              active={selectedMenu === "Roles"}
-              onClick={() => handleClick("Roles", "/userroles")}
               onHover={setHovered}
               hovered={hovered}
             />

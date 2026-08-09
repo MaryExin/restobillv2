@@ -1,0 +1,13 @@
+Options -Indexes
+
+# Server configuration and secrets must never be downloadable.
+<FilesMatch "^\.env(?:\..*)?$">
+  Require all denied
+</FilesMatch>
+
+# Database exports are streamed through the authenticated API. Block any old
+# files that still exist beneath the public XAMPP document root.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^pos_db_backup(?:/|$) - [F,L,NC]
+</IfModule>

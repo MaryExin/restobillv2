@@ -1,4 +1,8 @@
 <?php
+require_once __DIR__ . "/bootstrap.php";
+require_once __DIR__ . "/pos_developer_auth.php";
+require_once __DIR__ . "/pos_role_authorization.php";
+
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
@@ -31,7 +35,11 @@ function resolveReadingDatabaseName(array $input, string $posDbName, string $rep
         return [$reportDbName, "report"];
     }
 
-    return [$posDbName, "cnc"];
+    if ($scope === "cnc") {
+        return [$posDbName, "cnc"];
+    }
+
+    throw new InvalidArgumentException("Invalid reading database scope.");
 }
 
 try {
@@ -47,6 +55,19 @@ try {
     $charset = requireMysqlIdentifier($config["charset"] ?? "utf8mb4", "database charset");
     [$readingDbName, $readingDatabaseScope] = resolveReadingDatabaseName($input, $posDbName, $reportDbName);
 
+    $developerPreviewRequested = false;
+    if (array_key_exists("developerPreview", $input)) {
+        $developerPreviewRequested = filter_var(
+            $input["developerPreview"],
+            FILTER_VALIDATE_BOOLEAN
+        );
+    } elseif (array_key_exists("developer_preview", $input)) {
+        $developerPreviewRequested = filter_var(
+            $input["developer_preview"],
+            FILTER_VALIDATE_BOOLEAN
+        );
+    }
+
     $pdo = new PDO(
         "mysql:host={$config['host']};dbname={$readingDbName};charset={$charset}",
         $config["user"],
@@ -57,6 +78,37 @@ try {
             PDO::ATTR_EMULATE_PREPARES => false,
         ]
     );
+
+    $readingAccess = posDeveloperReadingAccess(
+        $readingDatabaseScope,
+        $developerPreviewRequested,
+        $pdo
+    );
+    if (!$readingAccess["authorized"]) {
+        http_response_code(401);
+        echo json_encode([
+            "success" => false,
+            "message" => "A valid POS access token is required. Report and preview modes require a Developer session."
+        ]);
+        exit;
+    }
+
+    $developerPreview = (bool)($readingAccess["developer_preview"] ?? false);
+    $readOnly = (bool)($readingAccess["read_only"] ?? false);
+
+    if (!(bool)($readingAccess["is_developer"] ?? false)) {
+        $readingToken = $readingAccess["token"] ?? [];
+        posRoleAuthRequirePermission(
+            $pdo,
+            trim((string)($readingToken["sub"] ?? "")),
+            "reading",
+            "zReading"
+        );
+    }
+
+    if ($readOnly) {
+        posDeveloperMakePdoReadOnly($pdo);
+    }
 
     $transactionDate = isset($input["transaction_date"])
         ? trim((string) $input["transaction_date"])
@@ -146,6 +198,8 @@ try {
         "transactionDate" => $transactionDate,
         "readingDatabaseScope" => $readingDatabaseScope,
         "readingDatabase" => $readingDbName,
+        "developerPreview" => $developerPreview,
+        "readOnly" => $readOnly,
         "totalTransactions" => count($data),
         "totalAmountDue" => $totalAmountDue,
         "data" => $data

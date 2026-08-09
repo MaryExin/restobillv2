@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+/* eslint-disable react/prop-types */
+import { useEffect, useState } from "react";
 import {
   FiGrid,
   FiLoader,
@@ -9,6 +10,7 @@ import {
   FiToggleRight,
 } from "react-icons/fi";
 import useApiHost from "../../../hooks/useApiHost";
+import { securedPosFetch } from "../../../utils/posRoleFetch";
 
 const PosTableLayout = ({ isDark, accent = "#3b82f6" }) => {
   const apiHost = useApiHost();
@@ -87,7 +89,7 @@ const PosTableLayout = ({ isDark, accent = "#3b82f6" }) => {
       setError("");
       setMessage("");
 
-      const response = await fetch(
+      const response = await securedPosFetch(
         `${apiHost}/api/pos_table_layout_settings.php`,
         {
           method: "POST",

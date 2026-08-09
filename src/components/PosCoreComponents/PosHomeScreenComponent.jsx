@@ -6,6 +6,8 @@ import { colorSchemes } from "../../constants/ColorSchemes";
 import "../../fonts/font-style.css";
 import useApiHost from "../../hooks/useApiHost";
 import useVersionLabel from "../../hooks/useVersionLabel";
+import { getConfiguredRoleLabel } from "../../utils/posRoleAccessConfig";
+import { posAuthenticatedFetch } from "../../utils/posAuthenticatedFetch";
 
 const PosHomeScreenComponent = () => {
   const { userId } = useZustandLoginCred();
@@ -22,7 +24,7 @@ const PosHomeScreenComponent = () => {
       if (!userId) return;
 
       try {
-        const response = await fetch(
+        const response = await posAuthenticatedFetch(
           `${apiHost}/api/get_shift_details.php?user_id=${userId}`,
         );
 
@@ -74,7 +76,9 @@ const PosHomeScreenComponent = () => {
       subtitle: `${versionLabel} Offline`,
       branch: dateselection?.Unit_Name || "N/A",
       userName: dateselection?.userName || "Guest",
-      userRole: dateselection?.userRole || "User",
+      userRole: getConfiguredRoleLabel(
+        dateselection?.userRoleValue || dateselection?.userRole || "User",
+      ),
       shiftStatus: status, // This will be "Open" or "Closed"
       terminalNo: dateselection?.terminal_number || "1",
       shiftNo: dateselection?.Shift_ID || "N/A",

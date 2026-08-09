@@ -1,12 +1,20 @@
 "use client";
+/* eslint-disable react/prop-types */
 
-import React, { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
-  FiPercent, FiSave, FiLoader, FiToggleLeft, FiToggleRight, FiPlus, FiTrash2, FiDollarSign,
+  FiPercent, FiSave, FiLoader, FiToggleLeft, FiToggleRight, FiPlus, FiTrash2,
 } from "react-icons/fi";
 import useApiHost from "../../../hooks/useApiHost";
 
 const RATE_TYPES = ["Percentage", "Fixed"];
+
+const mutationHeaders = (headers = {}) => {
+  const nextHeaders = { ...headers };
+  const token = window.localStorage.getItem("access_token");
+  if (token) nextHeaders.Authorization = `Bearer ${token}`;
+  return nextHeaders;
+};
 
 const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
   const apiHost = useApiHost();
@@ -87,7 +95,7 @@ const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
     try {
       const res    = await fetch(`${apiHost}/api/pos_service_charge.php`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: mutationHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           service_charge_enabled:    globalEnabled,
           service_charge_percentage: 0,
@@ -113,7 +121,7 @@ const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
     try {
       const res    = await fetch(`${apiHost}/api/pos_manage_other_charges.php`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: mutationHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ id, is_enabled: currentEnabled ? 0 : 1 }),
       });
       const result = await res.json();
@@ -134,7 +142,7 @@ const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
     try {
       const res    = await fetch(`${apiHost}/api/pos_manage_other_charges.php`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: mutationHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ id, amount: Number(amount || 0), rate_type: rateType }),
       });
       const result = await res.json();
@@ -156,7 +164,7 @@ const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
     try {
       const res    = await fetch(`${apiHost}/api/pos_manage_other_charges.php`, {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
+        headers: mutationHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ id }),
       });
       const result = await res.json();
@@ -179,7 +187,7 @@ const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
     try {
       const res    = await fetch(`${apiHost}/api/pos_manage_other_charges.php`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: mutationHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ particulars: name, amount: Number(newAmount || 0), rate_type: newRateType }),
       });
       const result = await res.json();

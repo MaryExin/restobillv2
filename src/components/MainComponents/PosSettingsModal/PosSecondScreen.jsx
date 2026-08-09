@@ -1,6 +1,14 @@
-import React, { useState, useEffect, useRef } from "react";
+/* eslint-disable react/prop-types */
+import { useState, useEffect, useRef } from "react";
 import { FiMonitor, FiUpload, FiMessageSquare, FiCheck, FiAlertCircle, FiImage } from "react-icons/fi";
 import useApiHost from "../../../hooks/useApiHost";
+
+const mutationHeaders = (headers = {}) => {
+  const nextHeaders = { ...headers };
+  const token = window.localStorage.getItem("access_token");
+  if (token) nextHeaders.Authorization = `Bearer ${token}`;
+  return nextHeaders;
+};
 
 const broadcastDisplayImageUpdated = () => {
   const token = String(new Date().getTime());
@@ -48,7 +56,7 @@ const PosSecondScreen = ({ isDark, accent = "#3b82f6" }) => {
     try {
       const r = await fetch(`${apiHost}/api/pos_second_screen_settings.php`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: mutationHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ announcement }),
       });
       const data = await r.json();
@@ -86,6 +94,7 @@ const PosSecondScreen = ({ isDark, accent = "#3b82f6" }) => {
     try {
       const r = await fetch(`${apiHost}/api/pos_second_screen_settings.php`, {
         method: "POST",
+        headers: mutationHeaders(),
         body: formData,
       });
       const data = await r.json();
@@ -105,7 +114,6 @@ const PosSecondScreen = ({ isDark, accent = "#3b82f6" }) => {
 
   const label = isDark ? "#f8fafc" : "#0f172a";
   const sub   = isDark ? "#94a3b8" : "#64748b";
-  const card  = isDark ? "bg-slate-800 border-white/8" : "bg-slate-50 border-slate-200";
   const input = isDark
     ? "bg-slate-900 border-slate-700 text-white placeholder:text-slate-500"
     : "bg-white border-slate-200 text-slate-900 placeholder:text-slate-400";

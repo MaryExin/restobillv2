@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+/* eslint-disable react/prop-types */
+import { useCallback, useState, useEffect, useMemo } from "react";
 import {
   FiPlus,
   FiShoppingBag,
@@ -14,8 +15,21 @@ import {
   FiFileText,
 } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
+import useApiHost from "../../../hooks/useApiHost";
+
+const POS_LEDGER_PATH =
+  import.meta.env.VITE_POS_LEDGER_ENDPOINT || "/api/pos_ledger_api.php";
+
+const posLedgerHeaders = (includeJson = false) => {
+  const headers = new Headers({ Accept: "application/json" });
+  const token = localStorage.getItem("access_token");
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  if (includeJson) headers.set("Content-Type", "application/json");
+  return headers;
+};
 
 const PosExpenses = ({ isDark, accent = "#3b82f6" }) => {
+  const apiHost = useApiHost();
   const [ledgerData, setLedgerData] = useState([]);
   const [isPettyModalOpen, setIsPettyModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -33,15 +47,18 @@ const PosExpenses = ({ isDark, accent = "#3b82f6" }) => {
 
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchLedger = async () => {
+  const fetchLedger = useCallback(async () => {
+    if (!apiHost) return;
+
     try {
       setIsLoading(true);
       const res = await fetch(
-        "http://localhost/api/pos_ledger_api.php?action=get_ledger",
+        `${apiHost}${POS_LEDGER_PATH}?action=get_ledger`,
+        { headers: posLedgerHeaders() },
       );
       const result = await res.json();
 
-      if (result.status === "success") {
+      if (res.ok && result.status === "success") {
         setLedgerData(result.data || []);
       } else {
         setLedgerData([]);
@@ -52,40 +69,37 @@ const PosExpenses = ({ isDark, accent = "#3b82f6" }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [apiHost]);
 
   useEffect(() => {
     fetchLedger();
-  }, []);
+  }, [fetchLedger]);
 
   const handleAction = async (type, formObj, setFormObj, isModal = false) => {
     if (!formObj.description || !formObj.amount) return;
-
-    const userEmail = localStorage.getItem("email") || "Unknown";
 
     const payload = {
       type,
       category: formObj.category || "General",
       description: formObj.description,
       amount: parseFloat(formObj.amount),
-      recorded_by: userEmail,
     };
 
     try {
       setIsSubmitting(true);
 
       const res = await fetch(
-        "http://localhost/api/pos_ledger_api.php?action=add_entry",
+        `${apiHost}${POS_LEDGER_PATH}?action=add_entry`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: posLedgerHeaders(true),
           body: JSON.stringify(payload),
         },
       );
 
       const result = await res.json();
 
-      if (result.status === "success") {
+      if (res.ok && result.status === "success") {
         await fetchLedger();
 
         if (type === "OUT") {

@@ -23,6 +23,12 @@ import {
 import { useTheme } from "../../context/ThemeContext";
 import useApiHost from "../../hooks/useApiHost";
 import { getCurrentUserRole } from "../../utils/getCurrentUserRole";
+import useZustandLoginCred from "../../context/useZustandLoginCred";
+import { hasPosReportAccess } from "../../utils/posRoleAccess";
+import {
+  usePosDeveloperSession,
+  usePosRoleAccessVersion,
+} from "../../hooks/usePosRoleAccessConfig";
 
 // Modals
 import DashboardModal from "../MainComponents/ReportsModal/DashboardModal";
@@ -120,6 +126,9 @@ const PosReports = ({
   const [eJournalData, setEJournalData] = useState(null);
   const [isLoadingEJournal, setIsLoadingEJournal] = useState(false);
   const apiHost = useApiHost();
+  const { roles } = useZustandLoginCred();
+  const roleAccessVersion = usePosRoleAccessVersion();
+  const developerMode = usePosDeveloperSession();
 
   // Authentication check for Price Change button
   const currentUserName = localStorage.getItem("username");
@@ -382,6 +391,10 @@ const PosReports = ({
       action: handleEJournalClick,
     },
   ];
+  const accessibleReportItems = reportItems.filter((item) =>
+    hasPosReportAccess(roles, item.label, developerMode),
+  );
+  void roleAccessVersion;
 
   // Logic: Append Price Change button if current user is 'LightemAdmin'
   // if (currentUserName === "LightemAdmin") {
@@ -446,9 +459,9 @@ const PosReports = ({
           {/* Grid Layout for Menu Cards */}
           <div className="px-6 py-6 sm:px-8 sm:py-8 overflow-y-auto max-h-[70vh]">
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-              {reportItems.map((item, index) => (
+              {accessibleReportItems.map((item) => (
                 <MenuCard
-                  key={index}
+                  key={item.label}
                   {...item}
                   onClick={item.action}
                   disabled={item.comingSoon}

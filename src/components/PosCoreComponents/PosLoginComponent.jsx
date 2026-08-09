@@ -217,6 +217,7 @@ const PosLoginComponent = () => {
         );
         localStorage.setItem("user_classification", result.classification || "");
         localStorage.setItem("profile_pic", nextProfilePic);
+        localStorage.removeItem("Cashier");
         localStorage.setItem(
           "posReadingDatabaseScope",
           nextReadingDatabaseScope,

@@ -28,12 +28,23 @@ import Billing from "../../assets/Billing.jpg";
 import PosQuickActionTile from "../MainComponents/Common/PosQuickActionTile";
 
 import useZustandLoginCred from "../../context/useZustandLoginCred";
-import { getCurrentUserRole } from "../../utils/getCurrentUserRole";
 import useApiHost from "../../hooks/useApiHost";
 import useBillingEnabled from "../../hooks/useBillingEnabled";
 import useVersionLabel from "../../hooks/useVersionLabel";
 import { useTheme } from "../../context/ThemeContext";
 import useZustandLayoutMode from "../../context/useZustandLayoutMode";
+import {
+  hasAnyPosSettingsAccess,
+  hasPosAnyReadingAccess,
+  hasPosHomeActionAccess,
+  hasPosRouteAccess,
+} from "../../utils/posRoleAccess";
+import {
+  usePosDeveloperSession,
+  usePosRoleAccessVersion,
+} from "../../hooks/usePosRoleAccessConfig";
+import { getConfiguredRoleLabel } from "../../utils/posRoleAccessConfig";
+import { posAuthenticatedFetch } from "../../utils/posAuthenticatedFetch";
 
 const POS_HOME_BG = "./pos-home-bg.png";
 const HEADER_HEIGHT = 96;
@@ -125,7 +136,9 @@ const LayoutPos = ({ children }) => {
     return resolved || POS_HOME_BG;
   }, [themeSettings?.Dashboard_Background_Url, apiHost]);
 
-  const { userId } = useZustandLoginCred();
+  const { userId, roles, resetLoginCred } = useZustandLoginCred();
+  const roleAccessVersion = usePosRoleAccessVersion();
+  const developerMode = usePosDeveloperSession();
 
   const [dateselection, setDateSelection] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -143,7 +156,7 @@ const LayoutPos = ({ children }) => {
     if (!userId) return;
     setIsLoading(true);
     try {
-      const response = await fetch(
+      const response = await posAuthenticatedFetch(
         `${apiHost}/api/get_shift_details.php?user_id=${userId}`,
       );
       const result = await response.json();
@@ -182,8 +195,14 @@ const LayoutPos = ({ children }) => {
       title: "Point of Sales",
       subtitle: `${versionLabel} Offline`,
       branch: dateselection?.Unit_Name || "N/A",
-      userName: dateselection?.userName || "Guest",
-      userRole: dateselection?.userRole || "User",
+      userName: developerMode
+        ? localStorage.getItem("username") || "POS Developer"
+        : dateselection?.userName || "Guest",
+      userRole: developerMode
+        ? "Developer"
+        : getConfiguredRoleLabel(
+            dateselection?.userRoleValue || dateselection?.userRole || "User",
+          ),
       shiftStatus: dateselection?.Shift_Status || "Closed",
       terminalNo: localStorage.getItem("posTerminalNumber") || "1",
       shiftNo: dateselection?.Shift_ID || "0",
@@ -204,11 +223,54 @@ const LayoutPos = ({ children }) => {
         localStorage.getItem("posCorpName") ||
         "N/A",
     };
-  }, [dateselection, versionLabel]);
+  }, [dateselection, versionLabel, developerMode]);
 
   const isClosed = branchInfo.shiftStatus?.toLowerCase() !== "open";
 
-  const isCashier = useMemo(() => getCurrentUserRole() === "cashier", []);
+  const canAccessProductList = useMemo(
+    () => hasPosRouteAccess(roles, "/productlist", developerMode),
+    [roles, roleAccessVersion, developerMode],
+  );
+  const canAccessPriceSyncing = useMemo(
+    () => hasPosRouteAccess(roles, "/pricesyncing", developerMode),
+    [roles, roleAccessVersion, developerMode],
+  );
+  const canAccessSalesRecordSyncing = useMemo(
+    () => hasPosRouteAccess(roles, "/salesrecordssyncing", developerMode),
+    [roles, roleAccessVersion, developerMode],
+  );
+  const canAccessOpenNewDay = useMemo(
+    () => hasPosHomeActionAccess(roles, "openNewDay", developerMode),
+    [roles, roleAccessVersion, developerMode],
+  );
+  const canAccessOrdering = useMemo(
+    () => hasPosRouteAccess(roles, "/ordering", developerMode),
+    [roles, roleAccessVersion, developerMode],
+  );
+  const canAccessBilling = useMemo(
+    () => hasPosRouteAccess(roles, "/printbilling", developerMode),
+    [roles, roleAccessVersion, developerMode],
+  );
+  const canAccessPayment = useMemo(
+    () => hasPosRouteAccess(roles, "/payments", developerMode),
+    [roles, roleAccessVersion, developerMode],
+  );
+  const canAccessPosReading = useMemo(
+    () => hasPosAnyReadingAccess(roles, developerMode),
+    [roles, roleAccessVersion, developerMode],
+  );
+  const canAccessPosReports = useMemo(
+    () => hasPosHomeActionAccess(roles, "posReports", developerMode),
+    [roles, roleAccessVersion, developerMode],
+  );
+  const canAccessSalesDashboard = useMemo(
+    () => hasPosRouteAccess(roles, "/salesdashboard", developerMode),
+    [roles, roleAccessVersion, developerMode],
+  );
+  const canOpenSettings = useMemo(
+    () => hasAnyPosSettingsAccess(roles, developerMode),
+    [roles, roleAccessVersion, developerMode],
+  );
 
   const handleClose = () => {
     setIsLogoutConfirmOpen(true);
@@ -218,6 +280,7 @@ const LayoutPos = ({ children }) => {
     setIsLogoutConfirmOpen(false);
     localStorage.removeItem("posTerminalNumber");
     localStorage.clear();
+    resetLoginCred();
     navigate("/");
   };
 
@@ -226,7 +289,7 @@ const LayoutPos = ({ children }) => {
   };
 
   const handleCardClick = (item) => {
-    if (item.id === "salesdashboard") {
+    if (item.id === "salesdashboard" && !developerMode) {
       setShowPasswordModal(true);
       setDashboardPassword("");
       setPasswordError("");
@@ -284,21 +347,25 @@ const LayoutPos = ({ children }) => {
         onClick={() => navigate("/poscorehomescreen")}
       />
 
-      <PosQuickActionTile
-        label="Product List"
-        icon={<FaBoxOpen className="text-[28px] sm:text-[30px]" />}
-        color="violet"
-        onClick={() => navigate("/productlist")}
-      />
+      {canAccessProductList && (
+        <PosQuickActionTile
+          label="Product List"
+          icon={<FaBoxOpen className="text-[28px] sm:text-[30px]" />}
+          color="violet"
+          onClick={() => navigate("/productlist")}
+        />
+      )}
 
-      <PosQuickActionTile
-        label="Products & Price Syncing"
-        icon={<FaMoneyBill className="text-[28px] sm:text-[30px]" />}
-        color="violet"
-        onClick={() => navigate("/pricesyncing")}
-      />
+      {canAccessPriceSyncing && (
+        <PosQuickActionTile
+          label="Products & Price Syncing"
+          icon={<FaMoneyBill className="text-[28px] sm:text-[30px]" />}
+          color="violet"
+          onClick={() => navigate("/pricesyncing")}
+        />
+      )}
 
-      {!isCashier && (
+      {canAccessSalesRecordSyncing && (
         <PosQuickActionTile
           label="Sales Record Syncing"
           icon={<FaCloudUploadAlt className="text-[28px] sm:text-[30px]" />}
@@ -307,24 +374,26 @@ const LayoutPos = ({ children }) => {
         />
       )}
 
-      <OpenNewDay />
+      {canAccessOpenNewDay && <OpenNewDay />}
 
-      <PosQuickActionTile
-        label="New Transaction"
-        icon={<FaReceipt className="text-[28px] sm:text-[30px]" />}
-        color="orange"
-        disabled={isClosed}
-        onClick={() => {
-          if (isClosed) return;
-          if (layoutMode === "Kiosk") {
-            navigate("/ordering", { state: { kioskAutoOpen: true } });
-          } else {
-            navigate("/ordering");
-          }
-        }}
-      />
+      {canAccessOrdering && (
+        <PosQuickActionTile
+          label="New Transaction"
+          icon={<FaReceipt className="text-[28px] sm:text-[30px]" />}
+          color="orange"
+          disabled={isClosed}
+          onClick={() => {
+            if (isClosed) return;
+            if (layoutMode === "Kiosk") {
+              navigate("/ordering", { state: { kioskAutoOpen: true } });
+            } else {
+              navigate("/ordering");
+            }
+          }}
+        />
+      )}
 
-      {layoutMode !== "Kiosk" && billingEnabled && (
+      {canAccessBilling && layoutMode !== "Kiosk" && billingEnabled && (
         <PosQuickActionTile
           label="Billing"
           icon={<FaReceipt className="text-[28px] sm:text-[30px]" />}
@@ -334,25 +403,29 @@ const LayoutPos = ({ children }) => {
         />
       )}
 
-      <PosQuickActionTile
-        label="Payment"
-        icon={<FaReceipt className="text-[28px] sm:text-[30px]" />}
-        color="green"
-        onClick={() => navigate("/payments")}
-        disabled={isClosed}
-      />
+      {canAccessPayment && (
+        <PosQuickActionTile
+          label="Payment"
+          icon={<FaReceipt className="text-[28px] sm:text-[30px]" />}
+          color="green"
+          onClick={() => navigate("/payments")}
+          disabled={isClosed}
+        />
+      )}
 
       <SwitchUser />
 
-      <PosQuickActionTile
-        label="POS Reading"
-        icon={<FaFileAlt className="text-[28px] sm:text-[30px]" />}
-        color="indigo"
-        disabled={isClosed}
-        onClick={() => setIsPosReadingOpen(true)}
-      />
+      {canAccessPosReading && (
+        <PosQuickActionTile
+          label="POS Reading"
+          icon={<FaFileAlt className="text-[28px] sm:text-[30px]" />}
+          color="indigo"
+          disabled={isClosed}
+          onClick={() => setIsPosReadingOpen(true)}
+        />
+      )}
 
-      {!isCashier && (
+      {canAccessPosReports && (
         <PosQuickActionTile
           label="POS Reports"
           icon={<FaChartPie className="text-[28px] sm:text-[30px]" />}
@@ -362,7 +435,9 @@ const LayoutPos = ({ children }) => {
       )}
 
       {menuOptions.map((item) => {
-        if (isCashier && item.id === "salesdashboard") return null;
+        if (item.id === "salesdashboard" && !canAccessSalesDashboard) {
+          return null;
+        }
         const disabled =
           item.id !== "salesdashboard" &&
           (item.id === "ordering" ||
@@ -815,21 +890,23 @@ const LayoutPos = ({ children }) => {
           <div className="flex flex-wrap gap-2 sm:gap-2.5">{quickActions}</div>
         </div>
 
-        <div className="fixed bottom-3 right-3 z-50 sm:bottom-4 sm:right-4">
-          <button
-            onClick={() => setIsSettingsOpen(true)}
-            className={`grid h-12 w-12 place-items-center rounded-full border shadow-[0_12px_30px_rgba(0,0,0,0.18)] transition-transform hover:scale-110 active:scale-95 sm:h-14 sm:w-14 ${
-              isDark
-                ? "border-white/10 bg-slate-900/85"
-                : "border-white/75 bg-white/88"
-            }`}
-          >
-            <FaCog
-              className="text-[24px] sm:text-[26px]"
-              style={{ color: brandSecondary }}
-            />
-          </button>
-        </div>
+        {canOpenSettings && (
+          <div className="fixed bottom-3 right-3 z-50 sm:bottom-4 sm:right-4">
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              className={`grid h-12 w-12 place-items-center rounded-full border shadow-[0_12px_30px_rgba(0,0,0,0.18)] transition-transform hover:scale-110 active:scale-95 sm:h-14 sm:w-14 ${
+                isDark
+                  ? "border-white/10 bg-slate-900/85"
+                  : "border-white/75 bg-white/88"
+              }`}
+            >
+              <FaCog
+                className="text-[24px] sm:text-[26px]"
+                style={{ color: brandSecondary }}
+              />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

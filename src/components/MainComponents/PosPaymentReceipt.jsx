@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { posAuthenticatedFetch } from "../../utils/posAuthenticatedFetch";
 
 const peso = (value) =>
   Number(value || 0).toLocaleString("en-PH", {
@@ -96,7 +97,7 @@ const PosPaymentReceipt = React.forwardRef(
 
       const loadShiftDetails = async () => {
         try {
-          const response = await fetch(
+          const response = await posAuthenticatedFetch(
             `${apiHost}/api/get_shift_details.php?user_id=${encodeURIComponent(
               resolvedUserId,
             )}`,

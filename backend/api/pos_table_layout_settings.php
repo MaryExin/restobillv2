@@ -9,7 +9,21 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
     exit;
 }
 
+if ($_SERVER["REQUEST_METHOD"] !== "GET") {
+    require __DIR__ . "/secure_guard.php";
+}
+
 require __DIR__ . "/pdo.php";
+require_once __DIR__ . "/pos_role_authorization.php";
+
+if ($_SERVER["REQUEST_METHOD"] !== "GET") {
+    posRoleAuthRequirePermission(
+        $pdo,
+        (string)($GLOBALS["pos_user_id"] ?? ""),
+        "settings",
+        "tableLayout"
+    );
+}
 
 const TABLE_LAYOUT_CATEGORY = "General";
 const TABLE_LAYOUT_ENABLED_DESCRIPTION = "Enable Table Floor Layout";
@@ -119,5 +133,6 @@ try {
 
     respond(true, "Table layout settings saved.", readTableLayoutSettings($pdo));
 } catch (Throwable $e) {
-    respond(false, $e->getMessage(), null, 500);
+    error_log("POS table layout settings error: " . $e->getMessage());
+    respond(false, "Unable to process table layout settings.", null, 500);
 }

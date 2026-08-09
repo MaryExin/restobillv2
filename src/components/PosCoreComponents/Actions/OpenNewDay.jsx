@@ -10,6 +10,7 @@ import useZustandLoginCred from "../../../context/useZustandLoginCred";
 import { useCustomSecuredMutation } from "../../../hooks/useCustomSecuredMutation";
 import ModalYesNoReusable from "../../Modals/ModalYesNoReusable";
 import ModalSuccessNavToSelf from "../../Modals/ModalSuccessNavToSelf";
+import { posAuthenticatedFetch } from "../../../utils/posAuthenticatedFetch";
 
 const OpenNewDay = () => {
   const queryClient = useQueryClient();
@@ -32,7 +33,7 @@ const OpenNewDay = () => {
     if (!userId || !apiHost) return;
 
     try {
-      const response = await fetch(
+      const response = await posAuthenticatedFetch(
         `${apiHost}/api/get_shift_details.php?user_id=${userId}`,
       );
       const result = await response.json();

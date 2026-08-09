@@ -24,6 +24,16 @@ const useZustandLoginCred = create((set) => ({
   setUserId: (userId) => set(() => ({ userId: userId })),
   setIpAddress: (ipAddress) => set(() => ({ ipAddress: ipAddress })),
   setProfilePic: (profilePic) => set(() => ({ profilePic: profilePic })),
+  resetLoginCred: () =>
+    set(() => ({
+      isAuthenticated: false,
+      firstName: "",
+      roles: [],
+      userId: "",
+      email: "",
+      ipAddress: "",
+      profilePic: "",
+    })),
 }));
 
 export default useZustandLoginCred;

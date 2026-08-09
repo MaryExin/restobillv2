@@ -9,7 +9,21 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
     exit;
 }
 
+if ($_SERVER["REQUEST_METHOD"] !== "GET") {
+    require __DIR__ . "/secure_guard.php";
+}
+
 require __DIR__ . "/pdo.php";
+require_once __DIR__ . "/pos_role_authorization.php";
+
+if ($_SERVER["REQUEST_METHOD"] !== "GET") {
+    posRoleAuthRequirePermission(
+        $pdo,
+        (string)($GLOBALS["pos_user_id"] ?? ""),
+        "settings",
+        "customerInfo"
+    );
+}
 
 const CUSTOMER_INFO_CATEGORY = "Discount";
 const CUSTOMER_INFO_ENABLED_DESCRIPTION = "Customer Info Enabled";
@@ -119,5 +133,6 @@ try {
 
     respond(true, "Customer info settings saved.", readCustomerInfoSettings($pdo));
 } catch (Throwable $e) {
-    respond(false, $e->getMessage(), null, 500);
+    error_log("POS customer info settings error: " . $e->getMessage());
+    respond(false, "Unable to process customer info settings.", null, 500);
 }

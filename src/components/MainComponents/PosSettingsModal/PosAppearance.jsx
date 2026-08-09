@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+/* eslint-disable react/prop-types */
+import { useEffect, useMemo, useState } from "react";
 import {
   FiCheck,
   FiLayers,
@@ -13,6 +14,7 @@ import {
 } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 import useApiHost from "../../../hooks/useApiHost";
+import { securedPosFetch } from "../../../utils/posRoleFetch";
 import { useTheme } from "../../../context/ThemeContext";
 import ModalYesNoReusable from "../../Modals/ModalYesNoReusable";
 import ModalSuccessNavToSelf from "../../Modals/ModalSuccessNavToSelf";
@@ -965,7 +967,7 @@ const PosAppearance = ({ adaptivePalette = [], getContrastText }) => {
         );
       }
 
-      const response = await fetch(`${apiHost}/api/theme_settings.php`, {
+      const response = await securedPosFetch(`${apiHost}/api/theme_settings.php`, {
         method: "POST",
         body: formData,
       });

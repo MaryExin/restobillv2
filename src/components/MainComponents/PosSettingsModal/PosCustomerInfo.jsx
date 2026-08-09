@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+/* eslint-disable react/prop-types */
+import { useEffect, useState } from "react";
 import {
   FiLoader,
   FiSave,
@@ -9,6 +10,7 @@ import {
   FiUsers,
 } from "react-icons/fi";
 import useApiHost from "../../../hooks/useApiHost";
+import { securedPosFetch } from "../../../utils/posRoleFetch";
 
 const PosCustomerInfo = ({ isDark, accent = "#3b82f6" }) => {
   const apiHost = useApiHost();
@@ -89,7 +91,7 @@ const PosCustomerInfo = ({ isDark, accent = "#3b82f6" }) => {
       setError("");
       setMessage("");
 
-      const response = await fetch(
+      const response = await securedPosFetch(
         `${apiHost}/api/pos_customer_info_settings.php`,
         {
           method: "POST",

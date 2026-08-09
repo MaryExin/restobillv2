@@ -1,19 +1,48 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
-import { FiUsers, FiTrash2, FiX, FiLoader, FiCamera } from "react-icons/fi";
+/* eslint-disable react/prop-types, react-hooks/exhaustive-deps */
+import { useState, useEffect, useRef } from "react";
+import {
+  FiUsers,
+  FiTrash2,
+  FiEdit2,
+  FiX,
+  FiLoader,
+  FiCamera,
+} from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 import Cropper from "react-easy-crop";
 import useApiHost from "../../../hooks/useApiHost";
+import { usePosRoleOptions } from "../../../hooks/usePosRoleAccessConfig";
+import {
+  getConfiguredRoleLabel,
+  normalizeConfiguredRoleValue,
+} from "../../../utils/posRoleAccessConfig";
+
+const POS_MANAGE_USERS_PATH =
+  import.meta.env.VITE_POS_MANAGE_USERS_ENDPOINT || "/api/pos_manage_users.php";
+
+const securedFetch = (url, options = {}) => {
+  const token = localStorage.getItem("access_token");
+  const headers = new Headers(options.headers || {});
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  return fetch(url, { ...options, headers });
+};
 
 const PosUserAccounts = ({ isDark, accent, getContrastText }) => {
   const apiHost = useApiHost();
+  const roleOptions = usePosRoleOptions();
+  const defaultRoleValue =
+    roleOptions.find((role) => String(role.value) === "0")?.value ||
+    roleOptions[0]?.value ||
+    "0";
   const fileInputRef = useRef(null);
   const [users, setUsers] = useState([]);
   const [businessUnits, setBusinessUnits] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingUuid, setEditingUuid] = useState(null);
 
   // Profile Picture States
   const [imageToCrop, setImageToCrop] = useState(null);
@@ -30,7 +59,7 @@ const PosUserAccounts = ({ isDark, accent, getContrastText }) => {
     username: "",
     password: "",
     contact: "",
-    position: "CASHIER",
+    position: defaultRoleValue,
     company: "",
   });
 
@@ -43,7 +72,7 @@ const PosUserAccounts = ({ isDark, accent, getContrastText }) => {
 
   const fetchUsers = async () => {
     try {
-      const res = await fetch(`${apiHost}/api/manage_users.php`);
+      const res = await securedFetch(`${apiHost}${POS_MANAGE_USERS_PATH}`);
       const data = await res.json();
       if (Array.isArray(data)) setUsers(data);
     } catch (err) {
@@ -55,11 +84,13 @@ const PosUserAccounts = ({ isDark, accent, getContrastText }) => {
 
   const fetchUnits = async () => {
     try {
-      const res = await fetch(`${apiHost}/api/manage_users.php?get_units=1`);
+      const res = await securedFetch(
+        `${apiHost}${POS_MANAGE_USERS_PATH}?get_units=1`,
+      );
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
         setBusinessUnits(data);
-        setFormData((prev) => ({ ...prev, company: data[0].Unit_Name }));
+        setFormData((prev) => ({ ...prev, company: data[0].Unit_Code }));
       }
     } catch (err) {
       console.error(err);
@@ -104,26 +135,67 @@ const PosUserAccounts = ({ isDark, accent, getContrastText }) => {
   const handleDelete = async (uuid, name) => {
     if (!window.confirm(`Are you sure you want to delete ${name}?`)) return;
     try {
-      const res = await fetch(`${apiHost}/api/manage_users.php`, {
+      const res = await securedFetch(`${apiHost}${POS_MANAGE_USERS_PATH}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ uuid }),
       });
       const result = await res.json();
-      if (result.success) {
+      if (res.ok && result.success) {
         setUsers(users.filter((u) => u.uuid !== uuid));
+      } else {
+        alert(result?.message || result?.error || "Delete failed");
       }
     } catch (err) {
       alert("Delete failed");
     }
   };
 
+  const resetForm = () => {
+    setFormData({
+      firstName: "",
+      middleName: "",
+      lastName: "",
+      username: "",
+      password: "",
+      contact: "",
+      position: defaultRoleValue,
+      company: businessUnits[0]?.Unit_Code || "",
+    });
+    setEditingUuid(null);
+    setFinalImage(null);
+    setImageToCrop(null);
+  };
+
+  const openCreateModal = () => {
+    resetForm();
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (user) => {
+    setEditingUuid(user.uuid);
+    setFormData({
+      firstName: user.firstname || "",
+      middleName: user.middlename || "",
+      lastName: user.lastname || "",
+      username: user.username || "",
+      password: "",
+      contact: user.contact || "",
+      position: normalizeConfiguredRoleValue(user.position),
+      company: user.company || businessUnits[0]?.Unit_Code || "",
+    });
+    setFinalImage(null);
+    setImageToCrop(null);
+    setIsModalOpen(true);
+  };
+
   const handleSubmit = async () => {
+    const isEditing = Boolean(editingUuid);
     if (
       !formData.username ||
       !formData.firstName ||
-      !formData.password ||
-      !formData.lastName
+      !formData.lastName ||
+      (!isEditing && !formData.password)
     ) {
       alert(
         "Please fill all required fields (First Name, Last Name, Email, Password).",
@@ -136,30 +208,33 @@ const PosUserAccounts = ({ isDark, accent, getContrastText }) => {
 
     setIsSaving(true);
     try {
-      const res = await fetch(`${apiHost}/api/manage_users.php`, {
-        method: "POST",
+      const res = await securedFetch(`${apiHost}${POS_MANAGE_USERS_PATH}`, {
+        method: isEditing ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
           image: finalImage,
           creatorUuid: creatorUuid,
+          ...(isEditing ? { uuid: editingUuid } : {}),
         }),
       });
       const result = await res.json();
-      if (result.success) {
+      if (res.ok && result.success) {
+        if (
+          isEditing &&
+          String(editingUuid) === String(localStorage.getItem("user_id") || "")
+        ) {
+          localStorage.setItem(
+            "user_classification",
+            String(result.classification ?? formData.position),
+          );
+          window.dispatchEvent(new Event("storage"));
+        }
         fetchUsers();
         setIsModalOpen(false);
-        setFinalImage(null);
-        setFormData({
-          firstName: "",
-          middleName: "",
-          lastName: "",
-          username: "",
-          password: "",
-          contact: "",
-          position: "CASHIER",
-          company: businessUnits[0]?.Unit_Name || "",
-        });
+        resetForm();
+      } else {
+        alert(result?.message || result?.error || "Save error");
       }
     } catch (err) {
       alert("Save error");
@@ -216,7 +291,7 @@ const PosUserAccounts = ({ isDark, accent, getContrastText }) => {
           </div>
         </div>
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={openCreateModal}
           className="px-12 py-6 rounded-[35px] font-black uppercase text-[12px] tracking-[0.3em] hover:scale-105 transition-transform"
           style={{ backgroundColor: accent, color: contrast }}
         >
@@ -235,7 +310,7 @@ const PosUserAccounts = ({ isDark, accent, getContrastText }) => {
             >
               <th className="px-8 py-4">Avatar</th>
               <th className="px-8 py-4">Name</th>
-              <th className="px-8 py-4">Position</th>
+              <th className="px-8 py-4">Role</th>
               <th className="px-8 py-4">Unit</th>
               <th className="px-8 py-4 text-right">Action</th>
             </tr>
@@ -270,23 +345,37 @@ const PosUserAccounts = ({ isDark, accent, getContrastText }) => {
                 <td
                   className={`px-8 py-6 font-black text-[10px] opacity-60 uppercase tracking-widest ${theme.subPanel} ${theme.textPrimary}`}
                 >
-                  {u.position}
+                  {getConfiguredRoleLabel(u.position)}
                 </td>
                 <td
                   className={`px-8 py-6 font-black text-[11px] ${theme.subPanel}`}
                   style={{ color: accent }}
                 >
-                  {u.company}
+                  {businessUnits.find((unit) => unit.Unit_Code === u.company)
+                    ?.Unit_Name || u.company}
                 </td>
                 <td
                   className={`px-8 py-6 rounded-r-3xl text-right ${theme.subPanel}`}
                 >
-                  <button
-                    onClick={() => handleDelete(u.uuid, u.firstname)}
-                    className="p-3 transition-all text-rose-500 hover:scale-125 hover:rotate-12"
-                  >
-                    <FiTrash2 size={18} />
-                  </button>
+                  <div className="flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => openEditModal(u)}
+                      className="p-3 transition-all opacity-70 hover:scale-125 hover:opacity-100"
+                      style={{ color: accent }}
+                      aria-label={`Edit ${u.firstname || "user"}`}
+                    >
+                      <FiEdit2 size={18} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(u.uuid, u.firstname)}
+                      className="p-3 transition-all text-rose-500 hover:scale-125 hover:rotate-12"
+                      aria-label={`Delete ${u.firstname || "user"}`}
+                    >
+                      <FiTrash2 size={18} />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -307,10 +396,13 @@ const PosUserAccounts = ({ isDark, accent, getContrastText }) => {
                 <h3
                   className={`text-4xl font-black uppercase tracking-tighter ${theme.textPrimary}`}
                 >
-                  User Registration
+                  {editingUuid ? "Edit User" : "User Registration"}
                 </h3>
                 <button
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={() => {
+                    setIsModalOpen(false);
+                    resetForm();
+                  }}
                   className="text-3xl transition-opacity opacity-20 hover:opacity-100"
                 >
                   <FiX />
@@ -352,7 +444,13 @@ const PosUserAccounts = ({ isDark, accent, getContrastText }) => {
                     { id: "middleName", label: "Middle Name" },
                     { id: "lastName", label: "Last Name" },
                     { id: "username", label: "Email / Username" },
-                    { id: "password", label: "Password", type: "password" },
+                    {
+                      id: "password",
+                      label: editingUuid
+                        ? "Password (leave blank to keep)"
+                        : "Password",
+                      type: "password",
+                    },
                     { id: "contact", label: "Contact Number" },
                   ].map((f) => (
                     <div key={f.id} className="space-y-2 text-left">
@@ -376,7 +474,7 @@ const PosUserAccounts = ({ isDark, accent, getContrastText }) => {
 
                   <div className="space-y-2 text-left">
                     <label className="text-[9px] font-black uppercase tracking-widest opacity-40 ml-4">
-                      Position
+                      User Role
                     </label>
                     <select
                       name="position"
@@ -386,10 +484,11 @@ const PosUserAccounts = ({ isDark, accent, getContrastText }) => {
                       }
                       className={`w-full p-5 rounded-[25px] border outline-none font-bold text-[12px] ${theme.input}`}
                     >
-                      <option value="CASHIER">CASHIER</option>
-                      <option value="SUPERVISOR">SUPERVISOR</option>
-                      <option value="MANAGER">MANAGER</option>
-                      <option value="ADMIN">ADMIN</option>
+                      {roleOptions.map((role) => (
+                        <option key={role.value} value={role.value}>
+                          {role.label}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
@@ -406,7 +505,7 @@ const PosUserAccounts = ({ isDark, accent, getContrastText }) => {
                       className={`w-full p-5 rounded-[25px] border outline-none font-bold text-[12px] ${theme.input}`}
                     >
                       {businessUnits.map((unit) => (
-                        <option key={unit.Unit_Name} value={unit.Unit_Name}>
+                        <option key={unit.Unit_Code} value={unit.Unit_Code}>
                           {unit.Unit_Name}
                         </option>
                       ))}
@@ -421,7 +520,11 @@ const PosUserAccounts = ({ isDark, accent, getContrastText }) => {
                 className="w-full py-8 mt-12 rounded-[35px] font-black uppercase tracking-[0.5em] text-sm shadow-2xl active:scale-95 transition-all"
                 style={{ backgroundColor: accent, color: contrast }}
               >
-                {isSaving ? "Creating Account..." : "Confirm & Save Registry"}
+                {isSaving
+                  ? "Saving..."
+                  : editingUuid
+                    ? "Save Changes"
+                    : "Confirm & Save Registry"}
               </button>
             </motion.div>
           </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { FaCashRegister, FaPrint } from "react-icons/fa";
 import { FiX } from "react-icons/fi";
@@ -8,6 +8,33 @@ import useApiHost from "../../hooks/useApiHost";
 import useGetDefaultPrinter from "../../hooks/useGetDefaultPrinter";
 import ButtonComponent from "./Common/ButtonComponent";
 import useBusinessInfo from "../../hooks/useBusinessInfo";
+import useZustandLoginCred from "../../context/useZustandLoginCred";
+import {
+  hasPosXReadingAccess,
+  hasPosZReadingAccess,
+} from "../../utils/posRoleAccess";
+import {
+  usePosDeveloperSession,
+  usePosRoleAccessVersion,
+} from "../../hooks/usePosRoleAccessConfig";
+import { posAuthenticatedFetch } from "../../utils/posAuthenticatedFetch";
+
+const parseReadingResponse = async (response) => {
+  const text = await response.text();
+  if (!text.trim()) {
+    throw new Error(
+      `The POS reading server returned an empty response (${response.status}).`,
+    );
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(
+      `The POS reading server returned an invalid response (${response.status}).`,
+    );
+  }
+};
 
 export default function PosReadingModal({
   open = true,
@@ -23,6 +50,17 @@ export default function PosReadingModal({
 }) {
   const apiHost = useApiHost();
   const defaultPrinterName = useGetDefaultPrinter();
+  const { roles } = useZustandLoginCred();
+  const roleAccessVersion = usePosRoleAccessVersion();
+  const developerMode = usePosDeveloperSession();
+  const canUseXReading = useMemo(
+    () => hasPosXReadingAccess(roles, developerMode),
+    [roles, roleAccessVersion, developerMode],
+  );
+  const canUseZReading = useMemo(
+    () => hasPosZReadingAccess(roles, developerMode),
+    [roles, roleAccessVersion, developerMode],
+  );
   const [printerName, setPrinterName] = useState("");
   const [printers, setPrinters] = useState([]);
 
@@ -138,7 +176,7 @@ export default function PosReadingModal({
       throw new Error("Shift date is missing.");
     }
 
-    const response = await fetch(
+    const response = await posAuthenticatedFetch(
       `${apiHost}/api/check_posreading_blockers.php`,
       {
         method: "POST",
@@ -155,7 +193,7 @@ export default function PosReadingModal({
       },
     );
 
-    const result = await response.json();
+    const result = await parseReadingResponse(response);
 
     if (!response.ok || !result.success) {
       throw new Error(result.message || "Failed to validate transactions.");
@@ -165,6 +203,7 @@ export default function PosReadingModal({
   };
 
   const handleOpenZReading = async () => {
+    if (!canUseZReading) return;
     try {
       setIsCheckingBlockers(true);
 
@@ -649,7 +688,7 @@ export default function PosReadingModal({
 
   const loadReadingPayload = async (isZReading) => {
     const endpoint = isZReading ? zEndpoint : xEndpoint;
-    const response = await fetch(`${apiHost}${endpoint}`, {
+    const response = await posAuthenticatedFetch(`${apiHost}${endpoint}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -657,7 +696,7 @@ export default function PosReadingModal({
       body: JSON.stringify(buildReadingRequestBody(isZReading)),
     });
 
-    const results = await response.json();
+    const results = await parseReadingResponse(response);
 
     if (!response.ok || !results.success) {
       throw new Error(results.message || "Failed to load reading data.");
@@ -695,6 +734,16 @@ export default function PosReadingModal({
   };
 
   const handlePrint = async () => {
+    if (
+      (activeType === "x" && !canUseXReading) ||
+      (activeType === "z" && !canUseZReading)
+    ) {
+      openBlockerModal(
+        "Access Denied",
+        "Your role does not have permission for this POS reading.",
+      );
+      return;
+    }
     if (!ensureReadingReady()) return;
 
     try {
@@ -763,17 +812,20 @@ export default function PosReadingModal({
                 title="X-Reading"
                 iconClassName="bg-sky-100 text-sky-600"
                 onClick={() => {
+                  if (!canUseXReading) return;
                   setActiveType("x");
                   resetForm();
                 }}
-                disabled={isPrinting}
+                disabled={isPrinting || !canUseXReading}
               />
 
               <ReadingCard
                 title="Z-Reading"
                 iconClassName="bg-orange-100 text-orange-500"
                 onClick={handleOpenZReading}
-                disabled={isPrinting || isCheckingBlockers}
+                disabled={
+                  isPrinting || isCheckingBlockers || !canUseZReading
+                }
               />
             </div>
 

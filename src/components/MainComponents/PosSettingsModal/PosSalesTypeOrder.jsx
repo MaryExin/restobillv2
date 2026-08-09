@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+/* eslint-disable react/prop-types */
+import { useEffect, useState } from "react";
 import { FiList, FiSave, FiLoader, FiArrowUp, FiArrowDown } from "react-icons/fi";
 import useApiHost from "../../../hooks/useApiHost";
+import { securedPosFetch } from "../../../utils/posRoleFetch";
 
 const PosSalesTypeOrder = ({ isDark, accent = "#3b82f6" }) => {
   const apiHost = useApiHost();
@@ -95,7 +97,7 @@ const PosSalesTypeOrder = ({ isDark, accent = "#3b82f6" }) => {
       setError("");
       setMessage("");
 
-      const response = await fetch(`${apiHost}/api/pos_sales_type_order.php`, {
+      const response = await securedPosFetch(`${apiHost}/api/pos_sales_type_order.php`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

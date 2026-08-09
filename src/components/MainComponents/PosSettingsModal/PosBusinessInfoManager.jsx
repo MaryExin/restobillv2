@@ -16,6 +16,7 @@ import {
 } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 import useBusinessInfo from "../../../hooks/useBusinessInfo";
+import { usePosDeveloperSession } from "../../../hooks/usePosRoleAccessConfig";
 
 const EMPTY_FORM = {
   companyName: "",
@@ -38,6 +39,7 @@ const EMPTY_FORM = {
 const MASTER_PASSWORD = "LESI_POSPASS@2023";
 
 const PosBusinessInfoManager = ({ isDark, accent, getContrastText }) => {
+  const developerMode = usePosDeveloperSession();
   const { businessInfo, isLoading, error, refetchBusinessInfo } =
     useBusinessInfo();
 
@@ -275,7 +277,7 @@ const PosBusinessInfoManager = ({ isDark, accent, getContrastText }) => {
     );
   }
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated && !developerMode) {
     return (
       <div className="max-w-3xl mx-auto">
         <div

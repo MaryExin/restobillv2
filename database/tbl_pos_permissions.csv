@@ -1,0 +1,56 @@
+id,permission_group,permission_key,permission_name,description,is_locked,is_developer_only,is_active,sort_order,created_at,updated_at
+1,routes,home,Home,POS home screen.,1,0,1,10,2026-08-09 00:00:00,2026-08-09 00:00:00
+2,routes,productList,Product List,Product list page.,0,0,1,20,2026-08-09 00:00:00,2026-08-09 00:00:00
+3,routes,productPriceSyncing,Product & Price Syncing,Product and price sync page.,0,0,1,30,2026-08-09 00:00:00,2026-08-09 00:00:00
+4,routes,salesRecordSyncing,Sales Record Syncing,Sales record sync page.,0,0,1,40,2026-08-09 00:00:00,2026-08-09 00:00:00
+5,routes,openNewDay,Open New Day,Open day action.,0,0,1,50,2026-08-09 00:00:00,2026-08-09 00:00:00
+6,routes,newTransaction,New Transaction,Ordering transaction page.,0,0,1,60,2026-08-09 00:00:00,2026-08-09 00:00:00
+7,routes,billing,Billing,Billing page.,0,0,1,70,2026-08-09 00:00:00,2026-08-09 00:00:00
+8,routes,payment,Payment,Payment page.,0,0,1,80,2026-08-09 00:00:00,2026-08-09 00:00:00
+9,routes,registrySales,Registry Sales,Sales registry page.,0,0,1,90,2026-08-09 00:00:00,2026-08-09 00:00:00
+10,routes,posReports,POS Reports,POS reports page.,0,0,1,100,2026-08-09 00:00:00,2026-08-09 00:00:00
+11,routes,salesDashboard,Sales Dashboard,Sales dashboard page.,0,0,1,110,2026-08-09 00:00:00,2026-08-09 00:00:00
+12,reading,xReading,X Reading,X reading access.,0,0,1,210,2026-08-09 00:00:00,2026-08-09 00:00:00
+13,reading,zReading,Z Reading,Z reading access.,0,0,1,220,2026-08-09 00:00:00,2026-08-09 00:00:00
+14,reports,dashboard,Dashboard,Sales dashboard report.,0,0,1,310,2026-08-09 00:00:00,2026-08-09 00:00:00
+15,reports,dailySales,Daily Sales,Daily sales report.,0,0,1,320,2026-08-09 00:00:00,2026-08-09 00:00:00
+16,reports,hourlySales,Hourly Sales,Hourly sales report.,0,0,1,330,2026-08-09 00:00:00,2026-08-09 00:00:00
+17,reports,transactions,Transactions,Transactions report.,0,0,1,340,2026-08-09 00:00:00,2026-08-09 00:00:00
+18,reports,salesPerItem,Sales Per Item,Sales per item report.,0,0,1,350,2026-08-09 00:00:00,2026-08-09 00:00:00
+19,reports,birESales,BIR E-Sales,BIR e-sales report.,0,0,1,360,2026-08-09 00:00:00,2026-08-09 00:00:00
+20,reports,zReadingReprint,Z-Reading,Z-reading reprint report.,0,0,1,370,2026-08-09 00:00:00,2026-08-09 00:00:00
+21,reports,zReadingMonthly,Z-Reading Monthly,Monthly Z-reading report.,0,0,1,380,2026-08-09 00:00:00,2026-08-09 00:00:00
+22,reports,customers,Customers,Customer report.,0,0,1,390,2026-08-09 00:00:00,2026-08-09 00:00:00
+23,reports,refunds,Refunds,Refunds report.,0,0,1,400,2026-08-09 00:00:00,2026-08-09 00:00:00
+24,reports,voids,Voids,Voids report.,0,0,1,410,2026-08-09 00:00:00,2026-08-09 00:00:00
+25,reports,logs,Logs,System logs report.,0,0,1,420,2026-08-09 00:00:00,2026-08-09 00:00:00
+26,reports,xml,XML,XML report export.,0,0,1,430,2026-08-09 00:00:00,2026-08-09 00:00:00
+27,reports,monthlySales,Monthly Sales,Monthly sales report.,0,0,1,440,2026-08-09 00:00:00,2026-08-09 00:00:00
+28,reports,salesPerItemPerDate,Sales Per Item Per Date,Sales per item by date report.,0,0,1,450,2026-08-09 00:00:00,2026-08-09 00:00:00
+29,reports,eJournal,E-Journal Report,Electronic journal report.,0,0,1,460,2026-08-09 00:00:00,2026-08-09 00:00:00
+30,reports,pricingManagement,Pricing Management,Pricing management report.,0,0,1,470,2026-08-09 00:00:00,2026-08-09 00:00:00
+31,settings,reportDatabase,Report Database,Report database settings.,0,0,1,510,2026-08-09 00:00:00,2026-08-09 00:00:00
+32,settings,myAccount,My Account,My account settings.,0,0,1,520,2026-08-09 00:00:00,2026-08-09 00:00:00
+33,settings,userAccounts,User Accounts,User account management.,0,0,1,530,2026-08-09 00:00:00,2026-08-09 00:00:00
+34,settings,userApproval,User Approval,User approval settings.,0,0,1,540,2026-08-09 00:00:00,2026-08-09 00:00:00
+35,settings,roleAccess,User Roles,Developer-only role access configuration.,0,1,1,550,2026-08-09 00:00:00,2026-08-09 00:00:00
+36,settings,registrySales,Registry Sales,Registry sales settings.,0,0,1,560,2026-08-09 00:00:00,2026-08-09 00:00:00
+37,settings,expensesPetty,Expenses & Petty,Expenses and petty cash settings.,0,0,1,570,2026-08-09 00:00:00,2026-08-09 00:00:00
+38,settings,modeOfPayment,Mode of Payment,Mode of payment settings.,0,0,1,580,2026-08-09 00:00:00,2026-08-09 00:00:00
+39,settings,serviceCharge,Service Charge,Service charge settings.,0,0,1,590,2026-08-09 00:00:00,2026-08-09 00:00:00
+40,settings,discountCeiling,Discount Ceiling,Discount ceiling settings.,0,0,1,600,2026-08-09 00:00:00,2026-08-09 00:00:00
+41,settings,discountMode,Discount Mode,Discount mode settings.,0,0,1,610,2026-08-09 00:00:00,2026-08-09 00:00:00
+42,settings,customerInfo,Customer Info,Customer info settings.,0,0,1,620,2026-08-09 00:00:00,2026-08-09 00:00:00
+43,settings,tableLayout,Table Layout,Table layout settings.,0,0,1,630,2026-08-09 00:00:00,2026-08-09 00:00:00
+44,settings,salesTypeOrder,Sales Type Order,Sales type order settings.,0,0,1,640,2026-08-09 00:00:00,2026-08-09 00:00:00
+45,settings,loyaltyConfiguration,Loyalty Configuration,Loyalty configuration settings.,0,0,1,650,2026-08-09 00:00:00,2026-08-09 00:00:00
+46,settings,emailReports,Email Reports,Email report settings.,0,0,1,660,2026-08-09 00:00:00,2026-08-09 00:00:00
+47,settings,dataSecurity,Data & Security,Data security settings.,0,0,1,670,2026-08-09 00:00:00,2026-08-09 00:00:00
+48,settings,appearance,Appearance,Appearance settings.,0,0,1,680,2026-08-09 00:00:00,2026-08-09 00:00:00
+49,settings,connectedDevices,Printer Settings,Connected device and printer settings.,0,0,1,690,2026-08-09 00:00:00,2026-08-09 00:00:00
+50,settings,printOptions,Print Options,Print option settings.,0,0,1,700,2026-08-09 00:00:00,2026-08-09 00:00:00
+51,settings,pictureSettings,Picture Settings,Picture settings.,0,0,1,710,2026-08-09 00:00:00,2026-08-09 00:00:00
+52,settings,productSubcategories,Product Subcategories,Product subcategory settings.,0,0,1,720,2026-08-09 00:00:00,2026-08-09 00:00:00
+53,settings,pricingEngine,Pricing Engine,Pricing engine settings.,0,0,1,730,2026-08-09 00:00:00,2026-08-09 00:00:00
+54,settings,layoutMode,Layout Mode,POS layout mode settings.,0,0,1,740,2026-08-09 00:00:00,2026-08-09 00:00:00
+55,settings,secondScreen,Second Screen,Second screen settings.,0,0,1,750,2026-08-09 00:00:00,2026-08-09 00:00:00

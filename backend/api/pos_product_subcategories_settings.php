@@ -9,7 +9,21 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
     exit;
 }
 
+if ($_SERVER["REQUEST_METHOD"] !== "GET") {
+    require __DIR__ . "/secure_guard.php";
+}
+
 require __DIR__ . "/pdo.php";
+require_once __DIR__ . "/pos_role_authorization.php";
+
+if ($_SERVER["REQUEST_METHOD"] !== "GET") {
+    posRoleAuthRequirePermission(
+        $pdo,
+        (string)($GLOBALS["pos_user_id"] ?? ""),
+        "settings",
+        "productSubcategories"
+    );
+}
 
 const SUBCATEGORIES_CATEGORY    = "Display";
 const SUBCATEGORIES_DESCRIPTION = "Enable Product Subcategories";
@@ -80,5 +94,6 @@ try {
 
     respond(true, "Product subcategories settings saved.", ["enable_subcategories" => readSetting($pdo)]);
 } catch (Throwable $e) {
-    respond(false, $e->getMessage(), null, 500);
+    error_log("POS product subcategories settings error: " . $e->getMessage());
+    respond(false, "Unable to process product subcategory settings.", null, 500);
 }
