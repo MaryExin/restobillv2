@@ -19,12 +19,16 @@ class ShiftSalesSyncWebStatusReadGateway
             return [
                 'message' => 'InvalidPayload',
                 'synced_row_keys' => [],
+                'primary_synced_row_keys' => [],
+                'report_synced_row_keys' => [],
                 'busunit_names' => [],
             ];
         }
 
         try {
             $syncedRowKeys = [];
+            $primarySyncedRowKeys = [];
+            $reportSyncedRowKeys = [];
             $busunitCodes = [];
 
             foreach ($shifts as $shift) {
@@ -48,14 +52,28 @@ class ShiftSalesSyncWebStatusReadGateway
                     continue;
                 }
 
-                if (
-                    $this->existsWebSyncedShift(
-                        $unitCode,
-                        $shiftId,
-                        $terminalNumber,
-                        $openingDateTime
-                    )
-                ) {
+                $primarySynced = $this->existsWebSyncedShift(
+                    $unitCode,
+                    $shiftId,
+                    $terminalNumber,
+                    $openingDateTime,
+                    $this->quoteIdentifier('tbl_pos_shifting_records')
+                );
+                $reportSynced = $this->existsWebSyncedShift(
+                    $unitCode,
+                    $shiftId,
+                    $terminalNumber,
+                    $openingDateTime,
+                    $this->quoteIdentifier('tbl_pos_shifting_records_bd')
+                );
+
+                if ($primarySynced) {
+                    $primarySyncedRowKeys[] = $rowKey;
+                }
+                if ($reportSynced) {
+                    $reportSyncedRowKeys[] = $rowKey;
+                }
+                if ($primarySynced && $reportSynced) {
                     $syncedRowKeys[] = $rowKey;
                 }
             }
@@ -65,6 +83,8 @@ class ShiftSalesSyncWebStatusReadGateway
             return [
                 'message' => 'Success',
                 'synced_row_keys' => array_values(array_unique($syncedRowKeys)),
+                'primary_synced_row_keys' => array_values(array_unique($primarySyncedRowKeys)),
+                'report_synced_row_keys' => array_values(array_unique($reportSyncedRowKeys)),
                 'busunit_names' => $busunitNames,
             ];
         } catch (Throwable $e) {
@@ -74,6 +94,8 @@ class ShiftSalesSyncWebStatusReadGateway
                 'message' => 'Failed',
                 'error' => $e->getMessage(),
                 'synced_row_keys' => [],
+                'primary_synced_row_keys' => [],
+                'report_synced_row_keys' => [],
                 'busunit_names' => [],
             ];
         }
@@ -83,11 +105,12 @@ class ShiftSalesSyncWebStatusReadGateway
         string $unitCode,
         string $shiftId,
         string $terminalNumber,
-        string $openingDateTime
+        string $openingDateTime,
+        string $table
     ): bool {
         $stmt = $this->conn->prepare("
             SELECT 1
-            FROM tbl_pos_shifting_records
+            FROM {$table}
             WHERE Unit_Code = :unit_code
               AND Shift_ID = :shift_id
               AND terminal_number = :terminal_number
@@ -136,5 +159,14 @@ class ShiftSalesSyncWebStatusReadGateway
         }
 
         return $map;
+    }
+
+    private function quoteIdentifier(string $identifier): string
+    {
+        if ($identifier === '' || !preg_match('/^[A-Za-z0-9_]+$/', $identifier)) {
+            throw new InvalidArgumentException('Invalid SQL identifier.');
+        }
+
+        return '`' . $identifier . '`';
     }
 }

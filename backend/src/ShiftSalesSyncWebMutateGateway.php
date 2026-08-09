@@ -14,77 +14,65 @@ class ShiftSalesSyncWebMutateGateway
     public function uploadExportedShifts(array $data, int|string $userId): array
     {
         $shifts = $data['shifts'] ?? [];
-        $transactions = $data['transactions'] ?? [];
-        $details = $data['details'] ?? [];
-        $discounts = $data['discounts'] ?? [];
-        $payments = $data['payments'] ?? [];
-        $otherCharges = $data['other_charges'] ?? [];
+        $reportDataset = $data['report_dataset'] ?? null;
 
         if (!is_array($shifts) || count($shifts) === 0) {
             return ['message' => 'NoRows'];
         }
 
-        $syncedShifts = 0;
-        $syncedTransactions = 0;
-        $syncedDetailed = 0;
-        $syncedDiscounts = 0;
-        $syncedPayments = 0;
-        $syncedOtherCharges = 0;
+        if (
+            $reportDataset !== null
+            && (!is_array($reportDataset)
+                || !is_array($reportDataset['shifts'] ?? null)
+                || count($reportDataset['shifts']) === 0)
+        ) {
+            return ['message' => 'ReportRowsMissing'];
+        }
 
         try {
             $this->conn->beginTransaction();
+            $primarySummary = $this->syncDataset($data, $this->destinationTables(false));
+            $reportSummary = $reportDataset !== null
+                ? $this->syncDataset($reportDataset, $this->destinationTables(true))
+                : null;
 
-            foreach ($shifts as $row) {
-                $this->upsertWebShiftRecord($row, 'Synced');
-                $this->markWebShiftSynced(
-                    (string) ($row['Unit_Code'] ?? ''),
-                    (string) ($row['Shift_ID'] ?? ''),
-                    (string) ($row['terminal_number'] ?? ''),
-                    (string) ($row['Opening_DateTime'] ?? '')
+            $primarySummary = array_merge(
+                $primarySummary,
+                $this->verifyDataset($data, $this->destinationTables(false))
+            );
+            if ($reportDataset !== null && $reportSummary !== null) {
+                $reportSummary = array_merge(
+                    $reportSummary,
+                    $this->verifyDataset($reportDataset, $this->destinationTables(true))
                 );
-                $syncedShifts++;
             }
 
-            foreach ($transactions as $row) {
-                $this->upsertWebTransaction($row);
-                $syncedTransactions++;
-            }
-
-            foreach ($transactions as $row) {
-                $this->deleteWebTransactionDetailsForScope($row);
-            }
-
-            foreach ($details as $row) {
-                $this->upsertWebTransactionDetailed($row);
-                $syncedDetailed++;
-            }
-
-            foreach ($discounts as $row) {
-                $this->upsertWebTransactionDiscount($row);
-                $syncedDiscounts++;
-            }
-
-            foreach ($payments as $row) {
-                $this->upsertWebTransactionPayment($row);
-                $syncedPayments++;
-            }
-
-            foreach ($otherCharges as $row) {
-                $this->upsertWebTransactionOtherCharge($row);
-                $syncedOtherCharges++;
-            }
-
+            $databaseName = (string) $this->conn->query('SELECT DATABASE()')->fetchColumn();
             $this->conn->commit();
+
+            $summaryMessage = $reportSummary === null
+                ? $this->formatTargetSummary('Main WEB', $primarySummary)
+                : $this->formatTargetSummary('Main WEB', $primarySummary)
+                    . ' ' . $this->formatTargetSummary('Report WEB', $reportSummary);
+            $summaryMessage .= " Verified in online database: {$databaseName}.";
 
             return [
                 'message' => 'Success',
-                'synced_shifts' => $syncedShifts,
-                'synced_transactions' => $syncedTransactions,
-                'synced_detailed' => $syncedDetailed,
-                'synced_discounts' => $syncedDiscounts,
-                'synced_payments' => $syncedPayments,
-                'synced_other_charges' => $syncedOtherCharges,
-                'summary_message' => "Synced {$syncedShifts} shift(s), {$syncedTransactions} transaction(s), {$syncedDetailed} detailed row(s), {$syncedDiscounts} discount row(s), {$syncedPayments} payment row(s), and {$syncedOtherCharges} other charge row(s) to WEB.",
+                'synced_shifts' => $primarySummary['synced_shifts'],
+                'synced_transactions' => $primarySummary['synced_transactions'],
+                'synced_detailed' => $primarySummary['synced_detailed'],
+                'synced_discounts' => $primarySummary['synced_discounts'],
+                'synced_payments' => $primarySummary['synced_payments'],
+                'synced_other_charges' => $primarySummary['synced_other_charges'],
+                'synced_customers' => $primarySummary['synced_customers'],
+                'synced_discounts_per_product' => $primarySummary['synced_discounts_per_product'],
+                'synced_loyalty_discounts' => $primarySummary['synced_loyalty_discounts'],
+                'target_summaries' => [
+                    'primary' => $primarySummary,
+                    'report' => $reportSummary,
+                ],
+                'database_name' => $databaseName,
+                'summary_message' => $summaryMessage,
             ];
         } catch (Throwable $e) {
             if ($this->conn->inTransaction()) {
@@ -100,13 +88,352 @@ class ShiftSalesSyncWebMutateGateway
         }
     }
 
-    private function upsertWebShiftRecord(array $row, string $statusValue): void
+    private function syncDataset(array $data, array $tables): array
+    {
+        $shifts = is_array($data['shifts'] ?? null) ? $data['shifts'] : [];
+        $transactions = is_array($data['transactions'] ?? null) ? $data['transactions'] : [];
+        $details = is_array($data['details'] ?? null) ? $data['details'] : [];
+        $discounts = is_array($data['discounts'] ?? null) ? $data['discounts'] : [];
+        $payments = is_array($data['payments'] ?? null) ? $data['payments'] : [];
+        $otherCharges = is_array($data['other_charges'] ?? null) ? $data['other_charges'] : [];
+        $customers = is_array($data['customers'] ?? null) ? $data['customers'] : [];
+        $discountsPerProduct = is_array($data['discounts_per_product'] ?? null)
+            ? $data['discounts_per_product']
+            : [];
+        $loyaltyDiscounts = is_array($data['loyalty_discounts'] ?? null)
+            ? $data['loyalty_discounts']
+            : [];
+
+        foreach ($shifts as $row) {
+            $this->upsertWebShiftRecord($row, 'Synced', $tables['shifts']);
+            $this->markWebShiftSynced(
+                (string) ($row['Unit_Code'] ?? ''),
+                (string) ($row['Shift_ID'] ?? ''),
+                (string) ($row['terminal_number'] ?? ''),
+                (string) ($row['Opening_DateTime'] ?? ''),
+                $tables['shifts']
+            );
+        }
+
+        foreach ($transactions as $row) {
+            $this->upsertWebTransaction($row, $tables['transactions']);
+            $this->deleteWebTransactionDetailsForScope($row, $tables['details']);
+            $this->deleteWebScopedChildrenForTransaction(
+                $row,
+                $tables['customers'],
+                'Category_Code',
+                'Unit_Code'
+            );
+            $this->deleteWebScopedChildrenForTransaction(
+                $row,
+                $tables['discounts_per_product'],
+                'category_code',
+                'unit_code'
+            );
+            $this->deleteWebScopedChildrenForTransaction(
+                $row,
+                $tables['loyalty_discounts'],
+                'Category_Code',
+                'Unit_Code'
+            );
+        }
+
+        foreach ($details as $row) {
+            $this->upsertWebTransactionDetailed($row, $tables['details']);
+        }
+        foreach ($discounts as $row) {
+            $this->upsertWebTransactionDiscount($row, $tables['discounts']);
+        }
+        foreach ($payments as $row) {
+            $this->upsertWebTransactionPayment($row, $tables['payments']);
+        }
+        foreach ($otherCharges as $row) {
+            $this->upsertWebTransactionOtherCharge($row, $tables['other_charges']);
+        }
+        foreach ($customers as $row) {
+            $this->insertWebTransactionCustomer($row, $tables['customers']);
+        }
+        foreach ($discountsPerProduct as $row) {
+            $this->insertWebDiscountPerProduct($row, $tables['discounts_per_product']);
+        }
+        foreach ($loyaltyDiscounts as $row) {
+            $this->insertWebLoyaltyDiscount($row, $tables['loyalty_discounts']);
+        }
+
+        return [
+            'synced_shifts' => count($shifts),
+            'synced_transactions' => count($transactions),
+            'synced_detailed' => count($details),
+            'synced_discounts' => count($discounts),
+            'synced_payments' => count($payments),
+            'synced_other_charges' => count($otherCharges),
+            'synced_customers' => count($customers),
+            'synced_discounts_per_product' => count($discountsPerProduct),
+            'synced_loyalty_discounts' => count($loyaltyDiscounts),
+        ];
+    }
+
+    private function destinationTables(bool $report): array
+    {
+        $suffix = $report ? '_bd' : '';
+
+        return [
+            'shifts' => $this->quoteIdentifier('tbl_pos_shifting_records' . $suffix),
+            'transactions' => $this->quoteIdentifier('tbl_pos_transactions' . $suffix),
+            'details' => $this->quoteIdentifier('tbl_pos_transactions_detailed' . $suffix),
+            'discounts' => $this->quoteIdentifier('tbl_pos_transactions_discounts' . $suffix),
+            'payments' => $this->quoteIdentifier('tbl_pos_transactions_payments' . $suffix),
+            'other_charges' => $this->quoteIdentifier('tbl_pos_transactions_other_charges' . $suffix),
+            'customers' => $this->quoteIdentifier('tbl_pos_transactions_customers' . $suffix),
+            'discounts_per_product' => $this->quoteIdentifier(
+                'tbl_pos_transactions_discounts_per_product' . $suffix
+            ),
+            'loyalty_discounts' => $this->quoteIdentifier('tbl_pos_loyalty_discounts' . $suffix),
+        ];
+    }
+
+    private function formatTargetSummary(string $label, array $summary): string
+    {
+        return "{$label}: {$summary['synced_shifts']} shift(s), "
+            . "{$summary['synced_transactions']} transaction(s), "
+            . "{$summary['synced_detailed']} detailed row(s), "
+            . "{$summary['synced_discounts']} discount row(s), "
+            . "{$summary['synced_payments']} payment row(s), "
+            . "{$summary['synced_other_charges']} other charge row(s), "
+            . "{$summary['synced_customers']} customer row(s), "
+            . "{$summary['synced_discounts_per_product']} product discount row(s), and "
+            . "{$summary['synced_loyalty_discounts']} loyalty row(s).";
+    }
+
+    private function verifyDataset(array $data, array $tables): array
+    {
+        $transactions = is_array($data['transactions'] ?? null) ? $data['transactions'] : [];
+        $checks = [
+            'shifts' => [
+                'expected' => count(is_array($data['shifts'] ?? null) ? $data['shifts'] : []),
+                'actual' => $this->countVerifiedShifts($data['shifts'] ?? [], $tables['shifts']),
+            ],
+            'transactions' => [
+                'expected' => count($transactions),
+                'actual' => $this->countVerifiedTransactionRows(
+                    $transactions,
+                    $tables['transactions'],
+                    'Category_Code',
+                    'Unit_Code',
+                    true
+                ),
+            ],
+            'details' => $this->verifiedChildCount(
+                $data,
+                'details',
+                $transactions,
+                $tables['details'],
+                'Category_Code',
+                'Unit_Code',
+                true
+            ),
+            'discounts' => $this->verifiedChildCount(
+                $data,
+                'discounts',
+                $transactions,
+                $tables['discounts'],
+                'Category_Code',
+                'Unit_Code',
+                true
+            ),
+            'payments' => $this->verifiedChildCount(
+                $data,
+                'payments',
+                $transactions,
+                $tables['payments'],
+                'Category_Code',
+                'Unit_Code',
+                true
+            ),
+            'other_charges' => $this->verifiedChildCount(
+                $data,
+                'other_charges',
+                $transactions,
+                $tables['other_charges'],
+                'Category_Code',
+                'Unit_Code',
+                true
+            ),
+            'customers' => $this->verifiedChildCount(
+                $data,
+                'customers',
+                $transactions,
+                $tables['customers'],
+                'Category_Code',
+                'Unit_Code'
+            ),
+            'discounts_per_product' => $this->verifiedChildCount(
+                $data,
+                'discounts_per_product',
+                $transactions,
+                $tables['discounts_per_product'],
+                'category_code',
+                'unit_code'
+            ),
+            'loyalty_discounts' => $this->verifiedChildCount(
+                $data,
+                'loyalty_discounts',
+                $transactions,
+                $tables['loyalty_discounts'],
+                'Category_Code',
+                'Unit_Code'
+            ),
+        ];
+
+        foreach ($checks as $tableKey => $check) {
+            if ($check['actual'] < $check['expected']) {
+                throw new RuntimeException(
+                    "WEB persistence verification failed for {$tableKey}: "
+                    . "expected {$check['expected']}, found {$check['actual']}."
+                );
+            }
+        }
+
+        return [
+            'verified' => true,
+            'verified_tables' => $checks,
+        ];
+    }
+
+    private function verifiedChildCount(
+        array $data,
+        string $dataKey,
+        array $transactions,
+        string $table,
+        string $categoryColumn,
+        string $unitColumn,
+        bool $includeTerminal = false
+    ): array
+    {
+        return [
+            'expected' => count(is_array($data[$dataKey] ?? null) ? $data[$dataKey] : []),
+            'actual' => $this->countVerifiedTransactionRows(
+                $transactions,
+                $table,
+                $categoryColumn,
+                $unitColumn,
+                $includeTerminal
+            ),
+        ];
+    }
+
+    private function countVerifiedShifts(array $shifts, string $table): int
+    {
+        $clauses = [];
+        $values = [];
+        $seen = [];
+
+        foreach ($shifts as $row) {
+            $unitCode = trim((string) ($row['Unit_Code'] ?? ''));
+            $shiftId = trim((string) ($row['Shift_ID'] ?? ''));
+            $terminal = trim((string) ($row['terminal_number'] ?? ''));
+            $opening = trim((string) ($row['Opening_DateTime'] ?? ''));
+            $key = $unitCode . '||' . $shiftId . '||' . $terminal . '||' . $opening;
+
+            if (
+                $unitCode === ''
+                || $shiftId === ''
+                || $terminal === ''
+                || $opening === ''
+                || isset($seen[$key])
+            ) {
+                continue;
+            }
+
+            $seen[$key] = true;
+            $clauses[] = '(Unit_Code = ? AND Shift_ID = ? AND terminal_number = ? '
+                . "AND Opening_DateTime = ? AND Status = 'Synced')";
+            array_push($values, $unitCode, $shiftId, $terminal, $opening);
+        }
+
+        return $this->countByClauses($table, $clauses, $values);
+    }
+
+    private function countVerifiedTransactionRows(
+        array $transactions,
+        string $table,
+        string $categoryColumn,
+        string $unitColumn,
+        bool $includeTerminal
+    ): int
+    {
+        $categoryColumn = $this->quoteIdentifier($categoryColumn);
+        $unitColumn = $this->quoteIdentifier($unitColumn);
+        $clauses = [];
+        $values = [];
+        $seen = [];
+
+        foreach ($transactions as $row) {
+            $category = trim((string) ($row['Category_Code'] ?? ''));
+            $unit = trim((string) ($row['Unit_Code'] ?? ''));
+            $transactionId = trim((string) ($row['transaction_id'] ?? ''));
+            $terminal = trim((string) ($row['terminal_number'] ?? ''));
+            $key = $category . '||' . $unit . '||' . $transactionId;
+
+            if ($includeTerminal) {
+                $key .= '||' . $terminal;
+            }
+
+            if (
+                $category === ''
+                || $unit === ''
+                || $transactionId === ''
+                || ($includeTerminal && $terminal === '')
+                || isset($seen[$key])
+            ) {
+                continue;
+            }
+
+            $seen[$key] = true;
+            $clause = "({$categoryColumn} = ? AND {$unitColumn} = ? AND transaction_id = ?";
+            array_push($values, $category, $unit, $transactionId);
+
+            if ($includeTerminal) {
+                $clause .= ' AND terminal_number = ?';
+                $values[] = $terminal;
+            }
+
+            $clauses[] = $clause . ')';
+        }
+
+        return $this->countByClauses($table, $clauses, $values);
+    }
+
+    private function countByClauses(string $table, array $clauses, array $values): int
+    {
+        if (count($clauses) === 0) {
+            return 0;
+        }
+
+        $where = implode(' OR ', $clauses);
+        $stmt = $this->conn->prepare("SELECT COUNT(*) FROM {$table} WHERE {$where}");
+
+        foreach ($values as $index => $value) {
+            $stmt->bindValue($index + 1, $value, PDO::PARAM_STR);
+        }
+
+        $stmt->execute();
+
+        return (int) $stmt->fetchColumn();
+    }
+
+    private function upsertWebShiftRecord(
+        array $row,
+        string $statusValue,
+        string $table
+    ): void
     {
         $existingId = $this->findExistingWebShiftId(
             (string) ($row['Unit_Code'] ?? ''),
             (string) ($row['Shift_ID'] ?? ''),
             (string) ($row['terminal_number'] ?? ''),
-            (string) ($row['Opening_DateTime'] ?? '')
+            (string) ($row['Opening_DateTime'] ?? ''),
+            $table
         );
 
         $params = [
@@ -136,7 +463,7 @@ class ShiftSalesSyncWebMutateGateway
 
         if ($existingId !== null) {
             $stmt = $this->conn->prepare("
-                UPDATE tbl_pos_shifting_records
+                UPDATE {$table}
                 SET
                     Category_Code = :Category_Code,
                     Unit_Code = :Unit_Code,
@@ -168,7 +495,7 @@ class ShiftSalesSyncWebMutateGateway
         }
 
         $stmt = $this->conn->prepare("
-            INSERT INTO tbl_pos_shifting_records (
+            INSERT INTO {$table} (
                 Category_Code,
                 Unit_Code,
                 Shift_ID,
@@ -223,14 +550,15 @@ class ShiftSalesSyncWebMutateGateway
         string $unitCode,
         string $shiftId,
         string $terminalNumber,
-        string $openingDateTime
+        string $openingDateTime,
+        string $table
     ): void {
         if ($unitCode === '' || $shiftId === '' || $terminalNumber === '' || $openingDateTime === '') {
             return;
         }
 
         $stmt = $this->conn->prepare("
-            UPDATE tbl_pos_shifting_records
+            UPDATE {$table}
             SET Status = 'Synced'
             WHERE Unit_Code = :unit_code
               AND Shift_ID = :shift_id
@@ -249,11 +577,12 @@ class ShiftSalesSyncWebMutateGateway
         string $unitCode,
         string $shiftId,
         string $terminalNumber,
-        string $openingDateTime
+        string $openingDateTime,
+        string $table
     ): ?int {
         $stmt = $this->conn->prepare("
             SELECT ID
-            FROM tbl_pos_shifting_records
+            FROM {$table}
             WHERE Unit_Code = :unit_code
               AND Shift_ID = :shift_id
               AND terminal_number = :terminal_number
@@ -272,10 +601,10 @@ class ShiftSalesSyncWebMutateGateway
         return $id !== false ? (int) $id : null;
     }
 
-    private function upsertWebTransaction(array $row): void
+    private function upsertWebTransaction(array $row, string $table): void
     {
         $existingId = $this->findExistingScopedTransactionId(
-            'tbl_pos_transactions',
+            $table,
             'ID',
             $row
         );
@@ -284,7 +613,7 @@ class ShiftSalesSyncWebMutateGateway
 
         if ($existingId !== null) {
             $stmt = $this->conn->prepare("
-                UPDATE tbl_pos_transactions SET
+                UPDATE {$table} SET
                     transaction_id = :transaction_id,
                     Category_Code = :Category_Code,
                     Unit_Code = :Unit_Code,
@@ -336,7 +665,7 @@ class ShiftSalesSyncWebMutateGateway
         }
 
         $stmt = $this->conn->prepare("
-            INSERT INTO tbl_pos_transactions (
+            INSERT INTO {$table} (
                 transaction_id,
                 Category_Code,
                 Unit_Code,
@@ -478,12 +807,12 @@ class ShiftSalesSyncWebMutateGateway
         ];
     }
 
-    private function upsertWebTransactionDetailed(array $row): void
+    private function upsertWebTransactionDetailed(array $row, string $table): void
     {
         $params = $this->detailParams($row);
 
         $stmt = $this->conn->prepare("
-            INSERT INTO tbl_pos_transactions_detailed (
+            INSERT INTO {$table} (
                 transaction_id,
                 Category_Code,
                 Unit_Code,
@@ -518,7 +847,7 @@ class ShiftSalesSyncWebMutateGateway
         $stmt->execute($params);
     }
 
-    private function deleteWebTransactionDetailsForScope(array $row): void
+    private function deleteWebTransactionDetailsForScope(array $row, string $table): void
     {
         $identity = $this->scopedTransactionIdentity($row);
         if ($identity === null) {
@@ -526,7 +855,7 @@ class ShiftSalesSyncWebMutateGateway
         }
 
         $stmt = $this->conn->prepare("
-            DELETE FROM tbl_pos_transactions_detailed
+            DELETE FROM {$table}
             WHERE Category_Code = :Category_Code
               AND Unit_Code = :Unit_Code
               AND terminal_number = :terminal_number
@@ -555,14 +884,14 @@ class ShiftSalesSyncWebMutateGateway
         ];
     }
 
-    private function upsertWebTransactionDiscount(array $row): void
+    private function upsertWebTransactionDiscount(array $row, string $table): void
     {
-        $existingId = $this->findExistingDiscountId($row);
+        $existingId = $this->findExistingDiscountId($row, $table);
         $params = $this->discountParams($row);
 
         if ($existingId !== null) {
             $stmt = $this->conn->prepare("
-                UPDATE tbl_pos_transactions_discounts SET
+                UPDATE {$table} SET
                     transaction_id = :transaction_id,
                     Category_Code = :Category_Code,
                     Unit_Code = :Unit_Code,
@@ -586,7 +915,7 @@ class ShiftSalesSyncWebMutateGateway
         }
 
         $stmt = $this->conn->prepare("
-            INSERT INTO tbl_pos_transactions_discounts (
+            INSERT INTO {$table} (
                 transaction_id,
                 Category_Code,
                 Unit_Code,
@@ -644,14 +973,14 @@ class ShiftSalesSyncWebMutateGateway
         ];
     }
 
-    private function upsertWebTransactionPayment(array $row): void
+    private function upsertWebTransactionPayment(array $row, string $table): void
     {
-        $existingId = $this->findExistingPaymentId($row);
+        $existingId = $this->findExistingPaymentId($row, $table);
         $params = $this->paymentParams($row);
 
         if ($existingId !== null) {
             $stmt = $this->conn->prepare("
-                UPDATE tbl_pos_transactions_payments SET
+                UPDATE {$table} SET
                     transaction_id = :transaction_id,
                     Category_Code = :Category_Code,
                     Unit_Code = :Unit_Code,
@@ -669,7 +998,7 @@ class ShiftSalesSyncWebMutateGateway
         }
 
         $stmt = $this->conn->prepare("
-            INSERT INTO tbl_pos_transactions_payments (
+            INSERT INTO {$table} (
                 transaction_id,
                 Category_Code,
                 Unit_Code,
@@ -709,14 +1038,14 @@ class ShiftSalesSyncWebMutateGateway
         ];
     }
 
-    private function upsertWebTransactionOtherCharge(array $row): void
+    private function upsertWebTransactionOtherCharge(array $row, string $table): void
     {
-        $existingId = $this->findExistingOtherChargeId($row);
+        $existingId = $this->findExistingOtherChargeId($row, $table);
         $params = $this->otherChargeParams($row);
 
         if ($existingId !== null) {
             $stmt = $this->conn->prepare("
-                UPDATE tbl_pos_transactions_other_charges SET
+                UPDATE {$table} SET
                     transaction_id = :transaction_id,
                     Category_Code = :Category_Code,
                     Unit_Code = :Unit_Code,
@@ -734,7 +1063,7 @@ class ShiftSalesSyncWebMutateGateway
         }
 
         $stmt = $this->conn->prepare("
-            INSERT INTO tbl_pos_transactions_other_charges (
+            INSERT INTO {$table} (
                 transaction_id,
                 Category_Code,
                 Unit_Code,
@@ -772,6 +1101,171 @@ class ShiftSalesSyncWebMutateGateway
             'amount' => $row['amount'] ?? null,
             'reference' => $row['reference'] ?? null,
         ];
+    }
+
+    private function deleteWebScopedChildrenForTransaction(
+        array $transactionRow,
+        string $table,
+        string $categoryColumn,
+        string $unitColumn
+    ): void
+    {
+        $identity = $this->scopedTransactionIdentity($transactionRow);
+        if ($identity === null) {
+            return;
+        }
+
+        $categoryColumn = $this->quoteIdentifier($categoryColumn);
+        $unitColumn = $this->quoteIdentifier($unitColumn);
+        $stmt = $this->conn->prepare("
+            DELETE FROM {$table}
+            WHERE transaction_id = :transaction_id
+              AND {$categoryColumn} = :Category_Code
+              AND {$unitColumn} = :Unit_Code
+        ");
+        $stmt->execute([
+            'transaction_id' => $identity['transaction_id'],
+            'Category_Code' => $identity['Category_Code'],
+            'Unit_Code' => $identity['Unit_Code'],
+        ]);
+    }
+
+    private function insertWebTransactionCustomer(array $row, string $table): void
+    {
+        $stmt = $this->conn->prepare("
+            INSERT INTO {$table} (
+                transaction_id,
+                Category_Code,
+                Unit_Code,
+                Project_Code,
+                transaction_date,
+                customer_id
+            ) VALUES (
+                :transaction_id,
+                :Category_Code,
+                :Unit_Code,
+                :Project_Code,
+                :transaction_date,
+                :customer_id
+            )
+        ");
+        $stmt->execute([
+            'transaction_id' => $row['transaction_id'] ?? null,
+            'Category_Code' => $row['Category_Code'] ?? null,
+            'Unit_Code' => $row['Unit_Code'] ?? null,
+            'Project_Code' => $row['Project_Code'] ?? null,
+            'transaction_date' => $row['transaction_date'] ?? null,
+            'customer_id' => $row['customer_id'] ?? null,
+        ]);
+    }
+
+    private function insertWebDiscountPerProduct(array $row, string $table): void
+    {
+        $stmt = $this->conn->prepare("
+            INSERT INTO {$table} (
+                transaction_id,
+                transaction_date,
+                category_code,
+                unit_code,
+                product_id,
+                item_name,
+                customer_id,
+                discount_type,
+                discount_sharing,
+                total_customers,
+                qualified_customers,
+                vat_exempt_amount,
+                discount_amount,
+                status,
+                created_at
+            ) VALUES (
+                :transaction_id,
+                :transaction_date,
+                :category_code,
+                :unit_code,
+                :product_id,
+                :item_name,
+                :customer_id,
+                :discount_type,
+                :discount_sharing,
+                :total_customers,
+                :qualified_customers,
+                :vat_exempt_amount,
+                :discount_amount,
+                :status,
+                :created_at
+            )
+        ");
+        $stmt->execute([
+            'transaction_id' => $row['transaction_id'] ?? null,
+            'transaction_date' => $row['transaction_date'] ?? null,
+            'category_code' => $row['category_code'] ?? $row['Category_Code'] ?? null,
+            'unit_code' => $row['unit_code'] ?? $row['Unit_Code'] ?? null,
+            'product_id' => $row['product_id'] ?? null,
+            'item_name' => $row['item_name'] ?? null,
+            'customer_id' => $row['customer_id'] ?? null,
+            'discount_type' => $row['discount_type'] ?? null,
+            'discount_sharing' => $row['discount_sharing'] ?? null,
+            'total_customers' => $row['total_customers'] ?? null,
+            'qualified_customers' => $row['qualified_customers'] ?? null,
+            'vat_exempt_amount' => $row['vat_exempt_amount'] ?? null,
+            'discount_amount' => $row['discount_amount'] ?? null,
+            'status' => $row['status'] ?? null,
+            'created_at' => $row['created_at'] ?? null,
+        ]);
+    }
+
+    private function insertWebLoyaltyDiscount(array $row, string $table): void
+    {
+        $stmt = $this->conn->prepare("
+            INSERT INTO {$table} (
+                transaction_id,
+                Category_Code,
+                Unit_Code,
+                Project_Code,
+                transaction_date,
+                loyalty_member_id,
+                customer_name,
+                phone_number,
+                points_redeemed,
+                points_earned,
+                discount_amount,
+                status,
+                usertracker,
+                created_at
+            ) VALUES (
+                :transaction_id,
+                :Category_Code,
+                :Unit_Code,
+                :Project_Code,
+                :transaction_date,
+                :loyalty_member_id,
+                :customer_name,
+                :phone_number,
+                :points_redeemed,
+                :points_earned,
+                :discount_amount,
+                :status,
+                :usertracker,
+                :created_at
+            )
+        ");
+        $stmt->execute([
+            'transaction_id' => $row['transaction_id'] ?? null,
+            'Category_Code' => $row['Category_Code'] ?? null,
+            'Unit_Code' => $row['Unit_Code'] ?? null,
+            'Project_Code' => $row['Project_Code'] ?? null,
+            'transaction_date' => $row['transaction_date'] ?? null,
+            'loyalty_member_id' => $row['loyalty_member_id'] ?? null,
+            'customer_name' => $row['customer_name'] ?? null,
+            'phone_number' => $row['phone_number'] ?? null,
+            'points_redeemed' => $row['points_redeemed'] ?? null,
+            'points_earned' => $row['points_earned'] ?? null,
+            'discount_amount' => $row['discount_amount'] ?? null,
+            'status' => $row['status'] ?? null,
+            'usertracker' => $row['usertracker'] ?? null,
+            'created_at' => $row['created_at'] ?? null,
+        ]);
     }
 
     private function findExistingScopedTransactionId(string $table, string $pk, array $row): ?int
@@ -816,11 +1310,11 @@ class ShiftSalesSyncWebMutateGateway
         ];
     }
 
-    private function findExistingDiscountId(array $row): ?int
+    private function findExistingDiscountId(array $row, string $table): ?int
     {
         $stmt = $this->conn->prepare("
             SELECT id
-            FROM tbl_pos_transactions_discounts
+            FROM {$table}
             WHERE transaction_id = :transaction_id
               AND COALESCE(Category_Code, '') = COALESCE(:Category_Code, '')
               AND COALESCE(Unit_Code, '') = COALESCE(:Unit_Code, '')
@@ -845,7 +1339,7 @@ class ShiftSalesSyncWebMutateGateway
         return $id !== false ? (int) $id : null;
     }
 
-    private function findExistingPaymentId(array $row): ?int
+    private function findExistingPaymentId(array $row, string $table): ?int
     {
         $identity = $this->scopedTransactionIdentity($row);
         if ($identity === null) {
@@ -854,7 +1348,7 @@ class ShiftSalesSyncWebMutateGateway
 
         $stmt = $this->conn->prepare("
             SELECT ID
-            FROM tbl_pos_transactions_payments
+            FROM {$table}
             WHERE transaction_id = :transaction_id
               AND COALESCE(Category_Code, '') = COALESCE(:Category_Code, '')
               AND COALESCE(Unit_Code, '') = COALESCE(:Unit_Code, '')
@@ -875,11 +1369,11 @@ class ShiftSalesSyncWebMutateGateway
         return $id !== false ? (int) $id : null;
     }
 
-    private function findExistingOtherChargeId(array $row): ?int
+    private function findExistingOtherChargeId(array $row, string $table): ?int
     {
         $stmt = $this->conn->prepare("
             SELECT ID
-            FROM tbl_pos_transactions_other_charges
+            FROM {$table}
             WHERE transaction_id = :transaction_id
               AND COALESCE(Category_Code, '') = COALESCE(:Category_Code, '')
               AND COALESCE(Unit_Code, '') = COALESCE(:Unit_Code, '')
@@ -906,5 +1400,14 @@ class ShiftSalesSyncWebMutateGateway
         $id = $stmt->fetchColumn();
 
         return $id !== false ? (int) $id : null;
+    }
+
+    private function quoteIdentifier(string $identifier): string
+    {
+        if ($identifier === '' || !preg_match('/^[A-Za-z0-9_]+$/', $identifier)) {
+            throw new InvalidArgumentException('Invalid SQL identifier.');
+        }
+
+        return '`' . $identifier . '`';
     }
 }
