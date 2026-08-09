@@ -1,14 +1,53 @@
 <?php
 // api/reports_dashboard.php
+declare(strict_types=1);
+
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
 header("Content-Type: application/json");
 
-if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") { exit; }
+require __DIR__ . "/secure_guard.php";
+
+if ($_SERVER["REQUEST_METHOD"] !== "POST") {
+  http_response_code(405);
+  header("Allow: POST, OPTIONS");
+  echo json_encode(["success" => false, "message" => "Method not allowed."]);
+  exit;
+}
 
 $raw = file_get_contents("php://input");
 $body = json_decode($raw, true) ?: [];
+
+$reportKey = trim((string)($body["reportKey"] ?? ""));
+$permissionByReportKey = [
+  "dashboard" => "dashboard",
+  "dailySales" => "dailySales",
+  "hourlySales" => "hourlySales",
+  "salesPerItem" => "salesPerItem",
+  "monthlySales" => "monthlySales",
+  "salesPerItemPerDate" => "salesPerItemPerDate",
+];
+
+if (!isset($permissionByReportKey[$reportKey])) {
+  http_response_code(422);
+  echo json_encode([
+    "success" => false,
+    "message" => "A valid reportKey is required.",
+  ]);
+  exit;
+}
+
+// Authorization always uses the original POS database. Report data may be
+// selected from the report database afterwards according to the date range.
+require __DIR__ . "/pdo.php";
+require_once __DIR__ . "/pos_role_authorization.php";
+posRoleAuthRequirePermission(
+  $pdo,
+  (string)($GLOBALS["pos_user_id"] ?? ""),
+  "reports",
+  $permissionByReportKey[$reportKey]
+);
 
 $datefrom = $body["datefrom"] ?? date("Y-m-d");
 $dateto   = $body["dateto"] ?? date("Y-m-d");
@@ -383,7 +422,7 @@ $monthlySalesRows = $stmt->fetchAll();
 /* ---------------------------
    Response
 ---------------------------- */
-echo json_encode([
+$response = [
   "filters" => [
     "datefrom" => $datefrom,
     "dateto" => $dateto,
@@ -392,12 +431,29 @@ echo json_encode([
     "includeVoided" => $includeVoided,
     "voidOnly" => $voidOnly,
   ],
-  "kpi" => $kpi,
-  "dailySales" => $dailyRows,
-  "dailyGraph" => $dailyGraphRows,
-  "hourlySales" => $hourlyRows,
-  "salesPerProduct" => $perProductRows,
-  "salesPerItemPerDate" => $perItemPerDateRows,
-  "hourlySalesPerProduct" => $hourlyPerProductRows,
-  "monthlySales" => $monthlySalesRows,
-]);
+];
+
+switch ($reportKey) {
+  case "dashboard":
+    $response["kpi"] = $kpi;
+    $response["salesPerProduct"] = $perProductRows;
+    break;
+  case "dailySales":
+    $response["dailySales"] = $dailyRows;
+    break;
+  case "hourlySales":
+    $response["hourlySales"] = $hourlyRows;
+    $response["hourlySalesPerProduct"] = $hourlyPerProductRows;
+    break;
+  case "salesPerItem":
+    $response["salesPerProduct"] = $perProductRows;
+    break;
+  case "monthlySales":
+    $response["monthlySales"] = $monthlySalesRows;
+    break;
+  case "salesPerItemPerDate":
+    $response["salesPerItemPerDate"] = $perItemPerDateRows;
+    break;
+}
+
+echo json_encode($response);

@@ -7,10 +7,7 @@ header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
 header("Content-Type: application/json; charset=utf-8");
 
-if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
-    http_response_code(200);
-    exit;
-}
+require __DIR__ . "/secure_guard.php";
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
     http_response_code(405);
@@ -22,7 +19,16 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
     exit;
 }
 
-require __DIR__ . "/report_db.php";
+require __DIR__ . "/pdo.php";
+require_once __DIR__ . "/pos_role_authorization.php";
+posRoleAuthRequirePermission(
+    $pdo,
+    (string)($GLOBALS["pos_user_id"] ?? ""),
+    "reports",
+    "xml"
+);
+
+require_once __DIR__ . "/report_db.php";
 
 function valueOrZero($value): string
 {

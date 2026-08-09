@@ -1,16 +1,45 @@
 <?php
+declare(strict_types=1);
+
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type");
+header("Access-Control-Allow-Headers: Content-Type, Authorization");
 header("Content-Type: application/json");
 
-if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') exit;
+require __DIR__ . "/secure_guard.php";
 
-require __DIR__ . '/report_db.php';
+if (!in_array($_SERVER["REQUEST_METHOD"], ["GET", "POST"], true)) {
+    http_response_code(405);
+    header("Allow: GET, POST, OPTIONS");
+    echo json_encode(["error" => "Method not allowed."]);
+    exit;
+}
+
+require __DIR__ . "/pdo.php";
+require_once __DIR__ . "/pos_role_authorization.php";
+posRoleAuthRequirePermission(
+    $pdo,
+    (string)($GLOBALS["pos_user_id"] ?? ""),
+    "reports",
+    "birESales"
+);
+
+require_once __DIR__ . '/report_db.php';
 
 try {
     $input = json_decode(file_get_contents("php://input"), true);
-    $activeTab = $input['tab'] ?? 'E1';
+    $input = is_array($input) ? $input : [];
+    if ($_SERVER["REQUEST_METHOD"] === "GET") {
+        $input = array_merge($input, $_GET);
+    }
+
+    $activeTab = trim((string)($input['tab'] ?? ''));
+    if (!in_array($activeTab, ["E1", "E2", "E3", "E4", "E5"], true)) {
+        http_response_code(422);
+        echo json_encode(["error" => "A valid tab is required."]);
+        exit;
+    }
+
     $dateFrom = $input['dateFrom'] ?? date('Y-m-d');
     $dateTo = $input['dateTo'] ?? date('Y-m-d');
     $conn = getReportPdo($dateFrom, $dateTo);

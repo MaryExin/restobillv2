@@ -1,12 +1,28 @@
 <?php
+declare(strict_types=1);
+
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
 header("Content-Type: application/json");
 
-if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
+require __DIR__ . "/secure_guard.php";
+
+if (!in_array($_SERVER["REQUEST_METHOD"], ["GET", "POST"], true)) {
+    http_response_code(405);
+    header("Allow: GET, POST, OPTIONS");
+    echo json_encode(["success" => false, "message" => "Method not allowed."]);
     exit;
 }
+
+require __DIR__ . "/pdo.php";
+require_once __DIR__ . "/pos_role_authorization.php";
+posRoleAuthRequirePermission(
+    $pdo,
+    (string)($GLOBALS["pos_user_id"] ?? ""),
+    "reports",
+    "transactions"
+);
 
 $dateFrom     = isset($_GET["dateFrom"]) ? trim($_GET["dateFrom"]) : null;
 $dateTo       = isset($_GET["dateTo"]) ? trim($_GET["dateTo"]) : null;

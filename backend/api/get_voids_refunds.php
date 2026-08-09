@@ -1,23 +1,48 @@
 <?php
+declare(strict_types=1);
+
 header("Access-Control-Allow-Origin: *");
 header("Content-Type: application/json; charset=UTF-8");
 header("Access-Control-Allow-Methods: POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
+require __DIR__ . "/secure_guard.php";
+
+if ($_SERVER["REQUEST_METHOD"] !== "POST") {
+    http_response_code(405);
+    header("Allow: POST, OPTIONS");
+    echo json_encode(["error" => "Method not allowed."]);
     exit;
 }
 
-require_once __DIR__ . '/report_db.php';
-
 $input = file_get_contents("php://input");
 $data = json_decode($input);
+$type = is_object($data) ? trim((string)($data->type ?? "")) : "";
+$permissionByType = [
+    "voids" => "voids",
+    "refunds" => "refunds",
+];
+
+if (!isset($permissionByType[$type])) {
+    http_response_code(422);
+    echo json_encode(["error" => "A valid report type is required."]);
+    exit;
+}
+
+require __DIR__ . "/pdo.php";
+require_once __DIR__ . "/pos_role_authorization.php";
+posRoleAuthRequirePermission(
+    $pdo,
+    (string)($GLOBALS["pos_user_id"] ?? ""),
+    "reports",
+    $permissionByType[$type]
+);
+
+require_once __DIR__ . '/report_db.php';
 
 $conn = getReportMysqli($data->dateFrom ?? null, $data->dateTo ?? null);
 
 if (isset($data->type) && isset($data->dateFrom) && isset($data->dateTo)) {
-    $type = $data->type; 
     $dateFrom = $data->dateFrom;
     $dateTo = $data->dateTo;
 
