@@ -96,6 +96,33 @@ function posReportMirrorShouldSkipSourceRank(int $sourceRank, int $skipInterval)
     return $sourceRank > 0 && $skipInterval > 0 && $sourceRank % $skipInterval === 0;
 }
 
+function posReportMirrorServiceTypeMustPost($serviceType): bool
+{
+    $normalizedServiceType = strtoupper(trim((string)($serviceType ?? "")));
+
+    return in_array($normalizedServiceType, ["FOOD PANDA", "GRAB"], true);
+}
+
+function posReportMirrorShouldSkipTransaction(
+    array $mapRow,
+    int $sourceRank,
+    int $skipInterval,
+    $serviceType
+): bool {
+    // Food-delivery marketplace sales must always be represented in the report
+    // database, even when their source rank lands on the configured interval or
+    // an earlier mirror attempt stored them as skipped.
+    if (posReportMirrorServiceTypeMustPost($serviceType)) {
+        return false;
+    }
+
+    $existingReportStatus = trim((string)($mapRow["report_status"] ?? ""));
+
+    return in_array($existingReportStatus, ["0", "1"], true)
+        ? $existingReportStatus === "1"
+        : posReportMirrorShouldSkipSourceRank($sourceRank, $skipInterval);
+}
+
 /**
  * Existing map rows are the enrollment marker for report mirroring. Normal
  * runtime enrollment comes only from transaction creation after the immutable
@@ -109,6 +136,20 @@ function posReportMirrorCanProcessSource(array $mapRow, bool $allowNewEnrollment
 function posReportMirrorColumnList(array $columns): string
 {
     return implode(", ", array_map("posReportMirrorQuote", $columns));
+}
+
+function posReportMirrorColumnReference(string $column, string $tableAlias = ""): string
+{
+    $quotedColumn = posReportMirrorQuote($column);
+    $tableAlias = trim($tableAlias);
+
+    if ($tableAlias === "") {
+        return $quotedColumn;
+    }
+
+    return posReportMirrorQuote(
+        posReportMirrorIdentifier($tableAlias, "SQL table alias")
+    ) . "." . $quotedColumn;
 }
 
 function posReportMirrorSelectColumnList(array $columns, array $overrides = []): string
@@ -192,18 +233,21 @@ function posReportMirrorScopedWhere(
     string $unitCode,
     string $transactionColumn = "transaction_id",
     string $categoryColumn = "Category_Code",
-    string $unitColumn = "Unit_Code"
+    string $unitColumn = "Unit_Code",
+    string $tableAlias = ""
 ): array {
-    $clauses = [posReportMirrorQuote($transactionColumn) . " = ?"];
+    $clauses = [
+        posReportMirrorColumnReference($transactionColumn, $tableAlias) . " = ?",
+    ];
     $params = [$transactionId];
 
     if ($categoryCode !== "") {
-        $clauses[] = posReportMirrorQuote($categoryColumn) . " = ?";
+        $clauses[] = posReportMirrorColumnReference($categoryColumn, $tableAlias) . " = ?";
         $params[] = $categoryCode;
     }
 
     if ($unitCode !== "") {
-        $clauses[] = posReportMirrorQuote($unitColumn) . " = ?";
+        $clauses[] = posReportMirrorColumnReference($unitColumn, $tableAlias) . " = ?";
         $params[] = $unitCode;
     }
 
@@ -235,36 +279,70 @@ function posReportMirrorReplaceRows(
     $stmt->execute($params);
 }
 
-function posReportMirrorUpsertRowsByDuplicateKey(
+function posReportMirrorUpdateThenInsertRows(
     PDO $pdo,
     string $sourceTable,
     string $targetTable,
     array $columns,
-    string $whereSql,
-    array $whereParams,
+    string $sourceWhereSql,
+    array $sourceWhereParams,
+    string $targetWhereSql,
+    array $targetWhereParams,
     array $selectOverrides = []
 ): void {
+    $sourceAlias = "mirror_source";
+    $targetAlias = "mirror_target";
+    $quotedSourceAlias = posReportMirrorQuote($sourceAlias);
+    $quotedTargetAlias = posReportMirrorQuote($targetAlias);
     $columnList = posReportMirrorColumnList($columns);
     $selectColumnList = posReportMirrorSelectColumnList($columns, $selectOverrides);
-    $params = array_merge(
+    $sourceParams = array_merge(
         posReportMirrorOverrideParams($columns, $selectOverrides),
-        $whereParams
+        $sourceWhereParams
     );
-    $updates = [];
+    $updateAssignments = [];
 
     foreach ($columns as $column) {
-        $quotedColumn = posReportMirrorQuote($column);
-        $updates[] = "{$quotedColumn} = VALUES({$quotedColumn})";
+        $updateAssignments[] =
+            posReportMirrorColumnReference($column, $targetAlias) .
+            " = " .
+            posReportMirrorColumnReference($column, $sourceAlias);
     }
 
-    $stmt = $pdo->prepare("
+    $updateStmt = $pdo->prepare("
+        UPDATE {$targetTable} AS {$quotedTargetAlias}
+        INNER JOIN (
+            SELECT {$selectColumnList}
+            FROM {$sourceTable}
+            WHERE {$sourceWhereSql}
+        ) AS {$quotedSourceAlias}
+        SET " . implode(", ", $updateAssignments) . "
+        WHERE {$targetWhereSql}
+    ");
+    $updateStmt->execute(array_merge($sourceParams, $targetWhereParams));
+
+    // Do not execute an INSERT at all for an existing report row. Even an
+    // A duplicate-key upsert still reserves an AUTO_INCREMENT value and creates
+    // the visible ID gaps this writer avoids.
+    $existsStmt = $pdo->prepare("
+        SELECT 1
+        FROM {$targetTable} AS {$quotedTargetAlias}
+        WHERE {$targetWhereSql}
+        LIMIT 1
+    ");
+    $existsStmt->execute($targetWhereParams);
+
+    if ($existsStmt->fetchColumn() !== false) {
+        return;
+    }
+
+    $insertStmt = $pdo->prepare("
         INSERT INTO {$targetTable} ({$columnList})
         SELECT {$selectColumnList}
         FROM {$sourceTable}
-        WHERE {$whereSql}
-        ON DUPLICATE KEY UPDATE " . implode(", ", $updates) . "
+        WHERE {$sourceWhereSql}
     ");
-    $stmt->execute($params);
+    $insertStmt->execute($sourceParams);
 }
 
 function posReportMirrorDeleteRows(PDO $pdo, string $targetTable, string $whereSql, array $whereParams): void
@@ -342,6 +420,7 @@ function posReportMirrorFetchSourceTransaction(
             CAST(`transaction_id` AS CHAR) AS transaction_id,
             CAST(`order_slip_no` AS CHAR) AS order_slip_no,
             CAST(`invoice_no` AS CHAR) AS invoice_no,
+            CAST(`order_type` AS CHAR) AS order_type,
             CAST(`Category_Code` AS CHAR) AS Category_Code,
             CAST(`Unit_Code` AS CHAR) AS Unit_Code
         FROM {$sourceMainTable}
@@ -424,9 +503,11 @@ function posReportMirrorMapTable(string $reportDbName): string
 }
 
 /**
- * The activation columns are required by every map read/write after the
- * activation-boundary release. Cache the result for the current PHP request
- * so save_order's activation claim and mirror do not repeat this lookup.
+ * The activation columns and scoped report-header unique key are required by
+ * every map read/write after the activation-boundary release. The scoped key
+ * protects the update-then-insert writer from concurrent duplicate headers.
+ * Cache the result for the current PHP request so save_order's activation
+ * claim and mirror do not repeat this lookup.
  */
 function posReportMirrorMapActivationMembershipReady(PDO $pdo, string $reportDbName): bool
 {
@@ -468,15 +549,39 @@ function posReportMirrorMapActivationMembershipReady(PDO $pdo, string $reportDbN
                          OR (SEQ_IN_INDEX = 2 AND COLUMN_NAME = 'activation_sequence')
                       )
                 ) = 2
+                AND (
+                    SELECT CASE
+                        WHEN COUNT(*) = 3
+                         AND SUM(CASE
+                            WHEN (SEQ_IN_INDEX = 1 AND COLUMN_NAME = 'transaction_id')
+                              OR (SEQ_IN_INDEX = 2 AND COLUMN_NAME = 'Category_Code')
+                              OR (SEQ_IN_INDEX = 3 AND COLUMN_NAME = 'Unit_Code')
+                            THEN 1
+                            ELSE 0
+                         END) = 3
+                        THEN 1
+                        ELSE 0
+                    END
+                    FROM information_schema.STATISTICS
+                    WHERE TABLE_SCHEMA = ?
+                      AND TABLE_NAME = 'tbl_pos_transactions'
+                      AND INDEX_NAME = 'ux_pos_transactions_report_txn_scope'
+                      AND NON_UNIQUE = 0
+                ) = 1
                 THEN 1
                 ELSE 0
             END
         ");
-        $stmt->execute([$reportDbName, $reportDbName, $reportDbName]);
+        $stmt->execute([
+            $reportDbName,
+            $reportDbName,
+            $reportDbName,
+            $reportDbName,
+        ]);
         $readiness[$cacheKey] = (int)$stmt->fetchColumn() === 1;
     } catch (Throwable $error) {
         error_log(
-            "Unable to verify POS report map activation schema: " .
+            "Unable to verify POS report mirror schema: " .
             $error->getMessage()
         );
         $readiness[$cacheKey] = false;
@@ -1066,10 +1171,12 @@ function mirrorPosTransactionToReport(
     } else {
         $skipInterval = posReportMirrorGetSkipInterval($pdo, $posDbName, $reportDbName);
     }
-    $existingReportStatus = trim((string)($mapRow["report_status"] ?? ""));
-    $shouldSkipTransaction = in_array($existingReportStatus, ["0", "1"], true)
-        ? $existingReportStatus === "1"
-        : posReportMirrorShouldSkipSourceRank($sourceRank, $skipInterval);
+    $shouldSkipTransaction = posReportMirrorShouldSkipTransaction(
+        $mapRow,
+        $sourceRank,
+        $skipInterval,
+        $sourceTransaction["order_type"] ?? ""
+    );
 
     if ($shouldSkipTransaction) {
         // A newly enrolled skipped transaction has never had report rows.
@@ -1163,13 +1270,26 @@ function mirrorPosTransactionToReport(
         static fn($column) => $column !== "ID"
     ));
 
-    posReportMirrorUpsertRowsByDuplicateKey(
+    $targetMainAlias = "mirror_target";
+    [$targetMainWhere, $targetMainParams] = posReportMirrorScopedWhere(
+        $reportTransactionId,
+        $sourceCategoryCode,
+        $sourceUnitCode,
+        "transaction_id",
+        "Category_Code",
+        "Unit_Code",
+        $targetMainAlias
+    );
+
+    posReportMirrorUpdateThenInsertRows(
         $pdo,
         $sourceMainTable,
         $targetMainTable,
         $reportMainColumns,
         $mainWhere,
         $mainParams,
+        $targetMainWhere,
+        $targetMainParams,
         [
             "transaction_id" => $reportTransactionId,
             "order_slip_no" => $reportOrderSlipNo,

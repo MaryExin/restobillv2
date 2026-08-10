@@ -125,6 +125,7 @@ foreach ([
     "COLUMN_NAME IN ('activation_key', 'activation_sequence')",
     "information_schema.STATISTICS",
     "ux_pos_report_map_activation_sequence",
+    "ux_pos_transactions_report_txn_scope",
     "NON_UNIQUE = 0",
 ] as $readinessContract) {
     posReportActivationSplitAssert(

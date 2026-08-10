@@ -131,7 +131,10 @@ $currentDatePdo = getZReadingReportPdo(
 if (
     $currentDatePdo !== $primaryPdo
     || str_contains($primaryPdo->preparedSql, "tbl_pos_shifting_records")
-    || str_contains($primaryPdo->preparedSql, "tbl_pos_transactions")
+    || preg_match(
+        '/FROM\s+(?:`[^`]+`\.)?`?tbl_pos_transactions`?\b/i',
+        $primaryPdo->preparedSql
+    ) === 1
 ) {
     throw new RuntimeException(
         "Failed: current-date Z-reading must not scan report data before activation"
