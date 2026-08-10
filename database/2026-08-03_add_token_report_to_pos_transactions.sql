@@ -1,5 +1,7 @@
 -- Adds a letters-only report token used to link db_cnc_pos transactions
 -- to reports_database rows even when reports_database.transaction_id is remapped.
+-- LEGACY HISTORICAL MIGRATION: do not run this for a new-transactions-only
+-- report mirror deployment. Use 2026-08-03_create_pos_report_transaction_map.sql.
 
 USE db_cnc_pos;
 

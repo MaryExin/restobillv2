@@ -23,6 +23,7 @@ import {
 import { useTheme } from "../../context/ThemeContext";
 import useApiHost from "../../hooks/useApiHost";
 import { getCurrentUserRole } from "../../utils/getCurrentUserRole";
+import { posAuthenticatedFetch } from "../../utils/posAuthenticatedFetch";
 import useZustandLoginCred from "../../context/useZustandLoginCred";
 import { hasPosReportAccess } from "../../utils/posRoleAccess";
 import {
@@ -150,19 +151,23 @@ const PosReports = ({
       setIsLoadingZReading(true);
       setZReadingData(null);
 
-      const res = await fetch(`${apiHost}/api/reprint_z_reading.php`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const res = await posAuthenticatedFetch(
+        `${apiHost}/api/reprint_z_reading.php`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            selectedDate,
+            categoryCode:
+              localStorage.getItem("posBusinessCategoryCode") || "",
+            unitCode: localStorage.getItem("posBusinessUnitCode") || "",
+            terminalNumber: localStorage.getItem("posTerminalNumber") || "1",
+            role: getCurrentUserRole(),
+          }),
         },
-        body: JSON.stringify({
-          selectedDate,
-          categoryCode: localStorage.getItem("posBusinessCategoryCode") || "",
-          unitCode: localStorage.getItem("posBusinessUnitCode") || "",
-          terminalNumber: localStorage.getItem("posTerminalNumber") || "1",
-          role: getCurrentUserRole(),
-        }),
-      });
+      );
 
       const json = await res.json();
 
@@ -197,20 +202,24 @@ const PosReports = ({
       setIsLoadingZReadingMonthly(true);
       setZReadingMonthlyData(null);
 
-      const res = await fetch(`${apiHost}/api/reprint_z_reading_monthly.php`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const res = await posAuthenticatedFetch(
+        `${apiHost}/api/reprint_z_reading_monthly.php`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            dateFrom,
+            dateTo,
+            categoryCode:
+              localStorage.getItem("posBusinessCategoryCode") || "",
+            unitCode: localStorage.getItem("posBusinessUnitCode") || "",
+            terminalNumber: localStorage.getItem("posTerminalNumber") || "1",
+            role: getCurrentUserRole(),
+          }),
         },
-        body: JSON.stringify({
-          dateFrom,
-          dateTo,
-          categoryCode: localStorage.getItem("posBusinessCategoryCode") || "",
-          unitCode: localStorage.getItem("posBusinessUnitCode") || "",
-          terminalNumber: localStorage.getItem("posTerminalNumber") || "1",
-          role: getCurrentUserRole(),
-        }),
-      });
+      );
 
       const json = await res.json();
 

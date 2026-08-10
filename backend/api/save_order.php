@@ -16,6 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require __DIR__ . "/bootstrap.php";
 require_once __DIR__ . "/pos_report_mirror.php";
+require_once __DIR__ . "/pos_report_mirror_activation.php";
 
 date_default_timezone_set('Asia/Manila');
 
@@ -122,6 +123,7 @@ function allocateDocumentCounter(
 }
 
 $manualTransactionStarted = false;
+$reportMirrorActivation = null;
 
 try {
     $raw = file_get_contents("php://input");
@@ -270,6 +272,27 @@ try {
         ":refund_date" => $refund_date,
         ":date_recorded" => $date_recorded
     ]);
+
+    // Capture the physical source row now. Later child inserts replace
+    // PDO::lastInsertId(); the first skipped mirror stores this exact ID as
+    // the immutable activation audit boundary.
+    $sourcePosId = trim((string)$pdo->lastInsertId());
+    if ($sourcePosId === "" || !preg_match('/^\d+$/', $sourcePosId) || (int)$sourcePosId <= 0) {
+        $sourceIdStmt = $pdo->prepare("
+            SELECT CAST(`ID` AS CHAR)
+            FROM `tbl_pos_transactions`
+            WHERE `transaction_id` = ?
+              AND `Category_Code` = ?
+              AND `Unit_Code` = ?
+            ORDER BY `ID` DESC
+            LIMIT 1
+        ");
+        $sourceIdStmt->execute([(string)$transaction_id, $Category_Code, $Unit_Code]);
+        $sourcePosId = trim((string)$sourceIdStmt->fetchColumn());
+    }
+    if ($sourcePosId === "" || !preg_match('/^\d+$/', $sourcePosId) || (int)$sourcePosId <= 0) {
+        throw new RuntimeException("Unable to identify the saved POS transaction row.");
+    }
 
     $sqlDetails = "INSERT INTO tbl_pos_transactions_detailed (
         transaction_id,
@@ -449,7 +472,85 @@ try {
         ":Log_Time" => $Log_Time
     ]);
 
-    mirrorPosTransactionToReport($pdo, $config, (string)$transaction_id, $Category_Code, $Unit_Code);
+    $posDbName = posReportMirrorIdentifier(
+        $config["db"] ?? "db_cnc_pos",
+        "POS database name"
+    );
+    $reportDbName = posReportMirrorIdentifier(
+        $config["report_db"] ?? "reports_database",
+        "report database name"
+    );
+    $reportSkipInterval = posReportMirrorGetSkipInterval(
+        $pdo,
+        $posDbName,
+        $reportDbName
+    );
+
+    // Claim and sequence allocation are constant-time and part of the sale
+    // transaction. Sequence 1 therefore identifies the first successfully
+    // committed transaction using the skipping approach.
+    $pdo->exec("SAVEPOINT pos_report_mirror_activation");
+    try {
+        $reportMirrorActivation = posReportMirrorActivationClaimAndNextSequence(
+            $pdo,
+            $config,
+            $sourcePosId,
+            (string)$transaction_id,
+            $transaction_date,
+            $reportSkipInterval
+        );
+        $pdo->exec("RELEASE SAVEPOINT pos_report_mirror_activation");
+    } catch (Throwable $activationError) {
+        try {
+            $pdo->exec("ROLLBACK TO SAVEPOINT pos_report_mirror_activation");
+            $pdo->exec("RELEASE SAVEPOINT pos_report_mirror_activation");
+        } catch (Throwable $savepointError) {
+            error_log(
+                "Unable to restore POS report activation savepoint: " .
+                $savepointError->getMessage()
+            );
+        }
+        error_log("Unable to activate POS report skipping: " . $activationError->getMessage());
+        $reportMirrorActivation = [
+            "status" => "activation_failed",
+            "active" => false,
+            "migration_required" => false,
+            "source_sequence" => null,
+        ];
+    }
+
+    $activationStatus = (string)($reportMirrorActivation["status"] ?? "");
+    $sourceSequence = (int)($reportMirrorActivation["source_sequence"] ?? 0);
+    $activationKey = trim((string)($reportMirrorActivation["activation_key"] ?? ""));
+    $canMirrorWithSkipping = $activationStatus === "active"
+        || $activationStatus === "not_required"
+        || (
+            $reportSkipInterval === 0
+            && $activationStatus === "waiting_for_first_skipped_transaction"
+        );
+
+    if ($canMirrorWithSkipping) {
+        mirrorPosTransactionToReport(
+            $pdo,
+            $config,
+            (string)$transaction_id,
+            $Category_Code,
+            $Unit_Code,
+            true,
+            $reportSkipInterval,
+            $sourceSequence > 0 ? $sourceSequence : max(1, (int)$sourcePosId),
+            $activationKey !== "" ? $activationKey : null,
+            $sourceSequence > 0 ? $sourceSequence : null
+        );
+    } else {
+        // Fail open for the sale, but do not create skipped report data with
+        // no durable boundary. After the migration is installed, the next
+        // successful save becomes the activation row and sequence 1.
+        error_log(
+            "POS report mirror skipped because activation state is unavailable: " .
+            ($activationStatus !== "" ? $activationStatus : "unknown")
+        );
+    }
 
     $pdo->commit();
     $manualTransactionStarted = false;
@@ -459,7 +560,8 @@ try {
         "message" => "Transaction saved successfully",
         "transaction_id" => $transaction_id,
         "order_slip_no" => $order_slip_no,
-        "total_amount" => round($totalAmount, 2)
+        "total_amount" => round($totalAmount, 2),
+        "report_mirror_activation" => $reportMirrorActivation
     ]);
 } catch (Throwable $e) {
     if (

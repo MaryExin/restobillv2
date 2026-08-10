@@ -23,6 +23,7 @@ const PosReportMirrorSettings = ({ isDark, accent = "#3b82f6" }) => {
   const [initialSkipInterval, setInitialSkipInterval] = useState("3");
   const [reportDatabase, setReportDatabase] = useState("");
   const [isSynced, setIsSynced] = useState(false);
+  const [mirrorActivation, setMirrorActivation] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -46,6 +47,21 @@ const PosReportMirrorSettings = ({ isDark, accent = "#3b82f6" }) => {
   }, [initialSkipInterval]);
 
   const hasChanges = String(skipInterval) !== String(initialSkipInterval);
+  const activationLabel = useMemo(() => {
+    if (mirrorActivation?.active) {
+      const value = String(mirrorActivation.activation_business_date || "");
+      const date = new Date(`${value}T00:00:00`);
+      return Number.isNaN(date.getTime())
+        ? value || "Active"
+        : new Intl.DateTimeFormat(undefined, {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          }).format(date);
+    }
+    if (mirrorActivation?.migration_required) return "Setup Required";
+    return "First Sale After Skipping Is Enabled";
+  }, [mirrorActivation]);
 
   useEffect(() => {
     if (!apiHost) return;
@@ -79,6 +95,7 @@ const PosReportMirrorSettings = ({ isDark, accent = "#3b82f6" }) => {
           setInitialSkipInterval(nextSkipInterval);
           setReportDatabase(String(result?.data?.report_database || ""));
           setIsSynced(Boolean(result?.data?.synced_to_report_database));
+          setMirrorActivation(result?.data?.report_mirror_activation || null);
         }
       } catch (err) {
         if (!cancelled) {
@@ -152,6 +169,7 @@ const PosReportMirrorSettings = ({ isDark, accent = "#3b82f6" }) => {
       setInitialSkipInterval(savedSkipInterval);
       setReportDatabase(String(result?.data?.report_database || ""));
       setIsSynced(Boolean(result?.data?.synced_to_report_database));
+      setMirrorActivation(result?.data?.report_mirror_activation || null);
       setMessage("Report database settings saved.");
     } catch (err) {
       setError(err.message || "Failed to save report database settings.");
@@ -251,7 +269,7 @@ const PosReportMirrorSettings = ({ isDark, accent = "#3b82f6" }) => {
           </div>
 
           <div
-            className={`mt-6 grid grid-cols-1 gap-4 rounded-2xl border p-4 sm:grid-cols-3 ${theme.panelSoft}`}
+            className={`mt-6 grid grid-cols-1 gap-4 rounded-2xl border p-4 sm:grid-cols-2 lg:grid-cols-4 ${theme.panelSoft}`}
           >
             <div>
               <span
@@ -287,6 +305,23 @@ const PosReportMirrorSettings = ({ isDark, accent = "#3b82f6" }) => {
                 }`}
               >
                 {isSynced ? "Saved" : "Pending"}
+              </span>
+            </div>
+
+            <div>
+              <span
+                className={`block text-[10px] font-black uppercase tracking-[0.16em] ${theme.textSoft}`}
+              >
+                Skip Started
+              </span>
+              <span
+                className={`mt-1 block text-sm font-black ${
+                  mirrorActivation?.active
+                    ? "text-emerald-500"
+                    : "text-amber-500"
+                }`}
+              >
+                {activationLabel}
               </span>
             </div>
           </div>

@@ -1,6 +1,6 @@
 -- Moves token_report out of the POS transaction tables.
--- Run 2026-08-03_create_pos_report_transaction_map.sql first so all current
--- CNC/report links are preserved in reports_database.tbl_pos_report_transaction_map.
+-- LEGACY HISTORICAL MIGRATION: new-transactions-only deployments do not add
+-- token_report columns and therefore do not need to run this script.
 
 USE reports_database;
 

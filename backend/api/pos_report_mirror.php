@@ -96,6 +96,16 @@ function posReportMirrorShouldSkipSourceRank(int $sourceRank, int $skipInterval)
     return $sourceRank > 0 && $skipInterval > 0 && $sourceRank % $skipInterval === 0;
 }
 
+/**
+ * Existing map rows are the enrollment marker for report mirroring. Normal
+ * runtime enrollment comes only from transaction creation after the immutable
+ * skipping activation boundary. Historical transactions remain unmapped.
+ */
+function posReportMirrorCanProcessSource(array $mapRow, bool $allowNewEnrollment): bool
+{
+    return $allowNewEnrollment || count($mapRow) > 0;
+}
+
 function posReportMirrorColumnList(array $columns): string
 {
     return implode(", ", array_map("posReportMirrorQuote", $columns));
@@ -413,6 +423,68 @@ function posReportMirrorMapTable(string $reportDbName): string
     return posReportMirrorTable($reportDbName, "tbl_pos_report_transaction_map");
 }
 
+/**
+ * The activation columns are required by every map read/write after the
+ * activation-boundary release. Cache the result for the current PHP request
+ * so save_order's activation claim and mirror do not repeat this lookup.
+ */
+function posReportMirrorMapActivationMembershipReady(PDO $pdo, string $reportDbName): bool
+{
+    static $readiness = [];
+
+    $cacheKey = spl_object_id($pdo) . "|" . strtolower($reportDbName);
+    if (array_key_exists($cacheKey, $readiness)) {
+        return $readiness[$cacheKey];
+    }
+
+    try {
+        $stmt = $pdo->prepare("
+            SELECT CASE
+                WHEN (
+                    SELECT COUNT(DISTINCT TABLE_NAME)
+                    FROM information_schema.TABLES
+                    WHERE TABLE_SCHEMA = ?
+                      AND TABLE_NAME IN (
+                          'tbl_pos_report_transaction_map',
+                          'tbl_pos_report_mirror_activation'
+                      )
+                ) = 2
+                AND (
+                    SELECT COUNT(DISTINCT COLUMN_NAME)
+                    FROM information_schema.COLUMNS
+                    WHERE TABLE_SCHEMA = ?
+                      AND TABLE_NAME = 'tbl_pos_report_transaction_map'
+                      AND COLUMN_NAME IN ('activation_key', 'activation_sequence')
+                ) = 2
+                AND (
+                    SELECT COUNT(*)
+                    FROM information_schema.STATISTICS
+                    WHERE TABLE_SCHEMA = ?
+                      AND TABLE_NAME = 'tbl_pos_report_transaction_map'
+                      AND INDEX_NAME = 'ux_pos_report_map_activation_sequence'
+                      AND NON_UNIQUE = 0
+                      AND (
+                            (SEQ_IN_INDEX = 1 AND COLUMN_NAME = 'activation_key')
+                         OR (SEQ_IN_INDEX = 2 AND COLUMN_NAME = 'activation_sequence')
+                      )
+                ) = 2
+                THEN 1
+                ELSE 0
+            END
+        ");
+        $stmt->execute([$reportDbName, $reportDbName, $reportDbName]);
+        $readiness[$cacheKey] = (int)$stmt->fetchColumn() === 1;
+    } catch (Throwable $error) {
+        error_log(
+            "Unable to verify POS report map activation schema: " .
+            $error->getMessage()
+        );
+        $readiness[$cacheKey] = false;
+    }
+
+    return $readiness[$cacheKey];
+}
+
 function posReportMirrorMapTokenExists(PDO $pdo, string $reportDbName, string $token): bool
 {
     $mapTable = posReportMirrorMapTable($reportDbName);
@@ -438,6 +510,8 @@ function posReportMirrorFetchReportMapByToken(
             CAST(`token_report` AS CHAR) AS token_report,
             CAST(`source_pos_id` AS CHAR) AS source_pos_id,
             CAST(`source_rank` AS CHAR) AS source_rank,
+            CAST(`activation_key` AS CHAR) AS activation_key,
+            CAST(`activation_sequence` AS CHAR) AS activation_sequence,
             CAST(`source_transaction_id` AS CHAR) AS source_transaction_id,
             CAST(`source_order_slip_no` AS CHAR) AS source_order_slip_no,
             CAST(`source_invoice_no` AS CHAR) AS source_invoice_no,
@@ -472,6 +546,8 @@ function posReportMirrorFetchReportMapBySource(
             CAST(`token_report` AS CHAR) AS token_report,
             CAST(`source_pos_id` AS CHAR) AS source_pos_id,
             CAST(`source_rank` AS CHAR) AS source_rank,
+            CAST(`activation_key` AS CHAR) AS activation_key,
+            CAST(`activation_sequence` AS CHAR) AS activation_sequence,
             CAST(`source_transaction_id` AS CHAR) AS source_transaction_id,
             CAST(`source_order_slip_no` AS CHAR) AS source_order_slip_no,
             CAST(`source_invoice_no` AS CHAR) AS source_invoice_no,
@@ -629,7 +705,9 @@ function posReportMirrorSaveReportMap(
     int $reportStatus,
     ?string $reportTransactionId,
     ?string $reportOrderSlipNo,
-    ?string $reportInvoiceNo
+    ?string $reportInvoiceNo,
+    ?string $activationKey = null,
+    ?int $activationSequence = null
 ): void {
     $mapTable = posReportMirrorMapTable($reportDbName);
     $sourceOrderSlipNo = trim($sourceOrderSlipNo) === "" ? "0" : trim($sourceOrderSlipNo);
@@ -641,6 +719,8 @@ function posReportMirrorSaveReportMap(
             `token_report`,
             `source_pos_id`,
             `source_rank`,
+            `activation_key`,
+            `activation_sequence`,
             `source_transaction_id`,
             `source_order_slip_no`,
             `source_invoice_no`,
@@ -650,7 +730,7 @@ function posReportMirrorSaveReportMap(
             `Category_Code`,
             `Unit_Code`,
             `report_status`
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
             `token_report` = CASE
                 WHEN `token_report` IS NULL OR `token_report` = ''
@@ -659,6 +739,11 @@ function posReportMirrorSaveReportMap(
             END,
             `source_pos_id` = VALUES(`source_pos_id`),
             `source_rank` = VALUES(`source_rank`),
+            `activation_key` = COALESCE(`activation_key`, VALUES(`activation_key`)),
+            `activation_sequence` = COALESCE(
+                `activation_sequence`,
+                VALUES(`activation_sequence`)
+            ),
             `source_transaction_id` = VALUES(`source_transaction_id`),
             `source_order_slip_no` = VALUES(`source_order_slip_no`),
             `source_invoice_no` = VALUES(`source_invoice_no`),
@@ -674,6 +759,8 @@ function posReportMirrorSaveReportMap(
         $tokenReport,
         $sourceId,
         $sourceRank,
+        $activationKey,
+        $activationSequence,
         $sourceTransactionId,
         $sourceOrderSlipNo,
         $sourceInvoiceNo,
@@ -814,7 +901,12 @@ function mirrorPosTransactionToReport(
     array $config,
     string $transactionId,
     string $categoryCode = "",
-    string $unitCode = ""
+    string $unitCode = "",
+    bool $allowNewEnrollment = false,
+    ?int $skipIntervalOverride = null,
+    ?int $sourceRankOverride = null,
+    ?string $activationKey = null,
+    ?int $activationSequence = null
 ): void {
     $transactionId = trim($transactionId);
     $categoryCode = trim($categoryCode);
@@ -824,10 +916,39 @@ function mirrorPosTransactionToReport(
         throw new InvalidArgumentException("transaction_id is required for report mirror.");
     }
 
+    $activationKey = $activationKey === null ? null : trim($activationKey);
+    $hasActivationKey = $activationKey !== null && $activationKey !== "";
+    $hasActivationSequence = $activationSequence !== null;
+    if ($hasActivationKey !== $hasActivationSequence) {
+        throw new InvalidArgumentException(
+            "Report mirror activation key and sequence must be provided together."
+        );
+    }
+    if ($hasActivationKey) {
+        if (!$allowNewEnrollment) {
+            throw new InvalidArgumentException(
+                "Activation membership is allowed only during new transaction enrollment."
+            );
+        }
+        if (strlen((string)$activationKey) > 191 || (int)$activationSequence <= 0) {
+            throw new InvalidArgumentException("Invalid report mirror activation membership.");
+        }
+    } else {
+        $activationKey = null;
+        $activationSequence = null;
+    }
+
     $posDbName = posReportMirrorIdentifier($config["db"] ?? "db_cnc_pos", "POS database name");
     $reportDbName = posReportMirrorIdentifier($config["report_db"] ?? "reports_database", "report database name");
 
     if (strcasecmp($posDbName, $reportDbName) === 0) {
+        return;
+    }
+
+    // Until the activation membership migration is installed, mirroring is a
+    // no-op. Primary transaction mutations must remain available and must not
+    // create map rows whose activation ownership cannot be recorded.
+    if (!posReportMirrorMapActivationMembershipReady($pdo, $reportDbName)) {
         return;
     }
 
@@ -842,14 +963,34 @@ function mirrorPosTransactionToReport(
     $sourceTransactionId = (string)$sourceTransaction["transaction_id"];
     $sourceOrderSlipNo = (string)$sourceTransaction["order_slip_no"];
     $sourceInvoiceNo = (string)$sourceTransaction["invoice_no"];
-    $tokenReport = posReportMirrorEnsureMapToken(
+    $sourceCategoryCode = (string)($sourceTransaction["Category_Code"] ?? $categoryCode);
+    $sourceUnitCode = (string)($sourceTransaction["Unit_Code"] ?? $unitCode);
+    $mapRow = posReportMirrorFetchReportMapBySource(
         $pdo,
         $reportDbName,
         $sourceId,
         $sourceTransactionId,
-        $sourceTransaction["Category_Code"] ?? $categoryCode,
-        $sourceTransaction["Unit_Code"] ?? $unitCode
+        $sourceCategoryCode,
+        $sourceUnitCode
     );
+
+    // Legacy transactions have no map row. Mutation endpoints must not enroll
+    // them; only the new-transaction creation flow opts in to enrollment.
+    if (!posReportMirrorCanProcessSource($mapRow, $allowNewEnrollment)) {
+        return;
+    }
+
+    $tokenReport = posReportMirrorMapValue($mapRow, "token_report");
+    if ($tokenReport === "") {
+        $tokenReport = posReportMirrorEnsureMapToken(
+            $pdo,
+            $reportDbName,
+            $sourceId,
+            $sourceTransactionId,
+            $sourceCategoryCode,
+            $sourceUnitCode
+        );
+    }
 
     $mainColumns = [
         "ID",
@@ -901,33 +1042,52 @@ function mirrorPosTransactionToReport(
     [$mainWhere, $mainParams] = posReportMirrorScopedWhere($transactionId, $categoryCode, $unitCode);
     $sourceMainTable = posReportMirrorTable($posDbName, "tbl_pos_transactions");
     $targetMainTable = posReportMirrorTable($reportDbName, "tbl_pos_transactions");
-    $sourceRank = posReportMirrorGetSourceTransactionRank($pdo, $posDbName, $sourceId);
-    $mapRow = posReportMirrorFetchReportMapBySource(
-        $pdo,
-        $reportDbName,
-        $sourceId,
-        $sourceTransactionId,
-        $sourceTransaction["Category_Code"] ?? $categoryCode,
-        $sourceTransaction["Unit_Code"] ?? $unitCode
-    );
+    $mappedSourceRank = (int)($mapRow["source_rank"] ?? 0);
+    if ($mappedSourceRank > 0) {
+        // Updates keep the original activation-relative rank and never recount
+        // the growing source transaction table.
+        $sourceRank = $mappedSourceRank;
+    } elseif ($sourceRankOverride !== null) {
+        if ($sourceRankOverride <= 0) {
+            throw new InvalidArgumentException("Invalid report mirror source rank override.");
+        }
+        $sourceRank = $sourceRankOverride;
+    } else {
+        // Backward-compatible fallback for explicitly authorized callers that
+        // have not yet adopted the constant-time activation sequence.
+        $sourceRank = posReportMirrorGetSourceTransactionRank($pdo, $posDbName, $sourceId);
+    }
 
-    $skipInterval = posReportMirrorGetSkipInterval($pdo, $posDbName, $reportDbName);
+    if ($skipIntervalOverride !== null) {
+        if ($skipIntervalOverride < 0 || $skipIntervalOverride === 1 || $skipIntervalOverride > 1000000) {
+            throw new InvalidArgumentException("Invalid report mirror skip interval override.");
+        }
+        $skipInterval = $skipIntervalOverride;
+    } else {
+        $skipInterval = posReportMirrorGetSkipInterval($pdo, $posDbName, $reportDbName);
+    }
     $existingReportStatus = trim((string)($mapRow["report_status"] ?? ""));
     $shouldSkipTransaction = in_array($existingReportStatus, ["0", "1"], true)
         ? $existingReportStatus === "1"
         : posReportMirrorShouldSkipSourceRank($sourceRank, $skipInterval);
 
     if ($shouldSkipTransaction) {
-        posReportMirrorDeleteTransactionFromReport(
-            $pdo,
-            $posDbName,
-            $reportDbName,
-            $tokenReport,
-            $transactionId,
-            $categoryCode,
-            $unitCode,
-            posReportMirrorMapValue($mapRow, "report_transaction_id")
-        );
+        // A newly enrolled skipped transaction has never had report rows.
+        // Avoid source-ID cleanup until a map proves this transaction was
+        // previously enrolled, because report child IDs are not a safe global
+        // identity across independent databases.
+        if (count($mapRow) > 0) {
+            posReportMirrorDeleteTransactionFromReport(
+                $pdo,
+                $posDbName,
+                $reportDbName,
+                $tokenReport,
+                $transactionId,
+                $categoryCode,
+                $unitCode,
+                posReportMirrorMapValue($mapRow, "report_transaction_id")
+            );
+        }
         posReportMirrorSaveReportMap(
             $pdo,
             $reportDbName,
@@ -942,7 +1102,9 @@ function mirrorPosTransactionToReport(
             1,
             null,
             null,
-            null
+            null,
+            $activationKey,
+            $activationSequence
         );
         return;
     }
@@ -986,13 +1148,15 @@ function mirrorPosTransactionToReport(
         $sourceRank,
         $sourceTransactionId,
         $sourceOrderSlipNo,
-            $sourceInvoiceNo,
-            $sourceTransaction["Category_Code"] ?? $categoryCode,
-            $sourceTransaction["Unit_Code"] ?? $unitCode,
-            0,
-            $reportTransactionId,
-            $reportOrderSlipNo,
-            $reportInvoiceNo
+        $sourceInvoiceNo,
+        $sourceTransaction["Category_Code"] ?? $categoryCode,
+        $sourceTransaction["Unit_Code"] ?? $unitCode,
+        0,
+        $reportTransactionId,
+        $reportOrderSlipNo,
+        $reportInvoiceNo,
+        $activationKey,
+        $activationSequence
     );
     $reportMainColumns = array_values(array_filter(
         $mainColumns,
@@ -1182,6 +1346,10 @@ function mirrorPosTransactionToReport(
     }
 }
 
+/**
+ * Repairs already-enrolled report rows only. The INNER JOIN on the map table
+ * prevents this maintenance helper from enrolling historical transactions.
+ */
 function mirrorRecentPosTransactionsToReport(PDO $pdo, array $config, int $limit = 200): int
 {
     $posDbName = posReportMirrorIdentifier($config["db"] ?? "db_cnc_pos", "POS database name");
@@ -1283,7 +1451,7 @@ function mirrorRecentPosTransactionsToReport(PDO $pdo, array $config, int $limit
                 ) AS source_rank
             FROM {$sourceMainTable} source_row
         ) p
-        LEFT JOIN {$mapTable} m
+        INNER JOIN {$mapTable} m
             ON m.`source_pos_id` <=> p.`ID`
         LEFT JOIN {$targetMainTable} r
             ON r.`transaction_id` <=> m.`report_transaction_id`

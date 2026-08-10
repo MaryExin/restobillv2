@@ -17,7 +17,6 @@ date_default_timezone_set("Asia/Manila");
     1. LOAD CONFIG & DB
 ------------------------------ */
 $config = require __DIR__ . "/config.php";
-require_once __DIR__ . "/pos_report_mirror.php";
 
 try {
     $dsn = "mysql:host={$config['host']};dbname={$config['db']};charset={$config['charset']}";
@@ -44,6 +43,8 @@ $user_id = $input['user_id'] ?? 0;
     3. FETCH DATA
 ------------------------------ */
 try {
+    // Historical report catch-up is intentionally disabled. These values stay
+    // in the response for backward compatibility with existing clients.
     $reportMirrorSynced = 0;
     $reportMirrorWarning = "";
 
@@ -134,12 +135,6 @@ try {
     $stmt_cats->bindValue(':unit_code', $unit_code, PDO::PARAM_STR);
     $stmt_cats->execute();
     $item_categories = $stmt_cats->fetchAll();
-
-    try {
-        $reportMirrorSynced = mirrorRecentPosTransactionsToReport($pdo, $config, 200);
-    } catch (Throwable $mirrorError) {
-        $reportMirrorWarning = $mirrorError->getMessage();
-    }
 
     /* ------------------------------
         8. RESPONSE

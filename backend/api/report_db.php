@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . "/pos_report_mirror_activation.php";
+
 // Picks which DB config a report endpoint should read from, based on the
 // report date(s) being requested:
 // - any requested date before today -> report_db (backup archive db)
@@ -34,11 +36,8 @@ function resolveReportDbConfig(array $config, ?string $dateFrom, ?string $dateTo
     return $dbConfig;
 }
 
-function getReportPdo(?string $dateFrom, ?string $dateTo = null): PDO
+function reportDbConnectPdo(array $dbConfig): PDO
 {
-    $config = require __DIR__ . "/config.php";
-    $dbConfig = resolveReportDbConfig($config, $dateFrom, $dateTo);
-
     $dsn = "mysql:host={$dbConfig['host']};dbname={$dbConfig['db']};charset={$dbConfig['charset']}";
     $options = [
         PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
@@ -49,11 +48,144 @@ function getReportPdo(?string $dateFrom, ?string $dateTo = null): PDO
     try {
         return new PDO($dsn, $dbConfig["user"], $dbConfig["pass"], $options);
     } catch (PDOException $e) {
-        http_response_code(500);
-        header("Content-Type: application/json");
-        echo json_encode(["error" => "DB connection failed", "details" => $e->getMessage()]);
-        exit;
+        error_log("Report database connection failed: " . $e->getMessage());
+        throw new RuntimeException("Unable to connect to the report database.");
     }
+}
+
+function getReportPdo(?string $dateFrom, ?string $dateTo = null): PDO
+{
+    $config = require __DIR__ . "/config.php";
+    return reportDbConnectPdo(resolveReportDbConfig($config, $dateFrom, $dateTo));
+}
+
+/** Opens the configured report database even when the requested date is today. */
+function getConfiguredReportPdo(): PDO
+{
+    $config = require __DIR__ . "/config.php";
+    $dbConfig = $config;
+    $dbConfig["db"] = $config["report_db"] ?? $config["db"];
+
+    return reportDbConnectPdo($dbConfig);
+}
+
+/**
+ * A Z-reading exists when the selected database has a closed shift with a
+ * non-zero Z counter for the exact business unit, terminal, and date range.
+ * Transaction count is intentionally not used because a zero-sales shift is
+ * still a valid Z-reading.
+ */
+function reportDbHasClosedZReading(
+    PDO $pdo,
+    string $dateFrom,
+    ?string $dateTo,
+    string $categoryCode,
+    string $unitCode,
+    string $terminalNumber
+): bool {
+    $dateFrom = trim($dateFrom);
+    $dateTo = trim((string)$dateTo);
+    if ($dateTo === "") {
+        $dateTo = $dateFrom;
+    }
+
+    $stmt = $pdo->prepare("
+        SELECT 1
+        FROM tbl_pos_shifting_records
+        WHERE Category_Code = ?
+          AND Unit_Code = ?
+          AND terminal_number = ?
+          AND DATE(Opening_DateTime) BETWEEN ? AND ?
+          AND IFNULL(Z_Counter_No, 0) <> 0
+        LIMIT 1
+    ");
+    $stmt->execute([
+        $categoryCode,
+        $unitCode,
+        $terminalNumber,
+        $dateFrom,
+        $dateTo,
+    ]);
+
+    return $stmt->fetchColumn() !== false;
+}
+
+function reportDbShouldFallbackToPrimary(
+    bool $isSuperAdmin,
+    bool $archiveRequested,
+    bool $archiveHasClosedZReading
+): bool {
+    return $isSuperAdmin && $archiveRequested && !$archiveHasClosedZReading;
+}
+
+/**
+ * Use reports_database for historical Z-readings. For an authenticated Super
+ * Admin only, fall back to the already-open primary POS connection when the
+ * archive contains no qualifying Z-reading for the requested date/range.
+ */
+function getZReadingReportPdo(
+    PDO $primaryPdo,
+    ?string $dateFrom,
+    ?string $dateTo,
+    string $categoryCode,
+    string $unitCode,
+    string $terminalNumber,
+    bool $isSuperAdmin
+): PDO {
+    $dateFrom = trim((string)$dateFrom);
+    $dateTo = trim((string)$dateTo);
+    if ($dateFrom === "") {
+        $dateFrom = $dateTo;
+    }
+    if ($dateTo === "") {
+        $dateTo = $dateFrom;
+    }
+
+    // Once skipping is activated, Super Admin reads are deterministic:
+    // original POS data before the boundary, report DB data on/after it. The
+    // post-activation branch deliberately never falls back to unskipped data.
+    if ($isSuperAdmin) {
+        $config = require __DIR__ . "/config.php";
+        $activation = posReportMirrorActivationReadState($primaryPdo, $config);
+        if (($activation["active"] ?? false) === true) {
+            $activationDate = (string)$activation["activation_business_date"];
+            if ($dateFrom < $activationDate && $dateTo >= $activationDate) {
+                throw new RuntimeException(
+                    "This Z-reading range crosses the report skipping activation date and requires the monthly split reader."
+                );
+            }
+            if ($dateTo < $activationDate) {
+                return $primaryPdo;
+            }
+
+            return getConfiguredReportPdo();
+        }
+    }
+
+    $archiveRequested = reportDbShouldUseArchive($dateFrom, $dateTo);
+    if (!$archiveRequested) {
+        return $primaryPdo;
+    }
+
+    $archivePdo = getReportPdo($dateFrom, $dateTo);
+    if (!$isSuperAdmin) {
+        return $archivePdo;
+    }
+
+    $archiveHasClosedZReading = reportDbHasClosedZReading(
+        $archivePdo,
+        trim((string)$dateFrom),
+        $dateTo,
+        $categoryCode,
+        $unitCode,
+        $terminalNumber
+    );
+
+    return reportDbShouldFallbackToPrimary(
+        $isSuperAdmin,
+        $archiveRequested,
+        $archiveHasClosedZReading
+    ) ? $primaryPdo : $archivePdo;
 }
 
 function getReportMysqli(?string $dateFrom, ?string $dateTo = null): mysqli

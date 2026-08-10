@@ -13,6 +13,7 @@ if (!in_array($_SERVER["REQUEST_METHOD"], ["GET", "POST"], true)) {
 require __DIR__ . "/pdo.php";
 require_once __DIR__ . "/pos_role_authorization.php";
 require_once __DIR__ . "/pos_report_mirror.php";
+require_once __DIR__ . "/pos_report_mirror_activation.php";
 
 function reportMirrorSettingsRespond(bool $success, string $message, $data = null, int $statusCode = 200): void
 {
@@ -111,6 +112,7 @@ function reportMirrorSettingsRead(PDO $pdo, array $config): array
         "pos_database_value" => $posValue,
         "report_database_value" => $reportValue,
         "synced_to_report_database" => $reportValue !== null && $reportValue === $effectiveValue,
+        "report_mirror_activation" => posReportMirrorActivationReadState($pdo, $config),
     ];
 }
 

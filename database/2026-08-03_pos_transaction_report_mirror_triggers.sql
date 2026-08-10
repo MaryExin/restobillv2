@@ -2,6 +2,8 @@
 -- 1) Drop the old "always mirror" triggers.
 -- 2) Remove every 3rd POS transaction from reports_database.
 -- 3) Keep reports_database transaction_id continuous for posted rows.
+-- LEGACY HISTORICAL MIGRATION: do not run this for a new-transactions-only
+-- report mirror deployment because it rewrites existing report history.
 --
 -- Run 2026-08-03_add_token_report_to_pos_transactions.sql first.
 

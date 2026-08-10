@@ -19,14 +19,21 @@ if (!in_array($_SERVER["REQUEST_METHOD"], ["GET", "POST"], true)) {
 
 require __DIR__ . "/pdo.php";
 require_once __DIR__ . "/pos_role_authorization.php";
+$authenticatedUserId = (string)($GLOBALS["pos_user_id"] ?? "");
 posRoleAuthRequirePermission(
     $pdo,
-    (string)($GLOBALS["pos_user_id"] ?? ""),
+    $authenticatedUserId,
     "reports",
     "zReadingMonthly"
 );
+$primaryPdo = $pdo;
+$authenticatedAccount = posRoleAuthAccount($primaryPdo, $authenticatedUserId);
+$isSuperAdmin = posRoleAuthCanonicalValue(
+    $authenticatedAccount["classification"] ?? ""
+) === "2";
 
 require_once __DIR__ . "/report_db.php";
+require_once __DIR__ . "/pos_z_reading_monthly_data.php";
 
 try {
     $raw = file_get_contents("php://input");
@@ -47,8 +54,6 @@ try {
     $dateTo = isset($input["dateTo"])
         ? trim((string)$input["dateTo"])
         : (isset($input["date_to"]) ? trim((string)$input["date_to"]) : "");
-
-    $pdo = getReportPdo($dateFrom, $dateTo);
 
     $categoryCode = "";
     if (isset($input["categoryCode"])) {
@@ -109,7 +114,9 @@ try {
         throw new Exception("categoryCode and unitCode are required.");
     }
 
-    $stmtBusinessUnit = $pdo->prepare("
+    // Business identity is authoritative in the live database even when the
+    // report figures are read from one or both data stores.
+    $stmtBusinessUnit = $primaryPdo->prepare("
         SELECT
             Corp_Code,
             Unit_Name,
@@ -134,264 +141,184 @@ try {
     $businessUnitTIN = (string)$businessUnit["Unit_TIN"];
     $businessUnitVATRegistration = (string)$businessUnit["VAT_Registration"];
 
-    // Earliest closed shift in range gives the "Beg." counters and the
-    // starting point of the period; latest closed shift gives the "End"
-    // counters, the period's Grand_Accum_Sales snapshot, and closing cash.
-    $stmtFirstShift = $pdo->prepare("
-        SELECT
-            Shift_ID,
-            Opening_DateTime,
-            Opening_Cash_Count,
-            Closing_DateTime,
-            Closing_Cash_Count,
-            Beg_OR,
-            End_OR,
-            Beg_VoidNo,
-            End_VoidNo,
-            Beg_RefundNo,
-            End_RefundNo,
-            Z_Counter_No,
-            Grand_Accum_Sales
-        FROM tbl_pos_shifting_records
-        WHERE Category_Code = ?
-          AND Unit_Code = ?
-          AND terminal_number = ?
-          AND DATE(Opening_DateTime) BETWEEN ? AND ?
-          AND IFNULL(Z_Counter_No, 0) <> 0
-        ORDER BY Shift_ID ASC
-        LIMIT 1
-    ");
-    $stmtFirstShift->execute([$categoryCode, $unitCode, $terminalNumber, $dateFrom, $dateTo]);
-    $firstShift = $stmtFirstShift->fetch();
+    $activationState = posReportMirrorActivationReadState($primaryPdo, $config);
+    $activationDate = ($activationState["active"] ?? false) === true
+        ? (string)$activationState["activation_business_date"]
+        : null;
+    $activationKey = ($activationState["active"] ?? false) === true
+        ? (string)$activationState["activation_key"]
+        : null;
+    [, $reportDbName] = posReportMirrorActivationDatabaseNames($config);
+    $dateEndExclusive = (new DateTimeImmutable($dateTo, new DateTimeZone("Asia/Manila")))
+        ->modify("+1 day")
+        ->format("Y-m-d");
+    $segmentPlans = [];
+    $dataSource = "primary";
 
-    if (!$firstShift) {
+    if ($activationDate !== null) {
+        if (!$isSuperAdmin && $dateFrom <= $activationDate) {
+            http_response_code(403);
+            throw new Exception(
+                "Only a Super Admin can combine original and skipped report data across the activation date."
+            );
+        }
+        $segmentPlans = posReportMirrorActivationPlanRange(
+            $dateFrom,
+            $dateTo,
+            $activationDate
+        );
+        $dataSource = count($segmentPlans) > 1
+            ? "primary_and_report"
+            : (string)($segmentPlans[0]["source"] ?? "primary");
+    } else {
+        $selectedPdo = getZReadingReportPdo(
+            $primaryPdo,
+            $dateFrom,
+            $dateTo,
+            $categoryCode,
+            $unitCode,
+            $terminalNumber,
+            $isSuperAdmin
+        );
+        $dataSource = $selectedPdo === $primaryPdo ? "primary" : "report";
+        $segmentPlans[] = [
+            "source" => $dataSource,
+            "start" => $dateFrom,
+            "end_exclusive" => $dateEndExclusive,
+            "pdo" => $selectedPdo,
+        ];
+    }
+
+    $reportPdo = null;
+    $loadedSegments = [];
+    $publicSegments = [];
+    $activationPrefixLoaded = false;
+    foreach ($segmentPlans as $plan) {
+        $source = (string)$plan["source"];
+
+        // If activation occurred after other sales on the same calendar day,
+        // keep those earlier physical rows in the original-data portion. The
+        // activation row itself and all later mapped rows remain report data.
+        if (
+            !$activationPrefixLoaded
+            && $activationDate !== null
+            && $activationKey !== null
+            && $source === "report"
+            && $dateFrom <= $activationDate
+            && $dateTo >= $activationDate
+        ) {
+            $activationDayEnd = (new DateTimeImmutable(
+                $activationDate,
+                new DateTimeZone("Asia/Manila")
+            ))->modify("+1 day")->format("Y-m-d");
+            $loadedSegments[] = [
+                "first_shift" => null,
+                "last_shift" => null,
+                "totals" => posZReadingMonthlyFetchTotals(
+                    $primaryPdo,
+                    $activationDate,
+                    $activationDayEnd,
+                    $categoryCode,
+                    $unitCode,
+                    $terminalNumber,
+                    $activationKey,
+                    $reportDbName,
+                    false
+                ),
+            ];
+            $publicSegments[] = [
+                "source" => "primary",
+                "dateFrom" => $activationDate,
+                "dateToExclusive" => $activationDayEnd,
+                "membership" => "before_activation",
+            ];
+            $activationPrefixLoaded = true;
+            $dataSource = "primary_and_report";
+        }
+
+        if (isset($plan["pdo"]) && $plan["pdo"] instanceof PDO) {
+            $segmentPdo = $plan["pdo"];
+        } elseif ($source === "primary") {
+            $segmentPdo = $primaryPdo;
+        } else {
+            $reportPdo ??= getConfiguredReportPdo();
+            $segmentPdo = $reportPdo;
+        }
+
+        $loaded = posZReadingMonthlyLoadSegment(
+            $segmentPdo,
+            (string)$plan["start"],
+            (string)$plan["end_exclusive"],
+            $categoryCode,
+            $unitCode,
+            $terminalNumber,
+            $source === "report" ? $activationKey : null,
+            $source === "report" ? $reportDbName : null,
+            $source === "report" ? true : null
+        );
+        if ($activationDate !== null && $source === "report") {
+            $expectedFirstShift = posZReadingMonthlyFetchShift(
+                $primaryPdo,
+                (string)$plan["start"],
+                (string)$plan["end_exclusive"],
+                $categoryCode,
+                $unitCode,
+                $terminalNumber,
+                false
+            );
+            $expectedLastShift = posZReadingMonthlyFetchShift(
+                $primaryPdo,
+                (string)$plan["start"],
+                (string)$plan["end_exclusive"],
+                $categoryCode,
+                $unitCode,
+                $terminalNumber,
+                true
+            );
+            if (
+                !posZReadingMonthlySameShift($expectedFirstShift, $loaded["first_shift"])
+                || !posZReadingMonthlySameShift($expectedLastShift, $loaded["last_shift"])
+            ) {
+                http_response_code(409);
+                throw new Exception(
+                    "The report database is missing one or more closed Z-readings in the post-activation portion of this range."
+                );
+            }
+        }
+        $loadedSegments[] = $loaded;
+        $publicSegments[] = [
+            "source" => $source,
+            "dateFrom" => (string)$plan["start"],
+            "dateToExclusive" => (string)$plan["end_exclusive"],
+        ];
+    }
+
+    $firstShift = null;
+    $lastShift = null;
+    foreach ($loadedSegments as $segment) {
+        if ($firstShift === null && $segment["first_shift"]) {
+            $firstShift = $segment["first_shift"];
+        }
+        if ($segment["last_shift"]) {
+            $lastShift = $segment["last_shift"];
+        }
+    }
+    if (!$firstShift || !$lastShift) {
         throw new Exception("No Z-reading reprint record found for the selected date range. Only closed shifts with Z_Counter_No not equal to 0 can be reprinted.");
     }
 
-    $stmtLastShift = $pdo->prepare("
-        SELECT
-            Shift_ID,
-            Opening_DateTime,
-            Opening_Cash_Count,
-            Closing_DateTime,
-            Closing_Cash_Count,
-            Beg_OR,
-            End_OR,
-            Beg_VoidNo,
-            End_VoidNo,
-            Beg_RefundNo,
-            End_RefundNo,
-            Z_Counter_No,
-            Grand_Accum_Sales
-        FROM tbl_pos_shifting_records
-        WHERE Category_Code = ?
-          AND Unit_Code = ?
-          AND terminal_number = ?
-          AND DATE(Opening_DateTime) BETWEEN ? AND ?
-          AND IFNULL(Z_Counter_No, 0) <> 0
-        ORDER BY Shift_ID DESC
-        LIMIT 1
-    ");
-    $stmtLastShift->execute([$categoryCode, $unitCode, $terminalNumber, $dateFrom, $dateTo]);
-    $lastShift = $stmtLastShift->fetch() ?: $firstShift;
-
-    $stmtSalesForRange = $pdo->prepare("
-        SELECT
-            SUM(TotalSales) AS Sales_For_The_Range,
-            SUM(VATableSales) AS VATableSales,
-            SUM(VATableSales_VAT) AS VATableSales_VAT,
-            SUM(VATExemptSales) AS VATExemptSales,
-            SUM(VATExemptSales_VAT) AS VATExemptSales_VAT,
-            SUM(VATZeroRatedSales) AS VATZeroRatedSales,
-            SUM(TotalSales) AS Gross_Amount,
-            SUM(Discount) AS Discount,
-            SUM(OtherCharges) AS OtherCharges
-        FROM tbl_pos_transactions
-        WHERE Category_Code = ?
-          AND Unit_Code = ?
-          AND terminal_number = ?
-          AND DATE(transaction_date) BETWEEN ? AND ?
-          AND Status = 'Active'
-    ");
-    $stmtSalesForRange->execute([$categoryCode, $unitCode, $terminalNumber, $dateFrom, $dateTo]);
-    $sales = $stmtSalesForRange->fetch() ?: [];
-
-    $stmtVoid = $pdo->prepare("
-        SELECT SUM(TotalAmountDue) AS Voided_Sales
-        FROM tbl_pos_transactions
-        WHERE Category_Code = ?
-          AND Unit_Code = ?
-          AND terminal_number = ?
-          AND DATE(transaction_date) BETWEEN ? AND ?
-          AND Status = 'Voided'
-    ");
-    $stmtVoid->execute([$categoryCode, $unitCode, $terminalNumber, $dateFrom, $dateTo]);
-    $voidedSales = (float)($stmtVoid->fetchColumn() ?: 0);
-
-    $stmtRefund = $pdo->prepare("
-        SELECT SUM(TotalAmountDue) AS Refunded_Sales
-        FROM tbl_pos_transactions
-        WHERE Category_Code = ?
-          AND Unit_Code = ?
-          AND terminal_number = ?
-          AND DATE(transaction_date) BETWEEN ? AND ?
-          AND Status = 'Refunded'
-    ");
-    $stmtRefund->execute([$categoryCode, $unitCode, $terminalNumber, $dateFrom, $dateTo]);
-    $refundedSales = (float)($stmtRefund->fetchColumn() ?: 0);
-
-    $stmtDiscSC = $pdo->prepare("
-        SELECT SUM(d.discount_amount) AS total_discount
-        FROM tbl_pos_transactions_discounts d
-        INNER JOIN tbl_pos_transactions t
-            ON d.transaction_id = t.transaction_id
-           AND d.Category_Code = t.Category_Code
-           AND d.Unit_Code = t.Unit_Code
-        WHERE t.Category_Code = ?
-          AND t.Unit_Code = ?
-          AND t.terminal_number = ?
-          AND DATE(t.transaction_date) BETWEEN ? AND ?
-          AND d.discount_type = 'Senior Citizen'
-          AND d.Status = 'Active'
-    ");
-    $stmtDiscSC->execute([$categoryCode, $unitCode, $terminalNumber, $dateFrom, $dateTo]);
-    $discountSC = (float)($stmtDiscSC->fetchColumn() ?: 0);
-
-    $stmtDiscPWD = $pdo->prepare("
-        SELECT SUM(d.discount_amount) AS total_discount
-        FROM tbl_pos_transactions_discounts d
-        INNER JOIN tbl_pos_transactions t
-            ON d.transaction_id = t.transaction_id
-           AND d.Category_Code = t.Category_Code
-           AND d.Unit_Code = t.Unit_Code
-        WHERE t.Category_Code = ?
-          AND t.Unit_Code = ?
-          AND t.terminal_number = ?
-          AND DATE(t.transaction_date) BETWEEN ? AND ?
-          AND d.discount_type = 'PWD'
-          AND d.Status = 'Active'
-    ");
-    $stmtDiscPWD->execute([$categoryCode, $unitCode, $terminalNumber, $dateFrom, $dateTo]);
-    $discountPWD = (float)($stmtDiscPWD->fetchColumn() ?: 0);
-
-    $stmtDiscNAAC = $pdo->prepare("
-        SELECT SUM(d.discount_amount) AS total_discount
-        FROM tbl_pos_transactions_discounts d
-        INNER JOIN tbl_pos_transactions t
-            ON d.transaction_id = t.transaction_id
-           AND d.Category_Code = t.Category_Code
-           AND d.Unit_Code = t.Unit_Code
-        WHERE t.Category_Code = ?
-          AND t.Unit_Code = ?
-          AND t.terminal_number = ?
-          AND DATE(t.transaction_date) BETWEEN ? AND ?
-          AND d.discount_type = 'NAAC'
-          AND d.Status = 'Active'
-    ");
-    $stmtDiscNAAC->execute([$categoryCode, $unitCode, $terminalNumber, $dateFrom, $dateTo]);
-    $discountNAAC = (float)($stmtDiscNAAC->fetchColumn() ?: 0);
-
-    $stmtDiscSolo = $pdo->prepare("
-        SELECT SUM(d.discount_amount) AS total_discount
-        FROM tbl_pos_transactions_discounts d
-        INNER JOIN tbl_pos_transactions t
-            ON d.transaction_id = t.transaction_id
-           AND d.Category_Code = t.Category_Code
-           AND d.Unit_Code = t.Unit_Code
-        WHERE t.Category_Code = ?
-          AND t.Unit_Code = ?
-          AND t.terminal_number = ?
-          AND DATE(t.transaction_date) BETWEEN ? AND ?
-          AND d.discount_type = 'Solo Parent'
-          AND d.Status = 'Active'
-    ");
-    $stmtDiscSolo->execute([$categoryCode, $unitCode, $terminalNumber, $dateFrom, $dateTo]);
-    $discountSolo = (float)($stmtDiscSolo->fetchColumn() ?: 0);
-
-    $stmtDiscOther = $pdo->prepare("
-        SELECT SUM(d.discount_amount) AS total_discount
-        FROM tbl_pos_transactions_discounts d
-        INNER JOIN tbl_pos_transactions t
-            ON d.transaction_id = t.transaction_id
-           AND d.Category_Code = t.Category_Code
-           AND d.Unit_Code = t.Unit_Code
-        WHERE t.Category_Code = ?
-          AND t.Unit_Code = ?
-          AND t.terminal_number = ?
-          AND DATE(t.transaction_date) BETWEEN ? AND ?
-          AND d.discount_type NOT IN ('Senior Citizen', 'PWD', 'NAAC', 'Solo Parent')
-          AND d.Status = 'Active'
-    ");
-    $stmtDiscOther->execute([$categoryCode, $unitCode, $terminalNumber, $dateFrom, $dateTo]);
-    $discountOther = (float)($stmtDiscOther->fetchColumn() ?: 0);
-
-    $stmtCash = $pdo->prepare("
-        SELECT SUM(b.payment_amount - a.change_amount) AS Payment_Cash
-        FROM tbl_pos_transactions a
-        INNER JOIN tbl_pos_transactions_payments b
-            ON a.transaction_id = b.transaction_id
-           AND a.Category_Code = b.Category_Code
-           AND a.Unit_Code = b.Unit_Code
-        WHERE a.Category_Code = ?
-          AND a.Unit_Code = ?
-          AND a.terminal_number = ?
-          AND DATE(a.transaction_date) BETWEEN ? AND ?
-          AND b.payment_method = 'Cash'
-          AND a.Status = 'Active'
-    ");
-    $stmtCash->execute([$categoryCode, $unitCode, $terminalNumber, $dateFrom, $dateTo]);
-    $paymentCash = (float)($stmtCash->fetchColumn() ?: 0);
-
-    $stmtCheque = $pdo->prepare("
-        SELECT SUM(b.payment_amount) AS Payment_Cheque
-        FROM tbl_pos_transactions a
-        INNER JOIN tbl_pos_transactions_payments b
-            ON a.transaction_id = b.transaction_id
-           AND a.Category_Code = b.Category_Code
-           AND a.Unit_Code = b.Unit_Code
-        WHERE a.Category_Code = ?
-          AND a.Unit_Code = ?
-          AND a.terminal_number = ?
-          AND DATE(a.transaction_date) BETWEEN ? AND ?
-          AND b.payment_method = 'Cheque'
-          AND a.Status = 'Active'
-    ");
-    $stmtCheque->execute([$categoryCode, $unitCode, $terminalNumber, $dateFrom, $dateTo]);
-    $paymentCheque = (float)($stmtCheque->fetchColumn() ?: 0);
-
-    $stmtCredit = $pdo->prepare("
-        SELECT SUM(b.payment_amount) AS Payment_CreditCard
-        FROM tbl_pos_transactions a
-        INNER JOIN tbl_pos_transactions_payments b
-            ON a.transaction_id = b.transaction_id
-           AND a.Category_Code = b.Category_Code
-           AND a.Unit_Code = b.Unit_Code
-        WHERE a.Category_Code = ?
-          AND a.Unit_Code = ?
-          AND a.terminal_number = ?
-          AND DATE(a.transaction_date) BETWEEN ? AND ?
-          AND b.payment_method = 'Credit Card'
-          AND a.Status = 'Active'
-    ");
-    $stmtCredit->execute([$categoryCode, $unitCode, $terminalNumber, $dateFrom, $dateTo]);
-    $paymentCreditCard = (float)($stmtCredit->fetchColumn() ?: 0);
-
-    $stmtOtherPayments = $pdo->prepare("
-        SELECT SUM(b.payment_amount) AS Payment_Others
-        FROM tbl_pos_transactions a
-        INNER JOIN tbl_pos_transactions_payments b
-            ON a.transaction_id = b.transaction_id
-           AND a.Category_Code = b.Category_Code
-           AND a.Unit_Code = b.Unit_Code
-        WHERE a.Category_Code = ?
-          AND a.Unit_Code = ?
-          AND a.terminal_number = ?
-          AND DATE(a.transaction_date) BETWEEN ? AND ?
-          AND b.payment_method NOT IN ('Cash', 'Cheque', 'Credit Card')
-          AND a.Status = 'Active'
-    ");
-    $stmtOtherPayments->execute([$categoryCode, $unitCode, $terminalNumber, $dateFrom, $dateTo]);
-    $paymentOthers = (float)($stmtOtherPayments->fetchColumn() ?: 0);
+    $sales = posZReadingMonthlyMergeTotals($loadedSegments);
+    $voidedSales = (float)($sales["Voided_Sales"] ?? 0);
+    $refundedSales = (float)($sales["Refunded_Sales"] ?? 0);
+    $discountSC = (float)($sales["Discount_SC"] ?? 0);
+    $discountPWD = (float)($sales["Discount_PWD"] ?? 0);
+    $discountNAAC = (float)($sales["Discount_NAAC"] ?? 0);
+    $discountSolo = (float)($sales["Discount_Solo"] ?? 0);
+    $discountOther = (float)($sales["Discount_Other"] ?? 0);
+    $paymentCash = (float)($sales["Payment_Cash"] ?? 0);
+    $paymentCheque = (float)($sales["Payment_Cheque"] ?? 0);
+    $paymentCreditCard = (float)($sales["Payment_CreditCard"] ?? 0);
+    $paymentOthers = (float)($sales["Payment_Others"] ?? 0);
 
     // "Present Accum. Sales" reflects the accumulated total as of the end of
     // the period (the last shift's running total), same convention as the
@@ -441,6 +368,9 @@ try {
         "data" => [
             "dateFrom" => $dateFrom,
             "dateTo" => $dateTo,
+            "dataSource" => $dataSource,
+            "activationDate" => $activationDate,
+            "sourceSegments" => $publicSegments,
 
             "reportDate" => date("M d, Y", strtotime($dateFrom)) . " - " . date("M d, Y", strtotime($dateTo)),
             "reportTime" => date("h:i A"),
@@ -547,7 +477,9 @@ try {
         ]
     ]);
 } catch (Throwable $e) {
-    http_response_code(500);
+    if (http_response_code() < 400) {
+        http_response_code(500);
+    }
     echo json_encode([
         "success" => false,
         "message" => $e->getMessage(),

@@ -19,14 +19,21 @@ if (!in_array($_SERVER["REQUEST_METHOD"], ["GET", "POST"], true)) {
 
 require __DIR__ . "/pdo.php";
 require_once __DIR__ . "/pos_role_authorization.php";
+$authenticatedUserId = (string)($GLOBALS["pos_user_id"] ?? "");
 posRoleAuthRequirePermission(
     $pdo,
-    (string)($GLOBALS["pos_user_id"] ?? ""),
+    $authenticatedUserId,
     "reports",
     "zReadingReprint"
 );
+$primaryPdo = $pdo;
+$authenticatedAccount = posRoleAuthAccount($primaryPdo, $authenticatedUserId);
+$isSuperAdmin = posRoleAuthCanonicalValue(
+    $authenticatedAccount["classification"] ?? ""
+) === "2";
 
 require_once __DIR__ . "/report_db.php";
+require_once __DIR__ . "/pos_z_reading_monthly_data.php";
 
 try {
     $raw = file_get_contents("php://input");
@@ -43,8 +50,6 @@ try {
     $selectedDate = isset($input["selectedDate"])
         ? trim((string)$input["selectedDate"])
         : (isset($input["selected_date"]) ? trim((string)$input["selected_date"]) : "");
-
-    $pdo = getReportPdo($selectedDate);
 
     $categoryCode = "";
     if (isset($input["categoryCode"])) {
@@ -97,11 +102,59 @@ try {
         throw new Exception("selectedDate is required.");
     }
 
+    $manilaTimezone = new DateTimeZone("Asia/Manila");
+    $selectedDateValue = DateTimeImmutable::createFromFormat(
+        "!Y-m-d",
+        $selectedDate,
+        $manilaTimezone
+    );
+    if (
+        !$selectedDateValue
+        || $selectedDateValue->format("Y-m-d") !== $selectedDate
+    ) {
+        throw new Exception("selectedDate must use YYYY-MM-DD format.");
+    }
+    $dateEndExclusive = $selectedDateValue->modify("+1 day")->format("Y-m-d");
+
     if ($categoryCode === "" || $unitCode === "") {
         throw new Exception("categoryCode and unitCode are required.");
     }
 
-    $stmtBusinessUnit = $pdo->prepare("
+    $activationState = posReportMirrorActivationReadState($primaryPdo, $config);
+    $activationDate = ($activationState["active"] ?? false) === true
+        ? (string)$activationState["activation_business_date"]
+        : null;
+    $activationKey = ($activationState["active"] ?? false) === true
+        ? (string)$activationState["activation_key"]
+        : null;
+    [, $reportDbName] = posReportMirrorActivationDatabaseNames($config);
+    $dataSource = "primary";
+
+    if ($activationDate !== null && $selectedDate >= $activationDate) {
+        if (!$isSuperAdmin && $selectedDate === $activationDate) {
+            http_response_code(403);
+            throw new Exception(
+                "Only a Super Admin can combine original and skipped report data on the activation date."
+            );
+        }
+        $pdo = getConfiguredReportPdo();
+        $dataSource = $selectedDate === $activationDate
+            ? "primary_and_report"
+            : "report";
+    } else {
+        $pdo = getZReadingReportPdo(
+            $primaryPdo,
+            $selectedDate,
+            $selectedDate,
+            $categoryCode,
+            $unitCode,
+            $terminalNumber,
+            $isSuperAdmin
+        );
+        $dataSource = $pdo === $primaryPdo ? "primary" : "report";
+    }
+
+    $stmtBusinessUnit = $primaryPdo->prepare("
         SELECT
             Corp_Code,
             Unit_Name,
@@ -154,7 +207,31 @@ try {
     $shift = $stmtShift->fetch();
 
     if (!$shift) {
+        if ($activationDate !== null && $selectedDate >= $activationDate) {
+            http_response_code(409);
+            throw new Exception(
+                "The report database is missing the closed Z-reading for this post-activation date."
+            );
+        }
         throw new Exception("No Z-reading reprint record found for the selected date. Only closed shifts with Z_Counter_No not equal to 0 can be reprinted.");
+    }
+
+    if ($activationDate !== null && $selectedDate >= $activationDate) {
+        $expectedShift = posZReadingMonthlyFetchShift(
+            $primaryPdo,
+            $selectedDate,
+            $dateEndExclusive,
+            $categoryCode,
+            $unitCode,
+            $terminalNumber,
+            true
+        );
+        if (!posZReadingMonthlySameShift($expectedShift, $shift)) {
+            http_response_code(409);
+            throw new Exception(
+                "The report database closed Z-reading does not match the primary POS shift for this date."
+            );
+        }
     }
 
     $reportDate = date("Y-m-d", strtotime($shift["Opening_DateTime"]));
@@ -357,6 +434,54 @@ try {
     $stmtOtherPayments->execute([$categoryCode, $unitCode, $terminalNumber, $reportDate]);
     $paymentOthers = (float)($stmtOtherPayments->fetchColumn() ?: 0);
 
+    // The activation day may contain original sales before skipping was
+    // enabled and mapped sales afterward. Recalculate all additive figures
+    // from explicit activation membership so those transactions are combined
+    // exactly once. Later days use only activation-member report rows.
+    if ($activationDate !== null && $selectedDate >= $activationDate) {
+        $dailySegments = [[
+            "totals" => posZReadingMonthlyFetchTotals(
+                $pdo,
+                $selectedDate,
+                $dateEndExclusive,
+                $categoryCode,
+                $unitCode,
+                $terminalNumber,
+                $activationKey,
+                $reportDbName,
+                true
+            ),
+        ]];
+        if ($selectedDate === $activationDate) {
+            $dailySegments[] = [
+                "totals" => posZReadingMonthlyFetchTotals(
+                    $primaryPdo,
+                    $selectedDate,
+                    $dateEndExclusive,
+                    $categoryCode,
+                    $unitCode,
+                    $terminalNumber,
+                    $activationKey,
+                    $reportDbName,
+                    false
+                ),
+            ];
+        }
+        $sales = posZReadingMonthlyMergeTotals($dailySegments);
+        $sales["Sales_For_The_Day"] = (float)($sales["Sales_For_The_Range"] ?? 0);
+        $voidedSales = (float)($sales["Voided_Sales"] ?? 0);
+        $refundedSales = (float)($sales["Refunded_Sales"] ?? 0);
+        $discountSC = (float)($sales["Discount_SC"] ?? 0);
+        $discountPWD = (float)($sales["Discount_PWD"] ?? 0);
+        $discountNAAC = (float)($sales["Discount_NAAC"] ?? 0);
+        $discountSolo = (float)($sales["Discount_Solo"] ?? 0);
+        $discountOther = (float)($sales["Discount_Other"] ?? 0);
+        $paymentCash = (float)($sales["Payment_Cash"] ?? 0);
+        $paymentCheque = (float)($sales["Payment_Cheque"] ?? 0);
+        $paymentCreditCard = (float)($sales["Payment_CreditCard"] ?? 0);
+        $paymentOthers = (float)($sales["Payment_Others"] ?? 0);
+    }
+
     $presentAccumulatedSales = (float)($shift["Grand_Accum_Sales"] ?: 0);
     $salesForTheDay = (float)($sales["Sales_For_The_Day"] ?: 0);
     $previousAccumulatedSales = $presentAccumulatedSales - $salesForTheDay;
@@ -390,6 +515,8 @@ try {
         "message" => "Z-reading reprint data loaded successfully.",
         "data" => [
             "shiftId" => (string)$shift["Shift_ID"],
+            "dataSource" => $dataSource,
+            "activationDate" => $activationDate,
             "reportDate" => date("F d, Y", strtotime($shift["Opening_DateTime"])),
             "reportTime" => date("h:i A", strtotime($shift["Closing_DateTime"])),
             "startDateTime" => date("m/d/y g:i A", strtotime($shift["Opening_DateTime"])),
@@ -495,7 +622,9 @@ try {
         ]
     ]);
 } catch (Throwable $e) {
-    http_response_code(500);
+    if (http_response_code() < 400) {
+        http_response_code(500);
+    }
     echo json_encode([
         "success" => false,
         "message" => $e->getMessage(),
