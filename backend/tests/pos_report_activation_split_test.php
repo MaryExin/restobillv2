@@ -431,6 +431,130 @@ try {
 }
 posReportActivationSplitAssert($reversedRangeRejected, "reversed report range is rejected");
 
+$closedDateRange = static function (string $dateFrom, string $dateTo): array {
+    $dates = [];
+    for (
+        $date = new DateTimeImmutable($dateFrom);
+        $date <= new DateTimeImmutable($dateTo);
+        $date = $date->modify("+1 day")
+    ) {
+        $dates[] = $date->format("Y-m-d");
+    }
+    return $dates;
+};
+
+posReportActivationSplitAssertSame(
+    [
+        [
+            "source" => "primary",
+            "start" => "2026-08-01",
+            "end_exclusive" => "2026-08-10",
+            "use_activation_membership" => false,
+        ],
+        [
+            "source" => "report",
+            "start" => "2026-08-10",
+            "end_exclusive" => "2026-09-01",
+            "use_activation_membership" => true,
+        ],
+    ],
+    posZReadingMonthlyPlanHybridRange(
+        "2026-08-01",
+        "2026-08-31",
+        $closedDateRange("2026-08-01", "2026-08-31"),
+        $closedDateRange("2026-08-10", "2026-08-31"),
+        "2026-08-10"
+    ),
+    "Super Admin monthly plan fills the report-missing prefix from primary"
+);
+
+posReportActivationSplitAssertSame(
+    [
+        [
+            "source" => "report",
+            "start" => "2026-08-01",
+            "end_exclusive" => "2026-08-02",
+            "use_activation_membership" => false,
+        ],
+        [
+            "source" => "primary",
+            "start" => "2026-08-02",
+            "end_exclusive" => "2026-08-03",
+            "use_activation_membership" => false,
+        ],
+        [
+            "source" => "report",
+            "start" => "2026-08-03",
+            "end_exclusive" => "2026-08-04",
+            "use_activation_membership" => false,
+        ],
+    ],
+    posZReadingMonthlyPlanHybridRange(
+        "2026-08-01",
+        "2026-08-03",
+        ["2026-08-01", "2026-08-02", "2026-08-03"],
+        ["2026-08-01", "2026-08-03"]
+    ),
+    "report coverage wins per day without double counting"
+);
+
+posReportActivationSplitAssertSame(
+    [
+        [
+            "source" => "primary",
+            "start" => "2026-08-01",
+            "end_exclusive" => "2026-08-02",
+            "use_activation_membership" => false,
+        ],
+        [
+            "source" => "primary",
+            "start" => "2026-08-03",
+            "end_exclusive" => "2026-08-04",
+            "use_activation_membership" => false,
+        ],
+    ],
+    posZReadingMonthlyPlanHybridRange(
+        "2026-08-01",
+        "2026-08-03",
+        ["2026-08-01", "2026-08-03"],
+        []
+    ),
+    "an unclosed day breaks otherwise adjacent primary segments"
+);
+
+posReportActivationSplitAssertSame(
+    [[
+        "source" => "report",
+        "start" => "2026-08-11",
+        "end_exclusive" => "2026-08-12",
+        "use_activation_membership" => true,
+    ]],
+    posZReadingMonthlyPlanHybridRange(
+        "2026-08-11",
+        "2026-08-11",
+        [],
+        ["2026-08-11"],
+        "2026-08-10"
+    ),
+    "a post-activation report-only closed shift remains authoritative"
+);
+
+$hybridReversedRejected = false;
+try {
+    posZReadingMonthlyPlanHybridRange(
+        "2026-08-02",
+        "2026-08-01",
+        [],
+        []
+    );
+} catch (InvalidArgumentException) {
+    $hybridReversedRejected = true;
+}
+posReportActivationSplitAssert(
+    $hybridReversedRejected,
+    "hybrid monthly planner rejects a reversed date range"
+);
+
 // Additive report values sum across sources; missing keys act as zero.
 $mergedTotals = posZReadingMonthlyMergeTotals([
     ["totals" => [
@@ -454,6 +578,10 @@ posReportActivationSplitAssertSame(9.0, $mergedTotals["Report_Only"], "report-on
 
 $totalsSource = posReportActivationSplitFunctionSource("posZReadingMonthlyFetchTotals");
 foreach ([
+    "ownershipMode === \"report_posted\"",
+    "ownershipMode === \"primary_fallback\"",
+    "report_status = 0",
+    "report_header.transaction_id",
     "t.transaction_date >= ?",
     "t.transaction_date < ?",
     "a.transaction_date >= ?",
@@ -470,6 +598,78 @@ foreach ([
         "monthly totals are missing boundary {$totalsBoundary}"
     );
 }
+
+final class PosZReadingClosedDatesStatementStub extends PDOStatement
+{
+    public array $params = [];
+
+    public function __construct(private array $values)
+    {
+    }
+
+    public function execute(?array $params = null): bool
+    {
+        $this->params = $params ?? [];
+        return true;
+    }
+
+    public function fetchColumn(int $column = 0): mixed
+    {
+        return count($this->values) > 0 ? array_shift($this->values) : false;
+    }
+}
+
+final class PosZReadingClosedDatesPdoStub extends PDO
+{
+    public string $sql = "";
+    public ?PosZReadingClosedDatesStatementStub $statement = null;
+
+    public function __construct(private array $values)
+    {
+    }
+
+    public function prepare(string $query, array $options = []): PDOStatement|false
+    {
+        $this->sql = $query;
+        $this->statement = new PosZReadingClosedDatesStatementStub($this->values);
+        return $this->statement;
+    }
+}
+
+$closedDatesPdo = new PosZReadingClosedDatesPdoStub([
+    "2026-08-01",
+    "2026-08-02",
+    "2026-08-02",
+]);
+posReportActivationSplitAssertSame(
+    ["2026-08-01", "2026-08-02"],
+    posZReadingMonthlyFetchClosedDates(
+        $closedDatesPdo,
+        "2026-08-01",
+        "2026-09-01",
+        "CAT",
+        "UNIT",
+        "1"
+    ),
+    "closed shift dates are ordered and deduplicated"
+);
+posReportActivationSplitAssertSame(
+    ["CAT", "UNIT", "1", "2026-08-01", "2026-09-01"],
+    $closedDatesPdo->statement?->params,
+    "closed shift coverage uses the exact business scope and half-open range"
+);
+foreach ([
+    "SELECT DISTINCT DATE(Opening_DateTime)",
+    "Opening_DateTime >= ?",
+    "Opening_DateTime < ?",
+    "IFNULL(Z_Counter_No, 0) <> 0",
+] as $closedDateContract) {
+    posReportActivationSplitAssert(
+        str_contains($closedDatesPdo->sql, $closedDateContract),
+        "closed shift coverage is missing {$closedDateContract}"
+    );
+}
+
 final class PosReportActivationMembershipStatementStub extends PDOStatement
 {
     private PosReportActivationMembershipPdoStub $owner;
@@ -591,6 +791,85 @@ foreach ($reportMembershipPdo->executions as $execution) {
     );
 }
 
+$ownershipParams = ["CAT", "UNIT", "1", "2026-08-01", "2026-09-01"];
+foreach (["primary_fallback", "report_posted"] as $ownershipMode) {
+    $ownershipPdo = new PosReportActivationMembershipPdoStub();
+    posZReadingMonthlyFetchTotals(
+        $ownershipPdo,
+        "2026-08-01",
+        "2026-09-01",
+        "CAT",
+        "UNIT",
+        "1",
+        null,
+        "report_test",
+        null,
+        $ownershipMode
+    );
+    posReportActivationSplitAssertSame(
+        3,
+        count($ownershipPdo->executions),
+        "{$ownershipMode} applies to transaction, discount, and payment totals"
+    );
+    foreach ($ownershipPdo->executions as $execution) {
+        posReportActivationSplitAssertSame(
+            $ownershipParams,
+            $execution["params"],
+            "{$ownershipMode} query parameters"
+        );
+        posReportActivationSplitAssertSame(
+            count($execution["params"]),
+            substr_count($execution["sql"], "?"),
+            "{$ownershipMode} placeholder count"
+        );
+        posReportActivationSplitAssert(
+            !str_contains($execution["sql"], "activation_key = ?"),
+            "{$ownershipMode} must not require activation membership"
+        );
+
+        if ($ownershipMode === "primary_fallback") {
+            posReportActivationSplitAssert(
+                str_contains($execution["sql"], "NOT EXISTS (")
+                    && str_contains($execution["sql"], ".source_pos_id =")
+                    && str_contains($execution["sql"], "_fallback.report_status = 0")
+                    && str_contains($execution["sql"], "report_header.transaction_id"),
+                "primary ownership must include only unmapped or missing-report rows"
+            );
+        } else {
+            posReportActivationSplitAssert(
+                str_contains(
+                    $execution["sql"],
+                    "INNER JOIN `report_test`.`tbl_pos_report_transaction_map`"
+                )
+                    && str_contains($execution["sql"], ".report_status = 0"),
+                "report ownership must include only posted mapped rows"
+            );
+        }
+    }
+}
+
+$mixedOwnershipRejected = false;
+try {
+    posZReadingMonthlyFetchTotals(
+        new PosReportActivationMembershipPdoStub(),
+        "2026-08-01",
+        "2026-09-01",
+        "CAT",
+        "UNIT",
+        "1",
+        $activationKey,
+        "report_test",
+        true,
+        "report_posted"
+    );
+} catch (InvalidArgumentException) {
+    $mixedOwnershipRejected = true;
+}
+posReportActivationSplitAssert(
+    $mixedOwnershipRejected,
+    "activation and hybrid ownership modes cannot be combined"
+);
+
 $shiftSource = posReportActivationSplitFunctionSource("posZReadingMonthlyFetchShift");
 foreach ([
     "Opening_DateTime >= ?",
@@ -644,19 +923,20 @@ $monthlyEndpoint = posReportActivationSplitRead(
     __DIR__ . "/../api/reprint_z_reading_monthly.php"
 );
 foreach ([
-    '$activationKey = ($activationState["active"] ?? false) === true',
-    '$activationPrefixLoaded = false',
-    '"totals" => posZReadingMonthlyFetchTotals(',
-    '"first_shift" => null',
-    '"last_shift" => null',
-    '"membership" => "before_activation"',
-    '$source === "report" ? $activationKey : null',
-    '$source === "report" ? $reportDbName : null',
-    '$source === "report" ? true : null',
-    '$expectedFirstShift = posZReadingMonthlyFetchShift(',
-    '$expectedLastShift = posZReadingMonthlyFetchShift(',
-    '!posZReadingMonthlySameShift($expectedFirstShift, $loaded["first_shift"])',
-    '!posZReadingMonthlySameShift($expectedLastShift, $loaded["last_shift"])',
+    '$activationDate = null',
+    '$reportDbName = ""',
+    '$isSuperAdmin) {',
+    '$activationState = posReportMirrorActivationReadState(',
+    '$dataSource = "primary"',
+    'posZReadingMonthlyFetchClosedDates(',
+    'posZReadingMonthlyPlanHybridRange(',
+    'posZReadingMonthlyFetchSuperAdminHybridTotals(',
+    '"calculationSource" => $calculationSource',
+    '"activationDate" => $activationDate',
+    '"sourceSegments" => $publicSegments',
+    '"source" => "primary"',
+    '"pdo" => $primaryPdo',
+    'Non-Super-Admin Z-reading segments must use the primary database.',
     'if ($firstShift === null && $segment["first_shift"])',
     '$firstShift = $segment["first_shift"]',
     '$lastShift = $segment["last_shift"]',
@@ -679,31 +959,47 @@ foreach ([
 }
 posReportActivationSplitAssert(
     preg_match(
-        '/posZReadingMonthlyFetchTotals\s*\(\s*\$primaryPdo\s*,.*?\$activationKey\s*,\s*\$reportDbName\s*,\s*false\s*\)/s',
+        '/if\s*\(\$isSuperAdmin\)\s*\{\s*\$activationState\s*=\s*posReportMirrorActivationReadState\(/s',
         $monthlyEndpoint
     ) === 1,
-    "monthly activation day must add only non-member primary totals"
+    "monthly activation state must be read only for Super Admin"
 );
+posReportActivationSplitAssert(
+    preg_match(
+        '/\$dataSource\s*=\s*count\(\$selectedSources\)\s*>\s*1.*?;\s*}\s*else\s*\{.*?\$segmentPlans\[\]\s*=\s*\[\s*"source"\s*=>\s*"primary"\s*,.*?"pdo"\s*=>\s*\$primaryPdo/s',
+        $monthlyEndpoint
+    ) === 1,
+    "monthly non-Super-Admin requests must use one primary-only segment"
+);
+foreach ([
+    'Only a Super Admin can combine',
+    '$activationPrefixLoaded',
+    '$useActivationMembership',
+    '"membership" => "before_activation"',
+    '$expectedFirstShift',
+    '$expectedLastShift',
+    'posReportMirrorActivationPlanRange(',
+    'getZReadingReportPdo(',
+] as $forbiddenMonthlyReportPath) {
+    posReportActivationSplitAssert(
+        !str_contains($monthlyEndpoint, $forbiddenMonthlyReportPath),
+        "monthly non-Super-Admin report path must be removed: {$forbiddenMonthlyReportPath}"
+    );
+}
 
 $dailyEndpoint = posReportActivationSplitRead(
     __DIR__ . "/../api/reprint_z_reading.php"
 );
 foreach ([
-    '$activationKey = ($activationState["active"] ?? false) === true',
-    '$dataSource = $selectedDate === $activationDate',
-    '? "primary_and_report"',
-    '$dailySegments = [[',
-    '"totals" => posZReadingMonthlyFetchTotals(',
-    '$activationKey,',
-    '$reportDbName,',
-    'true',
-    'if ($selectedDate === $activationDate)',
-    '$primaryPdo,',
-    'false',
-    '$sales = posZReadingMonthlyMergeTotals($dailySegments)',
-    '$expectedShift = posZReadingMonthlyFetchShift(',
-    'if (!posZReadingMonthlySameShift($expectedShift, $shift))',
-    'http_response_code(409)',
+    '$activationDate = null',
+    '$reportDbName = ""',
+    '$activationState = posReportMirrorActivationReadState(',
+    'getZReadingReportPdo(',
+    'posZReadingMonthlyFetchSuperAdminHybridTotals(',
+    '"calculationSource" => $calculationSource',
+    '"activationDate" => $activationDate',
+    '$dataSource = "primary"',
+    '$calculationSource = $isSuperAdmin',
 ] as $dailyContract) {
     posReportActivationSplitAssert(
         str_contains($dailyEndpoint, $dailyContract),
@@ -712,11 +1008,30 @@ foreach ([
 }
 posReportActivationSplitAssert(
     preg_match(
-        '/\$dailySegments\s*=\s*\[\[.*?\$activationKey\s*,\s*\$reportDbName\s*,\s*true\s*\).*?if\s*\(\$selectedDate\s*===\s*\$activationDate\).*?posZReadingMonthlyFetchTotals\s*\(\s*\$primaryPdo\s*,.*?\$activationKey\s*,\s*\$reportDbName\s*,\s*false\s*\)/s',
+        '/if\s*\(\$isSuperAdmin\)\s*\{\s*\$activationState\s*=\s*posReportMirrorActivationReadState\(/s',
         $dailyEndpoint
     ) === 1,
-    "daily activation date must merge report members with primary non-members"
+    "daily activation state must be read only for Super Admin"
 );
+posReportActivationSplitAssert(
+    preg_match(
+        '/getZReadingReportPdo\s*\(.*?\$terminalNumber\s*,\s*\$isSuperAdmin\s*\)/s',
+        $dailyEndpoint
+    ) === 1,
+    "daily source selection must use authenticated Super Admin status"
+);
+foreach ([
+    'Only a Super Admin can combine',
+    '$activationKey',
+    '$dailySegments',
+    '$expectedShift',
+    'posZReadingMonthlyFetchTotals(',
+] as $forbiddenDailyReportPath) {
+    posReportActivationSplitAssert(
+        !str_contains($dailyEndpoint, $forbiddenDailyReportPath),
+        "daily non-Super-Admin report path must be removed: {$forbiddenDailyReportPath}"
+    );
+}
 
 $saveOrder = posReportActivationSplitRead(__DIR__ . "/../api/save_order.php");
 $beginPosition = strpos($saveOrder, '$pdo->beginTransaction()');

@@ -9,7 +9,7 @@ require_once __DIR__ . "/../api/report_db.php";
 $fallbackCases = [
     "Super Admin falls back when archive is empty" => [true, true, false, true],
     "archive data wins when it exists" => [true, true, true, false],
-    "non-Super Admin cannot use fallback" => [false, true, false, false],
+    "non-Super Admin bypasses the fallback policy" => [false, true, false, false],
     "current-date source never needs fallback" => [true, false, false, false],
 ];
 
@@ -141,6 +141,59 @@ if (
     );
 }
 
+foreach ([
+    "before activation" => ["2026-08-09", "2026-08-09"],
+    "on activation" => ["2026-08-10", "2026-08-10"],
+    "after activation" => ["2026-08-11", "2026-08-11"],
+    "crossing activation" => ["2026-08-09", "2026-08-11"],
+] as $label => [$dateFrom, $dateTo]) {
+    $nonSuperAdminPrimary = new ZReadingFallbackPdoStub(false);
+    $selected = getZReadingReportPdo(
+        $nonSuperAdminPrimary,
+        $dateFrom,
+        $dateTo,
+        "CAT",
+        "UNIT",
+        "1",
+        false
+    );
+    if (
+        $selected !== $nonSuperAdminPrimary
+        || $nonSuperAdminPrimary->preparedSql !== ""
+        || $nonSuperAdminPrimary->statement !== null
+    ) {
+        throw new RuntimeException(
+            "Failed: non-Super-Admin {$label} Z-readings must remain on primary without probing the report database"
+        );
+    }
+}
+
+$reportDbSource = file_get_contents(__DIR__ . "/../api/report_db.php");
+if ($reportDbSource === false) {
+    throw new RuntimeException("Failed: unable to inspect report_db.php");
+}
+$selectorStart = strpos($reportDbSource, "function getZReadingReportPdo(");
+$primaryOnlyPosition = strpos(
+    $reportDbSource,
+    'if (!$isSuperAdmin) {',
+    (int)$selectorStart
+);
+$activationReadPosition = strpos(
+    $reportDbSource,
+    'posReportMirrorActivationReadState(',
+    (int)$selectorStart
+);
+if (
+    $selectorStart === false
+    || $primaryOnlyPosition === false
+    || $activationReadPosition === false
+    || $primaryOnlyPosition > $activationReadPosition
+) {
+    throw new RuntimeException(
+        "Failed: non-Super-Admin primary routing must happen before report activation access"
+    );
+}
+
 final class ZReadingFailingPdoStub extends PDO
 {
     public function __construct()
@@ -177,8 +230,7 @@ foreach (["reprint_z_reading.php", "reprint_z_reading_monthly.php"] as $endpoint
     }
     if (
         !str_contains($source, "posRoleAuthAccount(") ||
-        !str_contains($source, "posRoleAuthCanonicalValue(") ||
-        !str_contains($source, "getZReadingReportPdo(")
+        !str_contains($source, "posRoleAuthCanonicalValue(")
     ) {
         throw new RuntimeException(
             "Failed: {$endpoint} must use authenticated Z-reading source selection"
@@ -189,6 +241,24 @@ foreach (["reprint_z_reading.php", "reprint_z_reading_monthly.php"] as $endpoint
             "Failed: {$endpoint} must not trust the request role for fallback"
         );
     }
+    if (substr_count($source, "posReportMirrorActivationReadState(") !== 1) {
+        throw new RuntimeException(
+            "Failed: {$endpoint} activation state must have one Super-Admin-gated read"
+        );
+    }
+}
+
+$dailySource = file_get_contents(__DIR__ . "/../api/reprint_z_reading.php");
+$monthlySource = file_get_contents(__DIR__ . "/../api/reprint_z_reading_monthly.php");
+if (
+    $dailySource === false
+    || !str_contains($dailySource, "getZReadingReportPdo(")
+    || $monthlySource === false
+    || !str_contains($monthlySource, '"pdo" => $primaryPdo')
+) {
+    throw new RuntimeException(
+        "Failed: daily/monthly Z-reading role source contracts are missing"
+    );
 }
 
 echo "Z-reading report database fallback tests passed.\n";

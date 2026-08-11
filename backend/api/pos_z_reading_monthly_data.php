@@ -62,6 +62,146 @@ function posZReadingMonthlySameShift(?array $left, ?array $right): bool
             (string)($right["Opening_DateTime"] ?? "");
 }
 
+function posZReadingMonthlyFetchClosedDates(
+    PDO $pdo,
+    string $dateStart,
+    string $dateEndExclusive,
+    string $categoryCode,
+    string $unitCode,
+    string $terminalNumber
+): array {
+    $stmt = $pdo->prepare("
+        SELECT DISTINCT DATE(Opening_DateTime) AS business_date
+        FROM tbl_pos_shifting_records
+        WHERE Category_Code = ?
+          AND Unit_Code = ?
+          AND terminal_number = ?
+          AND Opening_DateTime >= ?
+          AND Opening_DateTime < ?
+          AND IFNULL(Z_Counter_No, 0) <> 0
+        ORDER BY business_date
+    ");
+    $stmt->execute([
+        $categoryCode,
+        $unitCode,
+        $terminalNumber,
+        $dateStart,
+        $dateEndExclusive,
+    ]);
+
+    $dates = [];
+    while (($value = $stmt->fetchColumn()) !== false) {
+        $date = trim((string)$value);
+        if ($date !== "") {
+            $dates[] = $date;
+        }
+    }
+
+    return array_values(array_unique($dates));
+}
+
+/**
+ * Builds the report-first closed-shift plan for an authenticated Super Admin.
+ * Transaction totals use map ownership separately; this plan chooses only the
+ * shift snapshots/counters for each date and keeps open days out of the range.
+ */
+function posZReadingMonthlyPlanHybridRange(
+    string $dateFrom,
+    string $dateTo,
+    array $primaryClosedDates,
+    array $reportClosedDates,
+    ?string $activationDate = null
+): array {
+    $timezone = new DateTimeZone("Asia/Manila");
+    $parseDate = static function (string $value, string $label) use ($timezone): DateTimeImmutable {
+        $value = trim($value);
+        $date = DateTimeImmutable::createFromFormat("!Y-m-d", $value, $timezone);
+        if (!$date || $date->format("Y-m-d") !== $value) {
+            throw new InvalidArgumentException("Invalid {$label}.");
+        }
+        return $date;
+    };
+
+    $start = $parseDate($dateFrom, "Z-reading start date");
+    $end = $parseDate($dateTo, "Z-reading end date");
+    if ($end < $start) {
+        throw new InvalidArgumentException(
+            "Z-reading end date must not be before start date."
+        );
+    }
+
+    $activation = null;
+    if ($activationDate !== null && trim($activationDate) !== "") {
+        $activation = $parseDate($activationDate, "report activation date");
+    }
+
+    $normalizeCoverage = static function (array $values) use ($start, $end): array {
+        $coverage = [];
+        foreach ($values as $value) {
+            $date = trim((string)$value);
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) !== 1) {
+                continue;
+            }
+            if ($date < $start->format("Y-m-d") || $date > $end->format("Y-m-d")) {
+                continue;
+            }
+            $coverage[$date] = true;
+        }
+        return $coverage;
+    };
+
+    $primaryCoverage = $normalizeCoverage($primaryClosedDates);
+    $reportCoverage = $normalizeCoverage($reportClosedDates);
+    $plans = [];
+    $activePlan = null;
+
+    for ($date = $start; $date <= $end; $date = $date->modify("+1 day")) {
+        $businessDate = $date->format("Y-m-d");
+        $source = isset($reportCoverage[$businessDate])
+            ? "report"
+            : (isset($primaryCoverage[$businessDate]) ? "primary" : null);
+
+        if ($source === null) {
+            if ($activePlan !== null) {
+                $plans[] = $activePlan;
+                $activePlan = null;
+            }
+            continue;
+        }
+
+        $useActivationMembership = $source === "report"
+            && $activation !== null
+            && $date >= $activation;
+        $endExclusive = $date->modify("+1 day")->format("Y-m-d");
+
+        if (
+            $activePlan !== null
+            && $activePlan["source"] === $source
+            && $activePlan["use_activation_membership"] === $useActivationMembership
+            && $activePlan["end_exclusive"] === $businessDate
+        ) {
+            $activePlan["end_exclusive"] = $endExclusive;
+            continue;
+        }
+
+        if ($activePlan !== null) {
+            $plans[] = $activePlan;
+        }
+        $activePlan = [
+            "source" => $source,
+            "start" => $businessDate,
+            "end_exclusive" => $endExclusive,
+            "use_activation_membership" => $useActivationMembership,
+        ];
+    }
+
+    if ($activePlan !== null) {
+        $plans[] = $activePlan;
+    }
+
+    return $plans;
+}
+
 function posZReadingMonthlyFetchTotals(
     PDO $pdo,
     string $dateStart,
@@ -71,7 +211,8 @@ function posZReadingMonthlyFetchTotals(
     string $terminalNumber,
     ?string $activationKey = null,
     ?string $activationMapDatabase = null,
-    ?bool $includeActivationMembers = null
+    ?bool $includeActivationMembers = null,
+    ?string $ownershipMode = null
 ): array {
     $scopeParams = [
         $categoryCode,
@@ -82,8 +223,33 @@ function posZReadingMonthlyFetchTotals(
     ];
     $activationKey = trim((string)$activationKey);
     $activationMapDatabase = trim((string)$activationMapDatabase);
+    $ownershipMode = trim((string)$ownershipMode);
     $mapTable = "";
-    if ($includeActivationMembers !== null) {
+    $reportMainTable = "";
+    if ($ownershipMode !== "" && $includeActivationMembers !== null) {
+        throw new InvalidArgumentException(
+            "Activation membership and hybrid ownership cannot be combined."
+        );
+    }
+    if ($ownershipMode !== "") {
+        if (!in_array($ownershipMode, ["primary_fallback", "report_posted"], true)) {
+            throw new InvalidArgumentException("Invalid Z-reading ownership mode.");
+        }
+        if ($activationMapDatabase === "") {
+            throw new InvalidArgumentException(
+                "Report database is required for hybrid Z-reading totals."
+            );
+        }
+        $reportDatabase = posReportMirrorIdentifier(
+            $activationMapDatabase,
+            "report database name"
+        );
+        $mapTable = posReportMirrorMapTable($reportDatabase);
+        $reportMainTable = posReportMirrorTable(
+            $reportDatabase,
+            "tbl_pos_transactions"
+        );
+    } elseif ($includeActivationMembers !== null) {
         if ($activationKey === "" || $activationMapDatabase === "") {
             throw new InvalidArgumentException(
                 "Activation key and report database are required for split Z-reading totals."
@@ -98,7 +264,60 @@ function posZReadingMonthlyFetchTotals(
     $membershipSql = static function (
         string $transactionAlias,
         string $mapAlias
-    ) use ($includeActivationMembers, $mapTable): array {
+    ) use (
+        $includeActivationMembers,
+        $ownershipMode,
+        $mapTable,
+        $reportMainTable
+    ): array {
+        if ($ownershipMode === "report_posted") {
+            return [
+                "join" => "
+                    INNER JOIN {$mapTable} {$mapAlias}
+                        ON {$mapAlias}.report_transaction_id = {$transactionAlias}.transaction_id
+                       AND {$mapAlias}.Category_Code = {$transactionAlias}.Category_Code
+                       AND {$mapAlias}.Unit_Code = {$transactionAlias}.Unit_Code
+                       AND {$mapAlias}.report_status = 0
+                ",
+                "where" => "",
+            ];
+        }
+
+        if ($ownershipMode === "primary_fallback") {
+            return [
+                "join" => "",
+                "where" => "
+                    AND (
+                        NOT EXISTS (
+                            SELECT 1
+                            FROM {$mapTable} {$mapAlias}
+                            WHERE {$mapAlias}.source_pos_id = {$transactionAlias}.ID
+                              AND {$mapAlias}.Category_Code = {$transactionAlias}.Category_Code
+                              AND {$mapAlias}.Unit_Code = {$transactionAlias}.Unit_Code
+                        )
+                        OR EXISTS (
+                            SELECT 1
+                            FROM {$mapTable} {$mapAlias}_fallback
+                            WHERE {$mapAlias}_fallback.source_pos_id = {$transactionAlias}.ID
+                              AND {$mapAlias}_fallback.Category_Code = {$transactionAlias}.Category_Code
+                              AND {$mapAlias}_fallback.Unit_Code = {$transactionAlias}.Unit_Code
+                              AND {$mapAlias}_fallback.report_status = 0
+                              AND NOT EXISTS (
+                                  SELECT 1
+                                  FROM {$reportMainTable} report_header
+                                  WHERE report_header.transaction_id =
+                                        {$mapAlias}_fallback.report_transaction_id
+                                    AND report_header.Category_Code =
+                                        {$mapAlias}_fallback.Category_Code
+                                    AND report_header.Unit_Code =
+                                        {$mapAlias}_fallback.Unit_Code
+                              )
+                        )
+                    )
+                ",
+            ];
+        }
+
         if ($includeActivationMembers === null) {
             return ["join" => "", "where" => ""];
         }
@@ -212,6 +431,47 @@ function posZReadingMonthlyFetchTotals(
     }
 
     return $totals;
+}
+
+function posZReadingMonthlyFetchSuperAdminHybridTotals(
+    PDO $primaryPdo,
+    PDO $reportPdo,
+    string $reportDatabase,
+    string $dateStart,
+    string $dateEndExclusive,
+    string $categoryCode,
+    string $unitCode,
+    string $terminalNumber
+): array {
+    $primaryTotals = posZReadingMonthlyFetchTotals(
+        $primaryPdo,
+        $dateStart,
+        $dateEndExclusive,
+        $categoryCode,
+        $unitCode,
+        $terminalNumber,
+        null,
+        $reportDatabase,
+        null,
+        "primary_fallback"
+    );
+    $reportTotals = posZReadingMonthlyFetchTotals(
+        $reportPdo,
+        $dateStart,
+        $dateEndExclusive,
+        $categoryCode,
+        $unitCode,
+        $terminalNumber,
+        null,
+        $reportDatabase,
+        null,
+        "report_posted"
+    );
+
+    return posZReadingMonthlyMergeTotals([
+        ["totals" => $primaryTotals],
+        ["totals" => $reportTotals],
+    ]);
 }
 
 function posZReadingMonthlyLoadSegment(

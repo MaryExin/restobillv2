@@ -120,38 +120,30 @@ try {
         throw new Exception("categoryCode and unitCode are required.");
     }
 
-    $activationState = posReportMirrorActivationReadState($primaryPdo, $config);
-    $activationDate = ($activationState["active"] ?? false) === true
-        ? (string)$activationState["activation_business_date"]
-        : null;
-    $activationKey = ($activationState["active"] ?? false) === true
-        ? (string)$activationState["activation_key"]
-        : null;
-    [, $reportDbName] = posReportMirrorActivationDatabaseNames($config);
+    $activationDate = null;
+    $reportDbName = "";
+    if ($isSuperAdmin) {
+        $activationState = posReportMirrorActivationReadState($primaryPdo, $config);
+        $activationDate = ($activationState["active"] ?? false) === true
+            ? (string)$activationState["activation_business_date"]
+            : null;
+        [, $reportDbName] = posReportMirrorActivationDatabaseNames($config);
+    }
     $dataSource = "primary";
-
-    if ($activationDate !== null && $selectedDate >= $activationDate) {
-        if (!$isSuperAdmin && $selectedDate === $activationDate) {
-            http_response_code(403);
-            throw new Exception(
-                "Only a Super Admin can combine original and skipped report data on the activation date."
-            );
-        }
-        $pdo = getConfiguredReportPdo();
-        $dataSource = $selectedDate === $activationDate
+    $pdo = getZReadingReportPdo(
+        $primaryPdo,
+        $selectedDate,
+        $selectedDate,
+        $categoryCode,
+        $unitCode,
+        $terminalNumber,
+        $isSuperAdmin
+    );
+    if ($pdo !== $primaryPdo) {
+        $dataSource = $activationDate !== null
+            && $selectedDate === $activationDate
             ? "primary_and_report"
             : "report";
-    } else {
-        $pdo = getZReadingReportPdo(
-            $primaryPdo,
-            $selectedDate,
-            $selectedDate,
-            $categoryCode,
-            $unitCode,
-            $terminalNumber,
-            $isSuperAdmin
-        );
-        $dataSource = $pdo === $primaryPdo ? "primary" : "report";
     }
 
     $stmtBusinessUnit = $primaryPdo->prepare("
@@ -214,24 +206,6 @@ try {
             );
         }
         throw new Exception("No Z-reading reprint record found for the selected date. Only closed shifts with Z_Counter_No not equal to 0 can be reprinted.");
-    }
-
-    if ($activationDate !== null && $selectedDate >= $activationDate) {
-        $expectedShift = posZReadingMonthlyFetchShift(
-            $primaryPdo,
-            $selectedDate,
-            $dateEndExclusive,
-            $categoryCode,
-            $unitCode,
-            $terminalNumber,
-            true
-        );
-        if (!posZReadingMonthlySameShift($expectedShift, $shift)) {
-            http_response_code(409);
-            throw new Exception(
-                "The report database closed Z-reading does not match the primary POS shift for this date."
-            );
-        }
     }
 
     $reportDate = date("Y-m-d", strtotime($shift["Opening_DateTime"]));
@@ -434,40 +408,23 @@ try {
     $stmtOtherPayments->execute([$categoryCode, $unitCode, $terminalNumber, $reportDate]);
     $paymentOthers = (float)($stmtOtherPayments->fetchColumn() ?: 0);
 
-    // The activation day may contain original sales before skipping was
-    // enabled and mapped sales afterward. Recalculate all additive figures
-    // from explicit activation membership so those transactions are combined
-    // exactly once. Later days use only activation-member report rows.
-    if ($activationDate !== null && $selectedDate >= $activationDate) {
-        $dailySegments = [[
-            "totals" => posZReadingMonthlyFetchTotals(
-                $pdo,
-                $selectedDate,
-                $dateEndExclusive,
-                $categoryCode,
-                $unitCode,
-                $terminalNumber,
-                $activationKey,
-                $reportDbName,
-                true
-            ),
-        ]];
-        if ($selectedDate === $activationDate) {
-            $dailySegments[] = [
-                "totals" => posZReadingMonthlyFetchTotals(
-                    $primaryPdo,
-                    $selectedDate,
-                    $dateEndExclusive,
-                    $categoryCode,
-                    $unitCode,
-                    $terminalNumber,
-                    $activationKey,
-                    $reportDbName,
-                    false
-                ),
-            ];
-        }
-        $sales = posZReadingMonthlyMergeTotals($dailySegments);
+    // Super Admin totals combine primary rows that have no report ownership
+    // with posted report rows. This fills report-missing history and the
+    // pre-enrollment prefix without counting the two copies of a mapped sale.
+    if ($isSuperAdmin) {
+        $hybridReportPdo = $pdo !== $primaryPdo
+            ? $pdo
+            : getConfiguredReportPdo();
+        $sales = posZReadingMonthlyFetchSuperAdminHybridTotals(
+            $primaryPdo,
+            $hybridReportPdo,
+            $reportDbName,
+            $selectedDate,
+            $dateEndExclusive,
+            $categoryCode,
+            $unitCode,
+            $terminalNumber
+        );
         $sales["Sales_For_The_Day"] = (float)($sales["Sales_For_The_Range"] ?? 0);
         $voidedSales = (float)($sales["Voided_Sales"] ?? 0);
         $refundedSales = (float)($sales["Refunded_Sales"] ?? 0);
@@ -482,6 +439,9 @@ try {
         $paymentOthers = (float)($sales["Payment_Others"] ?? 0);
     }
 
+    $calculationSource = $isSuperAdmin
+        ? "primary_and_report"
+        : $dataSource;
     $presentAccumulatedSales = (float)($shift["Grand_Accum_Sales"] ?: 0);
     $salesForTheDay = (float)($sales["Sales_For_The_Day"] ?: 0);
     $previousAccumulatedSales = $presentAccumulatedSales - $salesForTheDay;
@@ -516,6 +476,7 @@ try {
         "data" => [
             "shiftId" => (string)$shift["Shift_ID"],
             "dataSource" => $dataSource,
+            "calculationSource" => $calculationSource,
             "activationDate" => $activationDate,
             "reportDate" => date("F d, Y", strtotime($shift["Opening_DateTime"])),
             "reportTime" => date("h:i A", strtotime($shift["Closing_DateTime"])),

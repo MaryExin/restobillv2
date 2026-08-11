@@ -119,9 +119,9 @@ function reportDbShouldFallbackToPrimary(
 }
 
 /**
- * Use reports_database for historical Z-readings. For an authenticated Super
- * Admin only, fall back to the already-open primary POS connection when the
- * archive contains no qualifying Z-reading for the requested date/range.
+ * Only an authenticated Super Admin may select reports_database for a
+ * Z-reading. Every other role remains pinned to the already-open primary POS
+ * connection, including historical and activation-boundary requests.
  */
 function getZReadingReportPdo(
     PDO $primaryPdo,
@@ -141,25 +141,36 @@ function getZReadingReportPdo(
         $dateTo = $dateFrom;
     }
 
-    // Once skipping is activated, Super Admin reads are deterministic:
-    // original POS data before the boundary, report DB data on/after it. The
-    // post-activation branch deliberately never falls back to unskipped data.
-    if ($isSuperAdmin) {
-        $config = require __DIR__ . "/config.php";
-        $activation = posReportMirrorActivationReadState($primaryPdo, $config);
-        if (($activation["active"] ?? false) === true) {
-            $activationDate = (string)$activation["activation_business_date"];
-            if ($dateFrom < $activationDate && $dateTo >= $activationDate) {
-                throw new RuntimeException(
-                    "This Z-reading range crosses the report skipping activation date and requires the monthly split reader."
-                );
-            }
-            if ($dateTo < $activationDate) {
-                return $primaryPdo;
-            }
+    if (!$isSuperAdmin) {
+        return $primaryPdo;
+    }
 
-            return getConfiguredReportPdo();
+    // Once skipping is activated, a crossing range still belongs to the
+    // monthly hybrid reader. A non-crossing Super Admin range prefers the
+    // report database but may use primary data when the report database
+    // genuinely has no closed Z-reading for that day.
+    $config = require __DIR__ . "/config.php";
+    $activation = posReportMirrorActivationReadState($primaryPdo, $config);
+    if (($activation["active"] ?? false) === true) {
+        $activationDate = (string)$activation["activation_business_date"];
+        if ($dateFrom < $activationDate && $dateTo >= $activationDate) {
+            throw new RuntimeException(
+                "This Z-reading range crosses the report skipping activation date and requires the monthly split reader."
+            );
         }
+        $activationReportPdo = getConfiguredReportPdo();
+        $reportHasClosedZReading = reportDbHasClosedZReading(
+            $activationReportPdo,
+            $dateFrom,
+            $dateTo,
+            $categoryCode,
+            $unitCode,
+            $terminalNumber
+        );
+
+        return $reportHasClosedZReading
+            ? $activationReportPdo
+            : $primaryPdo;
     }
 
     $archiveRequested = reportDbShouldUseArchive($dateFrom, $dateTo);
@@ -168,10 +179,6 @@ function getZReadingReportPdo(
     }
 
     $archivePdo = getReportPdo($dateFrom, $dateTo);
-    if (!$isSuperAdmin) {
-        return $archivePdo;
-    }
-
     $archiveHasClosedZReading = reportDbHasClosedZReading(
         $archivePdo,
         trim((string)$dateFrom),

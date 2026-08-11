@@ -141,149 +141,120 @@ try {
     $businessUnitTIN = (string)$businessUnit["Unit_TIN"];
     $businessUnitVATRegistration = (string)$businessUnit["VAT_Registration"];
 
-    $activationState = posReportMirrorActivationReadState($primaryPdo, $config);
-    $activationDate = ($activationState["active"] ?? false) === true
-        ? (string)$activationState["activation_business_date"]
-        : null;
-    $activationKey = ($activationState["active"] ?? false) === true
-        ? (string)$activationState["activation_key"]
-        : null;
-    [, $reportDbName] = posReportMirrorActivationDatabaseNames($config);
+    $activationDate = null;
+    $reportDbName = "";
+    if ($isSuperAdmin) {
+        $activationState = posReportMirrorActivationReadState($primaryPdo, $config);
+        $activationDate = ($activationState["active"] ?? false) === true
+            ? (string)$activationState["activation_business_date"]
+            : null;
+        [, $reportDbName] = posReportMirrorActivationDatabaseNames($config);
+    }
     $dateEndExclusive = (new DateTimeImmutable($dateTo, new DateTimeZone("Asia/Manila")))
         ->modify("+1 day")
         ->format("Y-m-d");
     $segmentPlans = [];
     $dataSource = "primary";
+    $reportPdo = null;
 
-    if ($activationDate !== null) {
-        if (!$isSuperAdmin && $dateFrom <= $activationDate) {
-            http_response_code(403);
-            throw new Exception(
-                "Only a Super Admin can combine original and skipped report data across the activation date."
-            );
-        }
-        $segmentPlans = posReportMirrorActivationPlanRange(
-            $dateFrom,
-            $dateTo,
-            $activationDate
-        );
-        $dataSource = count($segmentPlans) > 1
-            ? "primary_and_report"
-            : (string)($segmentPlans[0]["source"] ?? "primary");
-    } else {
-        $selectedPdo = getZReadingReportPdo(
+    if ($isSuperAdmin) {
+        // Prefer report shift snapshots where they are closed and available;
+        // primary shifts fill missing dates. Additive transaction figures are
+        // combined later using row-level map ownership, not this shift plan.
+        $reportPdo = getConfiguredReportPdo();
+        $primaryClosedDates = posZReadingMonthlyFetchClosedDates(
             $primaryPdo,
             $dateFrom,
-            $dateTo,
+            $dateEndExclusive,
             $categoryCode,
             $unitCode,
-            $terminalNumber,
-            $isSuperAdmin
+            $terminalNumber
         );
-        $dataSource = $selectedPdo === $primaryPdo ? "primary" : "report";
+        $reportClosedDates = posZReadingMonthlyFetchClosedDates(
+            $reportPdo,
+            $dateFrom,
+            $dateEndExclusive,
+            $categoryCode,
+            $unitCode,
+            $terminalNumber
+        );
+        $segmentPlans = posZReadingMonthlyPlanHybridRange(
+            $dateFrom,
+            $dateTo,
+            $primaryClosedDates,
+            $reportClosedDates,
+            $activationDate
+        );
+        $selectedSources = array_values(array_unique(array_map(
+            static fn(array $plan): string => (string)$plan["source"],
+            $segmentPlans
+        )));
+        $dataSource = count($selectedSources) > 1
+            ? "primary_and_report"
+            : (string)($selectedSources[0] ?? "primary");
+    } else {
+        // Every non-Super-Admin role reads the complete requested range from
+        // the primary POS database and never probes reports_database.
         $segmentPlans[] = [
-            "source" => $dataSource,
+            "source" => "primary",
             "start" => $dateFrom,
             "end_exclusive" => $dateEndExclusive,
-            "pdo" => $selectedPdo,
+            "pdo" => $primaryPdo,
         ];
     }
 
-    $reportPdo = null;
     $loadedSegments = [];
     $publicSegments = [];
-    $activationPrefixLoaded = false;
     foreach ($segmentPlans as $plan) {
         $source = (string)$plan["source"];
-
-        // If activation occurred after other sales on the same calendar day,
-        // keep those earlier physical rows in the original-data portion. The
-        // activation row itself and all later mapped rows remain report data.
-        if (
-            !$activationPrefixLoaded
-            && $activationDate !== null
-            && $activationKey !== null
-            && $source === "report"
-            && $dateFrom <= $activationDate
-            && $dateTo >= $activationDate
-        ) {
-            $activationDayEnd = (new DateTimeImmutable(
-                $activationDate,
-                new DateTimeZone("Asia/Manila")
-            ))->modify("+1 day")->format("Y-m-d");
-            $loadedSegments[] = [
-                "first_shift" => null,
-                "last_shift" => null,
-                "totals" => posZReadingMonthlyFetchTotals(
-                    $primaryPdo,
-                    $activationDate,
-                    $activationDayEnd,
-                    $categoryCode,
-                    $unitCode,
-                    $terminalNumber,
-                    $activationKey,
-                    $reportDbName,
-                    false
-                ),
-            ];
-            $publicSegments[] = [
-                "source" => "primary",
-                "dateFrom" => $activationDate,
-                "dateToExclusive" => $activationDayEnd,
-                "membership" => "before_activation",
-            ];
-            $activationPrefixLoaded = true;
-            $dataSource = "primary_and_report";
-        }
 
         if (isset($plan["pdo"]) && $plan["pdo"] instanceof PDO) {
             $segmentPdo = $plan["pdo"];
         } elseif ($source === "primary") {
             $segmentPdo = $primaryPdo;
+        } elseif (!$isSuperAdmin) {
+            throw new RuntimeException(
+                "Non-Super-Admin Z-reading segments must use the primary database."
+            );
         } else {
             $reportPdo ??= getConfiguredReportPdo();
             $segmentPdo = $reportPdo;
         }
 
-        $loaded = posZReadingMonthlyLoadSegment(
-            $segmentPdo,
-            (string)$plan["start"],
-            (string)$plan["end_exclusive"],
-            $categoryCode,
-            $unitCode,
-            $terminalNumber,
-            $source === "report" ? $activationKey : null,
-            $source === "report" ? $reportDbName : null,
-            $source === "report" ? true : null
-        );
-        if ($activationDate !== null && $source === "report") {
-            $expectedFirstShift = posZReadingMonthlyFetchShift(
-                $primaryPdo,
+        if ($isSuperAdmin) {
+            $loaded = [
+                "first_shift" => posZReadingMonthlyFetchShift(
+                    $segmentPdo,
+                    (string)$plan["start"],
+                    (string)$plan["end_exclusive"],
+                    $categoryCode,
+                    $unitCode,
+                    $terminalNumber,
+                    false
+                ),
+                "last_shift" => posZReadingMonthlyFetchShift(
+                    $segmentPdo,
+                    (string)$plan["start"],
+                    (string)$plan["end_exclusive"],
+                    $categoryCode,
+                    $unitCode,
+                    $terminalNumber,
+                    true
+                ),
+                "totals" => [],
+            ];
+        } else {
+            $loaded = posZReadingMonthlyLoadSegment(
+                $segmentPdo,
                 (string)$plan["start"],
                 (string)$plan["end_exclusive"],
                 $categoryCode,
                 $unitCode,
                 $terminalNumber,
-                false
+                null,
+                null,
+                null
             );
-            $expectedLastShift = posZReadingMonthlyFetchShift(
-                $primaryPdo,
-                (string)$plan["start"],
-                (string)$plan["end_exclusive"],
-                $categoryCode,
-                $unitCode,
-                $terminalNumber,
-                true
-            );
-            if (
-                !posZReadingMonthlySameShift($expectedFirstShift, $loaded["first_shift"])
-                || !posZReadingMonthlySameShift($expectedLastShift, $loaded["last_shift"])
-            ) {
-                http_response_code(409);
-                throw new Exception(
-                    "The report database is missing one or more closed Z-readings in the post-activation portion of this range."
-                );
-            }
         }
         $loadedSegments[] = $loaded;
         $publicSegments[] = [
@@ -307,7 +278,34 @@ try {
         throw new Exception("No Z-reading reprint record found for the selected date range. Only closed shifts with Z_Counter_No not equal to 0 can be reprinted.");
     }
 
-    $sales = posZReadingMonthlyMergeTotals($loadedSegments);
+    if ($isSuperAdmin) {
+        if (!$reportPdo instanceof PDO) {
+            throw new RuntimeException(
+                "Unable to open the report database for hybrid Z-reading totals."
+            );
+        }
+        $hybridTotalSegments = [];
+        foreach ($segmentPlans as $plan) {
+            $hybridTotalSegments[] = [
+                "totals" => posZReadingMonthlyFetchSuperAdminHybridTotals(
+                    $primaryPdo,
+                    $reportPdo,
+                    $reportDbName,
+                    (string)$plan["start"],
+                    (string)$plan["end_exclusive"],
+                    $categoryCode,
+                    $unitCode,
+                    $terminalNumber
+                ),
+            ];
+        }
+        $sales = posZReadingMonthlyMergeTotals($hybridTotalSegments);
+    } else {
+        $sales = posZReadingMonthlyMergeTotals($loadedSegments);
+    }
+    $calculationSource = $isSuperAdmin
+        ? "primary_and_report"
+        : $dataSource;
     $voidedSales = (float)($sales["Voided_Sales"] ?? 0);
     $refundedSales = (float)($sales["Refunded_Sales"] ?? 0);
     $discountSC = (float)($sales["Discount_SC"] ?? 0);
@@ -369,6 +367,7 @@ try {
             "dateFrom" => $dateFrom,
             "dateTo" => $dateTo,
             "dataSource" => $dataSource,
+            "calculationSource" => $calculationSource,
             "activationDate" => $activationDate,
             "sourceSegments" => $publicSegments,
 
