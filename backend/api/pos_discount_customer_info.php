@@ -183,6 +183,7 @@ try {
             customer_id,
             discount_type,
             discount_amount,
+            vat_exemption,
             customer_name,
             date_of_birth,
             gender,
@@ -198,6 +199,7 @@ try {
             :customer_id,
             :discount_type,
             :discount_amount,
+            :vat_exemption,
             :customer_name,
             :date_of_birth,
             :gender,
@@ -214,6 +216,7 @@ try {
         SET customer_id = :customer_id,
             discount_type = :discount_type,
             discount_amount = :discount_amount,
+            vat_exemption = :vat_exemption,
             customer_name = :customer_name,
             date_of_birth = :date_of_birth,
             gender = :gender,
@@ -236,12 +239,17 @@ try {
         $discountType = normalizeDiscountType($entry["discount_type"] ?? "");
         $qualifiedCount = isset($entry["qualified_count"]) ? (int)$entry["qualified_count"] : 0;
         $discountAmount = isset($entry["discount_amount"]) ? (float)$entry["discount_amount"] : 0;
+        $vatExemption = isset($entry["vat_exemption"]) ? (float)$entry["vat_exemption"] : 0;
 
         if ($qualifiedCount <= 0 || $discountAmount <= 0) {
             continue;
         }
 
-        foreach (splitAmountAcrossCount($discountAmount, $qualifiedCount) as $rowAmount) {
+        $rowAmounts = splitAmountAcrossCount($discountAmount, $qualifiedCount);
+        $rowVatExemptions = splitAmountAcrossCount($vatExemption, $qualifiedCount);
+
+        foreach ($rowAmounts as $rowIdxInEntry => $rowAmount) {
+            $rowVatExemption = $rowVatExemptions[$rowIdxInEntry] ?? 0;
             $card = $customerInfo[$rowIndex] ?? [];
             if (!is_array($card)) {
                 $card = [];
@@ -262,6 +270,7 @@ try {
                     ":customer_id" => $customerId,
                     ":discount_type" => $discountType,
                     ":discount_amount" => moneyRound($rowAmount),
+                    ":vat_exemption" => moneyRound($rowVatExemption),
                     ":customer_name" => normalizeNullable($customerName),
                     ":date_of_birth" => normalizeNullable($dateOfBirth),
                     ":gender" => normalizeNullable($gender),
@@ -278,6 +287,7 @@ try {
                     ":customer_id" => $customerId,
                     ":discount_type" => $discountType,
                     ":discount_amount" => moneyRound($rowAmount),
+                    ":vat_exemption" => moneyRound($rowVatExemption),
                     ":customer_name" => normalizeNullable($customerName),
                     ":date_of_birth" => normalizeNullable($dateOfBirth),
                     ":gender" => normalizeNullable($gender),
