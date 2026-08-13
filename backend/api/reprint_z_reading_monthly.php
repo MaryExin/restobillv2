@@ -34,6 +34,7 @@ $isSuperAdmin = posRoleAuthCanonicalValue(
 
 require_once __DIR__ . "/report_db.php";
 require_once __DIR__ . "/pos_z_reading_monthly_data.php";
+require_once __DIR__ . "/monthly_z_reading_report.php";
 
 try {
     $raw = file_get_contents("php://input");
@@ -112,6 +113,60 @@ try {
 
     if ($categoryCode === "" || $unitCode === "") {
         throw new Exception("categoryCode and unitCode are required.");
+    }
+
+    $compareDatabases = monthlyZBoolean(
+        $input,
+        "compareDatabaseScopes",
+        "compare_database_scopes"
+    );
+    if ($compareDatabases) {
+        if (!posRoleAuthIsDeveloperSession()) {
+            posRoleAuthRespond(
+                "Monthly database comparison requires a Developer session.",
+                403
+            );
+        }
+
+        $dateFrom = monthlyZDate($dateFrom, "dateFrom");
+        $dateTo = monthlyZDate($dateTo, "dateTo");
+        $periodStart = new DateTimeImmutable($dateFrom);
+        $periodEnd = new DateTimeImmutable($dateTo);
+        if ((int)$periodStart->diff($periodEnd)->days > 30) {
+            throw new InvalidArgumentException(
+                "The monthly Z-reading date range cannot exceed 31 days."
+            );
+        }
+
+        $comparisonRequest = [
+            "dateFrom" => $dateFrom,
+            "dateTo" => $dateTo,
+            "terminalNumber" => $terminalNumber,
+            "machineNumber" => $machineNumber,
+            "serialNumber" => $serialNumber,
+            "ptuNumber" => $ptuNumber,
+            "ptuDateIssued" => $ptuDateIssued,
+        ];
+
+        $primaryPdo->beginTransaction();
+        $comparisonData = monthlyZBuildDatabaseComparison(
+            $primaryPdo,
+            require __DIR__ . "/config.php",
+            $dateFrom,
+            $dateTo,
+            $categoryCode,
+            $unitCode,
+            $terminalNumber,
+            $comparisonRequest
+        );
+        $primaryPdo->commit();
+
+        echo json_encode([
+            "success" => true,
+            "message" => "Main and skipped Report DB monthly computations loaded successfully.",
+            "data" => $comparisonData,
+        ], JSON_UNESCAPED_SLASHES);
+        exit;
     }
 
     // Business identity is authoritative in the live database even when the
@@ -475,7 +530,28 @@ try {
             "ptuDateIssued" => $ptuDateIssued,
         ]
     ]);
+} catch (InvalidArgumentException $e) {
+    if ($primaryPdo->inTransaction()) {
+        $primaryPdo->rollBack();
+    }
+    http_response_code(422);
+    echo json_encode([
+        "success" => false,
+        "message" => $e->getMessage(),
+    ]);
+} catch (MonthlyZReadingNoDataException $e) {
+    if ($primaryPdo->inTransaction()) {
+        $primaryPdo->rollBack();
+    }
+    http_response_code(404);
+    echo json_encode([
+        "success" => false,
+        "message" => $e->getMessage(),
+    ]);
 } catch (Throwable $e) {
+    if ($primaryPdo->inTransaction()) {
+        $primaryPdo->rollBack();
+    }
     if (http_response_code() < 400) {
         http_response_code(500);
     }
