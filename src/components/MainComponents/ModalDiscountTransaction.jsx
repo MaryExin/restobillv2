@@ -1773,22 +1773,23 @@ const ModalDiscountTransaction = ({
     const naacProratedBase = prorate(rawNaacCount);
     const soloParentProratedBase = prorate(rawSoloParentCount);
 
-    const seniorDiscountAmount = seniorProratedBase * 0.2;
-    const seniorVatExemption = seniorProratedBase * 0.12;
+    const seniorDiscountAmount = roundMoney(seniorProratedBase * 0.2);
+    const seniorVatExemption = roundMoney(seniorProratedBase * 0.12);
 
-    const pwdDiscountAmount = pwdProratedBase * 0.2;
-    const pwdVatExemption = pwdProratedBase * 0.12;
+    const pwdDiscountAmount = roundMoney(pwdProratedBase * 0.2);
+    const pwdVatExemption = roundMoney(pwdProratedBase * 0.12);
 
-    const naacDiscountAmount = naacProratedBase * 0.2;
-    const naacVatExemption = naacProratedBase * 0.12;
+    const naacDiscountAmount = roundMoney(naacProratedBase * 0.2);
+    const naacVatExemption = roundMoney(naacProratedBase * 0.12);
 
-    const soloParentDiscountAmount = soloParentProratedBase * 0.1;
-    const soloParentVatExemption = soloParentProratedBase * 0.12;
+    const soloParentDiscountAmount = roundMoney(soloParentProratedBase * 0.1);
+    const soloParentVatExemption = roundMoney(soloParentProratedBase * 0.12);
 
-    const manualDiscountAmount =
+    const manualDiscountAmount = roundMoney(
       manualMode === "percent"
         ? discountableGross * (manualPercent / 100)
-        : rawManualAmount;
+        : rawManualAmount,
+    );
     const manualVatExemption = 0;
 
     // Custom discount lines added via "+ Add Discount" (any lkp_discount_type
@@ -1873,9 +1874,11 @@ const ModalDiscountTransaction = ({
       isDiscountCeilingApplied,
     } = applyDiscountCeiling(rawDiscountBreakdown, discountCeilingAmount);
 
-    const totalVatExemption = discountBreakdown.reduce(
-      (sum, entry) => sum + Number(entry.vatExemption || 0),
-      0,
+    const totalVatExemption = roundMoney(
+      discountBreakdown.reduce(
+        (sum, entry) => sum + Number(entry.vatExemption || 0),
+        0,
+      ),
     );
 
     const finalVatExemptSales = Math.max(vatExemptSales - totalVatExemption, 0);

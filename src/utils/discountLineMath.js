@@ -11,6 +11,8 @@
 // discount * 0.6) and Solo Parent (10%, vatEx = discount * 1.2) math reduced
 // to; 0.6 = 0.12/0.2 and 1.2 = 0.12/0.1.
 
+const roundMoney = (value) => Math.round(Number(value || 0) * 100) / 100;
+
 export const prorateDiscountBase = (discountBase, count, sharingMode, safeCustomerCount) => {
   const safeCount = Math.max(Number(count) || 0, 0);
   if (sharingMode === "solo") {
@@ -28,14 +30,14 @@ export const computeDiscountLine = (line, proratedBase) => {
     // Flat peso amount off, not tied to a qualified-customer proration.
     // None of today's fixed-type discount types are VAT-exempt.
     return {
-      discountAmount: Math.max(Number(line?.manualAmount || 0), 0),
+      discountAmount: roundMoney(Math.max(Number(line?.manualAmount || 0), 0)),
       vatExemption: 0,
     };
   }
 
   return {
-    discountAmount: proratedBase * (percent / 100),
-    vatExemption: isVatExempt ? proratedBase * 0.12 : 0,
+    discountAmount: roundMoney(proratedBase * (percent / 100)),
+    vatExemption: isVatExempt ? roundMoney(proratedBase * 0.12) : 0,
   };
 };
 
@@ -63,9 +65,16 @@ export const resolveDiscountLineAmount = ({
     Number(stored.amount) > 0;
 
   if (canReuseStored) {
-    const discountAmount = Number(stored.amount);
+    const discountAmount = roundMoney(stored.amount);
+    const storedVatExemption = roundMoney(
+      stored.vat_exemption ?? stored.vatExemption ?? 0,
+    );
     const vatExemption =
-      isVatExempt && percent > 0 ? discountAmount * (0.12 / (percent / 100)) : 0;
+      isVatExempt && storedVatExemption > 0
+        ? storedVatExemption
+        : isVatExempt && percent > 0
+          ? roundMoney(discountAmount * (0.12 / (percent / 100)))
+          : 0;
     return { discountAmount, vatExemption };
   }
 
