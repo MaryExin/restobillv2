@@ -823,6 +823,137 @@ function monthlyZClosedShiftDates(array $shifts): array
     return $dates;
 }
 
+/**
+ * Build one continuous period without restoring intentionally skipped Report
+ * DB transactions. A date belongs entirely to Report DB when that database has
+ * a closed shift for it; Main DB is used only for dates with no Report DB shift.
+ */
+function monthlyZBuildDateFallbackShifts(
+    array $mainShifts,
+    array $reportShifts
+): array {
+    $reportDates = monthlyZClosedShiftDates($reportShifts);
+    $selected = array_values($reportShifts);
+    $fallbackDates = [];
+    $mainFallbackCount = 0;
+
+    foreach ($mainShifts as $mainShift) {
+        $date = substr(
+            (string)($mainShift["Opening_DateTime"] ?? ""),
+            0,
+            10
+        );
+        if ($date !== "" && isset($reportDates[$date])) {
+            continue;
+        }
+
+        $selected[] = $mainShift;
+        $mainFallbackCount += 1;
+        if ($date !== "") {
+            $fallbackDates[$date] = true;
+        }
+    }
+
+    usort($selected, static function (array $left, array $right): int {
+        $dateComparison = strcmp(
+            (string)($left["Opening_DateTime"] ?? ""),
+            (string)($right["Opening_DateTime"] ?? "")
+        );
+        if ($dateComparison !== 0) {
+            return $dateComparison;
+        }
+
+        return (float)($left["Shift_ID"] ?? 0)
+            <=> (float)($right["Shift_ID"] ?? 0);
+    });
+
+    $fallbackDateList = array_keys($fallbackDates);
+    sort($fallbackDateList);
+    $reportDateList = array_keys($reportDates);
+    sort($reportDateList);
+
+    return [
+        "shifts" => $selected,
+        "reportShiftCount" => count($reportShifts),
+        "mainFallbackShiftCount" => $mainFallbackCount,
+        "fallbackShiftDates" => $fallbackDateList,
+        "reportCoveredDates" => $reportDateList,
+    ];
+}
+
+function monthlyZSelectDateFallbackTransactions(
+    array $mainTransactions,
+    array $reportTransactions,
+    array $reportShifts
+): array {
+    $reportDates = monthlyZClosedShiftDates($reportShifts);
+    $transactions = [];
+    $reportCount = 0;
+    $mainFallbackCount = 0;
+    $fallbackDates = [];
+
+    foreach ($reportTransactions as $reportTransaction) {
+        $date = substr(
+            (string)($reportTransaction["transactionDate"] ?? ""),
+            0,
+            10
+        );
+        if ($date === "" || !isset($reportDates[$date])) {
+            continue;
+        }
+
+        $reportTransaction["source"] = "report";
+        $transactions[] = $reportTransaction;
+        $reportCount += 1;
+    }
+
+    foreach ($mainTransactions as $mainTransaction) {
+        $date = substr(
+            (string)($mainTransaction["transactionDate"] ?? ""),
+            0,
+            10
+        );
+        if ($date !== "" && isset($reportDates[$date])) {
+            continue;
+        }
+
+        $mainTransaction["source"] = "cnc";
+        $mainTransaction["fallbackReason"] = "missingReportDate";
+        $transactions[] = $mainTransaction;
+        $mainFallbackCount += 1;
+        if ($date !== "") {
+            $fallbackDates[$date] = true;
+        }
+    }
+
+    usort($transactions, static function (array $left, array $right): int {
+        $leftTimestamp = monthlyZTransactionTimestamp($left) ?? PHP_INT_MAX;
+        $rightTimestamp = monthlyZTransactionTimestamp($right) ?? PHP_INT_MAX;
+        if ($leftTimestamp !== $rightTimestamp) {
+            return $leftTimestamp <=> $rightTimestamp;
+        }
+
+        return strcmp(
+            (string)($left["transactionKey"] ?? ""),
+            (string)($right["transactionKey"] ?? "")
+        );
+    });
+
+    $fallbackDateList = array_keys($fallbackDates);
+    sort($fallbackDateList);
+
+    return [
+        "transactions" => $transactions,
+        "reportTransactionCount" => $reportCount,
+        "reportOnlyTransactionCount" => 0,
+        "mainFallbackTransactionCount" => $mainFallbackCount,
+        "fallbackReasons" => [
+            "missingReportDate" => $mainFallbackCount,
+        ],
+        "fallbackDates" => $fallbackDateList,
+    ];
+}
+
 function monthlyZTransactionTimestamp(array $transaction): ?int
 {
     $transactionDate = trim((string)(
@@ -858,13 +989,35 @@ function monthlyZClosedShiftIntervals(array $shifts): array
     return $intervals;
 }
 
+function monthlyZMalformedShiftDates(array $shifts): array
+{
+    $dates = [];
+    foreach ($shifts as $shift) {
+        $date = substr((string)($shift["Opening_DateTime"] ?? ""), 0, 10);
+        $opening = strtotime((string)($shift["Opening_DateTime"] ?? ""));
+        $closing = strtotime((string)(
+            ($shift["Closing_DateTime"] ?? "")
+                ?: ($shift["Opening_DateTime"] ?? "")
+        ));
+        if (
+            $date !== "" &&
+            ($opening === false || $closing === false || $closing < $opening)
+        ) {
+            $dates[$date] = true;
+        }
+    }
+
+    return $dates;
+}
+
 function monthlyZFilterTransactionsByShifts(
     array $transactions,
     array $shifts
 ): array {
     $closedDates = monthlyZClosedShiftDates($shifts);
     $closedIntervals = monthlyZClosedShiftIntervals($shifts);
-    if ($closedDates === [] || $closedIntervals === []) {
+    $malformedShiftDates = monthlyZMalformedShiftDates($shifts);
+    if ($closedDates === []) {
         return [];
     }
 
@@ -872,13 +1025,21 @@ function monthlyZFilterTransactionsByShifts(
         $transactions,
         static function (array $transaction) use (
             $closedDates,
-            $closedIntervals
+            $closedIntervals,
+            $malformedShiftDates
         ): bool {
             $date = substr(
                 (string)($transaction["transactionDate"] ?? ""),
                 0,
                 10
             );
+            // A closed shift can occasionally have a bad closing timestamp
+            // (for example, closing earlier than opening). Its Z-reading still
+            // owns that business date, so retain that date's transactions
+            // instead of silently dropping the entire day from the month.
+            if (isset($malformedShiftDates[$date])) {
+                return true;
+            }
             $timestamp = monthlyZTransactionTimestamp($transaction);
             if ($timestamp === null) {
                 return isset($closedDates[$date]);
@@ -896,6 +1057,18 @@ function monthlyZFilterTransactionsByShifts(
             return false;
         }
     ));
+}
+
+function monthlyZActiveSales(array $transactions): float
+{
+    $total = 0.0;
+    foreach ($transactions as $transaction) {
+        if (monthlyZStatusIs($transaction["status"] ?? "", "Active")) {
+            $total += (float)($transaction["totalSales"] ?? 0);
+        }
+    }
+
+    return $total;
 }
 
 function monthlyZFilterEffectiveTransactionsByShifts(
@@ -1185,6 +1358,34 @@ function monthlyZCoverageForEffective(
             "Preserve closed Report DB history; use Main DB for missing report data",
         "accumulatedSalesBasis" =>
             "Official Grand_Accum_Sales from the selected closing shift",
+    ];
+}
+
+function monthlyZCoverageForCombined(
+    array $transactionResult,
+    array $shiftResult
+): array {
+    return [
+        "databaseScope" => "combined",
+        "computationMode" =>
+            "Report DB on covered dates; Main DB only on missing Report DB dates",
+        "totalTransactions" => count($transactionResult["transactions"] ?? []),
+        "reportTransactions" => (int)(
+            $transactionResult["reportTransactionCount"] ?? 0
+        ),
+        "mainFallbackTransactions" => (int)(
+            $transactionResult["mainFallbackTransactionCount"] ?? 0
+        ),
+        "missingReportDates" => $shiftResult["fallbackShiftDates"] ?? [],
+        "reportCoveredDates" => $shiftResult["reportCoveredDates"] ?? [],
+        "totalClosedShifts" => count($shiftResult["shifts"] ?? []),
+        "reportShifts" => (int)($shiftResult["reportShiftCount"] ?? 0),
+        "mainFallbackShifts" => (int)(
+            $shiftResult["mainFallbackShiftCount"] ?? 0
+        ),
+        "preservesReportSkips" => true,
+        "accumulatedSalesBasis" =>
+            "Main DB balance before the selected period plus date-owned combined period sales",
     ];
 }
 
@@ -1591,11 +1792,17 @@ function monthlyZBuildDatabaseComparison(
     );
     $mainPayload = null;
     $reportPayload = null;
+    $combinedPayload = null;
     $mainError = "";
     $reportError = "";
+    $combinedError = "";
+    $mainTransactions = [];
+    $mainTransactionsForPeriod = [];
+    $reportTransactions = [];
+    $mainAccumulatedSales = 0.0;
 
     try {
-        $mainTransactions = monthlyZFetchMainTransactions(
+        $mainTransactionsForPeriod = monthlyZFetchMainTransactions(
             $pdo,
             $mainDatabase,
             $categoryCode,
@@ -1604,6 +1811,7 @@ function monthlyZBuildDatabaseComparison(
             $dateFrom,
             $dateTo
         );
+        $mainTransactions = $mainTransactionsForPeriod;
         $mainTransactions = monthlyZFilterTransactionsByShifts(
             $mainTransactions,
             $mainShifts
@@ -1706,9 +1914,101 @@ function monthlyZBuildDatabaseComparison(
         $reportError = $exception->getMessage();
     }
 
+    $combinedShiftResult = monthlyZBuildDateFallbackShifts(
+        $mainShifts,
+        $reportShifts
+    );
+    $missingReportDates = $combinedShiftResult["fallbackShiftDates"];
+    $hasMissingReportDates = $missingReportDates !== [];
+    $combinedCoverage = monthlyZCoverageForCombined(
+        ["transactions" => []],
+        $combinedShiftResult
+    );
+
+    if ($hasMissingReportDates) {
+        try {
+            $combinedTransactionResult = monthlyZSelectDateFallbackTransactions(
+                $mainTransactions,
+                $reportTransactions,
+                $reportShifts
+            );
+            $combinedCoverage = monthlyZCoverageForCombined(
+                $combinedTransactionResult,
+                $combinedShiftResult
+            );
+            $combinedChildren = monthlyZFetchChildRows(
+                $pdo,
+                $mainDatabase,
+                $reportDatabase,
+                $combinedTransactionResult["transactions"],
+                $categoryCode,
+                $unitCode,
+                $terminalNumber
+            );
+            $combinedLabel = "Combined Full Period (Report DB + Main DB Missing Dates)";
+            $mainAccumulatedThroughPeriod = monthlyZFetchSourceAccumulatedSales(
+                $pdo,
+                $mainDatabase,
+                $categoryCode,
+                $unitCode,
+                $terminalNumber,
+                $combinedShiftResult["shifts"]
+            );
+            $combinedAccumulatedSales = $mainAccumulatedThroughPeriod
+                - monthlyZActiveSales($mainTransactionsForPeriod)
+                + monthlyZActiveSales(
+                    $combinedTransactionResult["transactions"]
+                );
+            $combinedPayload = monthlyZComputePayload(
+                $combinedTransactionResult["transactions"],
+                $combinedChildren["discounts"],
+                $combinedChildren["payments"],
+                $combinedShiftResult["shifts"],
+                $canonicalBusinessUnit,
+                $request,
+                [
+                    "scope" => "combined",
+                    "databaseName" => "{$reportDatabase}+{$mainDatabase}",
+                    "label" => $combinedLabel,
+                    "developerPreview" => true,
+                    "presentAccumulatedSales" => $combinedAccumulatedSales,
+                ],
+                $combinedCoverage
+            );
+        } catch (MonthlyZReadingNoDataException $exception) {
+            $combinedError = $exception->getMessage();
+        }
+    }
+
     if ($mainPayload === null && $reportPayload === null) {
         throw new MonthlyZReadingNoDataException(
             $mainError ?: ($reportError ?: "No monthly Z-reading data found.")
+        );
+    }
+
+    $readings = [
+        monthlyZReadingEntry(
+            "cnc",
+            $mainLabel,
+            $mainPayload,
+            $mainCoverage,
+            $mainError
+        ),
+        monthlyZReadingEntry(
+            "report",
+            $reportLabel,
+            $reportPayload,
+            $reportCoverage,
+            $reportError
+        ),
+    ];
+    if ($hasMissingReportDates) {
+        $readings[] = monthlyZReadingEntry(
+            "combined",
+            "Combined Full Period (Report DB + Main DB Missing Dates)",
+            $combinedPayload,
+            $combinedCoverage,
+            $combinedError
         );
     }
 
@@ -1716,21 +2016,8 @@ function monthlyZBuildDatabaseComparison(
         "developerPreview" => true,
         "nonFiscalPreview" => true,
         "readOnly" => true,
-        "readings" => [
-            monthlyZReadingEntry(
-                "cnc",
-                $mainLabel,
-                $mainPayload,
-                $mainCoverage,
-                $mainError
-            ),
-            monthlyZReadingEntry(
-                "report",
-                $reportLabel,
-                $reportPayload,
-                $reportCoverage,
-                $reportError
-            ),
-        ],
+        "hasMissingReportDates" => $hasMissingReportDates,
+        "missingReportDates" => $missingReportDates,
+        "readings" => $readings,
     ];
 }

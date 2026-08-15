@@ -70,6 +70,65 @@ monthlyZComparisonAssert(
     "shift reconciliation must prefer matching report shifts and retain main fallback shifts"
 );
 
+$dateFallbackShifts = monthlyZBuildDateFallbackShifts(
+    [$mainShiftOne, $mainShiftTwo],
+    [$reportShiftTwo]
+);
+monthlyZComparisonAssert(
+    count($dateFallbackShifts["shifts"]) === 2 &&
+    $dateFallbackShifts["reportShiftCount"] === 1 &&
+    $dateFallbackShifts["mainFallbackShiftCount"] === 1 &&
+    $dateFallbackShifts["fallbackShiftDates"] === ["2026-08-11"] &&
+    $dateFallbackShifts["reportCoveredDates"] === ["2026-08-12"],
+    "combined shifts must use Report DB by covered date and Main DB only on missing dates"
+);
+
+$dateFallbackTransactions = monthlyZSelectDateFallbackTransactions(
+    [
+        [
+            "transactionKey" => "MAIN-11",
+            "transactionDate" => "2026-08-11",
+            "transactionTime" => "09:00 AM",
+            "source" => "cnc",
+        ],
+        [
+            "transactionKey" => "MAIN-12-SKIPPED",
+            "transactionDate" => "2026-08-12",
+            "transactionTime" => "09:00 AM",
+            "source" => "cnc",
+        ],
+    ],
+    [
+        [
+            "transactionKey" => "REPORT-12",
+            "transactionDate" => "2026-08-12",
+            "transactionTime" => "10:00 AM",
+            "source" => "report",
+        ],
+    ],
+    [$reportShiftTwo]
+);
+monthlyZComparisonAssert(
+    array_column(
+        $dateFallbackTransactions["transactions"],
+        "transactionKey"
+    ) === ["MAIN-11", "REPORT-12"] &&
+    $dateFallbackTransactions["mainFallbackTransactionCount"] === 1 &&
+    $dateFallbackTransactions["reportTransactionCount"] === 1 &&
+    $dateFallbackTransactions["fallbackDates"] === ["2026-08-11"],
+    "combined transactions must preserve Report DB skips on covered dates"
+);
+
+$combinedCoverage = monthlyZCoverageForCombined(
+    $dateFallbackTransactions,
+    $dateFallbackShifts
+);
+monthlyZComparisonAssert(
+    $combinedCoverage["missingReportDates"] === ["2026-08-11"] &&
+    $combinedCoverage["preservesReportSkips"] === true,
+    "combined coverage must disclose fallback dates and preserved skips"
+);
+
 $filteredTransactions = monthlyZFilterTransactionsByShifts(
     [
         [
@@ -87,6 +146,58 @@ monthlyZComparisonAssert(
     count($filteredTransactions) === 1 &&
     $filteredTransactions[0]["transactionTime"] === "09:00 AM",
     "comparison transactions must remain inside a closed shift"
+);
+
+$malformedShift = $mainShiftOne;
+$malformedShift["Closing_DateTime"] = "2026-08-11 07:59:00";
+$malformedDateTransactions = monthlyZFilterTransactionsByShifts(
+    [
+        [
+            "transactionDate" => "2026-08-11",
+            "transactionTime" => "12:00 PM",
+        ],
+        [
+            "transactionDate" => "2026-08-12",
+            "transactionTime" => "12:00 PM",
+        ],
+    ],
+    [$malformedShift]
+);
+monthlyZComparisonAssert(
+    count($malformedDateTransactions) === 1 &&
+    $malformedDateTransactions[0]["transactionDate"] === "2026-08-11",
+    "a malformed closed shift must retain its business date instead of dropping the day"
+);
+
+$reportOnlyFallback = monthlyZSelectDateFallbackTransactions(
+    [[
+        "transactionKey" => "MAIN-COVERED",
+        "transactionDate" => "2026-08-12",
+        "transactionTime" => "09:00 AM",
+    ]],
+    [],
+    [$reportShiftTwo]
+);
+monthlyZComparisonAssert(
+    $reportOnlyFallback["transactions"] === [] &&
+    $reportOnlyFallback["mainFallbackTransactionCount"] === 0,
+    "a Report-covered date with zero transactions must stay empty"
+);
+
+$allMainFallback = monthlyZSelectDateFallbackTransactions(
+    [[
+        "transactionKey" => "MAIN-ONLY",
+        "transactionDate" => "2026-08-11",
+        "transactionTime" => "09:00 AM",
+    ]],
+    [],
+    []
+);
+monthlyZComparisonAssert(
+    array_column($allMainFallback["transactions"], "transactionKey") === [
+        "MAIN-ONLY",
+    ],
+    "Main DB must own dates where Report DB has no closed shift"
 );
 
 $endpointSource = file_get_contents(
@@ -107,5 +218,15 @@ foreach ([
         "monthly endpoint is missing comparison contract {$comparisonContract}"
     );
 }
+
+$helperSource = file_get_contents(
+    __DIR__ . "/../api/monthly_z_reading_report.php"
+);
+monthlyZComparisonAssert(
+    is_string($helperSource) &&
+    str_contains($helperSource, '"combined"') &&
+    str_contains($helperSource, '"hasMissingReportDates"'),
+    "monthly comparison helper must expose the conditional combined result"
+);
 
 echo "Monthly Z-reading comparison tests passed.\n";
