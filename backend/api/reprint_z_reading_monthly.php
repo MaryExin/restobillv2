@@ -163,7 +163,9 @@ try {
 
         echo json_encode([
             "success" => true,
-            "message" => "Main and skipped Report DB monthly computations loaded successfully.",
+            "message" => count($comparisonData["readings"] ?? []) === 3
+                ? "Main, Report DB, and combined full-period computations loaded successfully."
+                : "Main and skipped Report DB monthly computations loaded successfully.",
             "data" => $comparisonData,
         ], JSON_UNESCAPED_SLASHES);
         exit;

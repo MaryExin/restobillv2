@@ -9,6 +9,8 @@ const peso = (value) =>
     maximumFractionDigits: 2,
   });
 
+
+  
 export function BuildOrderReceiptHtml({
   productcart,
   totalPrice,

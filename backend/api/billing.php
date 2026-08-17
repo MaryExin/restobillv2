@@ -569,6 +569,7 @@ try {
                 customer_id,
                 discount_type,
                 discount_amount,
+                vat_exemption,
                 customer_name,
                 date_of_birth,
                 gender,
@@ -584,6 +585,7 @@ try {
                 :customer_id,
                 :discount_type,
                 :discount_amount,
+                :vat_exemption,
                 :customer_name,
                 :date_of_birth,
                 :gender,
@@ -601,6 +603,7 @@ try {
                 customer_id = :new_customer_id,
                 discount_type = :discount_type,
                 discount_amount = :discount_amount,
+                vat_exemption = :vat_exemption,
                 customer_name = :customer_name,
                 date_of_birth = :date_of_birth,
                 gender = :gender,
@@ -617,6 +620,7 @@ try {
             $discountType   = normalizeDiscountType($entry['discount_type'] ?? '');
             $qualifiedCount = isset($entry['qualified_count']) ? (int)$entry['qualified_count'] : 0;
             $discountAmount = isset($entry['discount_amount']) ? (float)$entry['discount_amount'] : 0;
+            $vatExemption   = isset($entry['vat_exemption']) ? (float)$entry['vat_exemption'] : 0;
 
             if ($qualifiedCount <= 0 || $discountAmount <= 0) {
                 $skippedDiscountRows++;
@@ -624,13 +628,15 @@ try {
             }
 
             $splitAmounts = splitAmountAcrossCount($discountAmount, $qualifiedCount);
+            $splitVatExemptions = splitAmountAcrossCount($vatExemption, $qualifiedCount);
 
             if (empty($splitAmounts)) {
                 $skippedDiscountRows++;
                 continue;
             }
 
-            foreach ($splitAmounts as $rowAmount) {
+            foreach ($splitAmounts as $entryRowIndex => $rowAmount) {
+                $rowVatExemption = $splitVatExemptions[$entryRowIndex] ?? 0;
                 $existingRow = $existingRows[$rowIndex] ?? [];
                 $card = $customerInfo[$rowIndex] ?? [];
                 if (!is_array($card)) {
@@ -666,6 +672,7 @@ try {
                         ':new_customer_id' => $generatedCustomerId,
                         ':discount_type'   => $discountType,
                         ':discount_amount' => moneyRound($rowAmount),
+                        ':vat_exemption'   => moneyRound($rowVatExemption),
                         ':customer_name'   => normalizeNullable($customerName),
                         ':date_of_birth'   => normalizeNullable($dateOfBirth),
                         ':gender'          => normalizeNullable($gender),
@@ -684,6 +691,7 @@ try {
                         ':customer_id'     => $generatedCustomerId,
                         ':discount_type'   => $discountType,
                         ':discount_amount' => moneyRound($rowAmount),
+                        ':vat_exemption'   => moneyRound($rowVatExemption),
                         ':customer_name'   => normalizeNullable($customerName),
                         ':date_of_birth'   => normalizeNullable($dateOfBirth),
                         ':gender'          => normalizeNullable($gender),

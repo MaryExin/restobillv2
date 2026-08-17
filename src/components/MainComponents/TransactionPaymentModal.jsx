@@ -446,6 +446,36 @@ const SuccessModal = ({
   );
 };
 
+const ChangeDueModal = ({ isOpen, onClose, isDark, changeAmount }) => {
+  return (
+    <ModalShell
+      isOpen={isOpen}
+      onClose={onClose}
+      isDark={isDark}
+      maxWidth="max-w-[420px]"
+      zIndex="z-[100004]"
+    >
+      <div className="p-6 text-center">
+        <span className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+          Change Due
+        </span>
+        <div className="mt-3 text-4xl font-black text-emerald-500">
+          {peso(changeAmount)}
+        </div>
+
+        <ButtonComponent
+          type="button"
+          onClick={onClose}
+          variant="primary"
+          className="mt-6 w-full py-3 text-sm"
+        >
+          OK
+        </ButtonComponent>
+      </div>
+    </ModalShell>
+  );
+};
+
 const PaymentMethodPickerModal = ({
   isOpen,
   onClose,
@@ -2799,6 +2829,9 @@ export default function TransactionPaymentModal({
   // Used so the payment modal shows the exact amounts computed during Print Billing.
   const [billingStoredDiscounts, setBillingStoredDiscounts] = useState(null);
   const [billingCounts, setBillingCounts] = useState(null);
+  const [billingFinancialSnapshot, setBillingFinancialSnapshot] = useState(null);
+  const [hasFinancialEdits, setHasFinancialEdits] = useState(false);
+  const [hasDiscountEdits, setHasDiscountEdits] = useState(false);
 
   // Discount types (Senior/PWD/NAAC/Solo Parent + any custom type from
   // Settings > Discount Mode > Discount Types) are no longer always shown --
@@ -2909,6 +2942,8 @@ export default function TransactionPaymentModal({
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [showConfirmSaveModal, setShowConfirmSaveModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showChangeDueModal, setShowChangeDueModal] = useState(false);
+  const [pendingSuccessAction, setPendingSuccessAction] = useState(null);
   const [showCustomerExclusiveModal, setShowCustomerExclusiveModal] = useState(false);
   const [showLoyaltyModal, setShowLoyaltyModal] = useState(false);
 
@@ -2927,6 +2962,44 @@ export default function TransactionPaymentModal({
   // fractional amount actually credited instead of recomputing off today's
   // earning rule.
   const [loyaltyStoredPointsEarned, setLoyaltyStoredPointsEarned] = useState(null);
+
+  const markFinancialsEdited = () => setHasFinancialEdits(true);
+  const markDiscountsEdited = () => {
+    setHasFinancialEdits(true);
+    setHasDiscountEdits(true);
+  };
+  const setCustomerCountWithFinancialEdit = (nextValue) => {
+    markDiscountsEdited();
+    setCustomerCount(nextValue);
+  };
+  const setDiscountStateWithFinancialEdit = (nextValue) => {
+    markDiscountsEdited();
+    setDiscountState(nextValue);
+  };
+  const setOtherChargesWithFinancialEdit = (nextValue) => {
+    markFinancialsEdited();
+    setOtherCharges(nextValue);
+  };
+  const setDiscountSharingModeWithFinancialEdit = (nextValue) => {
+    markDiscountsEdited();
+    setDiscountSharingMode(nextValue);
+  };
+  const setSelectedProductIdsWithFinancialEdit = (nextValue) => {
+    markDiscountsEdited();
+    setSelectedProductIds(nextValue);
+  };
+  const setLoyaltyMemberWithFinancialEdit = (nextValue) => {
+    markDiscountsEdited();
+    setLoyaltyStoredDiscountAmount(null);
+    setLoyaltyStoredPointsEarned(null);
+    setLoyaltyMember(nextValue);
+  };
+  const setLoyaltyPointsToApplyWithFinancialEdit = (nextValue) => {
+    markDiscountsEdited();
+    setLoyaltyStoredDiscountAmount(null);
+    setLoyaltyStoredPointsEarned(null);
+    setLoyaltyPointsToApply(nextValue);
+  };
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -3367,8 +3440,48 @@ export default function TransactionPaymentModal({
     }
   };
 
+  const handleSuccessContinueClick = () => {
+    if (computed.changeAmount > 0) {
+      setPendingSuccessAction("continue");
+      setShowChangeDueModal(true);
+      return;
+    }
+
+    setShowSuccessModal(false);
+    onClose?.();
+  };
+
+  const handleSuccessPrintClick = () => {
+    if (computed.changeAmount > 0) {
+      setPendingSuccessAction("print");
+      setShowChangeDueModal(true);
+      return;
+    }
+
+    handleSuccessModalPrint();
+  };
+
+  const handleChangeDueAcknowledge = async () => {
+    setShowChangeDueModal(false);
+    const action = pendingSuccessAction;
+    setPendingSuccessAction(null);
+
+    if (action === "print") {
+      await handleSuccessModalPrint();
+      return;
+    }
+
+    setShowSuccessModal(false);
+    onClose?.();
+  };
+
   useEffect(() => {
     if (!isOpen || !transaction?.transaction_id) return;
+
+    const controller = new AbortController();
+    let cancelled = false;
+    const transactionId = transaction.transaction_id;
+    const fallbackHeadCount = transaction.customer_head_count;
 
     const initialize = async () => {
       setItems([]);
@@ -3376,11 +3489,16 @@ export default function TransactionPaymentModal({
       setErrorMessage("");
       setShowConfirmSaveModal(false);
       setShowSuccessModal(false);
+      setShowChangeDueModal(false);
+      setPendingSuccessAction(null);
       setReceiptSnapshot(null);
       setOtherCharges([]);
       setPayments([]);
       setBillingStoredDiscounts(null);
       setBillingCounts(null);
+      setBillingFinancialSnapshot(null);
+      setHasFinancialEdits(false);
+      setHasDiscountEdits(false);
       setAddedStatutoryKeys(new Set());
       setCustomDiscountLines([]);
       setRawCustomCountsByLabel(null);
@@ -3401,14 +3519,33 @@ export default function TransactionPaymentModal({
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              transaction_id: transaction.transaction_id,
+              transaction_id: transactionId,
             }),
+            signal: controller.signal,
           },
         );
 
         const data = await res.json();
+        if (cancelled) return;
 
         const txn = data?.transaction_summary || {};
+        const hasSavedDocument =
+          Number(txn.billing_no || 0) > 0 || Number(txn.invoice_no || 0) > 0;
+        setBillingFinancialSnapshot(
+          txn?.transaction_id && hasSavedDocument
+            ? {
+                totalSales: roundMoney(txn.TotalSales),
+                discount: roundMoney(txn.Discount),
+                otherCharges: roundMoney(txn.OtherCharges),
+                totalAmountDue: roundMoney(txn.TotalAmountDue),
+                vatableSales: roundMoney(txn.VATableSales),
+                vatableSalesVat: roundMoney(txn.VATableSales_VAT),
+                vatExemptSales: roundMoney(txn.VATExemptSales),
+                vatExemption: roundMoney(txn.VATExemptSales_VAT),
+                vatZeroRatedSales: roundMoney(txn.VATZeroRatedSales),
+              }
+            : null,
+        );
         const detailItems = Array.isArray(data?.items) ? data.items : [];
         const detailPayments = Array.isArray(data?.payments)
           ? data.payments
@@ -3464,7 +3601,7 @@ export default function TransactionPaymentModal({
 
         const safeHeadCount = Math.max(
           Number(
-            txn.customer_head_count || transaction.customer_head_count || 1,
+            txn.customer_head_count || fallbackHeadCount || 1,
           ),
           1,
         );
@@ -3514,7 +3651,7 @@ export default function TransactionPaymentModal({
 
           console.warn(
             "Discount rows exceed customer_head_count for transaction",
-            transaction.transaction_id,
+            transactionId,
             {
               safeHeadCount,
               rawSenior,
@@ -3566,7 +3703,12 @@ export default function TransactionPaymentModal({
 
         // Compute per-type totals from the rows saved during Print Billing so the
         // payment amounts match the billing receipt without recomputing from items.
-        const billingAmountsByType = { senior: 0, pwd: 0, naac: 0, soloParent: 0 };
+        const billingAmountsByType = {
+          senior: { discount: 0, vatExemption: 0 },
+          pwd: { discount: 0, vatExemption: 0 },
+          naac: { discount: 0, vatExemption: 0 },
+          soloParent: { discount: 0, vatExemption: 0 },
+        };
         const billingCountsByType = {
           senior: Number(discountCounts.senior || 0),
           pwd: Number(discountCounts.pwd || 0),
@@ -3580,7 +3722,10 @@ export default function TransactionPaymentModal({
           else if (t === "pwd" || t === "pwd discount") k = "pwd";
           else if (t === "naac" || t === "naac discount" || t.startsWith("national athletes")) k = "naac";
           else if (t.includes("solo parent") || t === "soloparent") k = "soloParent";
-          if (k) billingAmountsByType[k] += Number(row.discount_amount || 0);
+          if (k) {
+            billingAmountsByType[k].discount += Number(row.discount_amount || 0);
+            billingAmountsByType[k].vatExemption += Number(row.vat_exemption || 0);
+          }
         });
         setBillingStoredDiscounts(billingAmountsByType);
         setBillingCounts(billingCountsByType);
@@ -3627,18 +3772,28 @@ export default function TransactionPaymentModal({
             : [],
         );
       } catch (error) {
+        if (cancelled || error?.name === "AbortError") return;
         console.error(error);
         setErrorMessage("Failed to load transaction items.");
         setItems([]);
         setDiscountState(buildInitialDiscountState());
         setCustomerCards([]);
       } finally {
-        setIsLoadingItems(false);
+        if (!cancelled) setIsLoadingItems(false);
       }
     };
 
     initialize();
-  }, [isOpen, transaction, apiHost]);
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [
+    isOpen,
+    transaction?.transaction_id,
+    transaction?.customer_head_count,
+    apiHost,
+  ]);
 
   const totalQualifiedAll = useMemo(() => {
     const customCount = customDiscountLines
@@ -3838,64 +3993,90 @@ export default function TransactionPaymentModal({
     // what billing used. When counts are changed manually in the payment modal,
     // the stored amounts no longer correspond so we fall back to recomputing.
     const useStoredSenior =
+      !hasDiscountEdits &&
       billingStoredDiscounts !== null &&
       billingCounts !== null &&
       rawSeniorCount > 0 &&
       rawSeniorCount === billingCounts.senior &&
-      billingStoredDiscounts.senior > 0;
+      billingStoredDiscounts.senior.discount > 0;
     const useStoredPwd =
+      !hasDiscountEdits &&
       billingStoredDiscounts !== null &&
       billingCounts !== null &&
       rawPwdCount > 0 &&
       rawPwdCount === billingCounts.pwd &&
-      billingStoredDiscounts.pwd > 0;
+      billingStoredDiscounts.pwd.discount > 0;
     const useStoredNaac =
+      !hasDiscountEdits &&
       billingStoredDiscounts !== null &&
       billingCounts !== null &&
       rawNaacCount > 0 &&
       rawNaacCount === billingCounts.naac &&
-      billingStoredDiscounts.naac > 0;
+      billingStoredDiscounts.naac.discount > 0;
     const useStoredSoloParent =
+      !hasDiscountEdits &&
       billingStoredDiscounts !== null &&
       billingCounts !== null &&
       rawSoloParentCount > 0 &&
       rawSoloParentCount === billingCounts.soloParent &&
-      billingStoredDiscounts.soloParent > 0;
+      billingStoredDiscounts.soloParent.discount > 0;
 
-    // Senior/PWD/NAAC: discount = base × 0.20, vatEx = base × 0.12 → vatEx = discount × 0.6
-    // Solo Parent: discount = base × 0.10, vatEx = base × 0.12 → vatEx = discount × 1.2
-    const seniorDiscountAmount = useStoredSenior
-      ? billingStoredDiscounts.senior
-      : seniorProratedBase * 0.2;
-    const seniorVatExemption = useStoredSenior
-      ? billingStoredDiscounts.senior * 0.6
-      : seniorProratedBase * 0.12;
+    // When reusing amounts saved during Print Billing, read the stored
+    // discount and VAT-exemption directly instead of re-deriving VAT
+    // exemption from the (already rounded) stored discount amount --
+    // deriving it introduces a compounding rounding error on decimal amounts.
+    // Rows saved before vat_exemption was persisted (older transactions)
+    // read back as 0, so recompute VAT from the original prorated base rather
+    // than deriving it from an already rounded discount.
+    const seniorDiscountAmount = roundMoney(
+      useStoredSenior
+        ? billingStoredDiscounts.senior.discount
+        : seniorProratedBase * 0.2,
+    );
+    const seniorVatExemption = roundMoney(
+      useStoredSenior
+        ? billingStoredDiscounts.senior.vatExemption || seniorProratedBase * 0.12
+        : seniorProratedBase * 0.12,
+    );
 
-    const pwdDiscountAmount = useStoredPwd
-      ? billingStoredDiscounts.pwd
-      : pwdProratedBase * 0.2;
-    const pwdVatExemption = useStoredPwd
-      ? billingStoredDiscounts.pwd * 0.6
-      : pwdProratedBase * 0.12;
+    const pwdDiscountAmount = roundMoney(
+      useStoredPwd
+        ? billingStoredDiscounts.pwd.discount
+        : pwdProratedBase * 0.2,
+    );
+    const pwdVatExemption = roundMoney(
+      useStoredPwd
+        ? billingStoredDiscounts.pwd.vatExemption || pwdProratedBase * 0.12
+        : pwdProratedBase * 0.12,
+    );
 
-    const naacDiscountAmount = useStoredNaac
-      ? billingStoredDiscounts.naac
-      : naacProratedBase * 0.2;
-    const naacVatExemption = useStoredNaac
-      ? billingStoredDiscounts.naac * 0.6
-      : naacProratedBase * 0.12;
+    const naacDiscountAmount = roundMoney(
+      useStoredNaac
+        ? billingStoredDiscounts.naac.discount
+        : naacProratedBase * 0.2,
+    );
+    const naacVatExemption = roundMoney(
+      useStoredNaac
+        ? billingStoredDiscounts.naac.vatExemption || naacProratedBase * 0.12
+        : naacProratedBase * 0.12,
+    );
 
-    const soloParentDiscountAmount = useStoredSoloParent
-      ? billingStoredDiscounts.soloParent
-      : soloParentProratedBase * 0.1;
-    const soloParentVatExemption = useStoredSoloParent
-      ? billingStoredDiscounts.soloParent * 1.2
-      : soloParentProratedBase * 0.12;
+    const soloParentDiscountAmount = roundMoney(
+      useStoredSoloParent
+        ? billingStoredDiscounts.soloParent.discount
+        : soloParentProratedBase * 0.1,
+    );
+    const soloParentVatExemption = roundMoney(
+      useStoredSoloParent
+        ? billingStoredDiscounts.soloParent.vatExemption || soloParentProratedBase * 0.12
+        : soloParentProratedBase * 0.12,
+    );
 
-    const manualDiscountAmount =
+    const manualDiscountAmount = roundMoney(
       manualMode === "percent"
         ? discountableGross * (manualPercent / 100)
-        : rawManualAmount;
+        : rawManualAmount,
+    );
     const manualVatExemption = 0;
 
     const loyaltyDiscountAmount = loyaltyStoredDiscountAmount !== null
@@ -3923,7 +4104,9 @@ export default function TransactionPaymentModal({
         qualifiedCount,
         line,
         proratedBase,
-        storedCountsByLabel: rawCustomCountsByLabel,
+        storedCountsByLabel: hasDiscountEdits
+          ? null
+          : rawCustomCountsByLabel,
       });
 
       return {
@@ -3990,19 +4173,38 @@ export default function TransactionPaymentModal({
       ...customLinesComputed,
     ];
 
+    const preserveBillingDiscountBreakdown =
+      billingFinancialSnapshot !== null && !hasDiscountEdits;
+    const preservedBreakdownTotal = roundMoney(
+      rawDiscountBreakdown.reduce(
+        (sum, entry) => sum + Number(entry.discountAmount || 0),
+        0,
+      ),
+    );
     const {
       discountBreakdown,
       rawTotalDiscount,
       totalDiscount,
       isDiscountCeilingApplied,
-    } = applyDiscountCeiling(rawDiscountBreakdown, discountCeilingAmount);
+    } = preserveBillingDiscountBreakdown
+      ? {
+          discountBreakdown: rawDiscountBreakdown,
+          rawTotalDiscount: preservedBreakdownTotal,
+          totalDiscount: preservedBreakdownTotal,
+          isDiscountCeilingApplied: false,
+        }
+      : applyDiscountCeiling(rawDiscountBreakdown, discountCeilingAmount);
 
-    const totalVatExemption = discountBreakdown.reduce(
-      (sum, entry) => sum + Number(entry.vatExemption || 0),
-      0,
+    const totalVatExemption = roundMoney(
+      discountBreakdown.reduce(
+        (sum, entry) => sum + Number(entry.vatExemption || 0),
+        0,
+      ),
     );
 
-    const finalVatExemptSales = Math.max(vatExemptSales - totalVatExemption, 0);
+    const calculatedVatExemptSales = roundMoney(
+      Math.max(vatExemptSales - totalVatExemption, 0),
+    );
 
     const serviceChargeBase = grossTotal;
     const serviceChargeAmount = 0;
@@ -4017,26 +4219,71 @@ export default function TransactionPaymentModal({
       0,
     );
 
-    const totalOtherCharges = autoBillingChargesAmount + manualOtherChargesAmount;
-
-    const totalAmountDue = Math.max(
-      grossTotal - totalDiscount - totalVatExemption + totalOtherCharges,
-      0,
+    const calculatedOtherCharges = roundMoney(
+      autoBillingChargesAmount + manualOtherChargesAmount,
     );
 
-    const totalPaid = payments.reduce(
-      (sum, row) => sum + toNum(row.payment_amount),
-      0,
+    // Print Billing has already persisted the canonical financial snapshot on
+    // tbl_pos_transactions. Keep Payment on those exact cents until the cashier
+    // explicitly edits a discount, customer count, loyalty redemption, item
+    // selection, sharing mode, or charge. This also preserves partial
+    // Per-Product allocations that the payment detail response cannot rebuild.
+    const hasBillingSnapshot = billingFinancialSnapshot !== null;
+    const useBillingSnapshot = hasBillingSnapshot && !hasFinancialEdits;
+    const reuseBillingDiscounts = hasBillingSnapshot && !hasDiscountEdits;
+    const resolvedGrossTotal = hasBillingSnapshot
+      ? billingFinancialSnapshot.totalSales
+      : roundMoney(grossTotal);
+    const resolvedTotalDiscount = reuseBillingDiscounts
+      ? billingFinancialSnapshot.discount
+      : roundMoney(totalDiscount);
+    const resolvedTotalVatExemption = reuseBillingDiscounts
+      ? billingFinancialSnapshot.vatExemption
+      : totalVatExemption;
+    const resolvedOtherCharges = useBillingSnapshot
+      ? billingFinancialSnapshot.otherCharges
+      : calculatedOtherCharges;
+    const resolvedTotalAmountDue = useBillingSnapshot
+      ? billingFinancialSnapshot.totalAmountDue
+      : roundMoney(
+          Math.max(
+            resolvedGrossTotal -
+              resolvedTotalDiscount -
+              resolvedTotalVatExemption +
+              resolvedOtherCharges,
+            0,
+          ),
+        );
+    const resolvedVatableSales = reuseBillingDiscounts
+      ? billingFinancialSnapshot.vatableSales
+      : roundMoney(vatableSales);
+    const resolvedVatableSalesVat = reuseBillingDiscounts
+      ? billingFinancialSnapshot.vatableSalesVat
+      : roundMoney(vatableSalesVat);
+    const resolvedVatExemptSales = reuseBillingDiscounts
+      ? billingFinancialSnapshot.vatExemptSales
+      : calculatedVatExemptSales;
+    const resolvedVatZeroRatedSales = reuseBillingDiscounts
+      ? billingFinancialSnapshot.vatZeroRatedSales
+      : roundMoney(vatZeroRatedSales);
+
+    const totalPaid = roundMoney(
+      payments.reduce(
+        (sum, row) => sum + toNum(row.payment_amount),
+        0,
+      ),
     );
 
-    const changeAmount = Math.max(totalPaid - totalAmountDue, 0);
-    const shortOver = totalPaid - totalAmountDue;
+    const changeAmount = roundMoney(
+      Math.max(totalPaid - resolvedTotalAmountDue, 0),
+    );
+    const shortOver = roundMoney(totalPaid - resolvedTotalAmountDue);
 
     const loyaltyEarningRuleAmount = Number(loyaltyConfig.earningRuleAmount || 0);
     const loyaltyPointsToEarn = loyaltyStoredPointsEarned !== null
       ? loyaltyStoredPointsEarned
       : loyaltyEarningRuleAmount > 0
-        ? roundMoney(totalAmountDue / loyaltyEarningRuleAmount)
+        ? roundMoney(resolvedTotalAmountDue / loyaltyEarningRuleAmount)
         : 0;
 
     const loyaltyNewBalance = loyaltyMember
@@ -4057,7 +4304,7 @@ export default function TransactionPaymentModal({
       .join(", ");
 
     return {
-      grossTotal,
+      grossTotal: resolvedGrossTotal,
       totalQuantity,
       discountableGross,
       discountableBase,
@@ -4071,12 +4318,14 @@ export default function TransactionPaymentModal({
       totalQualifiedAll: totalQualifiedAllLocal,
       statutoryQualifiedCount,
       discountBreakdown,
-      rawTotalDiscount,
-      totalDiscount,
+      rawTotalDiscount: reuseBillingDiscounts
+        ? resolvedTotalDiscount
+        : rawTotalDiscount,
+      totalDiscount: resolvedTotalDiscount,
       discountCeilingAmount,
       isDiscountCeilingApplied,
-      totalVatExemption,
-      totalAmountDue,
+      totalVatExemption: resolvedTotalVatExemption,
+      totalAmountDue: resolvedTotalAmountDue,
       loyaltyDiscountAmount,
       loyaltyPointsToEarn,
       loyaltyNewBalance,
@@ -4087,12 +4336,12 @@ export default function TransactionPaymentModal({
       autoBillingCharges,
       autoBillingChargesAmount,
       manualOtherChargesAmount,
-      totalOtherCharges,
-      vatableSales,
-      vatableSalesVat,
-      vatExemptSales: finalVatExemptSales,
-      vatExemptSalesVat: totalVatExemption,
-      vatZeroRatedSales,
+      totalOtherCharges: resolvedOtherCharges,
+      vatableSales: resolvedVatableSales,
+      vatableSalesVat: resolvedVatableSalesVat,
+      vatExemptSales: resolvedVatExemptSales,
+      vatExemptSalesVat: resolvedTotalVatExemption,
+      vatZeroRatedSales: resolvedVatZeroRatedSales,
       totalPaid,
       changeAmount,
       shortOver,
@@ -4110,6 +4359,9 @@ export default function TransactionPaymentModal({
     autoBillingCharges,
     billingStoredDiscounts,
     billingCounts,
+    billingFinancialSnapshot,
+    hasFinancialEdits,
+    hasDiscountEdits,
     discountMode,
     discountSharingMode,
     selectedProductIds,
@@ -4167,6 +4419,7 @@ export default function TransactionPaymentModal({
   // types (from Settings > Discount Mode > Discount Types) get their own
   // dynamic line.
   const addStatutoryDiscount = (key) => {
+    markDiscountsEdited();
     setAddedStatutoryKeys((prev) => {
       const next = new Set(prev);
       next.add(key);
@@ -4176,6 +4429,7 @@ export default function TransactionPaymentModal({
   };
 
   const removeStatutoryDiscount = (key) => {
+    markDiscountsEdited();
     setAddedStatutoryKeys((prev) => {
       const next = new Set(prev);
       next.delete(key);
@@ -4188,6 +4442,7 @@ export default function TransactionPaymentModal({
   };
 
   const addCustomDiscountLine = (type) => {
+    markDiscountsEdited();
     setCustomDiscountLines((prev) => [
       ...prev,
       {
@@ -4205,10 +4460,12 @@ export default function TransactionPaymentModal({
   };
 
   const removeCustomDiscountLine = (localId) => {
+    markDiscountsEdited();
     setCustomDiscountLines((prev) => prev.filter((line) => line.localId !== localId));
   };
 
   const updateCustomLine = (localId, patch) => {
+    markDiscountsEdited();
     setCustomDiscountLines((prev) =>
       prev.map((line) => (line.localId === localId ? { ...line, ...patch } : line)),
     );
@@ -4531,7 +4788,7 @@ export default function TransactionPaymentModal({
                     subtitle="Add fees"
                     onClick={() => setShowOtherChargesModal(true)}
                     active={validManualOtherCharges.length > 0}
-                    disabled={false}
+                    disabled={isLoadingItems}
                   />
                   <ActionTile
                     isDark={isDark}
@@ -4545,6 +4802,7 @@ export default function TransactionPaymentModal({
                         (Number(x.qualifiedCount || 0) > 0 ||
                           Number(x.discountAmount || 0) > 0),
                     )}
+                    disabled={isLoadingItems}
                   />
                   <ActionTile
                     isDark={isDark}
@@ -4553,6 +4811,7 @@ export default function TransactionPaymentModal({
                     subtitle="Optional details"
                     onClick={() => setShowCustomerInfoModal(true)}
                     active={computed.totalQualifiedAll > 0}
+                    disabled={isLoadingItems}
                   />
                   <ActionTile
                     isDark={isDark}
@@ -4565,6 +4824,7 @@ export default function TransactionPaymentModal({
                         : setShowPaymentMethodsModal(true)
                     }
                     active={payments.length > 0}
+                    disabled={isLoadingItems}
                   />
                   <ActionTile
                     isDark={isDark}
@@ -4573,6 +4833,7 @@ export default function TransactionPaymentModal({
                     subtitle="Apply points or rewards"
                     onClick={() => setShowLoyaltyModal(true)}
                     active={Boolean(loyaltyMember)}
+                    disabled={isLoadingItems}
                   />
                   {shouldShowCustomerExclusive && (
                     <ActionTile
@@ -4582,6 +4843,7 @@ export default function TransactionPaymentModal({
                       subtitle="Input B1T1 ID"
                       onClick={() => setShowCustomerExclusiveModal(true)}
                       active={customerExclusiveValue.trim() !== ""}
+                      disabled={isLoadingItems}
                     />
                   )}
                 </div>
@@ -4881,7 +5143,7 @@ export default function TransactionPaymentModal({
         isDark={isDark}
         options={chargeOptions}
         rows={otherCharges}
-        setRows={setOtherCharges}
+        setRows={setOtherChargesWithFinancialEdit}
         readOnly={isPaidMode}
       />
 
@@ -4890,11 +5152,11 @@ export default function TransactionPaymentModal({
         onClose={() => setShowCustomerInfoModal(false)}
         isDark={isDark}
         customerCount={customerCount}
-        setCustomerCount={setCustomerCount}
+        setCustomerCount={setCustomerCountWithFinancialEdit}
         totalQualified={computed.totalQualifiedAll}
         customerCards={customerCards}
         setCustomerCards={setCustomerCards}
-        readOnly={false}
+        readOnly={isPaidMode}
       />
 
       <PaymentMethodPickerModal
@@ -4937,17 +5199,17 @@ export default function TransactionPaymentModal({
         onClose={() => setShowDiscountModal(false)}
         isDark={isDark}
         customerCount={customerCount}
-        setCustomerCount={setCustomerCount}
+        setCustomerCount={setCustomerCountWithFinancialEdit}
         discountState={discountState}
-        setDiscountState={setDiscountState}
+        setDiscountState={setDiscountStateWithFinancialEdit}
         computed={computed}
         discountCeilingAmount={discountCeilingAmount}
         readOnly={isPaidMode}
         discountMode={discountMode}
         discountSharingMode={discountSharingMode}
-        setDiscountSharingMode={setDiscountSharingMode}
+        setDiscountSharingMode={setDiscountSharingModeWithFinancialEdit}
         selectedProductIds={selectedProductIds}
-        setSelectedProductIds={setSelectedProductIds}
+        setSelectedProductIds={setSelectedProductIdsWithFinancialEdit}
         items={items}
         availableDiscountTypes={availableDiscountTypes}
         addedStatutoryKeys={addedStatutoryKeys}
@@ -4977,9 +5239,9 @@ export default function TransactionPaymentModal({
         apiHost={apiHost}
         loyaltyConfig={loyaltyConfig}
         loyaltyMember={loyaltyMember}
-        setLoyaltyMember={setLoyaltyMember}
+        setLoyaltyMember={setLoyaltyMemberWithFinancialEdit}
         loyaltyPointsToApply={loyaltyPointsToApply}
-        setLoyaltyPointsToApply={setLoyaltyPointsToApply}
+        setLoyaltyPointsToApply={setLoyaltyPointsToApplyWithFinancialEdit}
         loyaltyDiscountAmount={computed.loyaltyDiscountAmount}
         loyaltyPointsToEarn={computed.loyaltyPointsToEarn}
         readOnly={isPaidMode}
@@ -4999,16 +5261,20 @@ export default function TransactionPaymentModal({
 
       <SuccessModal
         isOpen={showSuccessModal}
-        onClose={() => {
-          setShowSuccessModal(false);
-          onClose?.();
-        }}
-        onPrint={handleSuccessModalPrint}
+        onClose={handleSuccessContinueClick}
+        onPrint={handleSuccessPrintClick}
         isPrinting={isPrinting}
         isDark={isDark}
         title="Payment Successful"
         message="The payment has been saved successfully. You can print the receipt now."
         printText="Print Invoice"
+      />
+
+      <ChangeDueModal
+        isOpen={showChangeDueModal}
+        onClose={handleChangeDueAcknowledge}
+        isDark={isDark}
+        changeAmount={computed.changeAmount}
       />
     </>
   );
