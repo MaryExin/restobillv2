@@ -188,7 +188,6 @@ try {
             customer_id,
             discount_type,
             discount_amount,
-            vat_exemption,
             customer_name,
             date_of_birth,
             gender,
@@ -238,11 +237,10 @@ try {
             continue;
         }
         if (!isset($discountCountsByLabel[$label])) {
-            $discountCountsByLabel[$label] = ["count" => 0, "amount" => 0.0, "vat_exemption" => 0.0];
+            $discountCountsByLabel[$label] = ["count" => 0, "amount" => 0.0];
         }
         $discountCountsByLabel[$label]["count"]++;
         $discountCountsByLabel[$label]["amount"] += (float)($row["discount_amount"] ?? 0);
-        $discountCountsByLabel[$label]["vat_exemption"] += (float)($row["vat_exemption"] ?? 0);
     }
 
     echo json_encode([

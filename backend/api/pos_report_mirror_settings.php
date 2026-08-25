@@ -13,7 +13,7 @@ if (!in_array($_SERVER["REQUEST_METHOD"], ["GET", "POST"], true)) {
 require __DIR__ . "/pdo.php";
 require_once __DIR__ . "/pos_role_authorization.php";
 require_once __DIR__ . "/pos_report_mirror.php";
-require_once __DIR__ . "/pos_report_mirror_activation.php";
+require_once __DIR__ . "/pos_report_initial_month_backfill.php";
 
 function reportMirrorSettingsRespond(bool $success, string $message, $data = null, int $statusCode = 200): void
 {
@@ -92,7 +92,11 @@ function reportMirrorSettingsConfiguredDatabaseNames(array $config): array
     return [$posDbName, $reportDbName];
 }
 
-function reportMirrorSettingsRead(PDO $pdo, array $config): array
+function reportMirrorSettingsRead(
+    PDO $pdo,
+    array $config,
+    ?array $initialMonthBackfill = null
+): array
 {
     [$posDbName, $reportDbName] = reportMirrorSettingsConfiguredDatabaseNames($config);
     $posValue = posReportMirrorFetchSkipIntervalFromSettings($pdo, $posDbName);
@@ -112,7 +116,8 @@ function reportMirrorSettingsRead(PDO $pdo, array $config): array
         "pos_database_value" => $posValue,
         "report_database_value" => $reportValue,
         "synced_to_report_database" => $reportValue !== null && $reportValue === $effectiveValue,
-        "report_mirror_activation" => posReportMirrorActivationReadState($pdo, $config),
+        "initial_month_backfill" => $initialMonthBackfill
+            ?? posReportInitialMonthBackfillReadState($pdo, $config),
     ];
 }
 
@@ -136,6 +141,61 @@ try {
     $body = json_decode(file_get_contents("php://input"), true);
     if (!is_array($body)) {
         $body = [];
+    }
+
+    $action = strtolower(trim((string)($body["action"] ?? "")));
+    if ($action === "run_initial_month_backfill") {
+        $rawBatchSize = $body["batch_size"] ?? POS_REPORT_INITIAL_MONTH_BACKFILL_DEFAULT_BATCH_SIZE;
+        if (
+            !is_int($rawBatchSize) &&
+            !(is_string($rawBatchSize) && preg_match('/^\d+$/', trim($rawBatchSize)))
+        ) {
+            throw new InvalidArgumentException("batch_size must be a positive whole number.");
+        }
+
+        $batchSize = (int)$rawBatchSize;
+        if ($batchSize <= 0) {
+            throw new InvalidArgumentException("batch_size must be a positive whole number.");
+        }
+
+        $backfillState = posReportInitialMonthBackfillRunBatch($pdo, $config, $batchSize);
+        $responseData = reportMirrorSettingsRead($pdo, $config, $backfillState);
+
+        if (($backfillState["status"] ?? "") === "migration_required") {
+            reportMirrorSettingsRespond(
+                false,
+                "Initial report backfill database migration is required.",
+                $responseData,
+                409
+            );
+        }
+
+        if (($backfillState["busy"] ?? false) === true) {
+            reportMirrorSettingsRespond(
+                false,
+                "Initial report backfill is already running.",
+                $responseData,
+                409
+            );
+        }
+
+        if (($backfillState["status"] ?? "") === "failed") {
+            reportMirrorSettingsRespond(
+                false,
+                "Initial report backfill stopped and can be resumed.",
+                $responseData,
+                500
+            );
+        }
+
+        $message = ($backfillState["status"] ?? "") === "completed"
+            ? "Initial current-month report backfill completed."
+            : "Initial current-month report backfill batch processed.";
+        reportMirrorSettingsRespond(true, $message, $responseData);
+    }
+
+    if ($action !== "") {
+        throw new InvalidArgumentException("Unsupported report mirror settings action.");
     }
 
     $rawSkipInterval = $body["skip_interval"] ?? $body["report_skip_interval"] ?? null;
