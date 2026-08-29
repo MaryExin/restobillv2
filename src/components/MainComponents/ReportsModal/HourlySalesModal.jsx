@@ -15,6 +15,7 @@ import {
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
 import { getCurrentUserRole } from "../../../utils/getCurrentUserRole";
+import { posAuthenticatedFetch } from "../../../utils/posAuthenticatedFetch";
 
 const peso = (value) =>
   `₱${Number(value || 0).toLocaleString(undefined, {
@@ -188,6 +189,8 @@ const HourlySalesModal = ({ isOpen, onClose }) => {
   const [viewMode, setViewMode] = useState("general");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("ALL");
+  const [selectedSalesType, setSelectedSalesType] = useState("ALL");
+  const [salesTypeOptions, setSalesTypeOptions] = useState([]);
 
   const today = new Date().toISOString().split("T")[0];
   const [dateFrom, setDateFrom] = useState(today);
@@ -225,13 +228,15 @@ const HourlySalesModal = ({ isOpen, onClose }) => {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost/api/reports_dashboard.php`, {
+      const response = await posAuthenticatedFetch(`http://localhost/api/reports_dashboard.php`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          reportKey: "hourlySales",
           datefrom: dateFrom,
           dateto: dateTo,
           includeVoided: false,
+          salesType: selectedSalesType === "ALL" ? "" : selectedSalesType,
           role: getCurrentUserRole(),
         }),
       });
@@ -249,7 +254,22 @@ const HourlySalesModal = ({ isOpen, onClose }) => {
     } finally {
       setLoading(false);
     }
-  }, [dateFrom, dateTo]);
+  }, [dateFrom, dateTo, selectedSalesType]);
+
+  useEffect(() => {
+    fetch(`http://localhost/api/sales_type_list.php`)
+      .then((res) => res.json())
+      .then((result) => {
+        const list = Array.isArray(result?.data) ? result.data : [];
+        setSalesTypeOptions(
+          list.map((item) => String(item?.description || "").trim()).filter(Boolean),
+        );
+      })
+      .catch((err) => {
+        console.error("Failed to load sales type list:", err);
+        setSalesTypeOptions([]);
+      });
+  }, []);
 
   useEffect(() => {
     if (isOpen) fetchData();
@@ -595,6 +615,25 @@ const HourlySalesModal = ({ isOpen, onClose }) => {
                   isOpen={openEndCal}
                   onClose={() => setOpenEndCal(false)}
                 />
+              </div>
+
+              <div>
+                <label className="block mb-2 text-sm font-medium text-slate-600">
+                  Sales Type
+                </label>
+
+                <select
+                  value={selectedSalesType}
+                  onChange={(e) => setSelectedSalesType(e.target.value)}
+                  className="w-full px-4 py-3 text-sm font-medium transition bg-slate-50 border outline-none rounded-2xl border-slate-200 text-slate-700 focus:border-blue-500"
+                >
+                  <option value="ALL">All Sales Types</option>
+                  {salesTypeOptions.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 

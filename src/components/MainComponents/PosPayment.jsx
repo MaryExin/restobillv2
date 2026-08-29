@@ -33,6 +33,9 @@ import ModalYesNoReusable from "../Modals/ModalYesNoReusable";
 import { MdWarning } from "react-icons/md";
 import { posAuthenticatedFetch } from "../../utils/posAuthenticatedFetch";
 import { usePosDeveloperSession } from "../../hooks/usePosRoleAccessConfig";
+import useBusinessInfo from "../../hooks/useBusinessInfo";
+import { buildVoidRefundHtml } from "../../utils/BuildVoidRefundHtml";
+import { printWithPdfFallback } from "../../utils/printWithPdfFallback";
 
 const KIOSK_DEFAULT_TABLE = "Table 01";
 
@@ -1029,6 +1032,7 @@ function TransactionRow({ index, style, data }) {
 
 export default function PosPayment() {
   const apiHost = useApiHost();
+  const { businessInfo } = useBusinessInfo();
   const developerMode = usePosDeveloperSession();
   const themeContext = useTheme();
   const isDark =
@@ -1335,35 +1339,50 @@ export default function PosPayment() {
 
       const now = new Date();
 
+      const voidRefundPayload = {
+        type,
+        items,
+        transaction: {
+          transaction_id:   row?.transaction_id   || "-",
+          invoice_no:       row?.invoice_no        || "-",
+          transaction_date: row?.transaction_date  || "-",
+          transaction_time: row?.transaction_time  || "-",
+          terminal_number:  row?.terminal_number   || "-",
+          order_type:       row?.order_type        || "-",
+          table_number:     row?.table_number      || "-",
+          cashier:          row?.cashier           || "-",
+          void_id:          row?.void_id            || "",
+          refund_id:        row?.refund_id          || "",
+        },
+        computed,
+        voidRefundInfo: {
+          authBy:      adminName || "-",
+          remarks:     remarks   || "NO REMARKS",
+          actionDate:  now.toLocaleDateString("en-PH"),
+          actionTime:  now.toLocaleTimeString("en-PH"),
+        },
+      };
+
       try {
-        await window.electronAPI.printEscPosVoidRefund({
-          type,
-          items,
-          transaction: {
-            transaction_id:   row?.transaction_id   || "-",
-            invoice_no:       row?.invoice_no        || "-",
-            transaction_date: row?.transaction_date  || "-",
-            transaction_time: row?.transaction_time  || "-",
-            terminal_number:  row?.terminal_number   || "-",
-            order_type:       row?.order_type        || "-",
-            table_number:     row?.table_number      || "-",
-            cashier:          row?.cashier           || "-",
-            void_id:          row?.void_id            || "",
-            refund_id:        row?.refund_id          || "",
-          },
-          computed,
-          voidRefundInfo: {
-            authBy:      adminName || "-",
-            remarks:     remarks   || "NO REMARKS",
-            actionDate:  now.toLocaleDateString("en-PH"),
-            actionTime:  now.toLocaleTimeString("en-PH"),
-          },
+        const result = await printWithPdfFallback({
+          attempt: () =>
+            window.electronAPI.printEscPosVoidRefund(voidRefundPayload),
+          buildFallbackHtml: () =>
+            buildVoidRefundHtml({ ...voidRefundPayload, businessInfo }),
+          fileName: `${type}-slip-${row?.transaction_id || Date.now()}.pdf`,
         });
+
+        if (!result?.success && !result?.canceled) {
+          console.error(
+            "[PRINT] Failed to print void/refund slip:",
+            result?.message,
+          );
+        }
       } catch (err) {
         console.error("[PRINT] Failed to print void/refund slip:", err);
       }
     },
-    [apiHost],
+    [apiHost, businessInfo],
   );
 
   const fetchShiftAdmins = useCallback(async () => {

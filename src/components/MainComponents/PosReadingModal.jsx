@@ -18,6 +18,23 @@ import {
   usePosRoleAccessVersion,
 } from "../../hooks/usePosRoleAccessConfig";
 import { posAuthenticatedFetch } from "../../utils/posAuthenticatedFetch";
+import { buildXPrintHtml, buildZPrintHtml } from "../../utils/BuildXZReadingHtml";
+import { printWithPdfFallback } from "../../utils/printWithPdfFallback";
+
+const DENOMINATIONS = [
+  { key: "1000", label: "₱1,000", value: 1000 },
+  { key: "500", label: "₱500", value: 500 },
+  { key: "200", label: "₱200", value: 200 },
+  { key: "100", label: "₱100", value: 100 },
+  { key: "50", label: "₱50", value: 50 },
+  { key: "20", label: "₱20", value: 20 },
+  { key: "10", label: "₱10", value: 10 },
+  { key: "5", label: "₱5", value: 5 },
+  { key: "1", label: "₱1", value: 1 },
+  { key: "0.25", label: "25¢", value: 0.25 },
+  { key: "0.05", label: "5¢", value: 0.05 },
+  { key: "0.01", label: "1¢", value: 0.01 },
+];
 
 const parseReadingResponse = async (response) => {
   const text = await response.text();
@@ -104,6 +121,42 @@ export default function PosReadingModal({
     cashDrawerAmount: "",
     verifyAmount: "",
   });
+  const [denomCounts, setDenomCounts] = useState({});
+  const [cashierChoice, setCashierChoice] = useState(selectedCashier);
+  const [cashierOptions, setCashierOptions] = useState([]);
+
+  useEffect(() => {
+    if (!open || !apiHost) return;
+
+    const userId = localStorage.getItem("user_id") || "";
+
+    fetch(
+      `${apiHost}/api/get_shift_details.php?user_id=${encodeURIComponent(userId)}`,
+    )
+      .then((res) => res.json())
+      .then((data) => {
+        const accounts = Array.isArray(data?.accounts) ? data.accounts : [];
+        const options = accounts
+          .filter((acc) =>
+            ["0", "cashier"].includes(
+              String(acc?.userRoleValue ?? acc?.userRole ?? "")
+                .trim()
+                .toLowerCase(),
+            ),
+          )
+          .map((acc) => ({
+            name: String(acc?.name || "").trim(),
+            username: String(acc?.username || acc?.email || "").trim(),
+          }))
+          .filter((acc) => acc.name);
+
+        setCashierOptions(options);
+      })
+      .catch((error) => {
+        console.error("Failed to load cashier list:", error);
+        setCashierOptions([]);
+      });
+  }, [open, apiHost]);
   const [isPrinting, setIsPrinting] = useState(false);
   const [isCheckingBlockers, setIsCheckingBlockers] = useState(false);
   const [blockerModal, setBlockerModal] = useState({
@@ -127,6 +180,15 @@ export default function PosReadingModal({
     [parsedCashDrawer, parsedVerifyAmount],
   );
 
+  const denomTotal = useMemo(
+    () =>
+      DENOMINATIONS.reduce(
+        (sum, d) => sum + Number(denomCounts[d.key] || 0) * d.value,
+        0,
+      ),
+    [denomCounts],
+  );
+
   const normalizedShiftDate = useMemo(() => {
     return String(shiftingDate || "").split(" ")[0];
   }, [shiftingDate]);
@@ -145,6 +207,8 @@ export default function PosReadingModal({
       cashDrawerAmount: "",
       verifyAmount: "",
     });
+    setDenomCounts({});
+    setCashierChoice(selectedCashier);
   };
 
   const openBlockerModal = (title, message) => {
@@ -246,6 +310,15 @@ export default function PosReadingModal({
     setErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
+  const handleDenomChange = (key, value) => {
+    const digitsOnly = value.replace(/[^0-9]/g, "");
+    setDenomCounts((prev) => ({ ...prev, [key]: digitsOnly }));
+  };
+
+  const applyDenomTotalToCashDrawer = () => {
+    handleChange("cashDrawerAmount", denomTotal.toFixed(2));
+  };
+
   const validate = () => {
     const nextErrors = {
       cashDrawerAmount: "",
@@ -278,348 +351,6 @@ export default function PosReadingModal({
       maximumFractionDigits: 2,
     });
 
-  const commonPrintStyles = `
-  <style>
-    :root {
-      --s: 1;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    @page {
-      size: 80mm auto;
-      margin: 0;
-    }
-
-    html, body {
-      margin: 0;
-      padding: 0;
-      width: 80mm;
-      background: #fff;
-      color: #000;
-      font-family: Arial, Helvetica, sans-serif;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-    }
-
-    body {
-      overflow: hidden;
-    }
-
-    .receipt {
-      width: 76.5mm;
-      padding: calc(8px * var(--s)) calc(16px * var(--s)) calc(8px * var(--s)) calc(1px * var(--s));
-      font-size: calc(10.5px * var(--s));
-      line-height: 1.18;
-      margin: 0;
-      box-sizing: border-box;
-    }
-
-    .center { text-align: center; }
-
-    .title {
-      font-weight: 900;
-      font-size: calc(15px * var(--s));
-      line-height: 1.15;
-      word-break: break-word;
-      overflow-wrap: break-word;
-    }
-
-    .subtitle {
-      font-size: calc(10px * var(--s));
-      line-height: 1.3;
-      word-break: break-word;
-      overflow-wrap: break-word;
-    }
-
-    .line {
-      border-top: 1px solid #000;
-      margin: calc(8px * var(--s)) 0 calc(7px * var(--s));
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      table-layout: fixed;
-      font-size: calc(9.6px * var(--s));
-    }
-
-    td, th {
-      padding: 0;
-      vertical-align: top;
-      line-height: 1.1;
-    }
-
-    .label {
-      width: 32%;
-      white-space: nowrap;
-      padding-right: 0;
-      text-align: left;
-    }
-
-    .value {
-      width: 68%;
-      text-align: right;
-      white-space: nowrap;
-      overflow: visible;
-      padding-right: calc(16px * var(--s));
-      padding-left: 0;
-    }
-
-    .strong {
-      font-weight: 700;
-    }
-  </style>
-`;
-
-  const buildXPrintHtml = (data) => {
-    const otherPaymentsBreakdown = Array.isArray(data?.otherPaymentsBreakdown)
-      ? data.otherPaymentsBreakdown
-      : Array.isArray(data?.paymentBreakdown)
-        ? data.paymentBreakdown
-        : [];
-
-    const otherPaymentsRows =
-      otherPaymentsBreakdown.length > 0
-        ? otherPaymentsBreakdown
-            .map(
-              (item) => `
-              <tr>
-                <td class="label sublabel">- ${item?.payment_method || "Other"}</td>
-                <td class="value subvalue">${money(item?.payment_amount || 0)}</td>
-              </tr>
-            `,
-            )
-            .join("")
-        : `
-          <tr>
-            <td class="label sublabel">- None</td>
-            <td class="value subvalue">${money(0)}</td>
-          </tr>
-        `;
-
-    return `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="utf-8" />
-        <title>X Reading</title>
-        ${commonPrintStyles}
-      <style>
-        .sublabel {
-          padding-left: calc(14px * var(--s));
-          font-size: calc(9.6px * var(--s));
-        }
-
-        .subvalue {
-          font-size: calc(9.6px * var(--s));
-          text-align: right;
-          white-space: nowrap;
-          padding-right: calc(14px * var(--s));
-        }
-      </style>
-      </head>
-      <body>
-        <div class="receipt">
-          <div class="center">
-            <div class="title">${data.companyName || ""}</div>
-            <div class="subtitle">${data.storeName || ""}</div>
-            <div class="subtitle">${data.corpName || ""}</div>
-            <div class="subtitle">${data.address || ""}</div>
-            <div class="subtitle">TIN: ${data.tin || ""}</div>
-            <div class="subtitle">MIN: ${data.machineNumber || ""}</div>
-            <div class="subtitle">S/N: ${data.serialNumber || ""}</div>
-            <div class="title" style="margin-top:8px;">X-READING</div>
-          </div>
-
-          <div class="line"></div>
-          <table>
-            <tr><td class="label">Report Date</td><td class="value">${data.reportDate || ""}</td></tr>
-            <tr><td class="label">Report Time</td><td class="value">${data.reportTime || ""}</td></tr>
-            <tr><td class="label">Start Date/Time</td><td class="value">${data.startDateTime || ""}</td></tr>
-            <tr><td class="label">End Date/Time</td><td class="value">${data.endDateTime || ""}</td></tr>
-            <tr><td class="label">Cashier</td><td class="value">${data.cashier || ""}</td></tr>
-            <tr><td class="label">Beg. INV.</td><td class="value">${data.begOR || ""}</td></tr>
-            <tr><td class="label">End INV.</td><td class="value">${data.endOR || ""}</td></tr>
-          </table>
-
-          <div class="line"></div>
-          <div class="strong">PAYMENTS</div>
-          <table>
-            <tr><td class="label">Opening Fund</td><td class="value">${money(data.openingFund)}</td></tr>
-            <tr><td class="label">Cash</td><td class="value">${money(data.cash)}</td></tr>
-            <tr><td class="label">Cheque</td><td class="value">${money(data.cheque)}</td></tr>
-            <tr><td class="label">Credit Card</td><td class="value">${money(data.creditCard)}</td></tr>
-            <tr><td class="label">Other Payments</td><td class="value">${money(data.otherPaymentsTotal ?? data.otherPayments)}</td></tr>
-            ${otherPaymentsRows}
-            <tr><td class="label strong">Total Payments</td><td class="value strong">${money(data.totalPayments)}</td></tr>
-            <tr><td class="label">Void</td><td class="value">${money(data.void)}</td></tr>
-            <tr><td class="label">Refund</td><td class="value">${money(data.refund)}</td></tr>
-            <tr><td class="label">Withdrawal</td><td class="value">${money(data.withdrawal)}</td></tr>
-          </table>
-
-          <div class="line"></div>
-          <div class="strong">SUMMARY</div>
-          <table>
-            <tr><td class="label">Cash In Drawer</td><td class="value">${money(data.summaryCashInDrawer)}</td></tr>
-            <tr><td class="label">Cheque</td><td class="value">${money(data.summaryCheque)}</td></tr>
-            <tr><td class="label">Credit Card</td><td class="value">${money(data.summaryCreditCard)}</td></tr>
-            <tr><td class="label">Other Payments</td><td class="value">${money(data.summaryOtherPayments)}</td></tr>
-            <tr><td class="label">Opening Fund</td><td class="value">${money(data.summaryOpeningFund)}</td></tr>
-            <tr><td class="label">Withdrawal</td><td class="value">${money(data.summaryWithdrawal)}</td></tr>
-            <tr><td class="label">Payments Received</td><td class="value">${money(data.summaryPaymentsReceived)}</td></tr>
-            <tr><td class="label strong">Short / Over</td><td class="value strong">${money(data.summaryShortOver)}</td></tr>
-          </table>
-        </div>
-      </body>
-    </html>
-  `;
-  };
-
-  const buildZPrintHtml = (data) => {
-    const vatExemptionValue =
-      data.vatExemption ?? data.lessVatExemption ?? data.vatExemptVat ?? 0;
-
-    return `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8" />
-          <title>Z Reading</title>
-          ${commonPrintStyles}
-        </head>
-        <body>
-          <div class="receipt">
-            <div class="center">
-              <div class="title">${data.companyName || ""}</div>
-              <div class="subtitle">${data.storeName || ""}</div>
-              <div class="subtitle">${data.corpName || ""}</div>
-              <div class="subtitle">${data.address || ""}</div>
-              <div class="subtitle">TIN: ${data.tin || ""}</div>
-              <div class="subtitle">MIN: ${data.machineNumber || ""}</div>
-              <div class="subtitle">S/N: ${data.serialNumber || ""}</div>
-              <div class="title" style="margin-top:8px;">Z-READING</div>
-            </div>
-
-            <div class="line"></div>
-            <table>
-              <tr><td class="label">Date Issued</td><td class="value">${data.reportDate || ""}</td></tr>
-              <tr><td class="label">Time</td><td class="value">${data.reportTime || ""}</td></tr>
-              <tr><td class="label">Beg SI No.</td><td class="value">${data.begSI || ""}</td></tr>
-              <tr><td class="label">End SI No.</td><td class="value">${data.endSI || ""}</td></tr>
-              <tr><td class="label">Beg Void No.</td><td class="value">${data.begVoid || ""}</td></tr>
-              <tr><td class="label">End Void No.</td><td class="value">${data.endVoid || ""}</td></tr>
-              <tr><td class="label">Beg Return No.</td><td class="value">${data.begReturn || ""}</td></tr>
-              <tr><td class="label">End Return No.</td><td class="value">${data.endReturn || ""}</td></tr>
-              <tr><td class="label">Reset Counter No.</td><td class="value">${data.resetCounterNo || 0}</td></tr>
-              <tr><td class="label">Z Counter No.</td><td class="value">${data.zCounterNo || 0}</td></tr>
-            </table>
-
-            <div class="line"></div>
-            <table>
-              <tr><td class="label">Present Accum. Sales</td><td class="value">${money(data.presentAccumulatedSales)}</td></tr>
-              <tr><td class="label">Previous Accum. Sales</td><td class="value">${money(data.previousAccumulatedSales)}</td></tr>
-              <tr><td class="label">Sales for the Day</td><td class="value">${money(data.salesForTheDay)}</td></tr>
-            </table>
-
-            <div class="line"></div>
-            <div class="strong">BREAKDOWN OF SALES</div>
-            <table>
-              <tr><td class="label">VATABLE SALES</td><td class="value">${money(data.vatableSales)}</td></tr>
-              <tr><td class="label">VAT AMOUNT</td><td class="value">${money(data.vatAmount)}</td></tr>
-              <tr><td class="label">VAT-EXEMPT SALES</td><td class="value">${money(data.vatExemptSales)}</td></tr>
-              <tr><td class="label">VAT EXEMPTION</td><td class="value">${money(vatExemptionValue)}</td></tr>
-              <tr><td class="label">ZERO RATED SALES</td><td class="value">${money(data.zeroRatedSales)}</td></tr>
-              <tr><td class="label">OTHER CHARGES</td><td class="value">${money(data.otherCharges)}</td></tr>
-            </table>
-
-            <div class="line"></div>
-            <table>
-              <tr><td class="label">Gross Amount:</td><td class="value">${money(data.grossAmount)}</td></tr>
-              <tr><td class="label">Discount:</td><td class="value">${money(data.lessDiscount)}</td></tr>
-              <tr><td class="label">VAT Exemption:</td><td class="value">${money(vatExemptionValue)}</td></tr>
-              <tr><td class="label">Refund:</td><td class="value">${money(data.lessReturn)}</td></tr>
-              <tr><td class="label">Void:</td><td class="value">${money(data.lessVoid)}</td></tr>
-              <tr><td class="label">VAT Adjustment:</td><td class="value">${money(data.lessVatAdjustment)}</td></tr>
-              <tr><td class="label strong">Net Amount:</td><td class="value strong">${money(data.netAmount)}</td></tr>
-            </table>
-
-            <div class="line"></div>
-            <div class="strong">DISCOUNT SUMMARY</div>
-            <table>
-              <tr><td class="label">SC Disc</td><td class="value">${money(data.scDisc)}</td></tr>
-              <tr><td class="label">PWD Disc</td><td class="value">${money(data.pwdDisc)}</td></tr>
-              <tr><td class="label">NAAC Disc</td><td class="value">${money(data.naacDisc)}</td></tr>
-              <tr><td class="label">Solo Parent Disc</td><td class="value">${money(data.soloParentDisc)}</td></tr>
-              <tr><td class="label">Other Disc</td><td class="value">${money(data.otherDisc)}</td></tr>
-            </table>
-
-            <div class="line"></div>
-            <div class="strong">SALES ADJUSTMENT</div>
-            <table>
-              <tr><td class="label">Void</td><td class="value">${money(data.salesAdjustmentVoid)}</td></tr>
-              <tr><td class="label">Return</td><td class="value">${money(data.salesAdjustmentReturn)}</td></tr>
-            </table>
-
-            <div class="line"></div>
-            <div class="strong">VAT ADJUSTMENT</div>
-            <table>
-              <tr><td class="label">SC Trans VAT Adj</td><td class="value">${money(data.scTransVatAdj)}</td></tr>
-              <tr><td class="label">PWD Trans VAT Adj</td><td class="value">${money(data.pwdTransVatAdj)}</td></tr>
-              <tr><td class="label">Reg Disc Trans VAT Adj</td><td class="value">${money(data.regDiscTransVatAdj)}</td></tr>
-              <tr><td class="label">Zero Rated Trans VAT Adj</td><td class="value">${money(data.zeroRatedTransVatAdj)}</td></tr>
-              <tr><td class="label">VAT on Return</td><td class="value">${money(data.vatOnReturn)}</td></tr>
-              <tr><td class="label">Other VAT Adjustments</td><td class="value">${money(data.otherVatAdjustments)}</td></tr>
-            </table>
-
-            <div class="line"></div>
-            <div class="strong">TRANSACTION SUMMARY</div>
-            <table>
-              <tr><td class="label">Cash In Drawer</td><td class="value">${money(data.cashInDrawer)}</td></tr>
-              <tr><td class="label">Cheque</td><td class="value">${money(data.cheque)}</td></tr>
-              <tr><td class="label">Credit Card</td><td class="value">${money(data.creditCard)}</td></tr>
-              <tr><td class="label">Other Payments</td><td class="value">${money(data.otherPayments)}</td></tr>
-              <tr><td class="label">Opening Fund</td><td class="value">${money(data.openingFund)}</td></tr>
-              <tr><td class="label">Less Withdrawal</td><td class="value">${money(data.lessWithdrawal)}</td></tr>
-              <tr><td class="label">Payments Received</td><td class="value">${money(data.paymentsReceived)}</td></tr>
-              <tr><td class="label strong">Short / Over</td><td class="value strong">${money(data.shortOver)}</td></tr>
-            </table>
-          </div>
-        </body>
-      </html>
-    `;
-  };
-
-  const printViaElectron = async (html, documentName = "pos-reading") => {
-    if (!window.electronAPI?.printReceipt) {
-      throw new Error("Electron print API is not available.");
-    }
-
-    const resolvedPrinterName =
-      String(printerName || "").trim() ||
-      String(defaultPrinterName || "").trim();
-
-    console.log("Selected printerName:", resolvedPrinterName);
-    console.log("Available printers:", printers);
-
-    const result = await window.electronAPI.printReceipt({
-      html,
-      printerName: resolvedPrinterName,
-      silent: true,
-      copies: 1,
-    });
-
-    console.log(`${documentName} print result:`, result);
-
-    if (!result?.success) {
-      throw new Error(result?.message || `Failed to print ${documentName}.`);
-    }
-
-    return result;
-  };
-
   const ensureReadingReady = () => {
     if (!validate()) return false;
 
@@ -639,25 +370,39 @@ export default function PosReadingModal({
     return true;
   };
 
-  const buildReadingRequestBody = (isZReading) => ({
-    readingType: isZReading ? "Z" : "X",
-    selectedCashier,
-    cashDrawerAmount: Number(values.cashDrawerAmount || 0),
-    verifyAmount: Number(values.verifyAmount || 0),
-    categoryCode: categoryCode || "",
-    unitCode: unitCode || "",
-    terminalNumber: localStorage.getItem("posTerminalNumber") || "1",
-    corpName: businessInfo.corpName || "",
-    shiftingDate: normalizedShiftDate,
-    machineNumber: businessInfo.machineNumber || "",
-    serialNumber: businessInfo.serialNumber || "",
-    ptuNumber: businessInfo.posProviderPTUNo || "",
-    ptuDateIssued: businessInfo.posProviderPTUDateIssued || "",
-    readingDatabaseScope: readingDatabaseScope(),
-    user_id: localStorage.getItem("user_id") || "",
-    user_name: localStorage.getItem("Cashier") || "Store Crew",
-    cashier_name: localStorage.getItem("username") || "Store Crew",
-  });
+  const buildReadingRequestBody = (isZReading) => {
+    const matchedCashierOption = cashierOptions.find(
+      (opt) => opt.name === cashierChoice,
+    );
+
+    return {
+      readingType: isZReading ? "Z" : "X",
+      selectedCashier: isZReading ? "All Cashiers" : cashierChoice,
+      selectedCashierUsername:
+        !isZReading && matchedCashierOption
+          ? matchedCashierOption.username
+          : "",
+      cashDrawerAmount: Number(values.cashDrawerAmount || 0),
+      verifyAmount: Number(values.verifyAmount || 0),
+      denominationBreakdown: DENOMINATIONS.reduce((acc, d) => {
+        acc[d.key] = Number(denomCounts[d.key] || 0);
+        return acc;
+      }, {}),
+      categoryCode: categoryCode || "",
+      unitCode: unitCode || "",
+      terminalNumber: localStorage.getItem("posTerminalNumber") || "1",
+      corpName: businessInfo.corpName || "",
+      shiftingDate: normalizedShiftDate,
+      machineNumber: businessInfo.machineNumber || "",
+      serialNumber: businessInfo.serialNumber || "",
+      ptuNumber: businessInfo.posProviderPTUNo || "",
+      ptuDateIssued: businessInfo.posProviderPTUDateIssued || "",
+      readingDatabaseScope: readingDatabaseScope(),
+      user_id: localStorage.getItem("user_id") || "",
+      user_name: localStorage.getItem("Cashier") || "Store Crew",
+      cashier_name: localStorage.getItem("username") || "Store Crew",
+    };
+  };
 
   const buildReadingPayload = (results) => ({
     ...results.data,
@@ -752,14 +497,31 @@ export default function PosReadingModal({
       const isZReading = activeType === "z";
       const payload = await loadReadingPayload(isZReading);
 
-      const result = await window.electronAPI.printEscposXzReading({
-        payload,
-        isZReading,
-        printerName: printerName || defaultPrinterName || "",
+      const result = await printWithPdfFallback({
+        attempt: () =>
+          window.electronAPI.printEscposXzReading({
+            payload,
+            isZReading,
+            printerName: printerName || defaultPrinterName || "",
+          }),
+        buildFallbackHtml: () =>
+          isZReading ? buildZPrintHtml(payload) : buildXPrintHtml(payload),
+        fileName: `${isZReading ? "Z" : "X"}-Reading-${payload?.reportDate || Date.now()}.pdf`,
       });
+
+      if (result?.canceled) {
+        return;
+      }
 
       if (!result?.success) {
         throw new Error(result?.message || "Failed to print X/Z reading.");
+      }
+
+      if (result?.printFallback) {
+        openBlockerModal(
+          "Saved as PDF",
+          `No printer available or a print error occurred — saved as PDF instead: ${result.filePath}`,
+        );
       }
 
       if (isZReading) {
@@ -858,7 +620,7 @@ export default function PosReadingModal({
           <AnimatePresence>
             {activeType && (
               <motion.div
-                className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 px-4 backdrop-blur-[2px]"
+                className="fixed inset-0 z-[210] flex items-center justify-center bg-black/40 px-4 py-6 backdrop-blur-[2px]"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -867,17 +629,17 @@ export default function PosReadingModal({
                   initial={{ opacity: 0, scale: 0.95, y: 10 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                  className="w-full max-w-lg rounded-[28px] bg-white p-7 shadow-[0_24px_70px_rgba(15,23,42,0.30)]"
+                  className="w-full max-w-4xl max-h-[95vh] overflow-y-auto rounded-[28px] bg-white p-6 shadow-[0_24px_70px_rgba(15,23,42,0.30)]"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <div className="text-sm font-semibold uppercase tracking-[0.18em] text-zinc-400">
                         POS Reading
                       </div>
-                      <h3 className="mt-1 text-3xl font-bold text-zinc-900">
+                      <h3 className="mt-0.5 text-3xl font-bold text-zinc-900">
                         {activeType === "x" ? "X-Reading" : "Z-Reading"}
                       </h3>
-                      <p className="mt-2 text-sm text-zinc-500">
+                      <p className="mt-1 text-sm text-zinc-500">
                         Enter the cash drawer amount and verify it first.
                       </p>
                     </div>
@@ -890,13 +652,57 @@ export default function PosReadingModal({
                         resetForm();
                       }}
                       disabled={isPrinting}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100 text-zinc-500 transition hover:bg-zinc-200 hover:text-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-500 transition hover:bg-zinc-200 hover:text-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      <FiX size={18} />
+                      <FiX size={20} />
                     </button>
                   </div>
 
-                  <div className="mt-6 space-y-5">
+                  <div className="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-semibold text-zinc-700">
+                        Cash Denomination Count
+                      </label>
+                      <span className="text-sm font-semibold text-zinc-500">
+                        Total: ₱ {money(denomTotal)}
+                      </span>
+                    </div>
+
+                    <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-6">
+                      {DENOMINATIONS.map((d) => (
+                        <div
+                          key={d.key}
+                          className="rounded-xl border border-zinc-200 bg-white p-2"
+                        >
+                          <div className="text-xs font-semibold text-zinc-500">
+                            {d.label}
+                          </div>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={denomCounts[d.key] || ""}
+                            onChange={(e) =>
+                              handleDenomChange(d.key, e.target.value)
+                            }
+                            disabled={isPrinting}
+                            placeholder="0"
+                            className="mt-1 h-11 w-full rounded-lg border border-zinc-200 px-2 text-base text-zinc-800 outline-none transition focus:border-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={applyDenomTotalToCashDrawer}
+                      disabled={isPrinting}
+                      className="theme-force-brand mt-3 rounded-xl bg-zinc-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Use Total as Cash Drawer Amount
+                    </button>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-2 gap-3">
                     <AmountField
                       label="Cash Drawer Amount"
                       name="cashDrawerAmount"
@@ -916,49 +722,75 @@ export default function PosReadingModal({
                     />
                   </div>
 
-                  <div className="mt-5 rounded-2xl bg-zinc-50 p-4">
-                    <div className="flex items-center justify-between text-sm text-zinc-500">
-                      <span>Difference</span>
-                      <span
-                        className={`font-semibold ${
-                          amountDifference === 0
-                            ? "text-emerald-600"
-                            : "text-rose-600"
-                        }`}
+                  <div className="mt-3 flex items-center justify-between rounded-xl bg-zinc-50 px-4 py-3">
+                    <span className="text-sm text-zinc-500">Difference</span>
+                    <span
+                      className={`text-base font-semibold ${
+                        amountDifference === 0
+                          ? "text-emerald-600"
+                          : "text-rose-600"
+                      }`}
+                    >
+                      ₱{" "}
+                      {Number.isFinite(amountDifference)
+                        ? amountDifference.toFixed(2)
+                        : "0.00"}
+                    </span>
+                  </div>
+
+                  <div
+                    className={`mt-4 grid gap-3 ${
+                      activeType === "x" ? "grid-cols-2" : "grid-cols-1"
+                    }`}
+                  >
+                    {activeType === "x" && (
+                      <div>
+                        <label className="mb-1.5 block text-sm font-semibold text-zinc-700">
+                          Cashier
+                        </label>
+
+                        <select
+                          value={cashierChoice}
+                          onChange={(e) => setCashierChoice(e.target.value)}
+                          disabled={isPrinting}
+                          className="h-14 w-full rounded-2xl border border-zinc-200 bg-white px-4 text-base text-zinc-800 outline-none transition focus:border-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <option value="All Cashiers">All Cashiers</option>
+                          {cashierOptions.map((opt) => (
+                            <option key={opt.name} value={opt.name}>
+                              {opt.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold text-zinc-700">
+                        Printer
+                      </label>
+
+                      <select
+                        value={printerName}
+                        onChange={(e) => setPrinterName(e.target.value)}
+                        disabled={isPrinting}
+                        className="h-14 w-full rounded-2xl border border-zinc-200 bg-white px-4 text-base text-zinc-800 outline-none transition focus:border-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        ₱{" "}
-                        {Number.isFinite(amountDifference)
-                          ? amountDifference.toFixed(2)
-                          : "0.00"}
-                      </span>
+                        <option value="">
+                          {defaultPrinterName
+                            ? `Default Printer (${defaultPrinterName})`
+                            : "Default Printer"}
+                        </option>
+                        {printers.map((printer) => (
+                          <option key={printer.name} value={printer.name}>
+                            {printer.displayName || printer.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
 
-                  <div className="mt-5">
-                    <label className="mb-2 block text-sm font-semibold text-zinc-700">
-                      Printer
-                    </label>
-
-                    <select
-                      value={printerName}
-                      onChange={(e) => setPrinterName(e.target.value)}
-                      disabled={isPrinting}
-                      className="h-14 w-full rounded-2xl border border-zinc-200 bg-white px-4 text-base text-zinc-800 outline-none transition focus:border-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      <option value="">
-                        {defaultPrinterName
-                          ? `Default Printer (${defaultPrinterName})`
-                          : "Default Printer"}
-                      </option>
-                      {printers.map((printer) => (
-                        <option key={printer.name} value={printer.name}>
-                          {printer.displayName || printer.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                  <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                     <button
                       type="button"
                       onClick={() => {
@@ -967,7 +799,7 @@ export default function PosReadingModal({
                         resetForm();
                       }}
                       disabled={isPrinting}
-                      className="rounded-[24px] bg-[#e5e7eb] px-6 py-3 text-sm font-bold text-zinc-800 transition hover:bg-[#dcdfe4] disabled:cursor-not-allowed disabled:opacity-60"
+                      className="rounded-[20px] bg-[#e5e7eb] px-8 py-4 text-base font-bold text-zinc-800 transition hover:bg-[#dcdfe4] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       Back
                     </button>
@@ -984,7 +816,7 @@ export default function PosReadingModal({
                       variant="primary"
                       icon={<FaPrint className="shrink-0" />}
                       fullWidth={false}
-                      className="px-6 rounded-[24px] shadow-[0_12px_30px_rgba(63,95,224,0.28)] !mb-0"
+                      className="px-8 !py-4 text-base rounded-[20px] shadow-[0_12px_30px_rgba(63,95,224,0.28)] !mb-0"
                     >
                       Print Now
                     </ButtonComponent>
@@ -1078,7 +910,7 @@ function ReadingCard({ title, onClick, iconClassName = "", disabled = false }) {
 function AmountField({ label, name, value, onChange, error, disabled = false }) {
   return (
     <div>
-      <label className="mb-2 block text-sm font-semibold text-zinc-700">
+      <label className="mb-1.5 block text-sm font-semibold text-zinc-700">
         {label}
       </label>
 
@@ -1102,7 +934,7 @@ function AmountField({ label, name, value, onChange, error, disabled = false }) 
         />
       </div>
 
-      {error ? <p className="mt-2 text-sm text-rose-500">{error}</p> : null}
+      {error ? <p className="mt-1 text-xs text-rose-500">{error}</p> : null}
     </div>
   );
 }

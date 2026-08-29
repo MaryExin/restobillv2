@@ -14,6 +14,7 @@ import {
 import * as XLSX from "xlsx";
 import { useTheme } from "../../../context/ThemeContext";
 import { getCurrentUserRole } from "../../../utils/getCurrentUserRole";
+import { posAuthenticatedFetch } from "../../../utils/posAuthenticatedFetch";
 
 const peso = (value) =>
   `₱${Number(value || 0).toLocaleString(undefined, {
@@ -149,10 +150,11 @@ const DailySalesModal = ({ isOpen, onClose }) => {
   const fetchSales = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost/api/reports_dashboard.php`, {
+      const response = await posAuthenticatedFetch(`http://localhost/api/reports_dashboard.php`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          reportKey: "dailySales",
           datefrom: dateFrom,
           dateto: dateTo,
           includeVoided: status === "All" || status === "Voided",

@@ -12,6 +12,7 @@ import {
   FaSyncAlt, // Added a sync icon for the refresh button
 } from "react-icons/fa";
 import { getCurrentUserRole } from "../../../utils/getCurrentUserRole";
+import { posAuthenticatedFetch } from "../../../utils/posAuthenticatedFetch";
 
 const peso = (value) =>
   `₱ ${Number(value || 0).toLocaleString("en-PH", {
@@ -40,12 +41,13 @@ const DashboardModal = ({ isOpen, onClose }) => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const response = await fetch(
+      const response = await posAuthenticatedFetch(
         "http://localhost/api/reports_dashboard.php",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            reportKey: "dashboard",
             datefrom: dateFrom,
             dateto: dateTo,
             includeVoided: false,

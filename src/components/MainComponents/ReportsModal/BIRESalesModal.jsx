@@ -5,6 +5,7 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import { getCurrentUserRole } from "../../../utils/getCurrentUserRole";
+import { posAuthenticatedFetch } from "../../../utils/posAuthenticatedFetch";
 
 const BirESalesModal = ({ isOpen, onClose }) => {
   const { theme } = useTheme();
@@ -34,7 +35,7 @@ const BirESalesModal = ({ isOpen, onClose }) => {
     if (!isOpen) return;
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost/api/bir_esales.php`, {
+      const response = await posAuthenticatedFetch(`http://localhost/api/bir_esales.php`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tab: activeTab, dateFrom, dateTo, role: getCurrentUserRole() }),
@@ -58,7 +59,7 @@ const BirESalesModal = ({ isOpen, onClose }) => {
 
     try {
       for (const tab of tabs) {
-        const response = await fetch(`http://localhost/api/bir_esales.php`, {
+        const response = await posAuthenticatedFetch(`http://localhost/api/bir_esales.php`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ tab: tab.id, dateFrom, dateTo, role: getCurrentUserRole() }),

@@ -215,6 +215,13 @@ try {
         ? (float)$input["verifyAmount"]
         : (isset($input["verify_amount"]) ? (float)$input["verify_amount"] : 0);
 
+    $denominationBreakdown = [];
+    if (isset($input["denominationBreakdown"]) && is_array($input["denominationBreakdown"])) {
+        foreach ($input["denominationBreakdown"] as $denomKey => $denomCount) {
+            $denominationBreakdown[(string)$denomKey] = (int)$denomCount;
+        }
+    }
+
     // Shift closure and audit identity always come from the authenticated
     // access-token account, never from request identity fields.
     $authenticatedToken = $readingAccess["token"];
@@ -866,6 +873,7 @@ try {
             "opening_fund" => $openingFund,
             "cash_drawer_amount" => $cashDrawerAmount,
             "verify_amount" => $verifyAmount,
+            "denomination_breakdown" => $denominationBreakdown,
             "beg_or" => $displayBegOR,
             "end_or" => $displayEndOR,
             "beg_void" => $displayBegVoidNo,
