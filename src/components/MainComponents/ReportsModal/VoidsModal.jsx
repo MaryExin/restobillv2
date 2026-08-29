@@ -4,6 +4,7 @@ import { useTheme } from "../../../context/ThemeContext";
 import * as XLSX from 'xlsx';
 import useApiHost from "../../../hooks/useApiHost";
 import { getCurrentUserRole } from "../../../utils/getCurrentUserRole";
+import { posAuthenticatedFetch } from "../../../utils/posAuthenticatedFetch";
 
 const VoidsModal = ({ isOpen, onClose }) => {
   const { theme } = useTheme();
@@ -41,7 +42,7 @@ const VoidsModal = ({ isOpen, onClose }) => {
     if (!isOpen) return;
     setLoading(true);
     try {
-      const response = await fetch("http://localhost/api/get_voids_refunds.php", {
+      const response = await posAuthenticatedFetch("http://localhost/api/get_voids_refunds.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: 'voids', dateFrom, dateTo, role: getCurrentUserRole() }),

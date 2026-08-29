@@ -9,6 +9,8 @@ import {
 import useBusinessInfo from "../../../hooks/useBusinessInfo";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
+import { buildZPrintHtml } from "../../../utils/BuildXZReadingHtml";
+import { printWithPdfFallback } from "../../../utils/printWithPdfFallback";
 
 const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
   const [selectedDate, setSelectedDate] = useState("");
@@ -94,14 +96,29 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
           0,
       };
 
-      const result = await window.electronAPI.printEscposXzReading({
-        payload,
-        isZReading: true,
-        // printerName: printerName || defaultPrinterName || "",
+      const result = await printWithPdfFallback({
+        attempt: () =>
+          window.electronAPI.printEscposXzReading({
+            payload,
+            isZReading: true,
+          }),
+        buildFallbackHtml: () => buildZPrintHtml(payload),
+        fileName: `Z-Reading-${payload?.reportDate || Date.now()}.pdf`,
       });
+
+      if (result?.canceled) {
+        return;
+      }
 
       if (!result?.success) {
         alert(result?.message || "Failed to print Z-Reading");
+        return;
+      }
+
+      if (result?.printFallback) {
+        alert(
+          `No printer available or a print error occurred — saved as PDF instead: ${result.filePath}`,
+        );
       }
     } catch (error) {
       console.error("Reprint Z-Reading print error:", error);

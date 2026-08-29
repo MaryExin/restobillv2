@@ -42,7 +42,10 @@ import {
   BuildBillingReceiptHtml,
   BuildOrderReceiptHtml,
 } from "../../utils/BuildOrderlistPrintHtml";
+import { printWithPdfFallback } from "../../utils/printWithPdfFallback";
+import { BuildQrItemsHtml } from "../../utils/BuildQrItemsHtml";
 import useGetDefaultPrinter from "../../hooks/useGetDefaultPrinter";
+import useBusinessInfo from "../../hooks/useBusinessInfo";
 import useBillingEnabled from "../../hooks/useBillingEnabled";
 import useZustandLayoutMode from "../../context/useZustandLayoutMode";
 import KioskRightPanel from "./KioskRightPanel";
@@ -70,8 +73,10 @@ const Orderlist = ({
   dateSelected,
   transactionId,
   onOrderSaved,
+  initialHeadCount,
 }) => {
   const defaultPrinterName = useGetDefaultPrinter();
+  const { businessInfo } = useBusinessInfo();
   const billingEnabled = useBillingEnabled();
   const { layoutMode } = useZustandLayoutMode();
   // "Restaurant Version 2" is the stored id behind the "Retail POS" layout option.
@@ -84,6 +89,13 @@ const Orderlist = ({
   const [isEditingTableName, setIsEditingTableName] = useState(false);
 
   const [isPrintingOnly, setIsPrintingOnly] = useState(false);
+
+  // Head count chosen when the order was opened (or loaded from the
+  // existing transaction when editing) — flows into save/update requests
+  // instead of a hardcoded default.
+  const [headCount, setHeadCount] = useState(
+    Number(initialHeadCount) > 0 ? Number(initialHeadCount) : 1,
+  );
 
   // Tracks the transaction ID after first save so retries use update_order.php instead of save_order.php
   const internalTransactionIdRef = useRef(null);
@@ -379,122 +391,54 @@ const Orderlist = ({
     loadPrinters();
   }, [defaultPrinterName]);
 
-  const printViaElectron = async ({
-    html,
-    fallbackDocumentName = "receipt",
-    afterSuccess,
-  }) => {
-    try {
-      if (!window.electronAPI?.printReceipt) {
-        throw new Error("Electron print API is not available.");
-      }
-
-      console.log("Selected printerName:", printerName);
-      console.log("Available printers:", printers);
-      console.log(
-        "Is aligned:",
-        printers.some((p) => p.name === printerName),
-      );
-
-      const result = await window.electronAPI.printReceipt({
-        html,
-        printerName: printerName || defaultPrinterName || "",
-        silent: true,
-        copies: 1,
-      });
-
-      console.log("Print result:", result);
-
-      if (!result?.success) {
-        throw new Error(
-          result?.message || `Failed to print ${fallbackDocumentName}.`,
-        );
-      }
-
-      if (typeof afterSuccess === "function") {
-        afterSuccess();
-      }
-
-      return { ok: true };
-    } catch (error) {
-      console.error(error);
-      alert(error.message || `Failed to print ${fallbackDocumentName}.`);
-      return { ok: false };
-    }
-  };
-
-  // const handlePrintAdditionalOrderElectron = async () => {
-  // const html = BuildOrderReceiptHtml({
-  // productcart: {
-  //   customer: tableselected,
-  //   items: additionalCartItems,
-  // },
-  // totalPrice: additionalTotalPrice,
-  // tableselected,
-  // instructions,
-  // transactionId,
-  // printMode: transactionId ? "additional" : "new",
-  //   });
-
-  //   return printViaElectron({
-  //     html,
-  //     fallbackDocumentName: transactionId
-  //       ? `additional-order-${transactionId}`
-  //       : `new-order-${tableselected}`,
-  //     afterSuccess: () => {
-  //       setIsReprint(false);
-  //       setShowqrModal(false);
-  //       setShowCartMobile(false);
-  //       setShowDesktopCartActions(false);
-  //       setshoworderlist(false);
-  //     },
-  //   });
-  // };
-
-  // const handlePrintAllElectron = async (printMode = "auto") => {
-  //   const html = BuildOrderReceiptHtml({
-  //     productcart: {
-  //       customer: tableselected,
-  //       items: cartSummaryItems,
-  //     },
-  //     totalPrice,
-  //     tableselected,
-  //     instructions,
-  //     transactionId,
-  //     printMode,
-  //   });
-
-  //   return printViaElectron({
-  //     html,
-  //     fallbackDocumentName: transactionId
-  //       ? `full-order-${transactionId}`
-  //       : `full-order-${tableselected}`,
-  //     afterSuccess: () => {
-  //       setIsReprint(false);
-  //       setShowqrModal(false);
-  //       setShowCartMobile(false);
-  //       setShowDesktopCartActions(false);
-  //     },
-  //   });
-  // };
-
   const handlePrintAdditionalOrderElectron = async (transactionIds) => {
     try {
-      const printResult = await window.electronAPI.printEscPos({
-        table: tableselected,
-        items: additionalCartItems,
-        total: additionalTotalPrice,
-        instructions,
-        transactionId: transactionId ? transactionId : transactionIds,
-        printMode: transactionId ? "additional" : "new",
-        printerName: printerName || defaultPrinterName || "",
+      const resolvedTransactionId = transactionId
+        ? transactionId
+        : transactionIds;
+      const resolvedPrintMode = transactionId ? "additional" : "new";
+
+      const printResult = await printWithPdfFallback({
+        attempt: () =>
+          window.electronAPI.printEscPos({
+            table: tableselected,
+            items: additionalCartItems,
+            total: additionalTotalPrice,
+            instructions,
+            transactionId: resolvedTransactionId,
+            printMode: resolvedPrintMode,
+            printerName: printerName || defaultPrinterName || "",
+          }),
+        buildFallbackHtml: () =>
+          BuildOrderReceiptHtml({
+            productcart: {
+              customer: tableselected,
+              items: additionalCartItems,
+            },
+            totalPrice: additionalTotalPrice,
+            tableselected,
+            instructions,
+            transactionId: resolvedTransactionId,
+            printMode: resolvedPrintMode,
+          }),
+        fileName: `additional-order-${resolvedTransactionId || tableselected}.pdf`,
       });
 
       console.log("ESC/POS additional print result:", printResult);
 
+      if (printResult?.canceled) {
+        return;
+      }
+
       if (!printResult?.success) {
         alert(printResult?.message || "Printing failed");
-        // return;
+        return;
+      }
+
+      if (printResult?.printFallback) {
+        alert(
+          `No printer available or a print error occurred — saved as PDF instead: ${printResult.filePath}`,
+        );
       }
 
       setIsReprint(false);
@@ -510,38 +454,65 @@ const Orderlist = ({
 
   const handlePrintAllElectron = async (printMode = "auto") => {
     try {
-      let printResult;
+      const resolvedPrintMode =
+        printMode === "auto"
+          ? transactionId
+            ? "additional"
+            : "new"
+          : printMode;
 
-      if (printMode === "duplicate") {
-        printResult = await window.electronAPI.printEscPosDuplicate({
-          table: tableselected,
-          items: cartSummaryItems,
-          total: totalPrice,
-          instructions,
-          transactionId,
-        });
-      } else {
-        printResult = await window.electronAPI.printEscPos({
-          table: tableselected,
-          items: cartSummaryItems,
-          total: totalPrice,
-          instructions,
-          transactionId,
-          printerName: printerName || defaultPrinterName || "",
-          printMode:
-            printMode === "auto"
-              ? transactionId
-                ? "additional"
-                : "new"
-              : printMode,
-        });
-      }
+      const printResult = await printWithPdfFallback({
+        attempt: () => {
+          if (printMode === "duplicate") {
+            return window.electronAPI.printEscPosDuplicate({
+              table: tableselected,
+              items: cartSummaryItems,
+              total: totalPrice,
+              instructions,
+              transactionId,
+            });
+          }
+
+          return window.electronAPI.printEscPos({
+            table: tableselected,
+            items: cartSummaryItems,
+            total: totalPrice,
+            instructions,
+            transactionId,
+            printerName: printerName || defaultPrinterName || "",
+            printMode: resolvedPrintMode,
+          });
+        },
+        buildFallbackHtml: () =>
+          BuildOrderReceiptHtml({
+            productcart: {
+              customer: tableselected,
+              items: cartSummaryItems,
+            },
+            totalPrice,
+            tableselected,
+            instructions,
+            transactionId,
+            printMode: resolvedPrintMode,
+          }),
+        fileName: `order-${transactionId || tableselected}.pdf`,
+      });
 
       console.log("ESC/POS full print result:", printResult);
+
+      if (printResult?.canceled) {
+        return;
+      }
 
       if (!printResult?.success) {
         alert(printResult?.message || "Printing failed");
         return;
+      }
+
+      if (printResult?.printFallback) {
+        alert(
+          `No printer available or a print error occurred — saved as PDF instead: ${printResult.filePath}`,
+        );
       }
 
       setIsReprint(false);
@@ -556,22 +527,45 @@ const Orderlist = ({
 
   const handleBillingPrintElectron = async (transaction, detailedItems) => {
     try {
-      const printResult = await window.electronAPI.printEscPosBilling({
-        transaction,
-        detailedproduct: detailedItems,
-        printerName: printerName || defaultPrinterName || "",
-        title: transaction?.billing_no
-          ? `billing-${transaction.billing_no}`
-          : transaction?.transaction_id
-            ? `billing-${transaction.transaction_id}`
-            : `billing-${tableselected}`,
+      const billingTitle = transaction?.billing_no
+        ? `billing-${transaction.billing_no}`
+        : transaction?.transaction_id
+          ? `billing-${transaction.transaction_id}`
+          : `billing-${tableselected}`;
+
+      const printResult = await printWithPdfFallback({
+        attempt: () =>
+          window.electronAPI.printEscPosBilling({
+            transaction,
+            detailedproduct: detailedItems,
+            printerName: printerName || defaultPrinterName || "",
+            title: billingTitle,
+          }),
+        buildFallbackHtml: () =>
+          BuildBillingReceiptHtml({
+            transaction,
+            detailedproduct: detailedItems,
+            businessInfo,
+            title: billingTitle,
+          }),
+        fileName: `${billingTitle}.pdf`,
       });
 
       console.log("ESC/POS billing print result:", printResult);
 
+      if (printResult?.canceled) {
+        return;
+      }
+
       if (!printResult?.success) {
         alert(printResult?.message || "Billing printing failed");
         return;
+      }
+
+      if (printResult?.printFallback) {
+        alert(
+          `No printer available or a print error occurred — saved as PDF instead: ${printResult.filePath}`,
+        );
       }
 
       setBillingSelectedTransaction(null);
@@ -841,6 +835,10 @@ const Orderlist = ({
         }));
 
         setSourceTransactionSummary(data.summary || {});
+
+        if (Number(data.summary?.customer_head_count) > 0) {
+          setHeadCount(Number(data.summary.customer_head_count));
+        }
 
         setproductcart({
           customer: tableselected,
@@ -1991,7 +1989,7 @@ const Orderlist = ({
         layoutMode === "Kiosk" ? kioskTableName : tableselected,
       );
       formData.append("order_type", orderTypeName);
-      formData.append("customer_head_count", 1);
+      formData.append("customer_head_count", headCount);
       formData.append("discount_type", "");
       formData.append("payment_method", "");
       formData.append("special_instructions", instructions || "");
@@ -2097,14 +2095,31 @@ const Orderlist = ({
     });
 
     try {
-      const result = await window.electronAPI.printEscPosQr({
-        items: qrItems,
-        table: tableRef,
-        transactionId: txRef,
+      const result = await printWithPdfFallback({
+        attempt: () =>
+          window.electronAPI.printEscPosQr({
+            items: qrItems,
+            table: tableRef,
+            transactionId: txRef,
+          }),
+        buildFallbackHtml: () =>
+          BuildQrItemsHtml({ items: qrItems, table: tableRef, transactionId: txRef }),
+        fileName: `qr-items-${txRef}.pdf`,
       });
+
+      if (result?.canceled) {
+        return;
+      }
 
       if (!result?.success) {
         alert(result?.message || "QR print failed.");
+        return;
+      }
+
+      if (result?.printFallback) {
+        alert(
+          `No printer available or a print error occurred — saved as PDF instead: ${result.filePath}`,
+        );
       }
     } catch (error) {
       console.error("ESC/POS QR print error:", error);

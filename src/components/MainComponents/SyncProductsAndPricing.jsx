@@ -26,7 +26,7 @@ import { useTheme } from "../../context/ThemeContext";
 import useCustomQuery from "../../hooks/useCustomQuery";
 import { useCustomSecuredMutation } from "../../hooks/useCustomSecuredMutation";
 import useApiHost from "../../hooks/useApiHost";
-import useWebApiHost from "../../hooks/useWebApiHost";
+import useResolvedTenantHost from "../../hooks/useResolvedTenantHost";
 
 import ProductImage from "../Common/ProductImage";
 import ModalYesNoReusable from "../Modals/ModalYesNoReusable";
@@ -732,9 +732,6 @@ const SyncProductsAndPricing = () => {
   const [selectedPricingCodes, setSelectedPricingCodes] = useState([]);
   const [pendingPricingCodes, setPendingPricingCodes] = useState([]);
   const [warningMode, setWarningMode] = useState(null);
-  const [isOnline, setIsOnline] = useState(
-    typeof navigator !== "undefined" ? navigator.onLine : true,
-  );
   const [virtualHeight, setVirtualHeight] = useState(620);
 
   const [isYesNoModalOpen, setYesNoModalOpen] = useState(false);
@@ -751,7 +748,16 @@ const SyncProductsAndPricing = () => {
   }, [selectedPricingCodes]);
 
   const apiHost = useApiHost();
-  const webApiHost = useWebApiHost();
+  const {
+    isOnline,
+    companyCode,
+    resolvedCompanyCode,
+    webApiHost,
+    isResolvingTenant,
+    tenantError,
+    isTenantResolved,
+    reloadTenant,
+  } = useResolvedTenantHost();
 
   const imageBaseUrl = webApiHost + import.meta.env.VITE_PRODUCT_IMAGES;
 
@@ -786,19 +792,6 @@ const SyncProductsAndPricing = () => {
   const { mutate: localMutate } = useCustomSecuredMutation(localMutateUrl);
 
   useEffect(() => {
-    const goOnline = () => setIsOnline(true);
-    const goOffline = () => setIsOnline(false);
-
-    window.addEventListener("online", goOnline);
-    window.addEventListener("offline", goOffline);
-
-    return () => {
-      window.removeEventListener("online", goOnline);
-      window.removeEventListener("offline", goOffline);
-    };
-  }, []);
-
-  useEffect(() => {
     const updateHeight = () => {
       const h = Math.max(360, window.innerHeight - 280);
       setVirtualHeight(h);
@@ -811,13 +804,20 @@ const SyncProductsAndPricing = () => {
 
   useEffect(() => {
     const busunitcode = localReadData?.target?.busunitcode || "";
-    if (!busunitcode) return;
+    if (!busunitcode || !isTenantResolved) return;
 
     webReadMutate({
+      companycode: resolvedCompanyCode,
       busunitcode,
       pricing_codes: selectedPricingCodes,
     });
-  }, [localReadData?.target?.busunitcode, selectedPricingCodes, webReadMutate]);
+  }, [
+    localReadData?.target?.busunitcode,
+    selectedPricingCodes,
+    webReadMutate,
+    isTenantResolved,
+    resolvedCompanyCode,
+  ]);
 
   const pricingOptions = useMemo(
     () => webReadData?.pricing_options || [],
@@ -894,8 +894,9 @@ const SyncProductsAndPricing = () => {
 
   const runRefresh = useCallback(() => {
     if (isSyncing) return;
+    reloadTenant();
     refetchLocal?.();
-  }, [refetchLocal, isSyncing]);
+  }, [refetchLocal, isSyncing, reloadTenant]);
 
   const rows = useMemo(() => {
     const webRows = webReadData?.web_rows || [];
@@ -1243,6 +1244,16 @@ const SyncProductsAndPricing = () => {
       return;
     }
 
+    if (!isTenantResolved) {
+      setReturnmessage({
+        message:
+          tenantError ||
+          "Unable to resolve the WEB tenant from ip.txt. Cannot sync yet.",
+      });
+      setshowhidesuccess(true);
+      return;
+    }
+
     if (!localReadData?.target?.busunitcode) {
       setReturnmessage({
         message: "No active business unit / pricing mapping found.",
@@ -1261,6 +1272,7 @@ const SyncProductsAndPricing = () => {
 
     webExportMutate(
       {
+        companycode: resolvedCompanyCode,
         busunitcode: localReadData?.target?.busunitcode,
         rows: selectedRows.map((row) => ({
           row_key: row.row_key,
@@ -1334,7 +1346,7 @@ This will also replace OFFLINE lkp_sales_type and tbl_pricing_by_sales_type usin
 
   const isLocalFailed = localReadMessage === "Failed";
   const isWebFailed = webReadMessage === "Failed";
-  const isRemoteOffline = isWebFailed;
+  const isRemoteOffline = isWebFailed || Boolean(tenantError);
   const noBusinessUnit = localReadMessage === "NoBusinessUnit";
 
   const isLoading =
@@ -1437,9 +1449,9 @@ This will also replace OFFLINE lkp_sales_type and tbl_pricing_by_sales_type usin
 
             <button
               onClick={runRefresh}
-              disabled={isSyncing}
+              disabled={isSyncing || isResolvingTenant}
               className={`rounded-2xl px-4 py-3 bg-blue-600 text-white font-bold hover:bg-blue-500 transition-all shadow-lg shadow-blue-900/20 flex items-center gap-2 ${
-                isSyncing
+                isSyncing || isResolvingTenant
                   ? "opacity-50 cursor-not-allowed pointer-events-none"
                   : ""
               }`}
@@ -1783,7 +1795,9 @@ This will also replace OFFLINE lkp_sales_type and tbl_pricing_by_sales_type usin
                   onClick={openSyncConfirm}
                   disabled={
                     isSyncing ||
+                    isResolvingTenant ||
                     !isOnline ||
+                    !isTenantResolved ||
                     isLocalFailed ||
                     isRemoteOffline ||
                     noBusinessUnit ||
@@ -1791,7 +1805,9 @@ This will also replace OFFLINE lkp_sales_type and tbl_pricing_by_sales_type usin
                   }
                   className={`w-full rounded-2xl px-5 py-3 font-bold transition-all ${
                     isSyncing ||
+                    isResolvingTenant ||
                     !isOnline ||
+                    !isTenantResolved ||
                     isLocalFailed ||
                     isRemoteOffline ||
                     noBusinessUnit ||
@@ -1845,11 +1861,17 @@ This will also replace OFFLINE lkp_sales_type and tbl_pricing_by_sales_type usin
                   <span className="font-bold">
                     {isLocalFailed
                       ? "LOCAL read failed"
-                      : isRemoteOffline
-                        ? "WEB database unreachable"
-                        : noBusinessUnit
-                          ? "No active local BU pricing mapping"
-                          : "WEB reconciliation ready"}
+                      : isResolvingTenant
+                        ? "Resolving TENANT from ip.txt"
+                        : tenantError
+                          ? `TENANT error: ${tenantError}`
+                          : !isTenantResolved
+                            ? "Waiting for TENANT from ip.txt"
+                            : isRemoteOffline
+                              ? "WEB database unreachable"
+                              : noBusinessUnit
+                                ? "No active local BU pricing mapping"
+                                : `WEB reconciliation ready (${resolvedCompanyCode || companyCode})`}
                   </span>
                 </div>
               </div>

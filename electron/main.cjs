@@ -5,6 +5,7 @@ const {
   protocol,
   session,
   screen,
+  dialog,
 } = require("electron");
 
 const { spawn } = require("child_process");
@@ -5135,6 +5136,79 @@ app.whenReady().then(() => {
         }
       } catch (closeError) {
         console.error("Error while closing print window:", closeError);
+      }
+    }
+  });
+
+  ipcMain.handle("print-to-pdf", async (_event, payload) => {
+    let pdfWindow = null;
+
+    try {
+      const { html = "", suggestedFileName = "receipt.pdf" } = payload || {};
+
+      if (!html || typeof html !== "string") {
+        return {
+          success: false,
+          message: "Missing document HTML.",
+        };
+      }
+
+      const saveDialogResult = await dialog.showSaveDialog(win, {
+        title: "Save as PDF",
+        defaultPath: path.join(app.getPath("documents"), suggestedFileName),
+        filters: [{ name: "PDF Files", extensions: ["pdf"] }],
+      });
+
+      if (saveDialogResult.canceled || !saveDialogResult.filePath) {
+        return { success: false, canceled: true };
+      }
+
+      const chosenPath = saveDialogResult.filePath;
+
+      pdfWindow = new BrowserWindow({
+        show: false,
+        width: RECEIPT_WINDOW_WIDTH_PX,
+        height: MIN_PRINT_WINDOW_HEIGHT_PX,
+        autoHideMenuBar: true,
+        backgroundColor: "#ffffff",
+        icon: app.isPackaged
+          ? path.join(process.resourcesPath, "icon.ico")
+          : path.join(__dirname, "..", "build", "icon.ico"),
+        webPreferences: {
+          contextIsolation: true,
+          nodeIntegration: false,
+          sandbox: false,
+        },
+      });
+
+      await pdfWindow.loadURL(
+        "data:text/html;charset=utf-8," + encodeURIComponent(html),
+      );
+
+      await waitForReceiptLayout(pdfWindow);
+
+      const pdfBuffer = await pdfWindow.webContents.printToPDF({
+        printBackground: true,
+        preferCSSPageSize: true,
+        margins: { top: 0, bottom: 0, left: 0, right: 0 },
+      });
+
+      fs.writeFileSync(chosenPath, pdfBuffer);
+
+      return { success: true, filePath: chosenPath };
+    } catch (error) {
+      console.error("Print to PDF error:", error);
+      return {
+        success: false,
+        message: error?.message || "Unexpected error while saving PDF.",
+      };
+    } finally {
+      try {
+        if (pdfWindow && !pdfWindow.isDestroyed()) {
+          pdfWindow.close();
+        }
+      } catch (closeError) {
+        console.error("Error while closing PDF window:", closeError);
       }
     }
   });

@@ -8,6 +8,9 @@ import {
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
 import { getCurrentUserRole } from "../../../utils/getCurrentUserRole";
+import { posAuthenticatedFetch } from "../../../utils/posAuthenticatedFetch";
+import { buildSalesPerProductHtml } from "../../../utils/BuildSalesPerProductHtml";
+import { printWithPdfFallback } from "../../../utils/printWithPdfFallback";
 
 const SalesPerProductModal = ({ isOpen, onClose }) => {
   const today = new Date().toISOString().split("T")[0];
@@ -23,10 +26,11 @@ const SalesPerProductModal = ({ isOpen, onClose }) => {
   const fetchSales = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("http://localhost/api/reports_dashboard.php", {
+      const res = await posAuthenticatedFetch("http://localhost/api/reports_dashboard.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          reportKey: "salesPerItem",
           datefrom: dateFrom,
           dateto: dateTo,
           role: getCurrentUserRole(),
@@ -87,7 +91,7 @@ const SalesPerProductModal = ({ isOpen, onClose }) => {
     try {
       setIsPrinting(true);
 
-      const result = await window.electronAPI.printEscposSalesPerProduct({
+      const salesPerProductPayload = {
         title: "SALES REPORT",
         dateFrom,
         dateTo,
@@ -102,13 +106,30 @@ const SalesPerProductModal = ({ isOpen, onClose }) => {
           qty: Number(totals.qty || 0),
           amount: Number(totals.amt || 0),
         },
+      };
+
+      const result = await printWithPdfFallback({
+        attempt: () =>
+          window.electronAPI.printEscposSalesPerProduct(salesPerProductPayload),
+        buildFallbackHtml: () => buildSalesPerProductHtml(salesPerProductPayload),
+        fileName: `sales-per-product-${dateFrom}-to-${dateTo}.pdf`,
       });
 
       console.log("sales per product print result:", result);
 
+      if (result?.canceled) {
+        return;
+      }
+
       if (!result?.success) {
         throw new Error(
           result?.message || "Failed to print sales per product report.",
+        );
+      }
+
+      if (result?.printFallback) {
+        alert(
+          `No printer available or a print error occurred — saved as PDF instead: ${result.filePath}`,
         );
       }
     } catch (error) {

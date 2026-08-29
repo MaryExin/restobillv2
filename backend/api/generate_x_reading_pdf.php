@@ -121,6 +121,13 @@ try {
         ? trim((string)$input["selectedCashier"])
         : (isset($input["selected_cashier"]) ? trim((string)$input["selected_cashier"]) : "All Cashiers");
 
+    // tbl_pos_transactions.cashier has historically been populated with either
+    // the cashier's full name or their login username/email depending on which
+    // flow saved the order, so both candidate values must be matched.
+    $selectedCashierUsername = isset($input["selectedCashierUsername"])
+        ? trim((string)$input["selectedCashierUsername"])
+        : "";
+
     $cashDrawerAmount = isset($input["cashDrawerAmount"])
         ? (float)$input["cashDrawerAmount"]
         : (isset($input["cash_drawer_amount"]) ? (float)$input["cash_drawer_amount"] : 0);
@@ -128,6 +135,13 @@ try {
     $verifyAmount = isset($input["verifyAmount"])
         ? (float)$input["verifyAmount"]
         : (isset($input["verify_amount"]) ? (float)$input["verify_amount"] : 0);
+
+    $denominationBreakdown = [];
+    if (isset($input["denominationBreakdown"]) && is_array($input["denominationBreakdown"])) {
+        foreach ($input["denominationBreakdown"] as $denomKey => $denomCount) {
+            $denominationBreakdown[(string)$denomKey] = (int)$denomCount;
+        }
+    }
 
     // Bind audit identity to the validated token/account, not request data.
     $authenticatedToken = $readingAccess["token"];
@@ -227,7 +241,22 @@ try {
         }
     }
 
-    $cashierLike = $selectedCashier === "All Cashiers" ? "%" : $selectedCashier . "%";
+    // Built as a regex alternation (not a plain LIKE prefix) so a single bound
+    // value can match a cashier stored as either their full name or their
+    // login username/email against the same tbl_pos_transactions.cashier column.
+    if ($selectedCashier === "All Cashiers" || $selectedCashier === "") {
+        $cashierLike = ".*";
+    } else {
+        $cashierMatchValues = array_values(array_unique(array_filter(
+            [$selectedCashier, $selectedCashierUsername],
+            fn($value) => $value !== ""
+        )));
+
+        $cashierLike = "^(" . implode("|", array_map(
+            fn($value) => preg_quote($value),
+            $cashierMatchValues
+        )) . ")";
+    }
 
     $sqlBusinessUnit = "
         SELECT
@@ -313,7 +342,7 @@ try {
           AND a.terminal_number = ?
           AND DATE(a.transaction_date) = ?
           AND UPPER(REPLACE(REPLACE(TRIM(b.payment_method), ' ', ''), '-', '')) NOT IN ('CASH', 'CHEQUE', 'CREDITCARD')
-          AND a.cashier LIKE ?
+          AND a.cashier REGEXP ?
           AND a.Status = 'Active'
         GROUP BY UPPER(REPLACE(REPLACE(TRIM(b.payment_method), ' ', ''), '-', ''))
         ORDER BY UPPER(REPLACE(REPLACE(TRIM(b.payment_method), ' ', ''), '-', '')) ASC
@@ -367,7 +396,7 @@ try {
         WHERE Category_Code = ?
           AND Unit_Code = ?
           AND terminal_number = ?
-          AND cashier LIKE ?
+          AND cashier REGEXP ?
           AND DATE(transaction_date) = ?
           AND invoice_no <> 0
         ORDER BY invoice_no ASC
@@ -391,7 +420,7 @@ try {
         WHERE Category_Code = ?
           AND Unit_Code = ?
           AND terminal_number = ?
-          AND cashier LIKE ?
+          AND cashier REGEXP ?
           AND invoice_no <> 0
         ORDER BY invoice_no DESC
         LIMIT 1
@@ -422,7 +451,7 @@ try {
           AND Unit_Code = ?
           AND terminal_number = ?
           AND DATE(transaction_date) = ?
-          AND cashier LIKE ?
+          AND cashier REGEXP ?
           AND Status = 'Active'
     ";
 
@@ -443,7 +472,7 @@ try {
           AND Unit_Code = ?
           AND terminal_number = ?
           AND DATE(transaction_date) = ?
-          AND cashier LIKE ?
+          AND cashier REGEXP ?
           AND Status = 'Voided'
     ";
 
@@ -464,7 +493,7 @@ try {
           AND Unit_Code = ?
           AND terminal_number = ?
           AND DATE(transaction_date) = ?
-          AND cashier LIKE ?
+          AND cashier REGEXP ?
           AND Status = 'Refunded'
     ";
 
@@ -486,7 +515,7 @@ try {
           AND terminal_number = ?
           AND DATE(transaction_date) = ?
           AND discount_type = 'Senior Citizen'
-          AND cashier LIKE ?
+          AND cashier REGEXP ?
           AND Status = 'Active'
     ";
 
@@ -508,7 +537,7 @@ try {
           AND terminal_number = ?
           AND DATE(transaction_date) = ?
           AND discount_type = 'PWD'
-          AND cashier LIKE ?
+          AND cashier REGEXP ?
           AND Status = 'Active'
     ";
 
@@ -530,7 +559,7 @@ try {
           AND terminal_number = ?
           AND DATE(transaction_date) = ?
           AND discount_type = 'NAAC'
-          AND cashier LIKE ?
+          AND cashier REGEXP ?
           AND Status = 'Active'
     ";
 
@@ -552,7 +581,7 @@ try {
           AND terminal_number = ?
           AND DATE(transaction_date) = ?
           AND discount_type = 'Solo Parent'
-          AND cashier LIKE ?
+          AND cashier REGEXP ?
           AND Status = 'Active'
     ";
 
@@ -577,7 +606,7 @@ try {
           AND discount_type <> 'PWD'
           AND discount_type <> 'NAAC'
           AND discount_type <> 'Solo Parent'
-          AND cashier LIKE ?
+          AND cashier REGEXP ?
           AND Status = 'Active'
     ";
 
@@ -603,7 +632,7 @@ try {
           AND a.terminal_number = ?
           AND DATE(a.transaction_date) = ?
           AND UPPER(REPLACE(REPLACE(TRIM(b.payment_method), ' ', ''), '-', '')) = 'CASH'
-          AND a.cashier LIKE ?
+          AND a.cashier REGEXP ?
           AND a.Status = 'Active'
     ";
 
@@ -629,7 +658,7 @@ try {
           AND a.terminal_number = ?
           AND DATE(a.transaction_date) = ?
           AND UPPER(REPLACE(REPLACE(TRIM(b.payment_method), ' ', ''), '-', '')) = 'CHEQUE'
-          AND a.cashier LIKE ?
+          AND a.cashier REGEXP ?
           AND a.Status = 'Active'
     ";
 
@@ -655,7 +684,7 @@ try {
           AND a.terminal_number = ?
           AND DATE(a.transaction_date) = ?
           AND UPPER(REPLACE(REPLACE(TRIM(b.payment_method), ' ', ''), '-', '')) = 'CREDITCARD'
-          AND a.cashier LIKE ?
+          AND a.cashier REGEXP ?
           AND a.Status = 'Active'
     ";
 
@@ -681,7 +710,7 @@ try {
           AND a.terminal_number = ?
           AND DATE(a.transaction_date) = ?
           AND UPPER(REPLACE(REPLACE(TRIM(b.payment_method), ' ', ''), '-', '')) NOT IN ('CASH', 'CHEQUE', 'CREDITCARD')
-          AND a.cashier LIKE ?
+          AND a.cashier REGEXP ?
           AND a.Status = 'Active'
     ";
 
@@ -760,6 +789,7 @@ try {
             "opening_fund" => $parOpeningFund,
             "cash_drawer_amount" => $cashDrawerAmount,
             "verify_amount" => $verifyAmount,
+            "denomination_breakdown" => $denominationBreakdown,
             "cash" => $parCash,
             "cheque" => $parCheque,
             "credit_card" => $parCreditCard,

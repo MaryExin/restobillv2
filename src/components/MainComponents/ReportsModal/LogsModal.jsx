@@ -7,6 +7,7 @@ import { useTheme } from "../../../context/ThemeContext";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import { getCurrentUserRole } from "../../../utils/getCurrentUserRole";
+import { posAuthenticatedFetch } from "../../../utils/posAuthenticatedFetch";
 
 const LogsModal = ({ isOpen, onClose }) => {
   const { theme } = useTheme(); 
@@ -23,7 +24,7 @@ const LogsModal = ({ isOpen, onClose }) => {
     if (!isOpen) return;
     setLoading(true);
     try {
-      const response = await fetch("http://localhost/api/get_logs.php", {
+      const response = await posAuthenticatedFetch("http://localhost/api/get_logs.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

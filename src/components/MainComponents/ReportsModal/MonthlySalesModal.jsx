@@ -7,6 +7,7 @@ import * as XLSX from "xlsx";
 import { useTheme } from "../../../context/ThemeContext";
 import useApiHost from "../../../hooks/useApiHost";
 import { getCurrentUserRole } from "../../../utils/getCurrentUserRole";
+import { posAuthenticatedFetch } from "../../../utils/posAuthenticatedFetch";
 
 const peso = (v) =>
   `₱${Number(v || 0).toLocaleString(undefined, {
@@ -97,10 +98,11 @@ const MonthlySalesModal = ({ isOpen, onClose }) => {
     if (!apiHost) return;
     setLoading(true);
     try {
-      const res = await fetch(`${apiHost}/api/reports_dashboard.php`, {
+      const res = await posAuthenticatedFetch(`${apiHost}/api/reports_dashboard.php`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          reportKey: "monthlySales",
           datefrom: dateFrom,
           dateto: dateTo,
           includeVoided: status === "All" || status === "Voided",

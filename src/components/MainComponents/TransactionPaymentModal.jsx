@@ -17,6 +17,7 @@ import {
 import { FaMoneyBill } from "react-icons/fa";
 import ButtonComponent from "./Common/ButtonComponent";
 import BuildPosPaymentReceiptHtml from "../../utils/BuildPosPaymentReceiptHtml";
+import { printWithPdfFallback } from "../../utils/printWithPdfFallback";
 import useGetDefaultPrinter from "../../hooks/useGetDefaultPrinter";
 import useBusinessInfo from "../../hooks/useBusinessInfo";
 import { resolveDiscountLineAmount } from "../../utils/discountLineMath";
@@ -2852,6 +2853,7 @@ export default function TransactionPaymentModal({
 
   const [otherCharges, setOtherCharges] = useState([]);
   const [payments, setPayments] = useState([]);
+  const [hasExistingPaymentRow, setHasExistingPaymentRow] = useState(false);
 
   // Discount types active for this transaction's sales type -- what the
   // "+ Add Discount" picker offers, resolved via lkp_discount_type +
@@ -2941,6 +2943,8 @@ export default function TransactionPaymentModal({
   const [showInputPaymentsModal, setShowInputPaymentsModal] = useState(false);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [showConfirmSaveModal, setShowConfirmSaveModal] = useState(false);
+  const [showConfirmMarkAsPaidModal, setShowConfirmMarkAsPaidModal] = useState(false);
+  const [isMarkingAsPaid, setIsMarkingAsPaid] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showChangeDueModal, setShowChangeDueModal] = useState(false);
   const [pendingSuccessAction, setPendingSuccessAction] = useState(null);
@@ -3365,7 +3369,7 @@ export default function TransactionPaymentModal({
         throw new Error("Electron print API is not available.");
       }
 
-      const result = await window.electronAPI.pospaymentreceipt({
+      const paymentReceiptPayload = {
         transaction: snapshot.transaction || transaction,
         items: snapshot.items || items,
         computed: snapshot.computed || computed,
@@ -3376,7 +3380,36 @@ export default function TransactionPaymentModal({
         terminalConfig,
         businessInfo,
         printerName: printerName || defaultPrinterName || "",
+      };
+
+      const receiptFileName = `payment-receipt-${
+        paymentReceiptPayload.transaction?.transaction_id || Date.now()
+      }.pdf`;
+
+      const result = await printWithPdfFallback({
+        attempt: () =>
+          window.electronAPI.pospaymentreceipt(paymentReceiptPayload),
+        buildFallbackHtml: () =>
+          BuildPosPaymentReceiptHtml(paymentReceiptPayload),
+        fileName: receiptFileName,
       });
+
+      console.log("Payment print result:", result);
+
+      if (result?.canceled) {
+        setIsPrinting(false);
+        return;
+      }
+
+      if (!result?.success) {
+        throw new Error(result?.message || "Failed to print receipt.");
+      }
+
+      if (result?.printFallback) {
+        alert(
+          `No printer available or a print error occurred — saved as PDF instead: ${result.filePath}`,
+        );
+      }
 
       const safeComputed = snapshot.computed || computed || {};
       const totalQualified = Number(
@@ -3385,44 +3418,29 @@ export default function TransactionPaymentModal({
           0,
       );
 
-      if (result?.success && totalQualified > 0) {
-        await window.electronAPI.pospaymentreceipt({
-          transaction: snapshot.transaction || transaction,
-          items: snapshot.items || items,
-          computed: snapshot.computed || computed,
-          payments: snapshot.payments || payments,
-          otherCharges: snapshot.otherCharges || otherCharges,
-          customerCards: snapshot.customerCards || customerCards,
-          isDuplicateCopy: snapshot.isDuplicateCopy || false,
-          terminalConfig,
-          businessInfo,
-          printerName: printerName || defaultPrinterName || "",
+      if (totalQualified > 0) {
+        const duplicateResult = await printWithPdfFallback({
+          attempt: () =>
+            window.electronAPI.pospaymentreceipt(paymentReceiptPayload),
+          buildFallbackHtml: () =>
+            BuildPosPaymentReceiptHtml(paymentReceiptPayload),
+          fileName: `payment-receipt-duplicate-${
+            paymentReceiptPayload.transaction?.transaction_id || Date.now()
+          }.pdf`,
         });
+
+        if (duplicateResult?.printFallback) {
+          alert(
+            `No printer available or a print error occurred for the duplicate copy — saved as PDF instead: ${duplicateResult.filePath}`,
+          );
+        } else if (!duplicateResult?.success && !duplicateResult?.canceled) {
+          console.error(
+            "Failed to print duplicate copy:",
+            duplicateResult?.message,
+          );
+        }
       }
-      // const html = BuildPosPaymentReceiptHtml({
-      //   transaction: snapshot.transaction || transaction,
-      //   items: snapshot.items || items,
-      //   computed: snapshot.computed || computed,
-      //   payments: snapshot.payments || payments,
-      //   otherCharges: snapshot.otherCharges || otherCharges,
-      //   customerCards: snapshot.customerCards || customerCards,
-      //   isDuplicateCopy: snapshot.isDuplicateCopy || false,
-      //   terminalConfig,
-      //   businessInfo,
-      // });
 
-      // const result = await window.electronAPI.printReceipt({
-      //   html,
-      //   printerName: printerName || defaultPrinterName || "",
-      //   silent: true,
-      //   copies: 1,
-      // });
-
-      console.log("Payment print result:", result);
-
-      if (!result?.success) {
-        throw new Error(result?.message || "Failed to print receipt.");
-      }
       setIsPrinting(false);
     } catch (error) {
       console.error(error);
@@ -3494,6 +3512,7 @@ export default function TransactionPaymentModal({
       setReceiptSnapshot(null);
       setOtherCharges([]);
       setPayments([]);
+      setHasExistingPaymentRow(false);
       setBillingStoredDiscounts(null);
       setBillingCounts(null);
       setBillingFinancialSnapshot(null);
@@ -3588,6 +3607,7 @@ export default function TransactionPaymentModal({
               }))
             : [],
         );
+        setHasExistingPaymentRow(detailPayments.length > 0);
 
         setOtherCharges(
           detailCharges.length > 0
@@ -4500,6 +4520,13 @@ export default function TransactionPaymentModal({
     modeOfPayments,
   ]);
 
+  const canMarkAsPaid =
+    !isPaidMode &&
+    hasExistingPaymentRow &&
+    String(transaction?.remarks || "")
+      .trim()
+      .toLowerCase() !== "paid";
+
   const addPaymentMethod = (method) => {
     setPayments((prev) => [
       ...prev,
@@ -4686,6 +4713,46 @@ export default function TransactionPaymentModal({
       setShowConfirmSaveModal(false);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleMarkAsPaid = async () => {
+    if (!canMarkAsPaid || !transaction?.transaction_id) return;
+
+    setIsMarkingAsPaid(true);
+    setErrorMessage("");
+
+    try {
+      const res = await fetch(
+        `${apiHost}/api/pos_payment_mark_as_paid.php`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            transaction_id: transaction.transaction_id,
+            category_code: terminalConfig.categoryCode,
+            unit_code: terminalConfig.unitCode,
+          }),
+        },
+      );
+
+      const data = await res.json();
+
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.message || "Failed to mark transaction as paid.");
+      }
+
+      setShowConfirmMarkAsPaidModal(false);
+      onSaved?.();
+      onClose?.();
+    } catch (error) {
+      console.error(error);
+      setErrorMessage(error.message || "Failed to mark transaction as paid.");
+      setShowConfirmMarkAsPaidModal(false);
+    } finally {
+      setIsMarkingAsPaid(false);
     }
   };
 
@@ -5102,6 +5169,26 @@ export default function TransactionPaymentModal({
                 </div>
               ) : null}
 
+              {canMarkAsPaid ? (
+                <div className="px-4 py-3 text-sm font-semibold text-emerald-500 rounded-2xl bg-emerald-500/10">
+                  A payment record already exists for this transaction but it
+                  is still marked as Pending. Use Mark as Paid to fix the
+                  status without recording a duplicate payment.
+                </div>
+              ) : null}
+
+              {canMarkAsPaid ? (
+                <ButtonComponent
+                  onClick={() => setShowConfirmMarkAsPaidModal(true)}
+                  isLoading={isMarkingAsPaid}
+                  disabled={isMarkingAsPaid || isSubmitting}
+                  loadingText="Marking as Paid..."
+                  variant="success"
+                >
+                  Mark as Paid
+                </ButtonComponent>
+              ) : null}
+
               <div className="grid grid-cols-2 gap-3">
                 <ButtonComponent
                   onClick={onClose}
@@ -5257,6 +5344,18 @@ export default function TransactionPaymentModal({
         yesText="Yes, Save Payment"
         noText="Cancel"
         busy={isSubmitting}
+      />
+
+      <YesNoModal
+        isOpen={showConfirmMarkAsPaidModal}
+        onClose={() => setShowConfirmMarkAsPaidModal(false)}
+        onYes={handleMarkAsPaid}
+        isDark={isDark}
+        title="Confirm Mark as Paid"
+        message="A payment record already exists for this transaction. Mark it as Paid without recording a new payment?"
+        yesText="Yes, Mark as Paid"
+        noText="Cancel"
+        busy={isMarkingAsPaid}
       />
 
       <SuccessModal

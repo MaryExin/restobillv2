@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld("appConfig", {
 
 contextBridge.exposeInMainWorld("electronAPI", {
   printReceipt: (payload) => ipcRenderer.invoke("print-receipt", payload),
+  printToPDF: (payload) => ipcRenderer.invoke("print-to-pdf", payload),
   printEscPosDuplicate: (data) =>
     ipcRenderer.invoke("print-escpos-duplicate", data),
   printEscposXzReading: (payload) =>

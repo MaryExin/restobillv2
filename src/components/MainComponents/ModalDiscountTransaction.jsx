@@ -16,6 +16,7 @@ import {
 } from "react-icons/fi";
 import ButtonComponent from "./Common/ButtonComponent";
 import { BuildPrintableDiscountReceiptHtml } from "../../utils/BuildPrintableDiscountReceiptHtml";
+import { printWithPdfFallback } from "../../utils/printWithPdfFallback";
 import useGetDefaultPrinter from "../../hooks/useGetDefaultPrinter";
 import useBusinessInfo from "../../hooks/useBusinessInfo";
 import { computeDiscountLine } from "../../utils/discountLineMath";
@@ -2289,87 +2290,52 @@ const ModalDiscountTransaction = ({
         transaction?.invoice_no ||
         "";
 
-      const result = await window.electronAPI.printEscposDiscount({
-        transaction: {
-          ...transaction,
-          cashier:
-            localStorage.getItem("username") ||
-            transaction?.cashier ||
-            "System",
-          billing_no: finalBillingNo,
-          invoice_no: finalInvoiceNo,
-        },
-        dateFrom,
-        computed,
-        items,
-        businessInfo,
-        printerName,
+      const discountTransactionPayload = {
+        ...transaction,
+        cashier:
+          localStorage.getItem("username") ||
+          transaction?.cashier ||
+          "System",
+        billing_no: finalBillingNo,
+        invoice_no: finalInvoiceNo,
+      };
+
+      const result = await printWithPdfFallback({
+        attempt: () =>
+          window.electronAPI.printEscposDiscount({
+            transaction: discountTransactionPayload,
+            dateFrom,
+            computed,
+            items,
+            businessInfo,
+            printerName,
+          }),
+        buildFallbackHtml: () =>
+          BuildPrintableDiscountReceiptHtml({
+            transaction: discountTransactionPayload,
+            dateFrom,
+            computed,
+            items,
+            scale: 1,
+            businessInfo,
+          }),
+        fileName: `discount-receipt-${finalBillingNo || transaction?.transaction_id || "receipt"}.pdf`,
       });
-
-      // const html = BuildPrintableDiscountReceiptHtml({
-      //   transaction: {
-      //     ...transaction,
-      //     cashier:
-      //       localStorage.getItem("username") ||
-      //       transaction?.cashier ||
-      //       "System",
-      //     billing_no: finalBillingNo,
-      //     invoice_no: finalInvoiceNo,
-      //   },
-      //   dateFrom,
-      //   computed,
-      //   items,
-      //   scale: 1,
-      //   businessInfo,
-      // });
-
-      // const result = await window.electronAPI.printReceipt({
-      //   html,
-      //   printerName,
-      //   silent: true,
-      //   copies: 1,
-      // });
-
-      // const handleDiscountPrintElectron = async ({
-      //   transaction,
-      //   finalBillingNo,
-      //   finalInvoiceNo,
-      //   dateFrom,
-      //   computed,
-      //   items,
-      //   businessInfo,
-      //   printerName,
-      // }) => {
-      //   const result = await window.electronAPI.printableDiscountReceipt({
-      //     transaction: {
-      //       ...transaction,
-      //       cashier:
-      //         localStorage.getItem("username") ||
-      //         transaction?.cashier ||
-      //         "System",
-      //       billing_no: finalBillingNo,
-      //       invoice_no: finalInvoiceNo,
-      //     },
-      //     dateFrom,
-      //     computed,
-      //     items,
-      //     businessInfo,
-      //     printerName,
-      //     silent: true,
-      //     copies: 1,
-      //   });
-
-      //   if (!result?.success) {
-      //     throw new Error(result?.message || "ESC/POS printing failed.");
-      //   }
-
-      //   return result;
-      // };
 
       console.log("Print result:", result);
 
+      if (result?.canceled) {
+        return;
+      }
+
       if (!result?.success) {
         throw new Error(result?.message || "Print failed.");
+      }
+
+      if (result?.printFallback) {
+        alert(
+          `No printer available or a print error occurred — saved as PDF instead: ${result.filePath}`,
+        );
       }
 
       // Always sync AUTO charges after billing — this deletes any stale charges from a
