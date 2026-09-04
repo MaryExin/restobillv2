@@ -11,6 +11,7 @@ import {
   FaDatabase,
   FaSyncAlt, // Added a sync icon for the refresh button
 } from "react-icons/fa";
+import useReportDateAccess from "../../../hooks/useReportDateAccess";
 import { getCurrentUserRole } from "../../../utils/getCurrentUserRole";
 import { posAuthenticatedFetch } from "../../../utils/posAuthenticatedFetch";
 
@@ -24,6 +25,7 @@ const toNum = (value) => Number(value || 0);
 
 const DashboardModal = ({ isOpen, onClose }) => {
   const today = new Date().toISOString().split("T")[0];
+  const { isDateLocked, lockedDate, isShiftDateLoading } = useReportDateAccess();
 
   const [dateFrom, setDateFrom] = useState(today);
   const [dateTo, setDateTo] = useState(today);
@@ -31,12 +33,20 @@ const DashboardModal = ({ isOpen, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [viewMode, setViewMode] = useState("graph");
 
+  // Admin/Cashier: report date is locked to the currently open shift.
+  useEffect(() => {
+    if (isDateLocked && lockedDate) {
+      setDateFrom(lockedDate);
+      setDateTo(lockedDate);
+    }
+  }, [isDateLocked, lockedDate]);
+
   // Auto-fetch when modal opens or dates change
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && (!isDateLocked || !isShiftDateLoading)) {
       fetchData();
     }
-  }, [isOpen, dateFrom, dateTo]);
+  }, [isOpen, dateFrom, dateTo, isDateLocked, isShiftDateLoading]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -115,29 +125,33 @@ const DashboardModal = ({ isOpen, onClose }) => {
 
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
               <div className="flex flex-wrap items-end gap-3 p-3 border rounded-2xl border-slate-200 bg-slate-50">
-                <div className="flex flex-col">
-                  <span className="mb-1 text-xs font-medium text-slate-500">
-                    Start Date
-                  </span>
-                  <input
-                    type="date"
-                    value={dateFrom}
-                    onChange={(e) => setDateFrom(e.target.value)}
-                    className="px-3 py-2 text-sm bg-white border outline-none rounded-xl border-slate-200 text-slate-700 focus:border-blue-400"
-                  />
-                </div>
+                {!isDateLocked && (
+                  <>
+                    <div className="flex flex-col">
+                      <span className="mb-1 text-xs font-medium text-slate-500">
+                        Start Date
+                      </span>
+                      <input
+                        type="date"
+                        value={dateFrom}
+                        onChange={(e) => setDateFrom(e.target.value)}
+                        className="px-3 py-2 text-sm bg-white border outline-none rounded-xl border-slate-200 text-slate-700 focus:border-blue-400"
+                      />
+                    </div>
 
-                <div className="flex flex-col">
-                  <span className="mb-1 text-xs font-medium text-slate-500">
-                    End Date
-                  </span>
-                  <input
-                    type="date"
-                    value={dateTo}
-                    onChange={(e) => setDateTo(e.target.value)}
-                    className="px-3 py-2 text-sm bg-white border outline-none rounded-xl border-slate-200 text-slate-700 focus:border-blue-400"
-                  />
-                </div>
+                    <div className="flex flex-col">
+                      <span className="mb-1 text-xs font-medium text-slate-500">
+                        End Date
+                      </span>
+                      <input
+                        type="date"
+                        value={dateTo}
+                        onChange={(e) => setDateTo(e.target.value)}
+                        className="px-3 py-2 text-sm bg-white border outline-none rounded-xl border-slate-200 text-slate-700 focus:border-blue-400"
+                      />
+                    </div>
+                  </>
+                )}
 
                 <button
                   onClick={fetchData}

@@ -83,6 +83,7 @@ export const POS_PERMISSION_GROUPS = [
       { key: "monthlySales", label: "Monthly Sales" },
       { key: "salesPerItemPerDate", label: "Sales Per Item Per Date" },
       { key: "eJournal", label: "E-Journal Report" },
+      { key: "customerHeadCount", label: "Customer Head Count" },
       { key: "pricingManagement", label: "Pricing Management" },
     ],
   },
@@ -186,6 +187,7 @@ export const POS_REPORT_PERMISSION_BY_LABEL = {
   "Sales Per Item Per Date": ["reports", "salesPerItemPerDate"],
   "E-Journal Report": ["reports", "eJournal"],
   "E-Journal": ["reports", "eJournal"],
+  "Customer Head Count": ["reports", "customerHeadCount"],
   "Pricing Management": ["reports", "pricingManagement"],
   "Price Change": ["reports", "pricingManagement"],
 };

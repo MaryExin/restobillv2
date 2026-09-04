@@ -8,21 +8,11 @@ require_once __DIR__ . "/pos_report_mirror_activation.php";
 
 function reportDbShouldUseArchive(?string $dateFrom, ?string $dateTo = null): bool
 {
-    $today = date("Y-m-d");
-    $dateFrom = trim((string)$dateFrom);
-    $dateTo = trim((string)$dateTo);
-
-    if ($dateFrom === "" && $dateTo === "") {
-        return false;
-    }
-    if ($dateFrom === "") {
-        $dateFrom = $dateTo;
-    }
-    if ($dateTo === "") {
-        $dateTo = $dateFrom;
-    }
-
-    return $dateFrom < $today || $dateTo < $today;
+    // Report viewing always reads the live POS database (config "db"), never
+    // the archive/report_db. The archive mirror can lag or stall (its sync is
+    // a separate write-side concern), which must never cause reports to show
+    // stale or incomplete data for dates that already exist in the live db.
+    return false;
 }
 
 function resolveReportDbConfig(array $config, ?string $dateFrom, ?string $dateTo = null): array

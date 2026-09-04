@@ -3,6 +3,7 @@ import { FaSyncAlt, FaTimes, FaSearch, FaHistory, FaCalendarAlt, FaPrint, FaFile
 import { useTheme } from "../../../context/ThemeContext";
 import * as XLSX from 'xlsx';
 import useApiHost from "../../../hooks/useApiHost";
+import useReportDateAccess from "../../../hooks/useReportDateAccess";
 import { getCurrentUserRole } from "../../../utils/getCurrentUserRole";
 import { posAuthenticatedFetch } from "../../../utils/posAuthenticatedFetch";
 
@@ -11,6 +12,7 @@ const RefundsModal = ({ isOpen, onClose }) => {
   const darkMode = theme === "dark";
   const apiHost = useApiHost();
   const today = new Date().toISOString().split('T')[0];
+  const { isDateLocked, lockedDate, isShiftDateLoading } = useReportDateAccess();
 
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
@@ -19,6 +21,14 @@ const RefundsModal = ({ isOpen, onClose }) => {
   const [dateTo, setDateTo] = useState(today);
   const [printEnabled, setPrintEnabled] = useState(false);
   const [businessInfo, setBusinessInfo] = useState({});
+
+  // Admin/Cashier: report date is locked to the currently open shift.
+  useEffect(() => {
+    if (isDateLocked && lockedDate) {
+      setDateFrom(lockedDate);
+      setDateTo(lockedDate);
+    }
+  }, [isDateLocked, lockedDate]);
 
   // Load print setting and business info
   useEffect(() => {
@@ -39,6 +49,7 @@ const RefundsModal = ({ isOpen, onClose }) => {
 
   const fetchData = useCallback(async () => {
     if (!isOpen) return;
+    if (isDateLocked && isShiftDateLoading) return;
     setLoading(true);
     try {
       const response = await posAuthenticatedFetch("http://localhost/api/get_voids_refunds.php", {
@@ -54,7 +65,7 @@ const RefundsModal = ({ isOpen, onClose }) => {
     } finally {
       setLoading(false);
     }
-  }, [dateFrom, dateTo, isOpen]);
+  }, [dateFrom, dateTo, isOpen, isDateLocked, isShiftDateLoading]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -137,9 +148,13 @@ const RefundsModal = ({ isOpen, onClose }) => {
 
           <div className="flex items-center gap-3">
             <div className={`flex items-center rounded-xl px-4 py-2.5 gap-3 border ${darkMode ? "bg-[#111827] border-white/10" : "bg-white border-slate-200"}`}>
-              <FaCalendarAlt className={darkMode ? "text-slate-500" : "text-slate-400"} />
-              <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className={`bg-transparent text-xs outline-none font-mono ${darkMode ? "text-white [color-scheme:dark]" : "text-slate-800"}`} />
-              <input type="date" value={dateTo}   onChange={(e) => setDateTo(e.target.value)}   className={`bg-transparent text-xs outline-none font-mono ${darkMode ? "text-white [color-scheme:dark]" : "text-slate-800"}`} />
+              {!isDateLocked && (
+                <>
+                  <FaCalendarAlt className={darkMode ? "text-slate-500" : "text-slate-400"} />
+                  <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className={`bg-transparent text-xs outline-none font-mono ${darkMode ? "text-white [color-scheme:dark]" : "text-slate-800"}`} />
+                  <input type="date" value={dateTo}   onChange={(e) => setDateTo(e.target.value)}   className={`bg-transparent text-xs outline-none font-mono ${darkMode ? "text-white [color-scheme:dark]" : "text-slate-800"}`} />
+                </>
+              )}
             </div>
 
             <button onClick={exportToExcel} className="flex items-center gap-2 px-5 py-3 font-bold text-white shadow-lg bg-emerald-600 hover:bg-emerald-700 rounded-xl active:scale-95">

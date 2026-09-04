@@ -27,6 +27,7 @@ $permissionByReportKey = [
   "salesPerItem" => "salesPerItem",
   "monthlySales" => "monthlySales",
   "salesPerItemPerDate" => "salesPerItemPerDate",
+  "customerHeadCount" => "customerHeadCount",
 ];
 
 if (!isset($permissionByReportKey[$reportKey])) {
@@ -431,6 +432,23 @@ $stmt->execute([
 $monthlySalesRows = $stmt->fetchAll();
 
 /* ---------------------------
+   Customer Head Count (TABLE range)
+---------------------------- */
+$sqlCustomerHeadCount = "
+  SELECT
+    t.transaction_date AS Date,
+    SUM(CASE WHEN $statusSql THEN 1 ELSE 0 END) AS `Transactions`,
+    SUM(CASE WHEN $statusSql THEN t.customer_head_count ELSE 0 END) AS `Head Count`
+  FROM tbl_pos_transactions t
+  WHERE t.transaction_date BETWEEN :datefrom AND :dateto
+  GROUP BY t.transaction_date
+  ORDER BY t.transaction_date ASC
+";
+$stmt = $pdo->prepare($sqlCustomerHeadCount);
+$stmt->execute([":datefrom" => $datefrom, ":dateto" => $dateto]);
+$customerHeadCountRows = $stmt->fetchAll();
+
+/* ---------------------------
    Response
 ---------------------------- */
 $response = [
@@ -464,6 +482,9 @@ switch ($reportKey) {
     break;
   case "salesPerItemPerDate":
     $response["salesPerItemPerDate"] = $perItemPerDateRows;
+    break;
+  case "customerHeadCount":
+    $response["customerHeadCount"] = $customerHeadCountRows;
     break;
 }
 

@@ -24,6 +24,7 @@ import {
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
 import { useTheme } from "../../../context/ThemeContext";
+import useReportDateAccess from "../../../hooks/useReportDateAccess";
 import { getCurrentUserRole } from "../../../utils/getCurrentUserRole";
 import { posAuthenticatedFetch } from "../../../utils/posAuthenticatedFetch";
 
@@ -250,21 +251,30 @@ const DetailsModal = ({ transaction, isOpen, onClose, isDark }) => {
 const TransactionsModal = ({ isOpen, onClose }) => {
   const { theme } = useTheme();
   const isDark = theme === "dark";
+  const { isDateLocked, lockedDate, isShiftDateLoading } = useReportDateAccess();
 
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [showFilter, setShowFilter] = useState(false);
   const [statusFilter, setStatusFilter] = useState("All");
-  
+
   // Naka-ISO format para sa API: YYYY-MM-DD
-  const today = new Date().toLocaleDateString('en-CA'); 
+  const today = new Date().toLocaleDateString('en-CA');
   const [dateFrom, setDateFrom] = useState(today);
   const [dateTo, setDateTo] = useState(today);
-  
+
   const [openStartCal, setOpenStartCal] = useState(false);
   const [openEndCal, setOpenEndCal] = useState(false);
   const [viewingTransaction, setViewingTransaction] = useState(null);
+
+  // Admin/Cashier: report date is locked to the currently open shift.
+  useEffect(() => {
+    if (isDateLocked && lockedDate) {
+      setDateFrom(lockedDate);
+      setDateTo(lockedDate);
+    }
+  }, [isDateLocked, lockedDate]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -287,8 +297,8 @@ const TransactionsModal = ({ isOpen, onClose }) => {
   }, [dateFrom, dateTo, searchTerm, statusFilter]);
 
   useEffect(() => {
-    if (isOpen) fetchData();
-  }, [isOpen, fetchData]);
+    if (isOpen && (!isDateLocked || !isShiftDateLoading)) fetchData();
+  }, [isOpen, fetchData, isDateLocked, isShiftDateLoading]);
 
   const paymentBreakdown = useMemo(() => {
     return data.reduce(
@@ -461,24 +471,26 @@ const TransactionsModal = ({ isOpen, onClose }) => {
                 </div>
               </div>
 
-              <div className="space-y-6">
-                <div className="relative">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 block ml-1">From Date</label>
-                  <button onClick={() => { setOpenStartCal(!openStartCal); setOpenEndCal(false); }} className={`w-full h-16 rounded-2xl border px-6 text-left flex items-center justify-between group transition-all ${isDark ? "bg-white/[0.03] border-white/10" : "bg-slate-50 border-slate-200"}`}>
-                    <span className={`text-lg font-black ${isDark ? "text-white" : "text-[#2e4a7d]"}`}>{dateFrom}</span>
-                    <FaChevronDown className="text-slate-500" size={10} />
-                  </button>
-                  <CustomCalendar selectedDate={dateFrom} onChange={setDateFrom} isOpen={openStartCal} onClose={() => setOpenStartCal(false)} isDark={isDark} />
+              {!isDateLocked && (
+                <div className="space-y-6">
+                  <div className="relative">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 block ml-1">From Date</label>
+                    <button onClick={() => { setOpenStartCal(!openStartCal); setOpenEndCal(false); }} className={`w-full h-16 rounded-2xl border px-6 text-left flex items-center justify-between group transition-all ${isDark ? "bg-white/[0.03] border-white/10" : "bg-slate-50 border-slate-200"}`}>
+                      <span className={`text-lg font-black ${isDark ? "text-white" : "text-[#2e4a7d]"}`}>{dateFrom}</span>
+                      <FaChevronDown className="text-slate-500" size={10} />
+                    </button>
+                    <CustomCalendar selectedDate={dateFrom} onChange={setDateFrom} isOpen={openStartCal} onClose={() => setOpenStartCal(false)} isDark={isDark} />
+                  </div>
+                  <div className="relative">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 block ml-1">To Date</label>
+                    <button onClick={() => { setOpenEndCal(!openEndCal); setOpenStartCal(false); }} className={`w-full h-16 rounded-2xl border px-6 text-left flex items-center justify-between group transition-all ${isDark ? "bg-white/[0.03] border-white/10" : "bg-slate-50 border-slate-200"}`}>
+                      <span className={`text-lg font-black ${isDark ? "text-white" : "text-[#2e4a7d]"}`}>{dateTo}</span>
+                      <FaChevronDown className="text-slate-500" size={10} />
+                    </button>
+                    <CustomCalendar selectedDate={dateTo} onChange={setDateTo} isOpen={openEndCal} onClose={() => setOpenEndCal(false)} isDark={isDark} />
+                  </div>
                 </div>
-                <div className="relative">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 block ml-1">To Date</label>
-                  <button onClick={() => { setOpenEndCal(!openEndCal); setOpenStartCal(false); }} className={`w-full h-16 rounded-2xl border px-6 text-left flex items-center justify-between group transition-all ${isDark ? "bg-white/[0.03] border-white/10" : "bg-slate-50 border-slate-200"}`}>
-                    <span className={`text-lg font-black ${isDark ? "text-white" : "text-[#2e4a7d]"}`}>{dateTo}</span>
-                    <FaChevronDown className="text-slate-500" size={10} />
-                  </button>
-                  <CustomCalendar selectedDate={dateTo} onChange={setDateTo} isOpen={openEndCal} onClose={() => setOpenEndCal(false)} isDark={isDark} />
-                </div>
-              </div>
+              )}
             </div>
 
             <button 

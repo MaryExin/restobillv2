@@ -7,6 +7,7 @@ import {
   FaFileExcel,
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
+import useReportDateAccess from "../../../hooks/useReportDateAccess";
 import { getCurrentUserRole } from "../../../utils/getCurrentUserRole";
 import { posAuthenticatedFetch } from "../../../utils/posAuthenticatedFetch";
 import { buildSalesPerProductHtml } from "../../../utils/BuildSalesPerProductHtml";
@@ -14,6 +15,7 @@ import { printWithPdfFallback } from "../../../utils/printWithPdfFallback";
 
 const SalesPerProductModal = ({ isOpen, onClose }) => {
   const today = new Date().toISOString().split("T")[0];
+  const { isDateLocked, lockedDate, isShiftDateLoading } = useReportDateAccess();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [salesData, setSalesData] = useState([]);
@@ -22,6 +24,14 @@ const SalesPerProductModal = ({ isOpen, onClose }) => {
 
   const [dateFrom, setDateFrom] = useState(today);
   const [dateTo, setDateTo] = useState(today);
+
+  // Admin/Cashier: report date is locked to the currently open shift.
+  useEffect(() => {
+    if (isDateLocked && lockedDate) {
+      setDateFrom(lockedDate);
+      setDateTo(lockedDate);
+    }
+  }, [isDateLocked, lockedDate]);
 
   const fetchSales = useCallback(async () => {
     setLoading(true);
@@ -48,8 +58,8 @@ const SalesPerProductModal = ({ isOpen, onClose }) => {
   }, [dateFrom, dateTo]);
 
   useEffect(() => {
-    if (isOpen) fetchSales();
-  }, [isOpen, fetchSales]);
+    if (isOpen && (!isDateLocked || !isShiftDateLoading)) fetchSales();
+  }, [isOpen, fetchSales, isDateLocked, isShiftDateLoading]);
 
   const filteredData = useMemo(() => {
     const kw = searchTerm.toLowerCase().trim();
@@ -165,18 +175,22 @@ const SalesPerProductModal = ({ isOpen, onClose }) => {
           </h2>
 
           <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="rounded border px-2 py-1 text-sm outline-none"
-            />
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="rounded border px-2 py-1 text-sm outline-none"
-            />
+            {!isDateLocked && (
+              <>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="rounded border px-2 py-1 text-sm outline-none"
+                />
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="rounded border px-2 py-1 text-sm outline-none"
+                />
+              </>
+            )}
 
             <button
               onClick={fetchSales}

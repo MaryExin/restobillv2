@@ -6,6 +6,7 @@ import {
 import * as XLSX from "xlsx";
 import { useTheme } from "../../../context/ThemeContext";
 import useApiHost from "../../../hooks/useApiHost";
+import useReportDateAccess from "../../../hooks/useReportDateAccess";
 import { getCurrentUserRole } from "../../../utils/getCurrentUserRole";
 import { posAuthenticatedFetch } from "../../../utils/posAuthenticatedFetch";
 
@@ -80,6 +81,7 @@ const SalesPerItemPerDateModal = ({ isOpen, onClose }) => {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const apiHost = useApiHost();
+  const { isDateLocked, lockedDate, isShiftDateLoading } = useReportDateAccess();
 
   const [salesData, setSalesData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -92,6 +94,14 @@ const SalesPerItemPerDateModal = ({ isOpen, onClose }) => {
   const [status, setStatus] = useState("Active");
   const [openStartCal, setOpenStartCal] = useState(false);
   const [openEndCal, setOpenEndCal] = useState(false);
+
+  // Admin/Cashier: report date is locked to the currently open shift.
+  useEffect(() => {
+    if (isDateLocked && lockedDate) {
+      setDateFrom(lockedDate);
+      setDateTo(lockedDate);
+    }
+  }, [isDateLocked, lockedDate]);
 
   const fetchSales = useCallback(async () => {
     if (!apiHost) return;
@@ -120,8 +130,8 @@ const SalesPerItemPerDateModal = ({ isOpen, onClose }) => {
   }, [apiHost, dateFrom, dateTo, status]);
 
   useEffect(() => {
-    if (isOpen) fetchSales();
-  }, [isOpen, fetchSales]);
+    if (isOpen && (!isDateLocked || !isShiftDateLoading)) fetchSales();
+  }, [isOpen, fetchSales, isDateLocked, isShiftDateLoading]);
 
   const filtered = salesData.filter((item) =>
     (item["Product Name"] || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -281,7 +291,7 @@ const SalesPerItemPerDateModal = ({ isOpen, onClose }) => {
               </button>
             </div>
             <div className="flex-1 space-y-6">
-              {[
+              {!isDateLocked && [
                 { label: "Date From", val: dateFrom, set: setDateFrom, open: openStartCal, setOpen: setOpenStartCal, closeOther: () => setOpenEndCal(false) },
                 { label: "Date To",   val: dateTo,   set: setDateTo,   open: openEndCal,   setOpen: setOpenEndCal,   closeOther: () => setOpenStartCal(false) },
               ].map(({ label, val, set, open, setOpen, closeOther }) => (

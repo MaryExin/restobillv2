@@ -278,11 +278,16 @@ class ProductSyncMutateGateway
     {
         $resolvedCategoryCode = $this->getCategoryCodeByBusunitCode($busunitCode);
 
+        // FOR UPDATE locks the matching row (or the gap, if none exists yet) for the
+        // duration of the caller's transaction, so a second, concurrent sync request
+        // for the same product_id blocks here instead of racing this SELECT and
+        // inserting a duplicate row once this transaction commits.
         $checkStmt = $this->conn->prepare("
             SELECT seq
             FROM tbl_inventory_products_masterlist
             WHERE product_id = :product_id
             LIMIT 1
+            FOR UPDATE
         ");
         $checkStmt->execute([
             'product_id' => $productId,
@@ -397,12 +402,15 @@ class ProductSyncMutateGateway
         array $online,
         int|string $userId
     ): int {
+        // FOR UPDATE — see upsertOfflineProduct() above; same race, same fix,
+        // applied here to the (inv_code, pricing_code) pricing row instead.
         $checkStmt = $this->conn->prepare("
             SELECT seq
             FROM tbl_pricing_details
             WHERE inv_code = :inv_code
               AND pricing_code = :pricing_code
             LIMIT 1
+            FOR UPDATE
         ");
         $checkStmt->execute([
             'inv_code' => $productId,

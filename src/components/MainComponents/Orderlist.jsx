@@ -643,6 +643,8 @@ const Orderlist = ({
       return;
     }
 
+    let cancelled = false;
+
     const fetchPricingProducts = async () => {
       try {
         setIsPricingLoading(true);
@@ -666,6 +668,7 @@ const Orderlist = ({
         );
 
         const result = await response.json();
+        if (cancelled) return;
 
         if (result?.status === "success") {
           const mappedProducts = Array.isArray(result.products)
@@ -689,18 +692,24 @@ const Orderlist = ({
         }
       } catch (error) {
         console.error("Failed to fetch pricing products:", error);
-        setPricingData({
-          sales_type_id: "",
-          pricing_category: "",
-          products: [],
-        });
-        setproductlist([]);
+        if (!cancelled) {
+          setPricingData({
+            sales_type_id: "",
+            pricing_category: "",
+            products: [],
+          });
+          setproductlist([]);
+        }
       } finally {
-        setIsPricingLoading(false);
+        if (!cancelled) setIsPricingLoading(false);
       }
     };
 
     fetchPricingProducts();
+
+    return () => {
+      cancelled = true;
+    };
   }, [
     apiHost,
     newtransaction?.business_info?.Category_Code,
@@ -3591,7 +3600,7 @@ const Orderlist = ({
                             key={
                               p._isFolder
                                 ? `folder-${p.subcategory_item_category}`
-                                : p.item_code || p.product_id || i
+                                : p.product_id || `${p.sku || p.item_name}-${i}`
                             }
                             whileHover={{ y: -8, scale: 1.02, rotate: 0.5 }}
                             whileTap={{ scale: 0.95 }}
@@ -3712,6 +3721,32 @@ const Orderlist = ({
                                 {/* 2. PREMIUM INFO SECTION */}
                                 <div className="relative z-10 flex flex-col justify-between flex-1 p-4 pb-6 text-left">
                                   <div className="flex-1 min-h-[32px]">
+                                    <span
+                                      className="mb-1 inline-flex items-center rounded-full px-2 py-0.5 text-[7px] font-black uppercase tracking-widest"
+                                      style={
+                                        String(p.isDiscountable || "")
+                                          .trim()
+                                          .toLowerCase() !== "no"
+                                          ? {
+                                              backgroundColor:
+                                                "rgba(34,197,94,0.15)",
+                                              color: "#22c55e",
+                                            }
+                                          : {
+                                              backgroundColor:
+                                                "rgba(148,163,184,0.15)",
+                                              color:
+                                                "var(--app-muted-text)",
+                                            }
+                                      }
+                                    >
+                                      {String(p.isDiscountable || "")
+                                        .trim()
+                                        .toLowerCase() !== "no"
+                                        ? "Discountable"
+                                        : "Non-Discountable"}
+                                    </span>
+
                                     <h4
                                       className="line-clamp-2 break-words text-[12px] font-black leading-tight mb-1 uppercase tracking-tight transition-colors duration-300"
                                       style={{ color: "var(--app-text)" }}

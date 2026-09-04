@@ -14,7 +14,8 @@
     "dev:electron:debug": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron --inspect=5858 .\"",
     "build": "vite build",
     "pack": "npm run build && electron-builder --dir",
-    "dist": "npm run build && electron-builder --win nsis"
+    "dist": "npm run build && electron-builder --win nsis",
+    "dist:mac": "npm run build && electron-builder --mac"
   },
   "dependencies": {
     "@emotion/react": "^11.11.0",
@@ -158,6 +159,18 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "icon": "public/logo.png",
+      "category": "public.app-category.business"
     }
   }
 }

@@ -95,6 +95,7 @@ function permissionDefinitions(): array
         ["group" => "reports", "key" => "monthlySales", "name" => "Monthly Sales", "description" => "Monthly sales report.", "locked" => false, "developer_only" => false, "sort" => 440],
         ["group" => "reports", "key" => "salesPerItemPerDate", "name" => "Sales Per Item Per Date", "description" => "Sales per item by date report.", "locked" => false, "developer_only" => false, "sort" => 450],
         ["group" => "reports", "key" => "eJournal", "name" => "E-Journal Report", "description" => "Electronic journal report.", "locked" => false, "developer_only" => false, "sort" => 460],
+        ["group" => "reports", "key" => "customerHeadCount", "name" => "Customer Head Count", "description" => "Customer head count report.", "locked" => false, "developer_only" => false, "sort" => 465],
         ["group" => "reports", "key" => "pricingManagement", "name" => "Pricing Management", "description" => "Pricing management report.", "locked" => false, "developer_only" => false, "sort" => 470],
 
         ["group" => "settings", "key" => "reportDatabase", "name" => "Report Database", "description" => "Report database settings.", "locked" => false, "developer_only" => false, "sort" => 510],

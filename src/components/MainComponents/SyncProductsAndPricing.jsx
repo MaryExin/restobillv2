@@ -31,6 +31,7 @@ import useResolvedTenantHost from "../../hooks/useResolvedTenantHost";
 import ProductImage from "../Common/ProductImage";
 import ModalYesNoReusable from "../Modals/ModalYesNoReusable";
 import ModalSuccessNavToSelf from "../Modals/ModalSuccessNavToSelf";
+import TutorialTip from "../common/TutorialTip";
 
 const peso = (value) =>
   Number(value || 0).toLocaleString("en-PH", {
@@ -1459,6 +1460,11 @@ This will also replace OFFLINE lkp_sales_type and tbl_pricing_by_sales_type usin
               <FiRefreshCw size={16} />
               Refresh
             </button>
+
+            <TutorialTip
+              section="Managing Products"
+              title="How product syncing works"
+            />
           </div>
         </div>
       </nav>

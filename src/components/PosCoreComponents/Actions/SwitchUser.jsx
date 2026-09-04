@@ -205,12 +205,13 @@ const SwitchUser = () => {
       }
 
       // Prefer the account the cashier explicitly picked from the list
-      // (selectedUser) over re-parsing login.php's response -- we already
-      // know exactly which uuid/email/name was clicked, so trust that as
-      // the source of truth for identity. login.php is only consulted here
-      // to verify the password and mint fresh tokens/role/profile pic.
+      // (selectedUser) for uuid/email -- we already know exactly which one
+      // was clicked. Username must come from login.php's response, same as
+      // the normal login flow: selectedUser.name is the full name (from
+      // get_shift_details.php), not the username, and would otherwise
+      // overwrite the correct value everywhere username is displayed.
       const nextUserId = selectedUser?.uuid || result?.userid || "";
-      const nextUsername = selectedUser?.name || result?.username || "";
+      const nextUsername = result?.username || selectedUser?.name || "";
       const nextEmail = selectedUser?.email || result?.email || loginEmail;
       const nextProfilePic = result?.profile_pic ?? "";
       const nextReadingDatabaseScope =
