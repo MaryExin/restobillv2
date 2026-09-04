@@ -4,24 +4,21 @@ import {
   FaSyncAlt,
   FaFilter,
   FaTimes,
-  FaCalendarAlt,
   FaFileExcel,
-  FaArrowRight,
+  FaPrint,
   FaChevronDown,
   FaChevronLeft,
   FaChevronRight,
+  FaUserFriends,
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
 import { useTheme } from "../../../context/ThemeContext";
+import useApiHost from "../../../hooks/useApiHost";
 import useReportDateAccess from "../../../hooks/useReportDateAccess";
 import { getCurrentUserRole } from "../../../utils/getCurrentUserRole";
 import { posAuthenticatedFetch } from "../../../utils/posAuthenticatedFetch";
 
-const peso = (value) =>
-  `₱${Number(value || 0).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+const number = (value) => Number(value || 0).toLocaleString();
 
 const CustomCalendar = ({
   selectedDate,
@@ -132,15 +129,17 @@ const CustomCalendar = ({
   );
 };
 
-const DailySalesModal = ({ isOpen, onClose }) => {
+const CustomerHeadCountModal = ({ isOpen, onClose }) => {
   const { theme } = useTheme();
   const isDark = theme === "dark";
+  const apiHost = useApiHost();
   const { isDateLocked, lockedDate, isShiftDateLoading } = useReportDateAccess();
 
-  const [salesData, setSalesData] = useState([]);
+  const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [showFilter, setShowFilter] = useState(false);
+  const [businessInfo, setBusinessInfo] = useState({});
 
   const today = new Date().toISOString().split("T")[0];
   const [dateFrom, setDateFrom] = useState(today);
@@ -157,14 +156,28 @@ const DailySalesModal = ({ isOpen, onClose }) => {
     }
   }, [isDateLocked, lockedDate]);
 
-  const fetchSales = useCallback(async () => {
+  useEffect(() => {
+    if (window.electronAPI?.readBusinessInfo) {
+      window.electronAPI
+        .readBusinessInfo()
+        .then((info) => { if (info) setBusinessInfo(info); })
+        .catch(() => {});
+    } else {
+      fetch("/businessInfo.json")
+        .then((r) => r.json())
+        .then(setBusinessInfo)
+        .catch(() => {});
+    }
+  }, [apiHost]);
+
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const response = await posAuthenticatedFetch(`http://localhost/api/reports_dashboard.php`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          reportKey: "dailySales",
+          reportKey: "customerHeadCount",
           datefrom: dateFrom,
           dateto: dateTo,
           includeVoided: status === "All" || status === "Voided",
@@ -173,98 +186,104 @@ const DailySalesModal = ({ isOpen, onClose }) => {
         }),
       });
       const result = await response.json();
-      setSalesData(result?.dailySales || []);
+      setRows(result?.customerHeadCount || []);
     } catch (err) {
       console.error(err);
-      setSalesData([]);
+      setRows([]);
     } finally {
       setLoading(false);
     }
   }, [dateFrom, dateTo, status]);
 
   useEffect(() => {
-    if (isOpen && (!isDateLocked || !isShiftDateLoading)) fetchSales();
-  }, [isOpen, fetchSales, isDateLocked, isShiftDateLoading]);
+    if (isOpen && (!isDateLocked || !isShiftDateLoading)) fetchData();
+  }, [isOpen, fetchData, isDateLocked, isShiftDateLoading]);
 
-  const filtered = salesData.filter((item) =>
+  const filtered = rows.filter((item) =>
     item.Date?.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
-  // --- Computed Totals for Summary ---
-  const totals = filtered.reduce((acc, item) => {
-    acc.gross += parseFloat(item["Gross Sales"] || 0);
-    acc.net += parseFloat(item["Net Sales"] || 0);
-    acc.vat += parseFloat(item["VAT Amount"] || 0);
-    acc.disc += (
-      parseFloat(item["SRC Disc."] || 0) +
-      parseFloat(item["PWD Disc."] || 0) +
-      parseFloat(item["NAAC Disc."] || 0) +
-      parseFloat(item["Solo Parent Disc."] || 0) +
-      parseFloat(item["Other Disc."] || 0)
-    );
-    return acc;
-  }, { gross: 0, net: 0, vat: 0, disc: 0 });
+  const totals = filtered.reduce(
+    (acc, item) => {
+      acc.transactions += Number(item["Transactions"] || 0);
+      acc.headCount += Number(item["Head Count"] || 0);
+      return acc;
+    },
+    { transactions: 0, headCount: 0 },
+  );
+
+  const handlePrint = () => { window.print(); };
 
   const handleExportExcel = () => {
-    const rows = filtered.map((item) => ({
+    const exportRows = filtered.map((item) => ({
       Date: item.Date || "",
-      "Gross Sales": item["Gross Sales"] || 0,
-      "SRC Disc.": item["SRC Disc."] || 0,
-      "PWD Disc.": item["PWD Disc."] || 0,
-      "NAAC Disc.": item["NAAC Disc."] || 0,
-      "Solo Parent Disc.": item["Solo Parent Disc."] || 0,
-      "Other Disc.": item["Other Disc."] || 0,
-      "Cash Payment": item["Cash Payment"] || 0,
-      "Cheque Payment": item["Cheque Payment"] || 0,
-      "Card Payment": item["Card Payment"] || 0,
-      "GCash Payment": item["GCash Payment"] || 0,
-      "Maya Payment": item["Maya Payment"] || 0,
-      "Other Payment": item["Other Payment"] || 0,
-      "VATable Sales": item["VATable Sales"] || 0,
-      "VAT Amount": item["VAT Amount"] || 0,
-      "VAT Exempt Sales": item["VAT Exempt Sales"] || 0,
-      "VAT Exemption": item["VAT Exemption"] || 0,
-      "Net Sales": item["Net Sales"] || 0,
+      Transactions: item["Transactions"] || 0,
+      "Head Count": item["Head Count"] || 0,
     }));
 
     const workbook = XLSX.utils.book_new();
-    const worksheet = XLSX.utils.json_to_sheet(rows);
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Daily Sales");
-    XLSX.writeFile(workbook, `Daily_Sales_${dateFrom}_to_${dateTo}.xlsx`);
+    const worksheet = XLSX.utils.json_to_sheet(exportRows);
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Customer Head Count");
+    XLSX.writeFile(workbook, `Customer_Head_Count_${dateFrom}_to_${dateTo}.xlsx`);
   };
 
   if (!isOpen) return null;
 
   return (
     <div className={`fixed inset-0 z-[100000] flex items-center justify-center p-3 backdrop-blur-md ${isDark ? "bg-slate-950/90" : "bg-slate-900/35"}`}>
+      <style>{`
+        @media print {
+          @page { size: 80mm auto; margin: 0 !important; }
+          body { margin: 0 !important; padding: 0 !important; width: 80mm; background-color: white; }
+          body * { visibility: hidden; }
+          #chc-print-area, #chc-print-area * {
+            visibility: visible;
+            color: black !important;
+            font-family: Arial, Helvetica, sans-serif;
+          }
+          #chc-print-area {
+            position: absolute; left: 0; top: 0;
+            width: 78mm; padding: 4mm 2mm; margin: 0;
+          }
+          .chc-header  { text-align: center; padding-bottom: 6px; margin-bottom: 6px; border-bottom: 1pt solid black; }
+          .chc-company { font-size: 13px; font-weight: 900; }
+          .chc-store   { font-size: 11px; font-weight: 700; }
+          .chc-address { font-size: 9px; }
+          .chc-title   { text-align: center; font-size: 12px; font-weight: 900; margin: 6px 0 4px; }
+          .chc-period  { text-align: center; font-size: 9px; margin-bottom: 6px; }
+          .chc-col-head { display: flex; font-size: 9px; font-weight: 900; border-bottom: 1pt solid black; padding-bottom: 3px; margin-bottom: 3px; }
+          .chc-row     { display: flex; font-size: 9px; border-bottom: 1pt dashed black; padding: 4px 0; }
+          .chc-total   { font-size: 10px; font-weight: 900; margin-top: 6px; text-align: right; }
+          .no-print    { display: none !important; }
+        }
+      `}</style>
       <div className={`relative flex h-[97vh] w-full max-w-[99%] flex-col overflow-hidden rounded-[32px] border shadow-[0_30px_90px_rgba(15,23,42,0.18)] ${isDark ? "border-white/10 bg-[#020617]" : "border-slate-200 bg-[#f8fafc]"}`}>
-        
+
         {/* Header Section */}
         <div className={`shrink-0 border-b px-8 py-6 ${isDark ? "border-white/10 bg-white/[0.03]" : "border-slate-200 bg-white"}`}>
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className={`text-sm font-semibold ${isDark ? "text-blue-400" : "text-blue-600"}`}>Reports Dashboard</div>
-              <h2 className={`mt-1 text-3xl font-bold sm:text-4xl ${isDark ? "text-white" : "text-slate-900"}`}>Daily Sales</h2>
-              
+              <h2 className={`mt-1 text-3xl font-bold sm:text-4xl ${isDark ? "text-white" : "text-slate-900"}`}>Customer Head Count</h2>
+
               <div className="flex gap-4 mt-4">
                  <div className={`px-4 py-2 rounded-2xl border ${isDark ? "bg-white/5 border-white/10" : "bg-white border-slate-200"}`}>
-                    <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Total Gross</p>
-                    <p className={`text-lg font-bold ${isDark ? "text-white" : "text-slate-900"}`}>{peso(totals.gross)}</p>
+                    <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Total Transactions</p>
+                    <p className={`text-lg font-bold ${isDark ? "text-white" : "text-slate-900"}`}>{number(totals.transactions)}</p>
                  </div>
                  <div className={`px-4 py-2 rounded-2xl border ${isDark ? "bg-white/5 border-white/10" : "bg-white border-slate-200"}`}>
-                    <p className="text-[10px] uppercase tracking-wider text-rose-500 font-bold">Total Discounts</p>
-                    <p className="text-lg font-bold text-rose-500">-{peso(totals.disc)}</p>
-                 </div>
-                 <div className={`px-4 py-2 rounded-2xl border ${isDark ? "bg-white/5 border-white/10" : "bg-white border-slate-200"}`}>
-                    <p className="text-[10px] uppercase tracking-wider text-emerald-500 font-bold">VAT Collected</p>
-                    <p className="text-lg font-bold text-emerald-500">{peso(totals.vat)}</p>
+                    <p className="text-[10px] uppercase tracking-wider text-indigo-500 font-bold">Total Head Count</p>
+                    <p className="text-lg font-bold text-indigo-500">{number(totals.headCount)}</p>
                  </div>
               </div>
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex gap-3 no-print">
               <button onClick={handleExportExcel} className={`flex h-11 items-center gap-2 rounded-2xl border px-4 text-sm font-semibold transition ${isDark ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500 hover:text-white" : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white"}`}>
                 <FaFileExcel size={14} /> Export Excel
+              </button>
+              <button onClick={handlePrint} className={`flex h-11 items-center gap-2 rounded-2xl border px-4 text-sm font-semibold transition ${isDark ? "border-blue-500/20 bg-blue-500/10 text-blue-300 hover:bg-blue-600 hover:text-white" : "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white"}`}>
+                <FaPrint size={14} /> Print
               </button>
               <button onClick={onClose} className={`flex h-11 w-11 items-center justify-center rounded-2xl border transition ${isDark ? "border-white/10 bg-white/[0.04] text-slate-300 hover:bg-rose-500 hover:text-white" : "border-slate-200 bg-white text-slate-500 hover:bg-rose-500 hover:text-white"}`}>
                 <FaTimes size={16} />
@@ -279,7 +298,7 @@ const DailySalesModal = ({ isOpen, onClose }) => {
             <FaSearch className={`absolute left-4 top-1/2 -translate-y-1/2 ${isDark ? "text-slate-500" : "text-slate-400"}`} size={14} />
             <input type="text" placeholder="Search by date..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`h-12 w-full rounded-2xl border pl-11 pr-4 text-sm font-medium outline-none transition ${isDark ? "border-white/10 bg-[#0a0f1e] text-white placeholder:text-slate-500 focus:border-blue-500/50" : "border-slate-200 bg-white text-slate-700 placeholder:text-slate-400 focus:border-blue-500"}`} />
           </div>
-          <button onClick={fetchSales} className={`flex h-12 w-12 items-center justify-center rounded-2xl border transition ${isDark ? "border-white/10 bg-[#0a0f1e] text-white hover:bg-white/10" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}>
+          <button onClick={fetchData} className={`flex h-12 w-12 items-center justify-center rounded-2xl border transition ${isDark ? "border-white/10 bg-[#0a0f1e] text-white hover:bg-white/10" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}>
             <FaSyncAlt className={loading ? "animate-spin" : ""} size={15} />
           </button>
           <button onClick={() => setShowFilter(true)} className="flex items-center h-12 gap-2 px-5 text-sm font-semibold text-white transition bg-blue-600 rounded-2xl hover:bg-blue-700">
@@ -290,27 +309,12 @@ const DailySalesModal = ({ isOpen, onClose }) => {
         {/* Table Area */}
         <div className="flex-1 px-8 py-5 overflow-hidden">
           <div className={`relative h-full overflow-auto rounded-[28px] border custom-scrollbar ${isDark ? "border-white/10 bg-[#050a18]" : "border-slate-200 bg-white"}`}>
-            <table className="min-w-[3000px] w-full border-separate border-spacing-0 text-left">
+            <table className="w-full border-separate border-spacing-0 text-left">
               <thead className="sticky top-0 z-[50]">
                 <tr className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? "bg-[#0a0f1e] text-slate-500" : "bg-slate-50 text-slate-400"}`}>
                   <th className={`sticky left-0 top-0 z-[60] border-b p-4 ${isDark ? "border-white/10 bg-[#0a0f1e]" : "border-slate-200 bg-slate-50"}`}>Date</th>
-                  <th className="p-4 border-b border-slate-200/10">Gross Sales</th>
-                  <th className="p-4 border-b border-slate-200/10 text-rose-400">SRC Disc.</th>
-                  <th className="p-4 border-b border-slate-200/10 text-rose-400">PWD Disc.</th>
-                  <th className="p-4 border-b border-slate-200/10 text-rose-400">NAAC Disc.</th>
-                  <th className="p-4 border-b border-slate-200/10 text-rose-400">Solo Parent</th>
-                  <th className="p-4 border-b border-slate-200/10 text-rose-400">Other Disc.</th>
-                  <th className="p-4 border-b border-slate-200/10">Cash Payment</th>
-                  <th className="p-4 border-b border-slate-200/10">Cheque Payment</th>
-                  <th className="p-4 border-b border-slate-200/10">Card Payment</th>
-                  <th className="p-4 border-b border-slate-200/10">GCash Payment</th>
-                  <th className="p-4 border-b border-slate-200/10">Maya Payment</th>
-                  <th className="p-4 border-b border-slate-200/10">Other Payment</th>
-                  <th className="p-4 border-b border-slate-200/10">VATable Sales</th>
-                  <th className="p-4 border-b border-slate-200/10">VAT Amount</th>
-                  <th className="p-4 border-b border-slate-200/10">VAT Exempt Sales</th>
-                  <th className="p-4 text-orange-400 border-b border-slate-200/10">Exemption</th>
-                  <th className={`sticky right-0 top-0 z-[60] border-b p-4 text-right ${isDark ? "border-white/10 bg-[#0a0f1e]" : "border-slate-200 bg-slate-50"}`}>Net Sales</th>
+                  <th className="p-4 border-b border-slate-200/10">Transactions</th>
+                  <th className="p-4 text-right border-b border-slate-200/10">Head Count</th>
                 </tr>
               </thead>
               <tbody className={`divide-y ${isDark ? "divide-white/5 text-slate-300" : "divide-slate-100 text-slate-700"}`}>
@@ -320,31 +324,16 @@ const DailySalesModal = ({ isOpen, onClose }) => {
                       <td className={`sticky left-0 z-[40] border-r p-4 font-bold ${isDark ? "border-white/5 bg-[#050a18] text-blue-400" : "border-slate-100 bg-white text-blue-600"}`}>
                         {item.Date}
                       </td>
-                      <td className="p-4">{peso(item["Gross Sales"])}</td>
-                      <td className="p-4 text-rose-500">-{Number(item["SRC Disc."] || 0).toFixed(2)}</td>
-                      <td className="p-4 text-rose-500">-{Number(item["PWD Disc."] || 0).toFixed(2)}</td>
-                      <td className="p-4 text-rose-500">-{Number(item["NAAC Disc."] || 0).toFixed(2)}</td>
-                      <td className="p-4 text-rose-500">-{Number(item["Solo Parent Disc."] || 0).toFixed(2)}</td>
-                      <td className="p-4 text-slate-500">-{Number(item["Other Disc."] || 0).toFixed(2)}</td>
-                      <td className="p-4">{peso(item["Cash Payment"])}</td>
-                      <td className="p-4">{peso(item["Cheque Payment"])}</td>
-                      <td className="p-4">{peso(item["Card Payment"])}</td>
-                      <td className="p-4 font-medium text-blue-400">{peso(item["GCash Payment"])}</td>
-                      <td className="p-4 font-medium text-emerald-400">{peso(item["Maya Payment"])}</td>
-                      <td className="p-4">{peso(item["Other Payment"])}</td>
-                      <td className="p-4">{peso(item["VATable Sales"])}</td>
-                      <td className="p-4 text-emerald-500">{peso(item["VAT Amount"])}</td>
-                      <td className="p-4">{peso(item["VAT Exempt Sales"])}</td>
-                      <td className="p-4 text-orange-500">{peso(item["VAT Exemption"])}</td>
-                      <td className={`sticky right-0 z-[40] border-l p-4 text-right text-base font-bold ${isDark ? "border-white/5 bg-[#050a18] text-white" : "border-slate-100 bg-white text-slate-900"}`}>
-                        {peso(item["Net Sales"])}
+                      <td className="p-4">{number(item["Transactions"])}</td>
+                      <td className="p-4 text-right text-base font-bold text-indigo-500">
+                        {number(item["Head Count"])}
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={18} className={`p-10 text-center text-sm ${isDark ? "text-slate-500" : "text-slate-400"}`}>
-                      No sales data found for the selected period.
+                    <td colSpan={3} className={`p-10 text-center text-sm ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+                      No customer head count data found for the selected period.
                     </td>
                   </tr>
                 )}
@@ -366,9 +355,11 @@ const DailySalesModal = ({ isOpen, onClose }) => {
               <p className="text-2xl font-bold text-emerald-500">Live</p>
             </div>
           </div>
-          <div className="px-8 py-4 text-right bg-blue-600 shadow-xl rounded-2xl">
-            <span className="text-xs font-bold tracking-widest uppercase text-white/70">Grand Total Net Revenue</span>
-            <h3 className="text-4xl font-black text-white">{peso(totals.net)}</h3>
+          <div className="px-8 py-4 text-right bg-indigo-600 shadow-xl rounded-2xl">
+            <span className="text-xs font-bold tracking-widest uppercase text-white/70 flex items-center gap-2 justify-end">
+              <FaUserFriends size={12} /> Grand Total Head Count
+            </span>
+            <h3 className="text-4xl font-black text-white">{number(totals.headCount)}</h3>
           </div>
         </div>
 
@@ -411,12 +402,43 @@ const DailySalesModal = ({ isOpen, onClose }) => {
                 </div>
               </div>
             </div>
-            <button onClick={() => { fetchSales(); setShowFilter(false); }} className="mt-8 rounded-2xl bg-blue-600 py-4 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-700 active:scale-[0.98]">
+            <button onClick={() => { fetchData(); setShowFilter(false); }} className="mt-8 rounded-2xl bg-blue-600 py-4 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-700 active:scale-[0.98]">
               Apply Search Criteria
             </button>
           </div>
         )}
       </div>
+
+      {/* 80mm print area — receipt-style summary, hidden on screen */}
+      <div id="chc-print-area" style={{ display: "none" }}>
+        <div className="chc-header">
+          {businessInfo?.companyName && <div className="chc-company">{businessInfo.companyName}</div>}
+          {businessInfo?.storeName && <div className="chc-store">{businessInfo.storeName}</div>}
+          {businessInfo?.address && <div className="chc-address">{businessInfo.address}</div>}
+          {businessInfo?.tin && <div className="chc-address">VAT REG TIN: {businessInfo.tin}</div>}
+        </div>
+
+        <div className="chc-title">CUSTOMER HEAD COUNT REPORT</div>
+        <div className="chc-period">PERIOD: {dateFrom} — {dateTo}</div>
+
+        <div className="chc-col-head">
+          <span style={{ width: "50%" }}>DATE</span>
+          <span style={{ width: "25%", textAlign: "right" }}>TXNS</span>
+          <span style={{ width: "25%", textAlign: "right" }}>HEAD CT</span>
+        </div>
+
+        {filtered.map((item, i) => (
+          <div key={i} className="chc-row">
+            <span style={{ width: "50%" }}>{item.Date}</span>
+            <span style={{ width: "25%", textAlign: "right" }}>{number(item["Transactions"])}</span>
+            <span style={{ width: "25%", textAlign: "right" }}>{number(item["Head Count"])}</span>
+          </div>
+        ))}
+
+        <div className="chc-total">TOTAL TRANSACTIONS: {number(totals.transactions)}</div>
+        <div className="chc-total">TOTAL HEAD COUNT: {number(totals.headCount)}</div>
+      </div>
+
       <style jsx>{`
         .custom-scrollbar::-webkit-scrollbar { height: 10px; width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
@@ -427,4 +449,4 @@ const DailySalesModal = ({ isOpen, onClose }) => {
   );
 };
 
-export default DailySalesModal;
+export default CustomerHeadCountModal;

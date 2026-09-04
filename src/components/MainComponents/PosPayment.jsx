@@ -32,6 +32,7 @@ import ButtonComponent from "./Common/ButtonComponent";
 import ModalYesNoReusable from "../Modals/ModalYesNoReusable";
 import { MdWarning } from "react-icons/md";
 import { posAuthenticatedFetch } from "../../utils/posAuthenticatedFetch";
+import TutorialTip from "../common/TutorialTip";
 import { usePosDeveloperSession } from "../../hooks/usePosRoleAccessConfig";
 import useBusinessInfo from "../../hooks/useBusinessInfo";
 import { buildVoidRefundHtml } from "../../utils/BuildVoidRefundHtml";
@@ -1829,13 +1830,19 @@ export default function PosPayment() {
                 </span>
               </button>
 
-              <h1
-                className={`mt-2 text-3xl font-black md:text-4xl ${
-                  isDark ? "text-white" : "text-slate-900"
-                }`}
-              >
-                Transaction Payment Management
-              </h1>
+              <div className="mt-2 flex items-center gap-3">
+                <h1
+                  className={`text-3xl font-black md:text-4xl ${
+                    isDark ? "text-white" : "text-slate-900"
+                  }`}
+                >
+                  Transaction Payment Management
+                </h1>
+                <TutorialTip
+                  section="Billing & Payment"
+                  title="How payment works"
+                />
+              </div>
               <p className="mt-2 max-w-3xl text-sm text-slate-500 md:text-base">
                 View pending, paid, voided, and refunded transactions in one
                 place.

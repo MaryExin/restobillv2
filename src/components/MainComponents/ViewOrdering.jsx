@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import useZustandLayoutMode from "../../context/useZustandLayoutMode";
 import Orderlist from "./Orderlist";
+import TutorialTip from "../common/TutorialTip";
 import {
   FaSearch,
   FaChevronLeft,
@@ -559,7 +560,11 @@ const ViewOrdering = () => {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({}),
+      body: JSON.stringify({
+        Category_Code: localStorage.getItem("posBusinessCategoryCode") || "",
+        Unit_Code: localStorage.getItem("posBusinessUnitCode") || "",
+        terminal_number: localStorage.getItem("posTerminalNumber") || "",
+      }),
     })
       .then(async (res) => {
         if (!res.ok) {
@@ -3292,12 +3297,18 @@ const ViewOrdering = () => {
           >
             {isTableLayoutEnabled ? (
               <>
-                <h1
-                  className="text-4xl md:text-6xl font-black tracking-tighter mb-2"
-                  style={{ color: pageText }}
-                >
-                  Table <span style={{ color: accent }}>Floor</span>
-                </h1>
+                <div className="flex items-center gap-3 mb-2">
+                  <h1
+                    className="text-4xl md:text-6xl font-black tracking-tighter"
+                    style={{ color: pageText }}
+                  >
+                    Table <span style={{ color: accent }}>Floor</span>
+                  </h1>
+                  <TutorialTip
+                    section="Taking a New Order"
+                    title="How to take an order"
+                  />
+                </div>
                 <div
                   className="flex flex-wrap gap-2"
                   style={{ color: pageMutedText }}
@@ -3326,12 +3337,18 @@ const ViewOrdering = () => {
               </>
             ) : (
               <>
-                <h1
-                  className="text-4xl md:text-6xl font-black tracking-tighter mb-2"
-                  style={{ color: pageText }}
-                >
-                  Pending <span style={{ color: accent }}>Tables</span>
-                </h1>
+                <div className="flex items-center gap-3 mb-2">
+                  <h1
+                    className="text-4xl md:text-6xl font-black tracking-tighter"
+                    style={{ color: pageText }}
+                  >
+                    Pending <span style={{ color: accent }}>Tables</span>
+                  </h1>
+                  <TutorialTip
+                    section="Taking a New Order"
+                    title="How to take an order"
+                  />
+                </div>
                 <p style={{ color: pageMutedText }}>
                   Click a table to manage guest orders.
                 </p>

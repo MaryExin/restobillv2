@@ -8,6 +8,7 @@ import useApiHost from "../../hooks/useApiHost";
 import useGetDefaultPrinter from "../../hooks/useGetDefaultPrinter";
 import ButtonComponent from "./Common/ButtonComponent";
 import useBusinessInfo from "../../hooks/useBusinessInfo";
+import TutorialTip from "../common/TutorialTip";
 import useZustandLoginCred from "../../context/useZustandLoginCred";
 import {
   hasPosXReadingAccess,
@@ -555,14 +556,21 @@ export default function PosReadingModal({
           transition={{ duration: 0.2 }}
           className="relative w-full max-w-4xl overflow-hidden rounded-[28px] border border-zinc-200 bg-[#eef2f8] p-8 shadow-[0_24px_70px_rgba(0,0,0,0.22)]"
         >
-          <button
-            type="button"
-            onClick={handleCloseAll}
-            disabled={isPrinting}
-            className="absolute right-4 top-4 inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-zinc-600 shadow-sm transition hover:scale-105 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <FiX size={20} />
-          </button>
+          <div className="absolute right-4 top-4 flex items-center gap-2">
+            <TutorialTip
+              section="X Reading & Z Reading"
+              title="How X-Reading & Z-Reading work"
+            />
+
+            <button
+              type="button"
+              onClick={handleCloseAll}
+              disabled={isPrinting}
+              className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-zinc-600 shadow-sm transition hover:scale-105 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <FiX size={20} />
+            </button>
+          </div>
 
           <div className="mx-auto max-w-3xl pt-6">
             <h2 className="text-center text-4xl font-extrabold tracking-tight text-[#37578d]">

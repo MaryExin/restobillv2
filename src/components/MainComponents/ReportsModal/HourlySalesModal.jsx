@@ -14,6 +14,7 @@ import {
   FaBox,
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
+import useReportDateAccess from "../../../hooks/useReportDateAccess";
 import { getCurrentUserRole } from "../../../utils/getCurrentUserRole";
 import { posAuthenticatedFetch } from "../../../utils/posAuthenticatedFetch";
 
@@ -182,6 +183,7 @@ const CustomCalendar = ({
 };
 
 const HourlySalesModal = ({ isOpen, onClose }) => {
+  const { isDateLocked, lockedDate, isShiftDateLoading } = useReportDateAccess();
   const [hourlyData, setHourlyData] = useState([]);
   const [hourlyProductData, setHourlyProductData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -197,6 +199,14 @@ const HourlySalesModal = ({ isOpen, onClose }) => {
   const [dateTo, setDateTo] = useState(today);
   const [openStartCal, setOpenStartCal] = useState(false);
   const [openEndCal, setOpenEndCal] = useState(false);
+
+  // Admin/Cashier: report date is locked to the currently open shift.
+  useEffect(() => {
+    if (isDateLocked && lockedDate) {
+      setDateFrom(lockedDate);
+      setDateTo(lockedDate);
+    }
+  }, [isDateLocked, lockedDate]);
 
   const hoursLabels = [
     "12AM",
@@ -272,8 +282,8 @@ const HourlySalesModal = ({ isOpen, onClose }) => {
   }, []);
 
   useEffect(() => {
-    if (isOpen) fetchData();
-  }, [isOpen, fetchData]);
+    if (isOpen && (!isDateLocked || !isShiftDateLoading)) fetchData();
+  }, [isOpen, fetchData, isDateLocked, isShiftDateLoading]);
 
   const categories = useMemo(() => {
     const cats = hourlyProductData.map((item) => item.Category).filter(Boolean);
@@ -569,53 +579,57 @@ const HourlySalesModal = ({ isOpen, onClose }) => {
             </div>
 
             <div className="flex-1 space-y-6">
-              <div className="relative">
-                <label className="block mb-2 text-sm font-medium text-slate-600">
-                  From
-                </label>
+              {!isDateLocked && (
+                <>
+                  <div className="relative">
+                    <label className="block mb-2 text-sm font-medium text-slate-600">
+                      From
+                    </label>
 
-                <button
-                  onClick={() => {
-                    setOpenStartCal(!openStartCal);
-                    setOpenEndCal(false);
-                  }}
-                  className="flex items-center justify-between w-full px-4 py-3 text-left transition border rounded-2xl border-slate-200 bg-slate-50 text-slate-700"
-                >
-                  <span className="font-medium">{dateFrom}</span>
-                  <FaChevronDown className="text-slate-400" size={12} />
-                </button>
+                    <button
+                      onClick={() => {
+                        setOpenStartCal(!openStartCal);
+                        setOpenEndCal(false);
+                      }}
+                      className="flex items-center justify-between w-full px-4 py-3 text-left transition border rounded-2xl border-slate-200 bg-slate-50 text-slate-700"
+                    >
+                      <span className="font-medium">{dateFrom}</span>
+                      <FaChevronDown className="text-slate-400" size={12} />
+                    </button>
 
-                <CustomCalendar
-                  selectedDate={dateFrom}
-                  onChange={setDateFrom}
-                  isOpen={openStartCal}
-                  onClose={() => setOpenStartCal(false)}
-                />
-              </div>
+                    <CustomCalendar
+                      selectedDate={dateFrom}
+                      onChange={setDateFrom}
+                      isOpen={openStartCal}
+                      onClose={() => setOpenStartCal(false)}
+                    />
+                  </div>
 
-              <div className="relative">
-                <label className="block mb-2 text-sm font-medium text-slate-600">
-                  To
-                </label>
+                  <div className="relative">
+                    <label className="block mb-2 text-sm font-medium text-slate-600">
+                      To
+                    </label>
 
-                <button
-                  onClick={() => {
-                    setOpenEndCal(!openEndCal);
-                    setOpenStartCal(false);
-                  }}
-                  className="flex items-center justify-between w-full px-4 py-3 text-left transition border rounded-2xl border-slate-200 bg-slate-50 text-slate-700"
-                >
-                  <span className="font-medium">{dateTo}</span>
-                  <FaChevronDown className="text-slate-400" size={12} />
-                </button>
+                    <button
+                      onClick={() => {
+                        setOpenEndCal(!openEndCal);
+                        setOpenStartCal(false);
+                      }}
+                      className="flex items-center justify-between w-full px-4 py-3 text-left transition border rounded-2xl border-slate-200 bg-slate-50 text-slate-700"
+                    >
+                      <span className="font-medium">{dateTo}</span>
+                      <FaChevronDown className="text-slate-400" size={12} />
+                    </button>
 
-                <CustomCalendar
-                  selectedDate={dateTo}
-                  onChange={setDateTo}
-                  isOpen={openEndCal}
-                  onClose={() => setOpenEndCal(false)}
-                />
-              </div>
+                    <CustomCalendar
+                      selectedDate={dateTo}
+                      onChange={setDateTo}
+                      isOpen={openEndCal}
+                      onClose={() => setOpenEndCal(false)}
+                    />
+                  </div>
+                </>
+              )}
 
               <div>
                 <label className="block mb-2 text-sm font-medium text-slate-600">

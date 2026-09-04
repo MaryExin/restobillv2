@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   FaTimes,
   FaCalendarAlt,
@@ -6,6 +6,7 @@ import {
   FaFileArchive,
 } from "react-icons/fa";
 import useBusinessInfo from "../../../hooks/useBusinessInfo";
+import useReportDateAccess from "../../../hooks/useReportDateAccess";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 
@@ -522,6 +523,7 @@ const InvoiceReceipt = ({ invoice, businessInfo }) => {
 };
 
 const EJournalReportModal = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
+  const { isDateLocked, lockedDate, isShiftDateLoading } = useReportDateAccess();
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [transactionId, setTransactionId] = useState("");
@@ -531,6 +533,15 @@ const EJournalReportModal = ({ isOpen, onClose, reportData, isLoading, onFilter 
   const [isExporting, setIsExporting] = useState(false);
 
   const { businessInfo } = useBusinessInfo();
+
+  // Admin/Cashier: date-range search is locked to the currently open shift.
+  // ID-based lookups (transaction/invoice/refund/void number) stay free.
+  useEffect(() => {
+    if (isDateLocked && lockedDate) {
+      setDateFrom(lockedDate);
+      setDateTo(lockedDate);
+    }
+  }, [isDateLocked, lockedDate]);
 
   if (!isOpen) return null;
 
@@ -605,29 +616,33 @@ const EJournalReportModal = ({ isOpen, onClose, reportData, isLoading, onFilter 
           </div>
 
           <div className="space-y-5">
-            <div className="flex flex-col gap-2.5">
-              <label className="text-[11px] font-semibold text-slate-500 uppercase ml-1 tracking-wider">
-                Date From
-              </label>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="w-full p-3 text-sm border-2 shadow-inner outline-none border-blue-50 bg-slate-50 rounded-xl focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+            {!isDateLocked && (
+              <>
+                <div className="flex flex-col gap-2.5">
+                  <label className="text-[11px] font-semibold text-slate-500 uppercase ml-1 tracking-wider">
+                    Date From
+                  </label>
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    className="w-full p-3 text-sm border-2 shadow-inner outline-none border-blue-50 bg-slate-50 rounded-xl focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
 
-            <div className="flex flex-col gap-2.5">
-              <label className="text-[11px] font-semibold text-slate-500 uppercase ml-1 tracking-wider">
-                Date To
-              </label>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="w-full p-3 text-sm border-2 shadow-inner outline-none border-blue-50 bg-slate-50 rounded-xl focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+                <div className="flex flex-col gap-2.5">
+                  <label className="text-[11px] font-semibold text-slate-500 uppercase ml-1 tracking-wider">
+                    Date To
+                  </label>
+                  <input
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    className="w-full p-3 text-sm border-2 shadow-inner outline-none border-blue-50 bg-slate-50 rounded-xl focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </>
+            )}
 
             <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
               <div className="flex-1 h-px bg-slate-200" />

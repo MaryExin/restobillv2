@@ -62,7 +62,7 @@ const SidePanel = () => {
 
   const { isMobile, toggleIsMobile } = useZustandMobile();
   const { isDekstopSideMenu, toggleIsDesktopSideMenu } = useZustandSideMenu();
-  const { selectedMenu, setSelectedMenu } = useZustandSideMenu();
+  const { selectedMenu, setSelectedMenu, openSettings } = useZustandSideMenu();
   const [hovered, setHovered] = useState("");
   const { roles, firstName, profilePic, userId } = useZustandLoginCred();
 
@@ -81,6 +81,12 @@ const SidePanel = () => {
   const handleClick = (key, path) => {
     setSelectedMenu(key);
     navigate(path);
+    toggleIsMobile();
+  };
+
+  const handleSettingsClick = (tab = null) => {
+    setSelectedMenu(tab || "Settings");
+    openSettings(tab);
     toggleIsMobile();
   };
 
@@ -256,7 +262,7 @@ const SidePanel = () => {
               icon={<IoSettingsOutline size={20} />}
               label="Settings"
               active={selectedMenu === "Settings"}
-              onClick={() => handleClick("Settings", "/settings")}
+              onClick={() => handleSettingsClick()}
               onHover={setHovered}
               hovered={hovered}
             />

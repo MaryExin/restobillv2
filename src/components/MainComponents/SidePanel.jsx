@@ -68,7 +68,7 @@ const SidePanel = () => {
   }, [logoutData]);
 
   const navigate = useNavigate();
-  const { selectedMenu, setSelectedMenu, toggleIsDesktopSideMenu } =
+  const { selectedMenu, setSelectedMenu, toggleIsDesktopSideMenu, openSettings } =
     useZustandSideMenu();
   const [hovered, setHovered] = useState("");
   const { roles, firstName, profilePic, userId, email } = useZustandLoginCred();
@@ -98,6 +98,16 @@ const SidePanel = () => {
       toggleIsMobile(); // handle mobile menu close
     } else {
       toggleIsDesktopSideMenu(); // handle desktop menu close
+    }
+  };
+
+  const handleSettingsClick = (tab = null) => {
+    setSelectedMenu(tab || "Settings");
+    openSettings(tab);
+    if (isMobile) {
+      toggleIsMobile();
+    } else {
+      toggleIsDesktopSideMenu();
     }
   };
 
@@ -207,7 +217,7 @@ const SidePanel = () => {
                         exit={{ opacity: 0, scale: 0.8 }}
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
-                        onClick={() => handleClick("Settings", "/settings")}
+                        onClick={() => handleSettingsClick()}
                         className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all duration-200 group"
                         title="Settings"
                       >
@@ -303,7 +313,7 @@ const SidePanel = () => {
                       whileTap={{ scale: 0.98 }}
                       onClick={() => {
                         setShowProfileDropdown(false);
-                        handleClick("Settings", "/settings");
+                        handleSettingsClick();
                       }}
                       className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-slate-300 hover:text-white hover:bg-slate-700/50 rounded-md transition-all duration-200"
                     >
@@ -482,9 +492,9 @@ const SidePanel = () => {
               <SectionLabel>System</SectionLabel>
               <MenuItem
                 icon={<FaBook size={16} />}
-                label="Video Tutorial"
-                active={selectedMenu === "Video Tutorial"}
-                onClick={() => handleClick("Video Tutorial", "/video-tutorial")}
+                label="Tutorial Guide"
+                active={selectedMenu === "Tutorial Guide"}
+                onClick={() => handleSettingsClick("Tutorial Guide")}
                 onHover={setHovered}
                 hovered={hovered}
               />

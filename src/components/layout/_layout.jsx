@@ -6,10 +6,12 @@ import SidePanel from "../MainComponents/SidePanel";
 import UserInfoPanel from "../MainComponents/UserInfoPanel";
 import useZustandMobile from "../../context/useZustandMobile";
 import ModalMobileMenu from "../Modals/ModalMobileMenu";
+import PosSettings from "../MainComponents/PosSettings";
 
 export default function Layout({ children }) {
   const { isMobile, toggleIsMobile } = useZustandMobile();
-  const { isDekstopSideMenu } = useZustandSideMenu();
+  const { isDekstopSideMenu, isSettingsOpen, settingsInitialTab, closeSettings } =
+    useZustandSideMenu();
 
   return (
     <>
@@ -19,6 +21,12 @@ export default function Layout({ children }) {
       <div className="flex flex-row overflow-x-hidden mt-10 ms-0 p-2 justify-center bg-gray-50">
         {children}
       </div>
+      <PosSettings
+        isOpen={isSettingsOpen}
+        onClose={closeSettings}
+        branchInfo={{}}
+        initialTab={settingsInitialTab}
+      />
     </>
   );
 }

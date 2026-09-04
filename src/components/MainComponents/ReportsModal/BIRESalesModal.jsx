@@ -4,18 +4,28 @@ import { useTheme } from "../../../context/ThemeContext";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
+import useReportDateAccess from "../../../hooks/useReportDateAccess";
 import { getCurrentUserRole } from "../../../utils/getCurrentUserRole";
 import { posAuthenticatedFetch } from "../../../utils/posAuthenticatedFetch";
 
 const BirESalesModal = ({ isOpen, onClose }) => {
   const { theme } = useTheme();
   const darkMode = theme === "dark";
+  const { isDateLocked, lockedDate, isShiftDateLoading } = useReportDateAccess();
   const [activeTab, setActiveTab] = useState("E1");
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFrom, setDateFrom] = useState(new Date().toISOString().split('T')[0]);
   const [dateTo, setDateTo] = useState(new Date().toISOString().split('T')[0]);
+
+  // Admin/Cashier: report date is locked to the currently open shift.
+  useEffect(() => {
+    if (isDateLocked && lockedDate) {
+      setDateFrom(lockedDate);
+      setDateTo(lockedDate);
+    }
+  }, [isDateLocked, lockedDate]);
 
   const fontStyle = { 
     fontFamily: "Arial, Helvetica, sans-serif",
@@ -33,6 +43,7 @@ const BirESalesModal = ({ isOpen, onClose }) => {
 
   const fetchData = useCallback(async () => {
     if (!isOpen) return;
+    if (isDateLocked && isShiftDateLoading) return;
     setLoading(true);
     try {
       const response = await posAuthenticatedFetch(`http://localhost/api/bir_esales.php`, {
@@ -48,7 +59,7 @@ const BirESalesModal = ({ isOpen, onClose }) => {
     } finally {
       setLoading(false);
     }
-  }, [activeTab, dateFrom, dateTo, isOpen]);
+  }, [activeTab, dateFrom, dateTo, isOpen, isDateLocked, isShiftDateLoading]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -212,8 +223,12 @@ const BirESalesModal = ({ isOpen, onClose }) => {
                </button>
             </div>
             <div className="flex items-center bg-white/20 rounded-full px-4 py-1.5 gap-2 border border-white/30">
-              <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="bg-transparent text-white text-[11px] outline-none font-normal [color-scheme:dark]" />
-              <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="bg-transparent text-white text-[11px] outline-none font-normal [color-scheme:dark]" />
+              {!isDateLocked && (
+                <>
+                  <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="bg-transparent text-white text-[11px] outline-none font-normal [color-scheme:dark]" />
+                  <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="bg-transparent text-white text-[11px] outline-none font-normal [color-scheme:dark]" />
+                </>
+              )}
             </div>
             <button onClick={fetchData} className="p-2 text-white transition-colors rounded-full hover:bg-white/10"><FaSyncAlt size={16} className={loading ? "animate-spin" : ""} /></button>
             <button onClick={onClose} className="p-2 text-white transition-colors bg-red-500 rounded-lg hover:bg-red-600"><FaTimes size={18} /></button>
