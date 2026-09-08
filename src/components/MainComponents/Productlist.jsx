@@ -7,24 +7,23 @@ import {
   FaTag,
   FaChartPie,
   FaLock,
-  FaKey,
   FaPowerOff,
   FaCheckCircle,
   FaExclamationTriangle,
   FaThLarge,
   FaPercent,
+  FaLayerGroup,
 } from "react-icons/fa";
 import { useTheme } from "../../context/ThemeContext";
 import useApiHost from "../../hooks/useApiHost";
-import { usePosDeveloperSession } from "../../hooks/usePosRoleAccessConfig";
 import ProductImage from "../Common/ProductImage";
+import TutorialTip from "../common/TutorialTip";
 
 const ProductList = () => {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const navigate = useNavigate();
   const apiHost = useApiHost();
-  const developerMode = usePosDeveloperSession();
 
   const imageBaseUrl = useMemo(() => {
     if (!apiHost) return "";
@@ -36,32 +35,15 @@ const ProductList = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("ALL");
   const [enablePictures, setEnablePictures] = useState(false);
+  const [editingSubcategoryId, setEditingSubcategoryId] = useState(null);
+  const [subcategoryDraft, setSubcategoryDraft] = useState("");
 
   // MODAL STATES
   const [showConfirm, setShowConfirm] = useState(false);
   const [pendingStatus, setPendingStatus] = useState(null);
 
-  // PASSWORD STATES
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [passwordInput, setPasswordInput] = useState("");
-  const [passError, setPassError] = useState(false);
-  const hasProductListAccess = isAuthenticated || developerMode;
-
-  const ADMIN_PASSWORD = "1";
-
-  const handlePasswordSubmit = (e) => {
-    e.preventDefault();
-    if (passwordInput === ADMIN_PASSWORD) {
-      setIsAuthenticated(true);
-      setPassError(false);
-    } else {
-      setPassError(true);
-      setPasswordInput("");
-    }
-  };
-
   const fetchProducts = useCallback(async () => {
-    if (!apiHost || !hasProductListAccess) return;
+    if (!apiHost) return;
     setIsLoading(true);
     try {
       const response = await fetch(`${apiHost}/api/get_product_masterlist.php`);
@@ -74,13 +56,11 @@ const ProductList = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [apiHost, hasProductListAccess]);
+  }, [apiHost]);
 
   useEffect(() => {
-    if (hasProductListAccess) {
-      fetchProducts();
-    }
-  }, [hasProductListAccess, fetchProducts]);
+    fetchProducts();
+  }, [fetchProducts]);
 
   useEffect(() => {
     if (!apiHost) return;
@@ -191,6 +171,38 @@ const ProductList = () => {
     }
   };
 
+  const saveSubcategory = async (pid, value) => {
+    const trimmedValue = value.trim();
+    const previousState = [...products];
+
+    setProducts((prev) =>
+      prev.map((p) =>
+        p.product_id === pid
+          ? { ...p, subcategory_item_category: trimmedValue }
+          : p,
+      ),
+    );
+
+    try {
+      const response = await fetch(
+        `${apiHost}/api/update_product_subcategory.php`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            product_id: pid,
+            subcategory_item_category: trimmedValue,
+          }),
+        },
+      );
+      const result = await response.json();
+      if (result.status !== "success") setProducts(previousState);
+    } catch (error) {
+      console.error("Save subcategory error:", error);
+      setProducts(previousState);
+    }
+  };
+
   const categoryStats = useMemo(() => {
     const stats = products.reduce((acc, curr) => {
       const cat = curr.item_category;
@@ -206,6 +218,22 @@ const ProductList = () => {
     const uniqueCats = Object.keys(categoryStats).sort();
     return ["ALL", ...uniqueCats];
   }, [categoryStats]);
+
+  const subcategoriesByCategory = useMemo(() => {
+    const map = {};
+    products.forEach((p) => {
+      const cat = p.item_category || "";
+      const sub = (p.subcategory_item_category || "").trim();
+      if (!sub) return;
+      if (!map[cat]) map[cat] = new Set();
+      map[cat].add(sub);
+    });
+    const result = {};
+    Object.keys(map).forEach((cat) => {
+      result[cat] = Array.from(map[cat]).sort();
+    });
+    return result;
+  }, [products]);
 
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
@@ -229,95 +257,6 @@ const ProductList = () => {
     }
     return categoryStats;
   }, [categoryStats, selectedCategory]);
-
-  if (!hasProductListAccess) {
-    return (
-      <div
-        className={`min-h-screen flex items-center justify-center p-6 ${
-          isDark ? "bg-[#0f172a]" : "bg-[#f8fafc]"
-        }`}
-      >
-        <div
-          className={`w-full max-w-md p-8 rounded-[40px] border-2 transition-all duration-500 ${
-            isDark
-              ? "bg-slate-900 border-white/10 shadow-2xl"
-              : "bg-white border-blue-500/20 shadow-xl"
-          }`}
-        >
-          <div className="flex flex-col items-center text-center">
-            <div
-              className={`w-20 h-20 rounded-3xl flex items-center justify-center mb-6 border-2 ${
-                isDark
-                  ? "bg-white/5 border-white/10 text-white"
-                  : "bg-blue-50 border-blue-100 text-blue-600"
-              }`}
-            >
-              <FaLock size={32} />
-            </div>
-            <h2
-              className={`text-2xl font-black uppercase tracking-tight ${
-                isDark ? "text-white" : "text-slate-800"
-              }`}
-            >
-              Restricted Access
-            </h2>
-            <p className="text-[10px] font-bold text-blue-600 uppercase tracking-[0.2em] mb-8">
-              
-            </p>
-            <form onSubmit={handlePasswordSubmit} className="w-full space-y-4">
-              <div className="relative">
-                <FaKey
-                  className={`absolute left-5 top-1/2 -translate-y-1/2 ${
-                    isDark ? "text-slate-500" : "text-slate-400"
-                  }`}
-                  size={16}
-                />
-                <input
-                  type="password"
-                  placeholder="Enter Admin Password"
-                  value={passwordInput}
-                  onChange={(e) => {
-                    setPassError(false);
-                    setPasswordInput(e.target.value);
-                  }}
-                  autoFocus
-                  className={`w-full pl-14 pr-6 py-4 rounded-2xl outline-none border-2 transition-all font-bold ${
-                    passError
-                      ? "border-rose-500 bg-rose-500/5 text-rose-500"
-                      : isDark
-                        ? "bg-slate-800 border-white/5 text-white focus:border-blue-500"
-                        : "bg-slate-50 border-slate-200 text-slate-800 focus:border-blue-500"
-                  }`}
-                />
-              </div>
-              {passError && (
-                <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest animate-bounce">
-                  Access Denied! Incorrect Password.
-                </p>
-              )}
-              <button
-                type="submit"
-                className="w-full py-4 font-black tracking-widest text-white uppercase transition-all bg-blue-600 shadow-lg rounded-2xl shadow-blue-500/30 hover:bg-blue-700 active:scale-95"
-              >
-                Unlock Product List
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate(-1)}
-                className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] ${
-                  isDark
-                    ? "text-slate-500 hover:text-white"
-                    : "text-slate-400 hover:text-slate-600"
-                }`}
-              >
-                Go Back
-              </button>
-            </form>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div
@@ -423,9 +362,14 @@ const ProductList = () => {
                   PRODUCT LIST
                 </h1>
                 <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">
-                  
+
                 </p>
               </div>
+
+              <TutorialTip
+                section="Managing Products"
+                title="How to use Product List"
+              />
             </div>
 
             <div className="flex items-center w-full gap-3 md:w-auto">
@@ -615,10 +559,69 @@ const ProductList = () => {
                       >
                         {item.item_name}
                       </h3>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em] flex items-center gap-2 mb-4">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em] flex items-center gap-2 mb-2">
                         <FaTag className="text-blue-500" size={10} />
                         {item.unit_of_measure}
                       </p>
+
+                      {/* Subcategory row */}
+                      <div className="mb-4">
+                        {editingSubcategoryId === item.product_id ? (
+                          <>
+                            <input
+                              autoFocus
+                              type="text"
+                              list={`subcat-options-${item.product_id}`}
+                              value={subcategoryDraft}
+                              onChange={(e) => setSubcategoryDraft(e.target.value)}
+                              onBlur={() => {
+                                saveSubcategory(item.product_id, subcategoryDraft);
+                                setEditingSubcategoryId(null);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.currentTarget.blur();
+                                } else if (e.key === "Escape") {
+                                  setEditingSubcategoryId(null);
+                                }
+                              }}
+                              placeholder="Set subcategory..."
+                              className={`w-full rounded-lg border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.1em] outline-none ${
+                                isDark
+                                  ? "bg-slate-800 border-blue-500/40 text-white"
+                                  : "bg-white border-blue-400 text-slate-700"
+                              }`}
+                            />
+                            <datalist id={`subcat-options-${item.product_id}`}>
+                              {(subcategoriesByCategory[item.item_category] || []).map(
+                                (sub) => (
+                                  <option key={sub} value={sub} />
+                                ),
+                              )}
+                            </datalist>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingSubcategoryId(item.product_id);
+                              setSubcategoryDraft(
+                                item.subcategory_item_category || "",
+                              );
+                            }}
+                            className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.1em] border-b border-dashed pb-0.5 transition-colors ${
+                              item.subcategory_item_category
+                                ? isDark
+                                  ? "text-slate-300 border-slate-600 hover:text-white"
+                                  : "text-slate-500 border-slate-300 hover:text-slate-800"
+                                : "text-blue-500/70 border-blue-500/30 hover:text-blue-500"
+                            }`}
+                          >
+                            <FaLayerGroup size={10} />
+                            {item.subcategory_item_category || "Add Subcategory"}
+                          </button>
+                        )}
+                      </div>
 
                       {/* Discountable toggle row */}
                       <div className="flex items-center justify-between mb-4">

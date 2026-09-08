@@ -9,6 +9,7 @@ import {
   FaFileInvoice,
   FaPrint,
   FaUsers,
+  FaUserFriends,
   FaUndo,
   FaTrashAlt,
   FaListUl,
@@ -49,6 +50,8 @@ import PricingDashboard from "../MainComponents/ReportsModal/PricingDashboard";
 import MonthlySalesModal from "../MainComponents/ReportsModal/MonthlySalesModal";
 import SalesPerItemPerDateModal from "../MainComponents/ReportsModal/SalesPerItemPerDateModal";
 import EJournalReportModal from "../MainComponents/ReportsModal/EJournalReportModal";
+import CustomerHeadCountModal from "../MainComponents/ReportsModal/CustomerHeadCountModal";
+import TutorialTip from "../common/TutorialTip";
 
 const MenuCard = ({
   icon: Icon,
@@ -399,6 +402,12 @@ const PosReports = ({
       color: "#475569",
       action: handleEJournalClick,
     },
+    {
+      label: "Customer Head Count",
+      icon: FaUserFriends,
+      color: "#4f46e5",
+      action: () => setActiveModal("customerHeadCount"),
+    },
   ];
   const accessibleReportItems = reportItems.filter((item) =>
     hasPosReportAccess(roles, item.label, developerMode),
@@ -452,16 +461,20 @@ const PosReports = ({
                 </h2>
               </div>
 
-              <button
-                onClick={onClose}
-                className={`flex h-11 w-11 items-center justify-center rounded-2xl border-2 transition-all active:scale-90 ${
-                  isDark
-                    ? "bg-white/[0.04] border-white/10 text-slate-300 hover:bg-rose-500 hover:border-rose-500 hover:text-white"
-                    : "bg-white border-slate-200 text-slate-500 hover:bg-rose-500 hover:border-rose-500 hover:text-white"
-                }`}
-              >
-                <FaTimes size={16} />
-              </button>
+              <div className="flex items-center gap-2">
+                <TutorialTip section="POS Reports" title="How to use POS Reports" />
+
+                <button
+                  onClick={onClose}
+                  className={`flex h-11 w-11 items-center justify-center rounded-2xl border-2 transition-all active:scale-90 ${
+                    isDark
+                      ? "bg-white/[0.04] border-white/10 text-slate-300 hover:bg-rose-500 hover:border-rose-500 hover:text-white"
+                      : "bg-white border-slate-200 text-slate-500 hover:bg-rose-500 hover:border-rose-500 hover:text-white"
+                  }`}
+                >
+                  <FaTimes size={16} />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -574,6 +587,10 @@ const PosReports = ({
       />
       <SalesPerItemPerDateModal
         isOpen={activeModal === "salesPerItemPerDate"}
+        onClose={() => setActiveModal(null)}
+      />
+      <CustomerHeadCountModal
+        isOpen={activeModal === "customerHeadCount"}
         onClose={() => setActiveModal(null)}
       />
 

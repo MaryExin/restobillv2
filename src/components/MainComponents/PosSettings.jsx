@@ -23,6 +23,7 @@ import {
   FiGrid,
   FiAward,
   FiList,
+  FiFileText,
 } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTheme } from "../../context/ThemeContext";
@@ -59,6 +60,7 @@ import PosTableLayout from "./PosSettingsModal/PosTableLayout";
 import PosLoyaltyConfig from "./PosSettingsModal/PosLoyaltyConfig";
 import PosSalesTypeOrder from "./PosSettingsModal/PosSalesTypeOrder";
 import PosReportMirrorSettings from "./PosSettingsModal/PosReportMirrorSettings";
+import PosTutorialGuide from "./PosSettingsModal/PosTutorialGuide";
 
 const MASTER_PASS    = "LESI_POSPASS@2023";
 const PROTECTED_TABS = new Set(["Mode of Payment", "Discount Mode", "Layout Mode"]);
@@ -90,9 +92,10 @@ const ALL_NAV_ITEMS = [
   { id: "Pricing Engine", icon: FiTag },
   { id: "Layout Mode", icon: FiMonitor },
   { id: "Second Screen", icon: FiMonitor },
+  { id: "Tutorial Guide", icon: FiFileText },
 ];
 
-const PosSettings = ({ isOpen, onClose, branchInfo }) => {
+const PosSettings = ({ isOpen, onClose, branchInfo, initialTab = null }) => {
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
   const { roles } = useZustandLoginCred();
@@ -130,16 +133,22 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
 
   useEffect(() => {
     if (isOpen) {
+      const preferredTab =
+        initialTab && navItems.some((nav) => nav.id === initialTab && !nav.route)
+          ? initialTab
+          : null;
       const firstContentTab = navItems.find((nav) => !nav.route) || navItems[0];
-      setActiveTab((current) =>
-        navItems.some((nav) => nav.id === current && !nav.route)
-          ? current
-          : firstContentTab?.id || "",
+      setActiveTab(
+        preferredTab ||
+          ((current) =>
+            navItems.some((nav) => nav.id === current && !nav.route)
+              ? current
+              : firstContentTab?.id || ""),
       );
       setIsMobileMenuOpen(false);
       setDeniedTab(null);
     }
-  }, [isOpen, navItems]);
+  }, [isOpen, navItems, initialTab]);
 
   const accentColor = "var(--branch-primary)";
   const accentSecondary = "var(--branch-secondary)";
@@ -370,6 +379,10 @@ const PosSettings = ({ isOpen, onClose, branchInfo }) => {
 
     if (activeTab === "Second Screen") {
       return <PosSecondScreen isDark={isDark} accent={accentColor} />;
+    }
+
+    if (activeTab === "Tutorial Guide") {
+      return <PosTutorialGuide isDark={isDark} accent={accentColor} />;
     }
 
     return null;

@@ -442,6 +442,7 @@ export function BuildOrderReceiptHtml({
 export function BuildBillingReceiptHtml({
   transaction,
   detailedproduct,
+  businessInfo = {},
   title = "Billing Receipt",
 }) {
   const receipt = (
@@ -493,6 +494,7 @@ export function BuildBillingReceiptHtml({
           <Receipt
             transaction={transaction}
             detailedproduct={detailedproduct}
+            businessInfo={businessInfo}
           />
         </div>
       </body>

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import useZustandLayoutMode from "../../context/useZustandLayoutMode";
 import Orderlist from "./Orderlist";
+import TutorialTip from "../common/TutorialTip";
 import {
   FaSearch,
   FaChevronLeft,
@@ -184,6 +185,10 @@ const ViewOrdering = () => {
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [showPendingConfirmModal, setShowPendingConfirmModal] = useState(false);
   const [pendingTableToOpen, setPendingTableToOpen] = useState("");
+  const [showHeadCountModal, setShowHeadCountModal] = useState(false);
+  const [pendingOrderTable, setPendingOrderTable] = useState("");
+  const [headCountInput, setHeadCountInput] = useState("1");
+  const [pendingHeadCount, setPendingHeadCount] = useState(1);
   const [tableMode, setTableMode] = useState("fixed");
   const [fixedSearch, setFixedSearch] = useState("");
   const [mergeSearch, setMergeSearch] = useState("");
@@ -555,7 +560,11 @@ const ViewOrdering = () => {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({}),
+      body: JSON.stringify({
+        Category_Code: localStorage.getItem("posBusinessCategoryCode") || "",
+        Unit_Code: localStorage.getItem("posBusinessUnitCode") || "",
+        terminal_number: localStorage.getItem("posTerminalNumber") || "",
+      }),
     })
       .then(async (res) => {
         if (!res.ok) {
@@ -1478,7 +1487,30 @@ const ViewOrdering = () => {
       return;
     }
 
-    openOrderList(tableValue, "");
+    promptHeadCount(tableValue);
+  };
+
+  const promptHeadCount = (tableValue) => {
+    setPendingOrderTable(tableValue);
+    setHeadCountInput("1");
+    setShowHeadCountModal(true);
+  };
+
+  const handleCancelHeadCount = () => {
+    setShowHeadCountModal(false);
+    setPendingOrderTable("");
+    setHeadCountInput("1");
+  };
+
+  const handleConfirmHeadCount = () => {
+    const parsed = parseInt(headCountInput, 10);
+    const finalCount = Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+
+    setPendingHeadCount(finalCount);
+    openOrderList(pendingOrderTable, "");
+    setShowHeadCountModal(false);
+    setPendingOrderTable("");
+    setHeadCountInput("1");
   };
 
   const getTableMergeValue = (table) =>
@@ -2150,8 +2182,8 @@ const ViewOrdering = () => {
       value = mergedTables.join(" & ");
     }
 
-    openOrderList(value, "");
     resetOrderModal();
+    promptHeadCount(value);
   };
 
   return (
@@ -2199,7 +2231,90 @@ const ViewOrdering = () => {
             dateSelected={selectedDate}
             transactionId={transactionId}
             onOrderSaved={handleOrderSaved}
+            initialHeadCount={pendingHeadCount}
           />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showHeadCountModal && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm px-4"
+            style={{ backgroundColor: "rgba(0,0,0,0.55)" }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="w-full max-w-sm rounded-[2rem] p-6 shadow-2xl border"
+              style={{
+                backgroundColor: surface,
+                borderColor: border,
+                boxShadow: `0 24px 60px ${toRgba(bg, 0.35)}`,
+              }}
+            >
+              <h2 className="text-xl font-black mb-1" style={{ color: text }}>
+                Number of Customers
+              </h2>
+              <p
+                className="text-sm leading-relaxed mb-4"
+                style={{ color: mutedText }}
+              >
+                How many guests are seated at{" "}
+                <span style={{ color: text, fontWeight: 700 }}>
+                  {pendingOrderTable || "this table"}
+                </span>
+                ?
+              </p>
+
+              <input
+                type="number"
+                min="1"
+                autoFocus
+                value={headCountInput}
+                onChange={(e) => setHeadCountInput(e.target.value)}
+                onFocus={(e) => e.target.select()}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleConfirmHeadCount();
+                }}
+                className="w-full rounded-xl py-3 px-4 text-base font-bold focus:outline-none transition-all border"
+                style={{
+                  backgroundColor: surfaceSoft,
+                  borderColor: border,
+                  color: text,
+                }}
+              />
+
+              <div className="flex gap-3 pt-6">
+                <button
+                  onClick={handleCancelHeadCount}
+                  className="flex-1 rounded-2xl px-5 py-4 transition-all"
+                  style={{
+                    backgroundColor: surfaceSoft,
+                    color: text,
+                    border: `1px solid ${border}`,
+                  }}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  onClick={handleConfirmHeadCount}
+                  className="flex-1 px-5 py-4 font-bold rounded-2xl transition-all"
+                  style={{
+                    background: `linear-gradient(180deg, ${accent} 0%, ${accentSecondary} 100%)`,
+                    color: getContrastText(accent, "#ffffff"),
+                    boxShadow: `0 12px 28px ${accentGlow}`,
+                  }}
+                >
+                  Open Order
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
 
@@ -3182,12 +3297,18 @@ const ViewOrdering = () => {
           >
             {isTableLayoutEnabled ? (
               <>
-                <h1
-                  className="text-4xl md:text-6xl font-black tracking-tighter mb-2"
-                  style={{ color: pageText }}
-                >
-                  Table <span style={{ color: accent }}>Floor</span>
-                </h1>
+                <div className="flex items-center gap-3 mb-2">
+                  <h1
+                    className="text-4xl md:text-6xl font-black tracking-tighter"
+                    style={{ color: pageText }}
+                  >
+                    Table <span style={{ color: accent }}>Floor</span>
+                  </h1>
+                  <TutorialTip
+                    section="Taking a New Order"
+                    title="How to take an order"
+                  />
+                </div>
                 <div
                   className="flex flex-wrap gap-2"
                   style={{ color: pageMutedText }}
@@ -3216,12 +3337,18 @@ const ViewOrdering = () => {
               </>
             ) : (
               <>
-                <h1
-                  className="text-4xl md:text-6xl font-black tracking-tighter mb-2"
-                  style={{ color: pageText }}
-                >
-                  Pending <span style={{ color: accent }}>Tables</span>
-                </h1>
+                <div className="flex items-center gap-3 mb-2">
+                  <h1
+                    className="text-4xl md:text-6xl font-black tracking-tighter"
+                    style={{ color: pageText }}
+                  >
+                    Pending <span style={{ color: accent }}>Tables</span>
+                  </h1>
+                  <TutorialTip
+                    section="Taking a New Order"
+                    title="How to take an order"
+                  />
+                </div>
                 <p style={{ color: pageMutedText }}>
                   Click a table to manage guest orders.
                 </p>

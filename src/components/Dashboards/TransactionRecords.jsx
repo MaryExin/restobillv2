@@ -20,6 +20,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import useApiHost from "../../hooks/useApiHost";
 import { useTheme } from "../../context/ThemeContext";
 import { useNavigate } from "react-router-dom";
+import TutorialTip from "../common/TutorialTip";
 
 const peso = (value) =>
   `₱ ${Number(value || 0).toLocaleString("en-PH", {
@@ -462,7 +463,11 @@ export default function TransactionRecords({ onClose }) {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({}),
+      body: JSON.stringify({
+        Category_Code: localStorage.getItem("posBusinessCategoryCode") || "",
+        Unit_Code: localStorage.getItem("posBusinessUnitCode") || "",
+        terminal_number: localStorage.getItem("posTerminalNumber") || "",
+      }),
     })
       .then((res) => res.json())
       .then((data) => {
@@ -721,9 +726,15 @@ export default function TransactionRecords({ onClose }) {
             Back
           </button>
 
-          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.22em] text-blue-500">
-            <FiTag />
-            Transaction Center
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.22em] text-blue-500">
+              <FiTag />
+              Transaction Center
+            </div>
+            <TutorialTip
+              section="Transaction Records"
+              title="How to use Transaction Records"
+            />
           </div>
         </div>
 

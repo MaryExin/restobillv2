@@ -27,6 +27,7 @@ $permissionByReportKey = [
   "salesPerItem" => "salesPerItem",
   "monthlySales" => "monthlySales",
   "salesPerItemPerDate" => "salesPerItemPerDate",
+  "customerHeadCount" => "customerHeadCount",
 ];
 
 if (!isset($permissionByReportKey[$reportKey])) {
@@ -62,6 +63,7 @@ $graph_dateto   = $body["graph_dateto"] ?? $datefrom;
 
 $includeVoided = !empty($body["includeVoided"]);
 $voidOnly = !empty($body["voidOnly"]);
+$salesType = trim((string)($body["salesType"] ?? ""));
 
 // status filter
 $statusSql = "t.status = 'Active'";
@@ -215,6 +217,8 @@ $dailyGraphRows = $stmt->fetchAll();
    Hourly Sales (TABLE range)
    ✅ 12-hour transaction_time supported
 ---------------------------- */
+$orderTypeSql = $salesType !== "" ? "AND t.order_type = :order_type" : "";
+
 $sqlHourly = "
   SELECT
     t.transaction_date AS Date,
@@ -222,11 +226,15 @@ $sqlHourly = "
     SUM(CASE WHEN $statusSql THEN t.TotalSales ELSE 0 END) AS amount
   FROM tbl_pos_transactions t
   WHERE t.transaction_date BETWEEN :datefrom AND :dateto
+    $orderTypeSql
   GROUP BY t.transaction_date, $hourExpr
   ORDER BY t.transaction_date ASC, hr ASC
 ";
 $stmt = $pdo->prepare($sqlHourly);
-$stmt->execute([":datefrom" => $datefrom, ":dateto" => $dateto]);
+$stmt->execute(array_merge(
+    [":datefrom" => $datefrom, ":dateto" => $dateto],
+    $salesType !== "" ? [":order_type" => $salesType] : []
+));
 $hourlyRaw = $stmt->fetchAll();
 
 $hourlyMap = [];
@@ -313,11 +321,15 @@ $sqlHourlyPerProduct = "
     ON m.product_id = d.product_id
   WHERE d.transaction_date BETWEEN :datefrom AND :dateto
     AND $statusSql
+    $orderTypeSql
   GROUP BY d.product_id, Category, `Product Name`, $hourExpr
   ORDER BY `Product Name` ASC, hr ASC
 ";
 $stmt = $pdo->prepare($sqlHourlyPerProduct);
-$stmt->execute([":datefrom" => $datefrom, ":dateto" => $dateto]);
+$stmt->execute(array_merge(
+    [":datefrom" => $datefrom, ":dateto" => $dateto],
+    $salesType !== "" ? [":order_type" => $salesType] : []
+));
 $hppRaw = $stmt->fetchAll();
 
 $hppMap = [];
@@ -420,6 +432,23 @@ $stmt->execute([
 $monthlySalesRows = $stmt->fetchAll();
 
 /* ---------------------------
+   Customer Head Count (TABLE range)
+---------------------------- */
+$sqlCustomerHeadCount = "
+  SELECT
+    t.transaction_date AS Date,
+    SUM(CASE WHEN $statusSql THEN 1 ELSE 0 END) AS `Transactions`,
+    SUM(CASE WHEN $statusSql THEN t.customer_head_count ELSE 0 END) AS `Head Count`
+  FROM tbl_pos_transactions t
+  WHERE t.transaction_date BETWEEN :datefrom AND :dateto
+  GROUP BY t.transaction_date
+  ORDER BY t.transaction_date ASC
+";
+$stmt = $pdo->prepare($sqlCustomerHeadCount);
+$stmt->execute([":datefrom" => $datefrom, ":dateto" => $dateto]);
+$customerHeadCountRows = $stmt->fetchAll();
+
+/* ---------------------------
    Response
 ---------------------------- */
 $response = [
@@ -453,6 +482,9 @@ switch ($reportKey) {
     break;
   case "salesPerItemPerDate":
     $response["salesPerItemPerDate"] = $perItemPerDateRows;
+    break;
+  case "customerHeadCount":
+    $response["customerHeadCount"] = $customerHeadCountRows;
     break;
 }
 

@@ -18,6 +18,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import useApiHost from "../../hooks/useApiHost";
 import useBillingEnabled from "../../hooks/useBillingEnabled";
 import { useTheme } from "../../context/ThemeContext";
+import TutorialTip from "../common/TutorialTip";
 
 const PrintBilling = () => {
   const { themeSettings } = useTheme();
@@ -62,7 +63,11 @@ const PrintBilling = () => {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({}),
+      body: JSON.stringify({
+        Category_Code: localStorage.getItem("posBusinessCategoryCode") || "",
+        Unit_Code: localStorage.getItem("posBusinessUnitCode") || "",
+        terminal_number: localStorage.getItem("posTerminalNumber") || "",
+      }),
     })
       .then((res) => res.json())
       .then((data) => {
@@ -235,11 +240,14 @@ const PrintBilling = () => {
               BACK TO DASHBOARD
             </span>
           </button>
-          <div
-            className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest"
-            style={{ color: "var(--app-accent)" }}
-          >
-            <FaPrint /> Billing Center
+          <div className="flex items-center gap-3">
+            <div
+              className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest"
+              style={{ color: "var(--app-accent)" }}
+            >
+              <FaPrint /> Billing Center
+            </div>
+            <TutorialTip section="Billing & Payment" title="How billing works" />
           </div>
         </nav>
 

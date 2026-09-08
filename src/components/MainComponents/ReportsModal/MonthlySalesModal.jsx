@@ -6,7 +6,9 @@ import {
 import * as XLSX from "xlsx";
 import { useTheme } from "../../../context/ThemeContext";
 import useApiHost from "../../../hooks/useApiHost";
+import useReportDateAccess from "../../../hooks/useReportDateAccess";
 import { getCurrentUserRole } from "../../../utils/getCurrentUserRole";
+import { posAuthenticatedFetch } from "../../../utils/posAuthenticatedFetch";
 
 const peso = (v) =>
   `₱${Number(v || 0).toLocaleString(undefined, {
@@ -79,6 +81,7 @@ const MonthlySalesModal = ({ isOpen, onClose }) => {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const apiHost = useApiHost();
+  const { isDateLocked, lockedDate, isShiftDateLoading } = useReportDateAccess();
 
   const [salesData, setSalesData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -93,14 +96,23 @@ const MonthlySalesModal = ({ isOpen, onClose }) => {
   const [openStartCal, setOpenStartCal] = useState(false);
   const [openEndCal, setOpenEndCal] = useState(false);
 
+  // Admin/Cashier: report date is locked to the currently open shift.
+  useEffect(() => {
+    if (isDateLocked && lockedDate) {
+      setDateFrom(lockedDate);
+      setDateTo(lockedDate);
+    }
+  }, [isDateLocked, lockedDate]);
+
   const fetchSales = useCallback(async () => {
     if (!apiHost) return;
     setLoading(true);
     try {
-      const res = await fetch(`${apiHost}/api/reports_dashboard.php`, {
+      const res = await posAuthenticatedFetch(`${apiHost}/api/reports_dashboard.php`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          reportKey: "monthlySales",
           datefrom: dateFrom,
           dateto: dateTo,
           includeVoided: status === "All" || status === "Voided",
@@ -119,8 +131,8 @@ const MonthlySalesModal = ({ isOpen, onClose }) => {
   }, [apiHost, dateFrom, dateTo, status]);
 
   useEffect(() => {
-    if (isOpen) fetchSales();
-  }, [isOpen, fetchSales]);
+    if (isOpen && (!isDateLocked || !isShiftDateLoading)) fetchSales();
+  }, [isOpen, fetchSales, isDateLocked, isShiftDateLoading]);
 
   const filtered = salesData.filter((item) =>
     (item.Period || "").toLowerCase().includes(searchTerm.toLowerCase()),
@@ -315,7 +327,7 @@ const MonthlySalesModal = ({ isOpen, onClose }) => {
               </button>
             </div>
             <div className="flex-1 space-y-6">
-              {[
+              {!isDateLocked && [
                 { label: "Date From", val: dateFrom, set: setDateFrom, open: openStartCal, setOpen: setOpenStartCal, closeOther: () => setOpenEndCal(false) },
                 { label: "Date To",   val: dateTo,   set: setDateTo,   open: openEndCal,   setOpen: setOpenEndCal,   closeOther: () => setOpenStartCal(false) },
               ].map(({ label, val, set, open, setOpen, closeOther }) => (

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   FaTimes,
@@ -10,6 +10,7 @@ import {
 } from "react-icons/fa";
 import { useTheme } from "../../context/ThemeContext";
 import useApiHost from "../../hooks/useApiHost";
+import useReportDateAccess from "../../hooks/useReportDateAccess";
 import { getCurrentUserRole } from "../../utils/getCurrentUserRole";
 
 const peso = (value) => {
@@ -249,6 +250,7 @@ export default function ModalXml({ isOpen, onClose }) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const apiHost = useApiHost();
+  const { isDateLocked, lockedDate, isShiftDateLoading } = useReportDateAccess();
 
   const [form, setForm] = useState({
     categoryCode: localStorage.getItem("posBusinessCategoryCode") || "",
@@ -258,6 +260,13 @@ export default function ModalXml({ isOpen, onClose }) {
     tenantId: "19092784",
     tenantKey: "K9BRJGJS",
   });
+
+  // Admin/Cashier: report date is locked to the currently open shift.
+  useEffect(() => {
+    if (isDateLocked && lockedDate) {
+      setForm((prev) => ({ ...prev, reportDate: lockedDate }));
+    }
+  }, [isDateLocked, lockedDate]);
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -492,16 +501,18 @@ export default function ModalXml({ isOpen, onClose }) {
                     <FaCalendarAlt />
                     Report Date
                   </label>
-                  <input
-                    type="date"
-                    value={form.reportDate}
-                    onChange={(e) => handleChange("reportDate", e.target.value)}
-                    className={`w-full rounded-2xl border px-4 py-3.5 text-base outline-none transition ${
-                      isDark
-                        ? "border-emerald-500/40 bg-slate-900 text-white focus:border-emerald-500"
-                        : "border-slate-300 bg-white text-slate-900 focus:border-emerald-500"
-                    }`}
-                  />
+                  {!isDateLocked && (
+                    <input
+                      type="date"
+                      value={form.reportDate}
+                      onChange={(e) => handleChange("reportDate", e.target.value)}
+                      className={`w-full rounded-2xl border px-4 py-3.5 text-base outline-none transition ${
+                        isDark
+                          ? "border-emerald-500/40 bg-slate-900 text-white focus:border-emerald-500"
+                          : "border-slate-300 bg-white text-slate-900 focus:border-emerald-500"
+                      }`}
+                    />
+                  )}
                 </div>
 
                 <div>
@@ -545,7 +556,7 @@ export default function ModalXml({ isOpen, onClose }) {
                 <div className="grid grid-cols-2 gap-3 pt-2">
                   <button
                     onClick={handleGenerate}
-                    disabled={isLoading}
+                    disabled={isLoading || (isDateLocked && isShiftDateLoading)}
                     className="rounded-2xl bg-blue-600 px-4 py-3.5 text-base font-black text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isLoading ? "Loading..." : "Generate"}

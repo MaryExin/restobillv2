@@ -12,6 +12,7 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
 }
 
 require __DIR__ . "/pdo.php";
+require_once __DIR__ . "/report_db.php";
 require_once __DIR__ . "/pos_role_authorization.php";
 
 try {
@@ -33,13 +34,17 @@ try {
     }
 
     try {
-        // Disable Foreign Key Checks to allow truncation of linked tables
+        // --- MAIN (LIVE) DATABASE ---
         $pdo->exec("SET FOREIGN_KEY_CHECKS = 0;");
 
         $tables = [
+                'lkp_loyalty_cs_name',
                 'tbl_main_activity_logs',
+                'tbl_main_transaction',
                 'tbl_main_transaction_logs',
+                'tbl_pos_discount_type_sales_type',
                 'tbl_pos_ledger',
+                'tbl_pos_loyalty_discounts',
                 'tbl_pos_shifting_records',
                 'tbl_pos_transactions',
                 'tbl_pos_transactions_customers',
@@ -48,6 +53,7 @@ try {
                 'tbl_pos_transactions_discounts_per_product',
                 'tbl_pos_transactions_other_charges',
                 'tbl_pos_transactions_payments',
+                'tbl_pos_zreading_archive_log',
                 'tbl_pos_document_counters' // Eto yung nate-truncate kaya nawawalan ng laman
         ];
 
@@ -60,25 +66,25 @@ try {
         $sql = "INSERT INTO tbl_pos_document_counters (
                         Category_Code,
                         Unit_Code,
-                        next_billing_no, 
-                        next_invoice_no, 
-                        next_transaction_id, 
+                        next_billing_no,
+                        next_invoice_no,
+                        next_transaction_id,
                         next_order_slip_no,
                         next_refund_id,
                         next_void_id
-                    ) 
-                    SELECT 
-                        Category_Code, 
-                        Unit_Code, 
-                        :billing, 
-                        :invoice, 
-                        :trans_id, 
-                        :order_slip, 
-                        :refund_id, 
-                        :void_id 
-                    FROM tbl_main_business_units 
+                    )
+                    SELECT
+                        Category_Code,
+                        Unit_Code,
+                        :billing,
+                        :invoice,
+                        :trans_id,
+                        :order_slip,
+                        :refund_id,
+                        :void_id
+                    FROM tbl_main_business_units
                     LIMIT 1"; // LIMIT 1 kung isang row lang ang laman o kailangan mo
-            
+
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
                 ':billing'    => 3000000001,
@@ -89,9 +95,42 @@ try {
                 ':void_id'    => 8000000001
         ]);
 
+        $pdo->exec("SET FOREIGN_KEY_CHECKS = 1;");
+
+        // --- REPORT (ARCHIVE) DATABASE ---
+        $reportPdo = getConfiguredReportPdo();
+        $reportPdo->exec("SET FOREIGN_KEY_CHECKS = 0;");
+
+        $reportTables = [
+                'lkp_loyalty_cs_name',
+                'tbl_main_activity_logs',
+                'tbl_main_transaction',
+                'tbl_main_transaction_logs',
+                'tbl_pos_discount_type_sales_type',
+                'tbl_pos_ledger',
+                'tbl_pos_loyalty_discounts',
+                'tbl_pos_report_mirror_activation',
+                'tbl_pos_report_transaction_map',
+                'tbl_pos_shifting_records',
+                'tbl_pos_transactions',
+                'tbl_pos_transactions_customers',
+                'tbl_pos_transactions_detailed',
+                'tbl_pos_transactions_discounts',
+                'tbl_pos_transactions_discounts_per_product',
+                'tbl_pos_transactions_other_charges',
+                'tbl_pos_transactions_payments',
+                'tbl_pos_zreading_archive_log'
+        ];
+
+        foreach ($reportTables as $table) {
+            $reportPdo->exec("TRUNCATE TABLE `$table`;");
+        }
+
+        $reportPdo->exec("SET FOREIGN_KEY_CHECKS = 1;");
+
         echo json_encode([
             "status" => "success",
-            "message" => "All tables truncated. Document counters reset with Category and Unit codes."
+            "message" => "All tables truncated in both the live and report databases. Document counters reset with Category and Unit codes."
         ]);
 
     } catch (Throwable $inner) {
@@ -106,6 +145,13 @@ try {
             $pdo->exec("SET FOREIGN_KEY_CHECKS = 1;");
         } catch (Throwable $restoreError) {
             error_log("POS database reset FK restore error: " . $restoreError->getMessage());
+        }
+        try {
+            if (isset($reportPdo)) {
+                $reportPdo->exec("SET FOREIGN_KEY_CHECKS = 1;");
+            }
+        } catch (Throwable $restoreError) {
+            error_log("POS database reset report-db FK restore error: " . $restoreError->getMessage());
         }
     }
 } catch (Throwable $e) {

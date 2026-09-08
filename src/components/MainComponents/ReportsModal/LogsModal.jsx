@@ -1,29 +1,40 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { 
-  FaSyncAlt, FaTimes, FaSearch, FaCalendarAlt, 
-  FaHistory, FaFilePdf, FaFileCsv 
+import {
+  FaSyncAlt, FaTimes, FaSearch, FaCalendarAlt,
+  FaHistory, FaFilePdf, FaFileCsv
 } from "react-icons/fa";
-import { useTheme } from "../../../context/ThemeContext"; 
+import { useTheme } from "../../../context/ThemeContext";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
+import useReportDateAccess from "../../../hooks/useReportDateAccess";
 import { getCurrentUserRole } from "../../../utils/getCurrentUserRole";
+import { posAuthenticatedFetch } from "../../../utils/posAuthenticatedFetch";
 
 const LogsModal = ({ isOpen, onClose }) => {
-  const { theme } = useTheme(); 
+  const { theme } = useTheme();
   const isDark = theme === "dark";
   const today = new Date().toISOString().split('T')[0];
+  const { isDateLocked, lockedDate, isShiftDateLoading } = useReportDateAccess();
 
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [dateRange, setDateRange] = useState({ from: today, to: today });
 
+  // Admin/Cashier: report date is locked to the currently open shift.
+  useEffect(() => {
+    if (isDateLocked && lockedDate) {
+      setDateRange({ from: lockedDate, to: lockedDate });
+    }
+  }, [isDateLocked, lockedDate]);
+
   // --- FETCH DATA ---
   const fetchData = useCallback(async () => {
     if (!isOpen) return;
+    if (isDateLocked && isShiftDateLoading) return;
     setLoading(true);
     try {
-      const response = await fetch("http://localhost/api/get_logs.php", {
+      const response = await posAuthenticatedFetch("http://localhost/api/get_logs.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -40,7 +51,7 @@ const LogsModal = ({ isOpen, onClose }) => {
     } finally { 
       setLoading(false); 
     }
-  }, [isOpen, dateRange]);
+  }, [isOpen, dateRange, isDateLocked, isShiftDateLoading]);
 
   useEffect(() => { 
     fetchData(); 
@@ -117,10 +128,14 @@ const LogsModal = ({ isOpen, onClose }) => {
 
             {/* Date Range Picker (Naibalik) */}
             <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${isDark ? 'bg-[#111827] border-white/5' : 'bg-slate-50 border-slate-200'}`}>
-               <FaCalendarAlt className="text-blue-500 text-[10px]" />
-               <input type="date" value={dateRange.from} onChange={(e) => setDateRange({...dateRange, from: e.target.value})} className={inputClass} />
-               <span className="text-slate-600 text-[9px] font-black px-1">TO</span>
-               <input type="date" value={dateRange.to} onChange={(e) => setDateRange({...dateRange, to: e.target.value})} className={inputClass} />
+               {!isDateLocked && (
+                 <>
+                   <FaCalendarAlt className="text-blue-500 text-[10px]" />
+                   <input type="date" value={dateRange.from} onChange={(e) => setDateRange({...dateRange, from: e.target.value})} className={inputClass} />
+                   <span className="text-slate-600 text-[9px] font-black px-1">TO</span>
+                   <input type="date" value={dateRange.to} onChange={(e) => setDateRange({...dateRange, to: e.target.value})} className={inputClass} />
+                 </>
+               )}
             </div>
 
             {/* Export Actions */}

@@ -14,7 +14,9 @@ import {
   FaBox,
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
+import useReportDateAccess from "../../../hooks/useReportDateAccess";
 import { getCurrentUserRole } from "../../../utils/getCurrentUserRole";
+import { posAuthenticatedFetch } from "../../../utils/posAuthenticatedFetch";
 
 const peso = (value) =>
   `₱${Number(value || 0).toLocaleString(undefined, {
@@ -181,6 +183,7 @@ const CustomCalendar = ({
 };
 
 const HourlySalesModal = ({ isOpen, onClose }) => {
+  const { isDateLocked, lockedDate, isShiftDateLoading } = useReportDateAccess();
   const [hourlyData, setHourlyData] = useState([]);
   const [hourlyProductData, setHourlyProductData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -188,12 +191,22 @@ const HourlySalesModal = ({ isOpen, onClose }) => {
   const [viewMode, setViewMode] = useState("general");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("ALL");
+  const [selectedSalesType, setSelectedSalesType] = useState("ALL");
+  const [salesTypeOptions, setSalesTypeOptions] = useState([]);
 
   const today = new Date().toISOString().split("T")[0];
   const [dateFrom, setDateFrom] = useState(today);
   const [dateTo, setDateTo] = useState(today);
   const [openStartCal, setOpenStartCal] = useState(false);
   const [openEndCal, setOpenEndCal] = useState(false);
+
+  // Admin/Cashier: report date is locked to the currently open shift.
+  useEffect(() => {
+    if (isDateLocked && lockedDate) {
+      setDateFrom(lockedDate);
+      setDateTo(lockedDate);
+    }
+  }, [isDateLocked, lockedDate]);
 
   const hoursLabels = [
     "12AM",
@@ -225,13 +238,15 @@ const HourlySalesModal = ({ isOpen, onClose }) => {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost/api/reports_dashboard.php`, {
+      const response = await posAuthenticatedFetch(`http://localhost/api/reports_dashboard.php`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          reportKey: "hourlySales",
           datefrom: dateFrom,
           dateto: dateTo,
           includeVoided: false,
+          salesType: selectedSalesType === "ALL" ? "" : selectedSalesType,
           role: getCurrentUserRole(),
         }),
       });
@@ -249,11 +264,26 @@ const HourlySalesModal = ({ isOpen, onClose }) => {
     } finally {
       setLoading(false);
     }
-  }, [dateFrom, dateTo]);
+  }, [dateFrom, dateTo, selectedSalesType]);
 
   useEffect(() => {
-    if (isOpen) fetchData();
-  }, [isOpen, fetchData]);
+    fetch(`http://localhost/api/sales_type_list.php`)
+      .then((res) => res.json())
+      .then((result) => {
+        const list = Array.isArray(result?.data) ? result.data : [];
+        setSalesTypeOptions(
+          list.map((item) => String(item?.description || "").trim()).filter(Boolean),
+        );
+      })
+      .catch((err) => {
+        console.error("Failed to load sales type list:", err);
+        setSalesTypeOptions([]);
+      });
+  }, []);
+
+  useEffect(() => {
+    if (isOpen && (!isDateLocked || !isShiftDateLoading)) fetchData();
+  }, [isOpen, fetchData, isDateLocked, isShiftDateLoading]);
 
   const categories = useMemo(() => {
     const cats = hourlyProductData.map((item) => item.Category).filter(Boolean);
@@ -549,52 +579,75 @@ const HourlySalesModal = ({ isOpen, onClose }) => {
             </div>
 
             <div className="flex-1 space-y-6">
-              <div className="relative">
+              {!isDateLocked && (
+                <>
+                  <div className="relative">
+                    <label className="block mb-2 text-sm font-medium text-slate-600">
+                      From
+                    </label>
+
+                    <button
+                      onClick={() => {
+                        setOpenStartCal(!openStartCal);
+                        setOpenEndCal(false);
+                      }}
+                      className="flex items-center justify-between w-full px-4 py-3 text-left transition border rounded-2xl border-slate-200 bg-slate-50 text-slate-700"
+                    >
+                      <span className="font-medium">{dateFrom}</span>
+                      <FaChevronDown className="text-slate-400" size={12} />
+                    </button>
+
+                    <CustomCalendar
+                      selectedDate={dateFrom}
+                      onChange={setDateFrom}
+                      isOpen={openStartCal}
+                      onClose={() => setOpenStartCal(false)}
+                    />
+                  </div>
+
+                  <div className="relative">
+                    <label className="block mb-2 text-sm font-medium text-slate-600">
+                      To
+                    </label>
+
+                    <button
+                      onClick={() => {
+                        setOpenEndCal(!openEndCal);
+                        setOpenStartCal(false);
+                      }}
+                      className="flex items-center justify-between w-full px-4 py-3 text-left transition border rounded-2xl border-slate-200 bg-slate-50 text-slate-700"
+                    >
+                      <span className="font-medium">{dateTo}</span>
+                      <FaChevronDown className="text-slate-400" size={12} />
+                    </button>
+
+                    <CustomCalendar
+                      selectedDate={dateTo}
+                      onChange={setDateTo}
+                      isOpen={openEndCal}
+                      onClose={() => setOpenEndCal(false)}
+                    />
+                  </div>
+                </>
+              )}
+
+              <div>
                 <label className="block mb-2 text-sm font-medium text-slate-600">
-                  From
+                  Sales Type
                 </label>
 
-                <button
-                  onClick={() => {
-                    setOpenStartCal(!openStartCal);
-                    setOpenEndCal(false);
-                  }}
-                  className="flex items-center justify-between w-full px-4 py-3 text-left transition border rounded-2xl border-slate-200 bg-slate-50 text-slate-700"
+                <select
+                  value={selectedSalesType}
+                  onChange={(e) => setSelectedSalesType(e.target.value)}
+                  className="w-full px-4 py-3 text-sm font-medium transition bg-slate-50 border outline-none rounded-2xl border-slate-200 text-slate-700 focus:border-blue-500"
                 >
-                  <span className="font-medium">{dateFrom}</span>
-                  <FaChevronDown className="text-slate-400" size={12} />
-                </button>
-
-                <CustomCalendar
-                  selectedDate={dateFrom}
-                  onChange={setDateFrom}
-                  isOpen={openStartCal}
-                  onClose={() => setOpenStartCal(false)}
-                />
-              </div>
-
-              <div className="relative">
-                <label className="block mb-2 text-sm font-medium text-slate-600">
-                  To
-                </label>
-
-                <button
-                  onClick={() => {
-                    setOpenEndCal(!openEndCal);
-                    setOpenStartCal(false);
-                  }}
-                  className="flex items-center justify-between w-full px-4 py-3 text-left transition border rounded-2xl border-slate-200 bg-slate-50 text-slate-700"
-                >
-                  <span className="font-medium">{dateTo}</span>
-                  <FaChevronDown className="text-slate-400" size={12} />
-                </button>
-
-                <CustomCalendar
-                  selectedDate={dateTo}
-                  onChange={setDateTo}
-                  isOpen={openEndCal}
-                  onClose={() => setOpenEndCal(false)}
-                />
+                  <option value="ALL">All Sales Types</option>
+                  {salesTypeOptions.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 

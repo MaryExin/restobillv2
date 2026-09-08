@@ -3,13 +3,16 @@ import { FaSyncAlt, FaTimes, FaSearch, FaTrashAlt, FaCalendarAlt, FaPrint, FaFil
 import { useTheme } from "../../../context/ThemeContext";
 import * as XLSX from 'xlsx';
 import useApiHost from "../../../hooks/useApiHost";
+import useReportDateAccess from "../../../hooks/useReportDateAccess";
 import { getCurrentUserRole } from "../../../utils/getCurrentUserRole";
+import { posAuthenticatedFetch } from "../../../utils/posAuthenticatedFetch";
 
 const VoidsModal = ({ isOpen, onClose }) => {
   const { theme } = useTheme();
   const darkMode = theme === "dark";
   const apiHost = useApiHost();
   const today = new Date().toISOString().split('T')[0];
+  const { isDateLocked, lockedDate, isShiftDateLoading } = useReportDateAccess();
 
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
@@ -18,6 +21,14 @@ const VoidsModal = ({ isOpen, onClose }) => {
   const [dateTo, setDateTo] = useState(today);
   const [printEnabled, setPrintEnabled] = useState(false);
   const [businessInfo, setBusinessInfo] = useState({});
+
+  // Admin/Cashier: report date is locked to the currently open shift.
+  useEffect(() => {
+    if (isDateLocked && lockedDate) {
+      setDateFrom(lockedDate);
+      setDateTo(lockedDate);
+    }
+  }, [isDateLocked, lockedDate]);
 
   // Load print setting and business info
   useEffect(() => {
@@ -39,9 +50,10 @@ const VoidsModal = ({ isOpen, onClose }) => {
 
   const fetchData = useCallback(async () => {
     if (!isOpen) return;
+    if (isDateLocked && isShiftDateLoading) return;
     setLoading(true);
     try {
-      const response = await fetch("http://localhost/api/get_voids_refunds.php", {
+      const response = await posAuthenticatedFetch("http://localhost/api/get_voids_refunds.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: 'voids', dateFrom, dateTo, role: getCurrentUserRole() }),
@@ -54,7 +66,7 @@ const VoidsModal = ({ isOpen, onClose }) => {
     } finally {
       setLoading(false);
     }
-  }, [dateFrom, dateTo, isOpen]);
+  }, [dateFrom, dateTo, isOpen, isDateLocked, isShiftDateLoading]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -141,9 +153,13 @@ const VoidsModal = ({ isOpen, onClose }) => {
 
             {/* Date pickers */}
             <div className={`flex items-center rounded-xl px-4 py-2.5 gap-3 border ${darkMode ? "bg-[#111827] border-white/10" : "bg-white border-slate-200"}`}>
-              <FaCalendarAlt className={darkMode ? "text-slate-500" : "text-slate-400"} />
-              <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className={`bg-transparent text-xs outline-none font-mono ${darkMode ? "text-white [color-scheme:dark]" : "text-slate-800"}`} />
-              <input type="date" value={dateTo}   onChange={(e) => setDateTo(e.target.value)}   className={`bg-transparent text-xs outline-none font-mono ${darkMode ? "text-white [color-scheme:dark]" : "text-slate-800"}`} />
+              {!isDateLocked && (
+                <>
+                  <FaCalendarAlt className={darkMode ? "text-slate-500" : "text-slate-400"} />
+                  <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className={`bg-transparent text-xs outline-none font-mono ${darkMode ? "text-white [color-scheme:dark]" : "text-slate-800"}`} />
+                  <input type="date" value={dateTo}   onChange={(e) => setDateTo(e.target.value)}   className={`bg-transparent text-xs outline-none font-mono ${darkMode ? "text-white [color-scheme:dark]" : "text-slate-800"}`} />
+                </>
+              )}
             </div>
 
             <button onClick={fetchData} className={`p-3 rounded-xl ${darkMode ? "bg-slate-700/50 text-slate-400" : "bg-slate-100 text-slate-500"}`}>

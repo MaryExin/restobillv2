@@ -103,7 +103,10 @@ try {
     // 3) Create summary (pick only important header fields + totals)
     $summary = [
         "transaction_id" => (int)$header["transaction_id"],
-        "order_type" => $header["order_type"] ?? "DINE IN"
+        "order_type" => $header["order_type"] ?? "DINE IN",
+        "customer_head_count" => isset($header["customer_head_count"]) && (int)$header["customer_head_count"] > 0
+            ? (int)$header["customer_head_count"]
+            : 1
 
     ];
 
