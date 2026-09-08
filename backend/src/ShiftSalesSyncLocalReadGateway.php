@@ -140,22 +140,19 @@ class ShiftSalesSyncLocalReadGateway
 
     private function getOfflineShiftRows(string $busunitCode): array
     {
+        // Finalization writes Remarks = Synced only after both WEB datasets
+        // are verified. Keep open/incomplete shifts visible, but do not rescan
+        // completed history on every refresh.
         $stmt = $this->conn->prepare("
             SELECT *
             FROM tbl_pos_shifting_records
             WHERE Unit_Code = :unit_code
-            ORDER BY
-                COALESCE(
-                    STR_TO_DATE(Closing_DateTime, '%c/%e/%Y %H:%i'),
-                    STR_TO_DATE(Closing_DateTime, '%c/%e/%Y %h:%i %p'),
-                    STR_TO_DATE(Closing_DateTime, '%Y-%m-%d %H:%i:%s'),
-                    STR_TO_DATE(Closing_DateTime, '%Y-%m-%d %H:%i'),
-                    STR_TO_DATE(Date_Recorded, '%c/%e/%Y %H:%i'),
-                    STR_TO_DATE(Date_Recorded, '%c/%e/%Y %h:%i %p'),
-                    STR_TO_DATE(Date_Recorded, '%Y-%m-%d %H:%i:%s'),
-                    STR_TO_DATE(Date_Recorded, '%Y-%m-%d %H:%i')
-                ) DESC,
-                ID DESC
+              AND (
+                    COALESCE(Shift_Status, '') <> 'Closed'
+                    OR COALESCE(Closing_DateTime, '') = ''
+                    OR COALESCE(Remarks, '') <> 'Synced'
+                  )
+            ORDER BY ID DESC
         ");
         $stmt->execute([
             'unit_code' => $busunitCode,
@@ -170,33 +167,30 @@ class ShiftSalesSyncLocalReadGateway
         string $terminalNumber,
         string $openingDateTime
     ): array {
+        // Match the stored date strings directly so MySQL can use an index on
+        // transaction_date instead of parsing every historical transaction.
+        $dateCandidates = $this->getTransactionDateCandidates($openingDateTime);
+        if (count($dateCandidates) === 0) {
+            return [];
+        }
+
+        $datePlaceholders = implode(',', array_fill(0, count($dateCandidates), '?'));
         $sql = "
             SELECT transaction_id, Category_Code, Unit_Code, terminal_number
             FROM tbl_pos_transactions
-            WHERE Category_Code = :category_code
-              AND Unit_Code = :unit_code
-              AND terminal_number = :terminal_number
-              AND COALESCE(
-                    STR_TO_DATE(transaction_date, '%c/%e/%Y'),
-                    STR_TO_DATE(transaction_date, '%Y-%m-%d')
-                  ) = DATE(COALESCE(
-                    STR_TO_DATE(:opening_datetime_1, '%c/%e/%Y %h:%i %p'),
-                    STR_TO_DATE(:opening_datetime_2, '%c/%e/%Y %H:%i'),
-                    STR_TO_DATE(:opening_datetime_3, '%Y-%m-%d %H:%i:%s'),
-                    STR_TO_DATE(:opening_datetime_4, '%Y-%m-%d %H:%i')
-                  ))
+            WHERE Category_Code = ?
+              AND Unit_Code = ?
+              AND terminal_number = ?
+              AND transaction_date IN ({$datePlaceholders})
             ORDER BY ID ASC
         ";
 
         $stmt = $this->conn->prepare($sql);
         $stmt->execute([
-            'category_code' => $categoryCode,
-            'unit_code' => $unitCode,
-            'terminal_number' => $terminalNumber,
-            'opening_datetime_1' => $openingDateTime,
-            'opening_datetime_2' => $openingDateTime,
-            'opening_datetime_3' => $openingDateTime,
-            'opening_datetime_4' => $openingDateTime,
+            $categoryCode,
+            $unitCode,
+            $terminalNumber,
+            ...$dateCandidates,
         ]);
 
         $refs = [];
@@ -222,13 +216,6 @@ class ShiftSalesSyncLocalReadGateway
     private function getChildCountsByTransactionRefs(array $transactionRefs): array
     {
         $scope = $this->buildScopedTransactionWhere($transactionRefs);
-        $transactionScope = $this->buildScopedTransactionWhere(
-            $transactionRefs,
-            'Category_Code',
-            'Unit_Code',
-            'transaction_id',
-            'terminal_number'
-        );
 
         if ($scope['where'] === '') {
             return [
@@ -250,10 +237,7 @@ class ShiftSalesSyncLocalReadGateway
         );
 
         return [
-            'transactions' => $this->countRows(
-                "SELECT COUNT(*) FROM tbl_pos_transactions WHERE {$transactionScope['where']}",
-                $transactionScope['values']
-            ),
+            'transactions' => count($transactionRefs),
             'detailed' => $this->countRows(
                 "SELECT COUNT(*) FROM tbl_pos_transactions_detailed WHERE {$scope['where']}",
                 $scope['values']
@@ -291,41 +275,58 @@ class ShiftSalesSyncLocalReadGateway
     ): array {
         $clauses = [];
         $values = [];
-        $seen = [];
+        $groups = [];
 
         foreach ($transactionRefs as $ref) {
             $category = trim((string) ($ref['Category_Code'] ?? ''));
             $unit = trim((string) ($ref['Unit_Code'] ?? ''));
             $transactionId = trim((string) ($ref['transaction_id'] ?? ''));
             $terminal = trim((string) ($ref['terminal_number'] ?? ''));
-            $key = $category . '||' . $unit . '||' . $transactionId;
-
-            if ($terminalColumn !== null) {
-                $key .= '||' . $terminal;
-            }
-
             if (
                 $category === ''
                 || $unit === ''
                 || $transactionId === ''
                 || ($terminalColumn !== null && $terminal === '')
-                || isset($seen[$key])
             ) {
                 continue;
             }
 
-            $seen[$key] = true;
-            $clause = "({$categoryColumn} = ? AND {$unitColumn} = ? AND {$transactionColumn} = ?";
-            $values[] = $category;
-            $values[] = $unit;
-            $values[] = $transactionId;
+            $groupKey = $category . '||' . $unit;
+            if ($terminalColumn !== null) {
+                $groupKey .= '||' . $terminal;
+            }
+
+            if (!isset($groups[$groupKey])) {
+                $groups[$groupKey] = [
+                    'category' => $category,
+                    'unit' => $unit,
+                    'terminal' => $terminal,
+                    'transaction_ids' => [],
+                ];
+            }
+
+            $groups[$groupKey]['transaction_ids'][$transactionId] = $transactionId;
+        }
+
+        foreach ($groups as $group) {
+            $transactionIds = array_values($group['transaction_ids']);
+            if (count($transactionIds) === 0) {
+                continue;
+            }
+
+            $placeholders = implode(',', array_fill(0, count($transactionIds), '?'));
+            $clause = "({$categoryColumn} = ? AND {$unitColumn} = ?";
+            $values[] = $group['category'];
+            $values[] = $group['unit'];
 
             if ($terminalColumn !== null) {
                 $clause .= " AND {$terminalColumn} = ?";
-                $values[] = $terminal;
+                $values[] = $group['terminal'];
             }
 
-            $clauses[] = $clause . ")";
+            $clause .= " AND {$transactionColumn} IN ({$placeholders}))";
+            array_push($values, ...$transactionIds);
+            $clauses[] = $clause;
         }
 
         return [
@@ -399,6 +400,25 @@ class ShiftSalesSyncLocalReadGateway
         }
         $stmt->execute();
         return (int) $stmt->fetchColumn();
+    }
+
+    private function getTransactionDateCandidates(string $openingDateTime): array
+    {
+        $sortableDate = $this->toSortableDate($openingDateTime);
+        if (preg_match('/^\d{4}-\d{2}-\d{2}/', $sortableDate) !== 1) {
+            return [];
+        }
+
+        $date = DateTime::createFromFormat('!Y-m-d', substr($sortableDate, 0, 10));
+        if (!$date instanceof DateTime) {
+            return [];
+        }
+
+        return array_values(array_unique([
+            $date->format('Y-m-d'),
+            $date->format('n/j/Y'),
+            $date->format('m/d/Y'),
+        ]));
     }
 
     private function buildShiftKey(

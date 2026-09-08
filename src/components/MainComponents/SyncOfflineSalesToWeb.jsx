@@ -814,6 +814,7 @@ const SyncOfflineSalesToWeb = () => {
       if (!isTenantResolved) return;
 
       const shifts = (rowsInput || [])
+        .filter((row) => row.ready_to_sync)
         .map((row) => ({
           row_key: row.row_key,
           unit_code: row.unit_code,
