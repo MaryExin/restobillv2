@@ -29,14 +29,12 @@ import {
   FiDatabase,
 } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
-
 import { useTheme } from "../../context/ThemeContext";
 import useCustomQuery from "../../hooks/useCustomQuery";
 import { useCustomSecuredMutation } from "../../hooks/useCustomSecuredMutation";
 import useApiHost from "../../hooks/useApiHost";
 import { resolveCompanyTenant } from "../../utils/resolveCompanyTenant";
 import { parseIpConfigText } from "../../utils/parseIpConfig";
-
 import ModalYesNoReusable from "../Modals/ModalYesNoReusable";
 import ModalSuccessNavToSelf from "../Modals/ModalSuccessNavToSelf";
 
@@ -814,6 +812,7 @@ const SyncOfflineSalesToWeb = () => {
       if (!isTenantResolved) return;
 
       const shifts = (rowsInput || [])
+        .filter((row) => row.ready_to_sync)
         .map((row) => ({
           row_key: row.row_key,
           unit_code: row.unit_code,

@@ -30,6 +30,7 @@ class ShiftSalesSyncWebStatusReadGateway
             $primarySyncedRowKeys = [];
             $reportSyncedRowKeys = [];
             $busunitCodes = [];
+            $validShifts = [];
 
             foreach ($shifts as $shift) {
                 $unitCode = trim((string) ($shift['unit_code'] ?? ''));
@@ -52,20 +53,36 @@ class ShiftSalesSyncWebStatusReadGateway
                     continue;
                 }
 
-                $primarySynced = $this->existsWebSyncedShift(
+                $identityKey = $this->buildShiftIdentityKey(
                     $unitCode,
                     $shiftId,
                     $terminalNumber,
-                    $openingDateTime,
-                    $this->quoteIdentifier('tbl_pos_shifting_records')
+                    $openingDateTime
                 );
-                $reportSynced = $this->existsWebSyncedShift(
-                    $unitCode,
-                    $shiftId,
-                    $terminalNumber,
-                    $openingDateTime,
-                    $this->quoteIdentifier('tbl_pos_shifting_records_bd')
-                );
+                $validShifts[] = [
+                    'row_key' => $rowKey,
+                    'identity_key' => $identityKey,
+                    'unit_code' => $unitCode,
+                    'shift_id' => $shiftId,
+                    'terminal_number' => $terminalNumber,
+                    'opening_datetime' => $openingDateTime,
+                ];
+            }
+
+            $primarySyncedKeys = $this->findWebSyncedShiftKeys(
+                $validShifts,
+                $this->quoteIdentifier('tbl_pos_shifting_records')
+            );
+            $reportSyncedKeys = $this->findWebSyncedShiftKeys(
+                $validShifts,
+                $this->quoteIdentifier('tbl_pos_shifting_records_bd')
+            );
+
+            foreach ($validShifts as $shift) {
+                $identityKey = (string) $shift['identity_key'];
+                $rowKey = (string) $shift['row_key'];
+                $primarySynced = isset($primarySyncedKeys[$identityKey]);
+                $reportSynced = isset($reportSyncedKeys[$identityKey]);
 
                 if ($primarySynced) {
                     $primarySyncedRowKeys[] = $rowKey;
@@ -101,31 +118,73 @@ class ShiftSalesSyncWebStatusReadGateway
         }
     }
 
-    private function existsWebSyncedShift(
+    private function findWebSyncedShiftKeys(
+        array $shifts,
+        string $table
+    ): array {
+        $syncedKeys = [];
+
+        foreach (array_chunk($shifts, 250) as $chunk) {
+            $clauses = [];
+            $values = [];
+
+            foreach ($chunk as $shift) {
+                $clauses[] = '(
+                    Unit_Code = ?
+                    AND Shift_ID = ?
+                    AND terminal_number = ?
+                    AND Opening_DateTime = ?
+                )';
+                array_push(
+                    $values,
+                    $shift['unit_code'],
+                    $shift['shift_id'],
+                    $shift['terminal_number'],
+                    $shift['opening_datetime']
+                );
+            }
+
+            if (count($clauses) === 0) {
+                continue;
+            }
+
+            $where = implode(' OR ', $clauses);
+            $stmt = $this->conn->prepare("
+                SELECT Unit_Code, Shift_ID, terminal_number, Opening_DateTime
+                FROM {$table}
+                WHERE Status = 'Synced'
+                  AND ({$where})
+            ");
+
+            foreach ($values as $index => $value) {
+                $stmt->bindValue($index + 1, $value, PDO::PARAM_STR);
+            }
+
+            $stmt->execute();
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $key = $this->buildShiftIdentityKey(
+                    (string) ($row['Unit_Code'] ?? ''),
+                    (string) ($row['Shift_ID'] ?? ''),
+                    (string) ($row['terminal_number'] ?? ''),
+                    (string) ($row['Opening_DateTime'] ?? '')
+                );
+                $syncedKeys[$key] = true;
+            }
+        }
+
+        return $syncedKeys;
+    }
+
+    private function buildShiftIdentityKey(
         string $unitCode,
         string $shiftId,
         string $terminalNumber,
-        string $openingDateTime,
-        string $table
-    ): bool {
-        $stmt = $this->conn->prepare("
-            SELECT 1
-            FROM {$table}
-            WHERE Unit_Code = :unit_code
-              AND Shift_ID = :shift_id
-              AND terminal_number = :terminal_number
-              AND Opening_DateTime = :opening_datetime
-              AND Status = 'Synced'
-            LIMIT 1
-        ");
-        $stmt->execute([
-            'unit_code' => $unitCode,
-            'shift_id' => $shiftId,
-            'terminal_number' => $terminalNumber,
-            'opening_datetime' => $openingDateTime,
-        ]);
-
-        return (bool) $stmt->fetchColumn();
+        string $openingDateTime
+    ): string {
+        return trim($unitCode) . '||'
+            . trim($shiftId) . '||'
+            . trim($terminalNumber) . '||'
+            . trim($openingDateTime);
     }
 
     private function getBusunitNames(array $busunitCodes): array
