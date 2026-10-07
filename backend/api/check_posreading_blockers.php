@@ -69,7 +69,7 @@ try {
     }
 
     $pdo = new PDO(
-        "mysql:host={$config['host']};dbname={$readingDbName};charset={$charset}",
+        "mysql:host={$config['host']};dbname={$readingDbName};charset={$charset}" . ";port=" . (int)($config['port'] ?? 3306),
         $config["user"],
         $config["pass"],
         [

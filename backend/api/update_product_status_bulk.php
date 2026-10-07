@@ -5,7 +5,7 @@ header("Access-Control-Allow-Methods: POST");
 header("Access-Control-Allow-Headers: Content-Type");
 
 $config = include 'config.php';
-$conn = new mysqli($config['host'], $config['user'], $config['pass'], $config['db']);
+$conn = new mysqli($config['host'], $config['user'], $config['pass'], $config['db'], (int)($config['port'] ?? 3306));
 
 if ($conn->connect_error) {
     echo json_encode(["status" => "error", "message" => "Database error"]);

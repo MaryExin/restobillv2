@@ -19,7 +19,8 @@ $conn = new mysqli(
     $config["host"],
     $config["user"],
     $config["pass"],
-    $config["db"]
+    $config["db"],
+    (int)($config['port'] ?? 3306)
 );
 
 if ($conn->connect_error) {
@@ -384,7 +385,7 @@ try {
 
     $reportMirrorWarning = "";
     try {
-        $dsn = "mysql:host={$config['host']};dbname={$config['db']};charset={$config['charset']}";
+        $dsn = "mysql:host={$config['host']};dbname={$config['db']};charset={$config['charset']}" . ";port=" . (int)($config['port'] ?? 3306);
         $mirrorPdo = new PDO($dsn, $config["user"], $config["pass"], [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,

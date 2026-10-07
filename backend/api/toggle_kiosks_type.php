@@ -15,7 +15,7 @@ $config = require __DIR__ . "/config.php";
 
 try {
     $pdo = new PDO(
-        "mysql:host={$config['host']};dbname={$config['db']};charset=utf8mb4",
+        "mysql:host={$config['host']};dbname={$config['db']};charset=utf8mb4" . ";port=" . (int)($config['port'] ?? 3306),
         $config["user"],
         $config["pass"],
         [

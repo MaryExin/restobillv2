@@ -33,6 +33,7 @@ function posDeveloperDatabaseConnection(): ?PDO
     $database = posDeveloperEnv("DB_NAME");
     $username = posDeveloperEnv("DB_USER");
     $password = posDeveloperEnv("DB_PASS");
+    $port = (int)posDeveloperEnv("DB_PORT", "3306");
 
     if ($host === "" || $database === "" || $username === "") {
         return null;
@@ -40,7 +41,7 @@ function posDeveloperDatabaseConnection(): ?PDO
 
     try {
         $connection = new PDO(
-            "mysql:host={$host};dbname={$database};charset=utf8mb4",
+            "mysql:host={$host};port={$port};dbname={$database};charset=utf8mb4",
             $username,
             $password,
             [

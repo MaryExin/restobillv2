@@ -12,6 +12,7 @@ if (!in_array($_SERVER["REQUEST_METHOD"], ["GET", "POST"], true)) {
 
 require __DIR__ . "/pdo.php";
 require_once __DIR__ . "/pos_role_authorization.php";
+require_once __DIR__ . "/pos_database_backup.php";
 
 posRoleAuthRequirePermission(
     $pdo,
@@ -45,7 +46,7 @@ if ($_SERVER["REQUEST_METHOD"] !== $allowedMethods[$action]) {
 
 $tableName = "tbl_system_settings_backup_db";
 
-$conn = new mysqli($host, $user, $pass, $db);
+$conn = new mysqli($host, $user, $pass, $db, (int)($config['port'] ?? 3306));
 if ($conn->connect_error) {
     echo json_encode(["status" => "error", "message" => "Connection failed"]);
     exit;
@@ -81,20 +82,8 @@ elseif ($action === 'immediate_export') {
         exit;
     }
 
-    $mysqldump = PHP_OS_FAMILY === "Windows"
-        ? "C:\\xampp\\mysql\\bin\\mysqldump.exe"
-        : "/Applications/XAMPP/xamppfiles/bin/mysqldump";
-    $command = escapeshellarg($mysqldump)
-        . " --user=" . escapeshellarg($user)
-        . " --password=" . escapeshellarg($pass)
-        . " --host=" . escapeshellarg($host)
-        . " " . escapeshellarg($db)
-        . " > " . escapeshellarg($full_path) . " 2>&1";
     try {
-        exec($command, $output, $return_var);
-        if ($return_var !== 0 || !is_file($full_path) || filesize($full_path) === 0) {
-            throw new RuntimeException("mysqldump did not create a valid backup file");
-        }
+        posDatabaseExport($config, $full_path);
 
         header_remove("Content-Type");
         header("Content-Type: application/sql");
@@ -139,21 +128,8 @@ elseif ($action === 'scheduled_export') {
     $finalPath = rtrim($backupDir, DIRECTORY_SEPARATOR)
         . DIRECTORY_SEPARATOR
         . "B1T1_Latest_Backup.sql";
-    $mysqldump = PHP_OS_FAMILY === "Windows"
-        ? "C:\\xampp\\mysql\\bin\\mysqldump.exe"
-        : "/Applications/XAMPP/xamppfiles/bin/mysqldump";
-    $command = escapeshellarg($mysqldump)
-        . " --user=" . escapeshellarg($user)
-        . " --password=" . escapeshellarg($pass)
-        . " --host=" . escapeshellarg($host)
-        . " " . escapeshellarg($db)
-        . " > " . escapeshellarg($stagedPath) . " 2>&1";
-
     try {
-        exec($command, $output, $return_var);
-        if ($return_var !== 0 || !is_file($stagedPath) || filesize($stagedPath) === 0) {
-            throw new RuntimeException("mysqldump did not create a valid scheduled backup");
-        }
+        posDatabaseExport($config, $stagedPath);
         chmod($stagedPath, 0600);
         if (is_file($finalPath) && !unlink($finalPath)) {
             throw new RuntimeException("the previous scheduled backup could not be replaced");

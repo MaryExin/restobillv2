@@ -10,7 +10,7 @@ $corsPolicy = new CorsPolicy();
 $corsPolicy->cors();
 
 // Security / Auth
-$database = new Database($config["host"], $config["db"], $config["user"], $config["pass"]);
+$database = new Database($config["host"], $config["db"], $config["user"], $config["pass"], $config["port"] ?? 3306);
 $user_gateway = new UserGateway($database);
 $codec = new JWTCodec($_ENV["SECRET_KEY"]);
 $auth = new Auth($user_gateway, $codec);

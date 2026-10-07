@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("appConfig", {
+  getStandaloneBackend: () => ipcRenderer.invoke("get-standalone-backend"),
   getApiHost: () => ipcRenderer.invoke("get-api-host"),
   getWebApiHost: () => ipcRenderer.invoke("get-web-api-host"),
   getSalesSyncTenant: () => ipcRenderer.invoke("get-sales-sync-tenant"),

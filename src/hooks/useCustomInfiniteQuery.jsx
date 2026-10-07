@@ -1,7 +1,8 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
+import { standaloneFetch } from "../utils/standaloneFetch";
 
 const fetchData = async (url, page, search, pageData) => {
-  const res = await fetch(
+  const res = await standaloneFetch(
     url + "?page=" + page + "&search=" + search + "&pageData=" + pageData,
     {
       method: "GET",

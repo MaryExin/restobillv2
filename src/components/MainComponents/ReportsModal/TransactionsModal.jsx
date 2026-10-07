@@ -5,6 +5,7 @@ import React, {
   useRef,
   useMemo,
 } from "react";
+import { standaloneFetch } from "../../../utils/standaloneFetch";
 import {
   FaHistory,
   FaSearch,
@@ -137,7 +138,7 @@ const DetailsModal = ({ transaction, isOpen, onClose, isDark }) => {
   useEffect(() => {
     if (isOpen && transaction) {
       setLoading(true);
-      fetch(`http://localhost/api/get_transaction_items.php?id=${transaction.transaction_id}&date=${transaction.transaction_date}&role=${getCurrentUserRole()}`)
+      standaloneFetch(`http://localhost/api/get_transaction_items.php?id=${transaction.transaction_id}&date=${transaction.transaction_date}&role=${getCurrentUserRole()}`)
         .then((res) => res.json())
         .then((res) => {
           if (res.success) {
