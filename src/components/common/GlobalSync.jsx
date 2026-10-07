@@ -1,6 +1,7 @@
 "use client";
 import { useEffect } from "react";
 import { normalizePosApiHost } from "../../utils/posRoleFetch";
+import { standaloneFetch } from "../../utils/standaloneFetch";
 
 const backupHeaders = () => {
   const headers = new Headers({ Accept: "application/json" });
@@ -28,7 +29,7 @@ const GlobalSync = () => {
         const apiBase = normalizePosApiHost(
           localStorage.getItem("apiendpoint") || "http://localhost",
         );
-        const res = await fetch(
+        const res = await standaloneFetch(
           `${apiBase}/api/pos_db_backup_api.php?action=scheduled_export`,
           { method: "POST", headers: backupHeaders() },
         );
@@ -55,7 +56,7 @@ const GlobalSync = () => {
         const apiBase = normalizePosApiHost(
           localStorage.getItem("apiendpoint") || "http://localhost",
         );
-        const res = await fetch(
+        const res = await standaloneFetch(
           `${apiBase}/api/pos_db_backup_api.php?action=get_settings`,
           { headers: backupHeaders() },
         );

@@ -137,8 +137,7 @@ try {
         $config["db"] ?? "",
         $config["user"] ?? "",
         $config["pass"] ?? "",
-        $config["driver"] ?? "mysql",
-        $config["sqlite_path"] ?? ""
+        $config['port'] ?? 3306
     );
 
     $pdo = $database->getConnection();

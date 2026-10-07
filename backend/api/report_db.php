@@ -28,7 +28,7 @@ function resolveReportDbConfig(array $config, ?string $dateFrom, ?string $dateTo
 
 function reportDbConnectPdo(array $dbConfig): PDO
 {
-    $dsn = "mysql:host={$dbConfig['host']};dbname={$dbConfig['db']};charset={$dbConfig['charset']}";
+    $dsn = "mysql:host={$dbConfig['host']};dbname={$dbConfig['db']};charset={$dbConfig['charset']}" . ";port=" . (int)($dbConfig['port'] ?? 3306);
     $options = [
         PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -190,7 +190,7 @@ function getReportMysqli(?string $dateFrom, ?string $dateTo = null): mysqli
     $config = require __DIR__ . "/config.php";
     $dbConfig = resolveReportDbConfig($config, $dateFrom, $dateTo);
 
-    $conn = new mysqli($dbConfig["host"], $dbConfig["user"], $dbConfig["pass"], $dbConfig["db"]);
+    $conn = new mysqli($dbConfig["host"], $dbConfig["user"], $dbConfig["pass"], $dbConfig["db"], (int)($dbConfig['port'] ?? 3306));
     if ($conn->connect_error) {
         http_response_code(500);
         header("Content-Type: application/json");

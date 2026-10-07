@@ -6,6 +6,7 @@ import {
   FiCheckCircle, FiLoader, FiActivity, FiArrowDownCircle 
 } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
+import { standaloneFetch } from "../../../utils/standaloneFetch";
 
 const PosCashDrops = ({ isDark, accent }) => {
   const [amount, setAmount] = useState("");
@@ -19,7 +20,7 @@ const PosCashDrops = ({ isDark, accent }) => {
   const fetchDrops = async () => {
     setLoading(true);
     try {
-      const res = await fetch("http://localhost/api/pos_ledger_handler.php?action=get_ledger");
+      const res = await standaloneFetch("http://localhost/api/pos_ledger_handler.php?action=get_ledger");
       const result = await res.json();
       if (result.status === "success") {
         // Filter lang ang Cash Drop categories na active
@@ -45,7 +46,7 @@ const PosCashDrops = ({ isDark, accent }) => {
 
     setStatus("saving");
     try {
-      const response = await fetch("http://localhost/api/pos_ledger_handler.php?action=add_entry", {
+      const response = await standaloneFetch("http://localhost/api/pos_ledger_handler.php?action=add_entry", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

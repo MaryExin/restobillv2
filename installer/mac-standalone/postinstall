@@ -1,0 +1,742 @@
+#!/bin/bash
+set -Eeuo pipefail
+umask 077
+export PHP_INI_SCAN_DIR=''
+unset PHPRC DYLD_LIBRARY_PATH DYLD_INSERT_LIBRARIES
+
+STATE='/Library/Application Support/LightemStandalone'
+PAYLOAD="$STATE/setup"
+WEBROOT="$STATE/backend"
+PHPMYADMIN="$STATE/phpmyadmin"
+DATA="$STATE/data"
+ROOT_SECRET="$STATE/secrets/database-root.txt"
+RUNTIME_BASE='/Library/Lightem/runtime'
+APP='/Applications/Lightem Pos.app'
+LEGACY='/Applications/XAMPP/xamppfiles'
+LOG='/var/log/lightem-standalone-setup.log'
+RUN_ID="$(date -u +%Y%m%d%H%M%S)-$$"
+BACKUP="$STATE/backups/$RUN_ID"
+STEP='Preparing standalone setup'
+MODE=fresh
+# Compiled into each package: the normal installer never inspects XAMPP.
+# The setup app selects the separate import package only after an explicit choice.
+COPY_XAMPP_REQUESTED=0
+CHANGED=0
+PROVISIONED=0
+APP_CHANGED=0
+HTTP_PORT=8080
+EXISTING_HTTP_PORT=8080
+ACTIVE_HTTP_PORT=8080
+DB_REGISTERED=0
+HTTP_REGISTERED=0
+OLD_RUNTIME=''
+RUNTIME=''
+exec 3>&2
+
+say() { printf '[%s] %s\n' "$(date -u +%FT%TZ)" "$*"; }
+step() { STEP="$1"; say "$STEP"; }
+die() { printf 'Lightem standalone setup failed during: %s. %s. Log: %s\n' "$STEP" "$*" "$LOG" >&3; exit 1; }
+safe_path() {
+  local current="$1"
+  while [ "$current" != / ]; do
+    [ ! -L "$current" ] || die 'An installation path is a symbolic link; no redirected files will be changed'
+    current="${current%/*}"
+    [ -n "$current" ] || current=/
+  done
+}
+# BEGIN STANDALONE PROCESS CHECKS
+port_pids() {
+  local output status=0
+  # Bash 3.2 inherits ERR inside $(...) despite the outer status handler.
+  # Guard the command inside the substitution so an unused port remains status 1.
+  output=$(if /usr/sbin/lsof -nP -t -iTCP:"$1" -sTCP:LISTEN 2>/dev/null; then exit 0; else exit $?; fi) || status=$?
+  [ "$status" -le 1 ] || die "Cannot inspect local service ports (lsof exit $status)"
+  printf '%s' "$output"
+}
+port_belongs_to() {
+  local port="$1" prefix="$2" pid executable listeners
+  listeners=$(port_pids "$port") || return 1
+  for pid in $listeners; do
+    # Read every lsof record: head -1 closes the pipe early and can turn a
+    # healthy process inspection into SIGPIPE under the installer's pipefail.
+    executable=$(if /usr/sbin/lsof -a -p "$pid" -d txt -Fn 2>/dev/null | /usr/bin/awk '/^n/ && !found {print substr($0,2);found=1}'; then exit 0; else exit $?; fi) || return 1
+    case "$executable" in "$prefix"/*) ;; *) return 1 ;; esac
+  done
+}
+wait_port_closed() {
+  local attempt listeners
+  for attempt in $(seq 1 30); do
+    listeners=$(port_pids "$1") || return 1
+    [ -n "$listeners" ] || return 0
+    sleep 1
+  done
+  return 1
+}
+runtime_processes_present() {
+  local processes
+  processes=$(/bin/ps -axo command=) || return 2
+  printf '%s\n' "$processes" | /usr/bin/awk -v prefix="$RUNTIME_BASE/" -v name="/bin/$1" 'index($1,prefix)==1 && substr($1,length($1)-length(name)+1)==name {found=1} END {exit !found}'
+}
+stop_service() {
+  local executable attempt status listeners
+  if [ "$1" = http ]; then executable=httpd; else executable=mysqld; fi
+  /bin/launchctl bootout "system/com.lightem.standalone.$1" >/dev/null 2>&1 || true
+  for attempt in $(seq 1 30); do
+    listeners=$(port_pids "$2") || return 1
+    status=0; runtime_processes_present "$executable" || status=$?
+    [ "$status" -le 1 ] || return 1
+    # After the owned Apache workers exit, XAMPP may take the old port 80.
+    # Never wait for or stop that unrelated listener during update/rollback.
+    if [ "$status" -eq 1 ] && { [ "$1" = http ] || [ -z "$listeners" ]; }; then return 0; fi
+    sleep 1
+  done
+  return 1
+}
+# END STANDALONE PROCESS CHECKS
+# BEGIN STANDALONE SERVICE OWNERSHIP
+validate_service_ownership() {
+  local kind="$1" plist label loaded status=0 executable loaded_program metadata
+  label="com.lightem.standalone.$kind"
+  plist="/Library/LaunchDaemons/$label.plist"
+  safe_path "$plist"
+  # A missing service is expected on first install. Preserve launchctl's status
+  # before the inherited ERR trap can turn its 113 into a setup failure.
+  loaded=$(if /bin/launchctl print "system/$label" 2>/dev/null; then exit 0; else exit $?; fi) || status=$?
+  [ "$status" -eq 0 ] || [ "$status" -eq 113 ] || die "Cannot inspect the registered Lightem service $label (launchctl exit $status)"
+  if [ ! -e "$plist" ]; then
+    [ "$status" -eq 113 ] || die 'A loaded Lightem service has no matching owned configuration'
+    return
+  fi
+  [ -f "$plist" ] && [ ! -L "$plist" ] || die 'The service configuration is not a regular file'
+  metadata=$(/usr/bin/stat -f '%u:%Lp' "$plist") || die 'Cannot inspect service configuration ownership'
+  [ "${metadata%%:*}" = 0 ] || die 'The service configuration is not owned by root'
+  [[ "${metadata#*:}" =~ ^[0-7]{3,4}$ ]] || die 'The service configuration permissions are invalid'
+  [ $((8#${metadata#*:} & 0022)) -eq 0 ] || die 'The service configuration is writable by another user'
+  executable=$(/usr/bin/plutil -convert json -o - "$plist" | run_php -r '
+    $p=json_decode(stream_get_contents(STDIN),true,512,JSON_THROW_ON_ERROR);
+    $kind=$argv[1];$base=$argv[2];$state=$argv[3];$label="com.lightem.standalone.".$kind;
+    $args=$p["ProgramArguments"]??null;$exe=is_array($args)?($args[0]??""):"";
+    $name=$kind==="http"?"httpd":"mysqld";$user=$kind==="http"?"root":"_lightemdb";
+    if(($p["Label"]??"")!==$label || ($p["UserName"]??"")!==$user || isset($p["Program"]) || !is_string($exe) || !preg_match("~^".preg_quote($base,"~")."/[1-9][0-9]{0,19}/bin/".$name."$~D",$exe))exit(1);
+    $expected=$kind==="http"?[$exe,"-f",$state."/config/httpd.conf","-DFOREGROUND"]:[$exe,"--defaults-file=".$state."/config/database.cnf"];
+    if($args!==$expected)exit(1);echo $exe;
+  ' "$kind" "$RUNTIME_BASE" "$STATE") || die 'The service belongs to another installation or uses unexpected settings'
+  if [ "$status" -eq 0 ]; then
+    loaded_program=$(printf '%s\n' "$loaded" | /usr/bin/sed -n 's/^[[:space:]]*program = //p')
+    [ "$loaded_program" = "$executable" ] || die 'The loaded service executable differs from its owned configuration'
+  fi
+}
+# END STANDALONE SERVICE OWNERSHIP
+
+run_php() { "$RUNTIME/bin/php" -n "$@"; }
+# BEGIN STANDALONE CLASSIFICATION
+installation_phase() {
+  run_php -r '
+    $path=$argv[1];
+    if (!file_exists($path)) { echo "none"; exit; }
+    if (is_link($path) || fileowner($path)!==0 || (fileperms($path)&0077)!==0) exit(1);
+    $s=json_decode(file_get_contents($path),true,512,JSON_THROW_ON_ERROR);
+    $m=json_decode(file_get_contents($argv[2]),true,512,JSON_THROW_ON_ERROR);
+    if (($s["formatVersion"]??0)!==1 || ($s["runtimeKind"]??"")!=="standalone" || ($s["dataRoot"]??"")!==$argv[3] || ($s["runtimeSha256"]??"")!==$m["runtimeSha256"] || !in_array($s["sourceKind"]??"",["fresh","legacy"],true) || !in_array($s["status"]??"",["initializing","ready"],true)) exit(1);
+    if (array_key_exists("httpPort",$s) && !in_array($s["httpPort"],[80,8080],true)) exit(1);
+    echo $s["status"]==="ready" ? "ready" : "pending-".$s["sourceKind"];
+  ' "$STATE/standalone-runtime.json" "$PAYLOAD/manifest.json" "$DATA"
+}
+record_phase() {
+  run_php -r '
+    $m=json_decode(file_get_contents($argv[2]),true,512,JSON_THROW_ON_ERROR);
+    $v=["formatVersion"=>1,"runtimeKind"=>"standalone","status"=>$argv[4],"sourceKind"=>$argv[5],"dataRoot"=>$argv[3],"runtimeSha256"=>$m["runtimeSha256"],"httpPort"=>(int)$argv[6]];
+    $f=$argv[1].".tmp";if(is_link($f))exit(1);
+    if(file_put_contents($f,json_encode($v,JSON_THROW_ON_ERROR)."\n")===false)exit(1);
+    if(!chmod($f,0600)||!rename($f,$argv[1]))exit(1);
+  ' "$STATE/standalone-runtime.json" "$PAYLOAD/manifest.json" "$DATA" "$1" "$SOURCE_KIND" "$HTTP_PORT"
+}
+classify_installation() {
+  PHASE=$(installation_phase) || die 'The protected standalone state is invalid or requires a tested runtime upgrade'
+  SOURCE_KIND=fresh
+  if [ "$PHASE" = pending-legacy ]; then
+    [ "$COPY_XAMPP_REQUESTED" = 1 ] || die 'An unfinished XAMPP import was preserved. Select Copy data from XAMPP in Lightem Setup to resume it'
+    [ -f "$LEGACY/htdocs/api/bootstrap.php" ] && [ -f "$LEGACY/htdocs/.env" ] || die 'The original backend is required to verify the interrupted migration'
+    MODE=migrate; SOURCE_KIND=legacy
+  elif [ -f "$WEBROOT/.lightem-managed-install.json" ]; then
+    [ "$PHASE" != none ] || die 'The private backend has no matching protected installation state'
+    MODE=update
+  elif [ "$PHASE" = ready ]; then
+    die 'The installed backend marker is missing; preserved data requires recovery'
+  elif [ "$PHASE" = pending-fresh ]; then
+    MODE=fresh
+  elif [ "$COPY_XAMPP_REQUESTED" = 1 ]; then
+    [ -f "$LEGACY/htdocs/api/bootstrap.php" ] && [ -f "$LEGACY/htdocs/.env" ] || die 'Copy data from XAMPP was selected, but its Lightem backend or settings are missing. Uncheck this option for a new standalone store'
+    [ -z "$(ls -A "$WEBROOT")" ] && [ -z "$(ls -A "$DATA")" ] || die 'Unrecognized private files were preserved; review is required before migration'
+    MODE=migrate; SOURCE_KIND=legacy
+  elif [ -n "$(ls -A "$WEBROOT")" ] || [ -n "$(ls -A "$DATA")" ]; then
+    die 'The private installation contains unrelated files; recovery is required before replacement'
+  fi
+}
+# END STANDALONE CLASSIFICATION
+# BEGIN STANDALONE HTTP TRANSITION
+existing_http_port() {
+  if [ "$PHASE" = none ]; then printf '%s' "$HTTP_PORT"; return; fi
+  # Classification has already validated this protected ownership record.
+  # Records written before separate-port support did not contain httpPort.
+  run_php -r '
+    $s=json_decode(file_get_contents($argv[1]),true,512,JSON_THROW_ON_ERROR);
+    $port=$s["httpPort"]??80;
+    if (!in_array($port,[80,8080],true)) exit(1);
+    echo $port;
+  ' "$STATE/standalone-runtime.json"
+}
+check_http_destination() {
+  # Port 80 is deliberately outside this check: it may belong to XAMPP.
+  port_belongs_to "$HTTP_PORT" "$RUNTIME_BASE" || die "Standalone web port $HTTP_PORT belongs to another application"
+}
+stop_private_http() {
+  stop_service http "$ACTIVE_HTTP_PORT" || die 'The private web server did not stop'
+}
+# END STANDALONE HTTP TRANSITION
+# BEGIN STANDALONE LEGACY COPY CHECKS
+check_legacy_source() {
+  local listeners
+  listeners=$(port_pids 3306) || die 'Cannot inspect the original database port'
+  [ -n "$listeners" ] || die 'Start MySQL in XAMPP and pause sales before copying its store. Setup does not start or change XAMPP services'
+  port_belongs_to 3306 "$LEGACY" || die 'The original database port belongs to another server'
+  # Validate settings before any connection. Bundled PHP works independently
+  # of the XAMPP PHP version, extensions and socket configuration.
+  run_php -r '
+    require $argv[1];
+    try {
+      [, $config]=lightemSettings(lightemRoot($argv[2]));
+      if (!in_array((string)$config["host"],["localhost","127.0.0.1"],true) || lightemDatabasePort($config["port"]??3306)!==3306) {
+        throw new LightemSetupException("The copy source must use local XAMPP MySQL on port 3306; no remote or custom-port database was contacted.");
+      }
+      if ($argv[4]==="verify") {
+        $result=lightemVerifyInstallation(lightemRoot($argv[2]),lightemRoot($argv[3]),true,false,static function(array $settings,?string $database=null):PDO {
+          $settings["host"]="127.0.0.1";$settings["port"]=3306;
+          return lightemConnect($settings,$database);
+        });
+        echo json_encode($result,JSON_THROW_ON_ERROR)."\n";
+      }
+    } catch (Throwable $error) { lightemFail($error); }
+  ' "$PAYLOAD/verify.php" "$LEGACY/htdocs" "$PAYLOAD" "${1:-settings}"
+}
+# END STANDALONE LEGACY COPY CHECKS
+write_state() {
+  run_php -r '$m=json_decode(file_get_contents($argv[1]),true,512,JSON_THROW_ON_ERROR);$v=["installerId"=>"com.lenard.restobill.setup","formatVersion"=>1,"runtimeKind"=>"standalone","version"=>$m["version"],"buildId"=>$m["buildId"],"runtimeRoot"=>$argv[3],"httpPort"=>(int)$argv[4]];file_put_contents($argv[2].".tmp",json_encode($v,JSON_PRETTY_PRINT|JSON_THROW_ON_ERROR)."\n");chmod($argv[2].".tmp",0644);rename($argv[2].".tmp",$argv[2]);' "$PAYLOAD/manifest.json" "$STATE/installation.json" "$RUNTIME" "$HTTP_PORT"
+}
+cleanup() {
+  local status=$?
+  local listeners
+  trap - EXIT ERR
+  set +e +u
+  if [ "$status" -ne 0 ]; then
+    say "Setup failed during $STEP. Recovery files: $BACKUP"
+    if [ "$CHANGED" -eq 1 ]; then
+      if stop_service http "$ACTIVE_HTTP_PORT" && stop_service database 3307; then
+        if [ "$MODE" = update ]; then
+          for part in backend config installation.json standalone-runtime.json; do
+            if [ -e "$BACKUP/$part" ]; then rm -rf "$STATE/$part"; /usr/bin/ditto "$BACKUP/$part" "$STATE/$part"; fi
+          done
+          rm -rf "$PHPMYADMIN"
+          [ ! -d "$BACKUP/phpmyadmin" ] || /usr/bin/ditto "$BACKUP/phpmyadmin" "$PHPMYADMIN"
+          for service in http database; do
+            if [ -f "$BACKUP/com.lightem.standalone.$service.plist" ]; then
+              /usr/bin/ditto "$BACKUP/com.lightem.standalone.$service.plist" "/Library/LaunchDaemons/com.lightem.standalone.$service.plist"
+              if [ "$service" = http ] && ! port_belongs_to "$EXISTING_HTTP_PORT" "$RUNTIME_BASE"; then
+                say "The previous HTTP configuration was restored, but port $EXISTING_HTTP_PORT is now occupied. Its service was left stopped; the other application was not changed."
+                continue
+              fi
+              /bin/launchctl bootstrap system "/Library/LaunchDaemons/com.lightem.standalone.$service.plist" || true
+            fi
+          done
+        elif [ "$PROVISIONED" -eq 1 ]; then
+          say 'Verified private database and configuration retained for a safe retry.'
+        fi
+        if [ "$APP_CHANGED" -eq 1 ]; then
+          rm -rf "$APP"
+          [ ! -d "$BACKUP/Lightem Pos.app" ] || /usr/bin/ditto "$BACKUP/Lightem Pos.app" "$APP"
+        fi
+      else
+        say 'Automatic file restoration stopped because a service is still running. Recovery copies were preserved.'
+      fi
+    fi
+    printf 'Standalone installation did not complete. Step: %s. Log: %s\n' "$STEP" "$LOG" >&3
+  fi
+  exit "$status"
+}
+trap cleanup EXIT
+trap 'die "A required operation failed at line $LINENO (exit $?); see the protected setup log"' ERR
+
+# BEGIN STANDALONE ACCOUNTS
+ensure_service_account() {
+  local name="$1" candidate user_id group_id users groups user_exists=0 group_exists=0 properties='' field expected actual missing=''
+  users=$(/usr/bin/dscl . -list /Users UniqueID) || die 'Cannot inspect local user identifiers'
+  groups=$(/usr/bin/dscl . -list /Groups PrimaryGroupID) || die 'Cannot inspect local group identifiers'
+  safe_path "$STATE/accounts/$name"
+  if [ -f "$STATE/accounts/$name" ]; then
+    IFS=: read -r candidate group_id < "$STATE/accounts/$name"
+    [[ "$candidate" =~ ^[34][0-9][0-9]$ ]] && [ "$candidate" = "$group_id" ] || die 'The managed account record is invalid'
+  else
+    if printf '%s\n' "$users" | /usr/bin/awk -v n="$name" '$1==n {found=1} END {exit !found}' || printf '%s\n' "$groups" | /usr/bin/awk -v n="$name" '$1==n {found=1} END {exit !found}'; then die 'A service account name is already used by another installation'; fi
+    for candidate in $(seq 300 499); do
+      if ! printf '%s\n' "$users" | /usr/bin/awk '{print $2}' | /usr/bin/grep -qx "$candidate" && ! printf '%s\n' "$groups" | /usr/bin/awk '{print $2}' | /usr/bin/grep -qx "$candidate"; then break; fi
+    done
+    [ "$candidate" -lt 499 ] || die 'No service account identifier is available'
+    printf '%s:%s\n' "$candidate" "$candidate" > "$STATE/accounts/$name"
+    chmod 600 "$STATE/accounts/$name"
+  fi
+  user_id=$(printf '%s\n' "$users" | /usr/bin/awk -v n="$name" '$1==n {print $2}')
+  group_id=$(printf '%s\n' "$groups" | /usr/bin/awk -v n="$name" '$1==n {print $2}')
+  [ -z "$user_id" ] || [ "$user_id" = "$candidate" ] || die 'A managed service account identifier was changed'
+  [ -z "$group_id" ] || [ "$group_id" = "$candidate" ] || die 'A managed service group identifier was changed'
+  if printf '%s\n' "$users" | /usr/bin/awk -v n="$name" -v id="$candidate" '$2==id && $1!=n {found=1} END {exit !found}' || printf '%s\n' "$groups" | /usr/bin/awk -v n="$name" -v id="$candidate" '$2==id && $1!=n {found=1} END {exit !found}'; then die 'A service account identifier is used by another account'; fi
+  if printf '%s\n' "$users" | /usr/bin/awk -v n="$name" '$1==n {found=1} END {exit !found}'; then user_exists=1; fi
+  if printf '%s\n' "$groups" | /usr/bin/awk -v n="$name" '$1==n {found=1} END {exit !found}'; then group_exists=1; fi
+  if [ "$user_exists" -eq 1 ]; then
+    properties=$(/usr/bin/dscl . -read "/Users/$name" UniqueID PrimaryGroupID UserShell NFSHomeDirectory IsHidden) || die 'Cannot inspect managed service account properties'
+  fi
+  # Inspect only non-secret properties. Existing complete accounts need no
+  # directory writes, especially no Password reset during an app update.
+  for field in UniqueID PrimaryGroupID UserShell NFSHomeDirectory IsHidden; do
+    case "$field" in
+      UniqueID|PrimaryGroupID) expected="$candidate" ;;
+      UserShell) expected=/usr/bin/false ;;
+      NFSHomeDirectory) expected=/var/empty ;;
+      IsHidden) expected=1 ;;
+    esac
+    actual=$(printf '%s\n' "$properties" | /usr/bin/awk -v key="$field" '
+      $1==key":" || $1=="dsAttrTypeNative:"key":" {
+        if (NF!=2 || count++) invalid=1
+        value=$2
+      }
+      END {if (invalid) exit 1; printf "%s", value}
+    ') || die 'The managed service account properties are invalid'
+    if [ -z "$actual" ]; then
+      missing="$missing $field"
+    else
+      [ "$actual" = "$expected" ] || die "A managed service account property was changed: $field"
+    fi
+  done
+  if [ "$user_exists" -eq 1 ] && [ "$group_exists" -eq 1 ] && [ -n "$group_id" ] && [ -z "$missing" ]; then return 0; fi
+  # A protected account record permits resuming only missing creation steps.
+  [ "$group_exists" -eq 1 ] || /usr/bin/dscl . -create "/Groups/$name"
+  [ -n "$group_id" ] || /usr/bin/dscl . -create "/Groups/$name" PrimaryGroupID "$candidate"
+  [ "$user_exists" -eq 1 ] || /usr/bin/dscl . -create "/Users/$name"
+  for field in $missing; do
+    case "$field" in
+      UniqueID|PrimaryGroupID) expected="$candidate" ;;
+      UserShell) expected=/usr/bin/false ;;
+      NFSHomeDirectory) expected=/var/empty ;;
+      IsHidden) expected=1 ;;
+    esac
+    /usr/bin/dscl . -create "/Users/$name" "$field" "$expected"
+  done
+  [ "$user_exists" -eq 1 ] || /usr/bin/dscl . -create "/Users/$name" Password '*'
+}
+# END STANDALONE ACCOUNTS
+
+# BEGIN STANDALONE BOOTSTRAP
+bootstrap_database() {
+  # The bundled mysql_install_db has unquoted ownership commands. A relative
+  # path avoids splitting "Application Support" without changing the runtime.
+  (
+    cd "$DATA" || exit 1
+    # Installer's inherited TMPDIR is root-only. Keep both temporary-file paths
+    # private to the database account; the vendor also splits forwarded options.
+    TMPDIR="$STATE/run/database/tmp" "$RUNTIME/bin/mysql_install_db" --no-defaults --basedir="$RUNTIME" --datadir=. --tmpdir=../run/database/tmp --user=_lightemdb --auth-root-authentication-method=normal --skip-test-db
+  )
+}
+# END STANDALONE BOOTSTRAP
+
+# BEGIN STANDALONE INCOMPLETE DATABASE
+recover_incomplete_bootstrap() {
+  safe_path "$DATA"
+  safe_path "$WEBROOT"
+  [ -n "$(ls -A "$DATA")" ] || return 0
+  [ ! -e "$ROOT_SECRET" ] && [ ! -L "$ROOT_SECRET" ] || return 0
+  case "$PHASE:$MODE" in pending-fresh:fresh|pending-legacy:migrate) ;; *) return 0 ;; esac
+  [ -z "$(ls -A "$WEBROOT")" ] || die 'Private backend files were preserved; database recovery requires review'
+  # No administrator secret has been prepared and no backend has been copied.
+  # Preserve only recognized bootstrap output, never an unrelated database.
+  run_php -r '
+    $root=$argv[1];
+    foreach(new DirectoryIterator($root) as $f){
+      if($f->isDot())continue;
+      $name=$f->getFilename();
+      if($f->isLink())exit(1);
+      if($f->isDir()){
+        if(!in_array($name,["mysql","performance_schema","sys"],true))exit(1);
+        foreach(new RecursiveIteratorIterator(new RecursiveDirectoryIterator($f->getPathname(),FilesystemIterator::SKIP_DOTS),RecursiveIteratorIterator::SELF_FIRST) as $child){
+          if($child->isLink()||(!$child->isDir()&&!$child->isFile()))exit(1);
+        }
+      }elseif(!$f->isFile()||!preg_match("/^(?:aria_log_control|aria_log\\.[0-9]+|ibdata[0-9]+|ib_logfile[0-9]+|ib_buffer_pool|tc\\.log|mysql_upgrade_info)$/D",$name))exit(1);
+    }
+  ' "$DATA" || die 'Unrecognized database files were preserved; recovery requires review'
+  safe_path "$BACKUP/incomplete-database"
+  [ ! -e "$BACKUP/incomplete-database" ] || die 'The database recovery destination already exists'
+  mv "$DATA" "$BACKUP/incomplete-database"
+  mkdir "$DATA"
+  chown _lightemdb:_lightemdb "$DATA"
+  chmod 700 "$DATA"
+  say "Preserved interrupted database initialization in $BACKUP/incomplete-database"
+}
+# END STANDALONE INCOMPLETE DATABASE
+
+# BEGIN STANDALONE CONFIGURATION
+write_configuration() {
+  local init_clause=''
+  [ ! -f "$STATE/run/database-init.sql" ] || init_clause="init-file=\"$STATE/run/database-init.sql\""
+  cat > "$STATE/config/database.cnf" <<EOF
+[mysqld]
+basedir="$RUNTIME"
+datadir="$DATA"
+tmpdir="$STATE/run/database/tmp"
+port=3307
+bind-address=127.0.0.1
+skip-name-resolve
+socket="$STATE/run/database/mysql.sock"
+pid-file="$STATE/run/database/mysql.pid"
+log-error="$STATE/logs/database/error.log"
+plugin-dir="$RUNTIME/lib/mysql/plugin"
+character-sets-dir="$RUNTIME/share/mysql/charsets"
+lc-messages-dir="$RUNTIME/share/mysql"
+event-scheduler=OFF
+local-infile=0
+symbolic-links=0
+$init_clause
+EOF
+  cat > "$STATE/config/php.ini" <<EOF
+[PHP]
+date.timezone=Asia/Manila
+display_errors=Off
+log_errors=On
+error_log="$STATE/logs/http/php-error.log"
+memory_limit=256M
+post_max_size=64M
+upload_max_filesize=64M
+upload_tmp_dir="$STATE/run/http"
+session.save_path="$STATE/run/http"
+expose_php=Off
+allow_url_include=Off
+mysqli.default_port=3307
+pdo_mysql.default_socket="$STATE/run/database/mysql.sock"
+curl.cainfo=/etc/ssl/cert.pem
+openssl.cafile=/etc/ssl/cert.pem
+EOF
+  cat > "$STATE/config/httpd.conf" <<EOF
+ServerRoot "$RUNTIME"
+Listen ${HTTP_PORT:-8080}
+ServerName localhost
+PidFile "$STATE/run/http/httpd.pid"
+DefaultRuntimeDir "$STATE/run/http"
+LoadModule authz_core_module modules/mod_authz_core.so
+LoadModule authz_host_module modules/mod_authz_host.so
+LoadModule log_config_module modules/mod_log_config.so
+LoadModule mime_module modules/mod_mime.so
+LoadModule dir_module modules/mod_dir.so
+LoadModule alias_module modules/mod_alias.so
+LoadModule headers_module modules/mod_headers.so
+LoadModule rewrite_module modules/mod_rewrite.so
+LoadModule unixd_module modules/mod_unixd.so
+LoadModule env_module modules/mod_env.so
+LoadModule setenvif_module modules/mod_setenvif.so
+LoadModule php_module modules/libphp.so
+User _lightemhttp
+Group _lightemhttp
+PHPIniDir "$STATE/config"
+DocumentRoot "$WEBROOT"
+DirectoryIndex index.php index.html
+TypesConfig /dev/null
+AddType text/css .css
+AddType application/javascript .js
+AddType image/png .png
+AddType image/jpeg .jpg .jpeg
+AddType image/svg+xml .svg
+ErrorLog "$STATE/logs/http/error.log"
+LogFormat "%h %l %u %t \\"%r\\" %>s %b" common
+CustomLog "$STATE/logs/http/access.log" common
+<Directory />
+  AllowOverride None
+  Require all denied
+</Directory>
+<Directory "$WEBROOT">
+  Options -Indexes -Includes -ExecCGI
+  AllowOverride FileInfo AuthConfig Limit Options
+  Require ip 127.0.0.1 ::1 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 fc00::/7 fe80::/10
+</Directory>
+# Match Windows while keeping older Mac bookmarks on the canonical cookie path.
+RedirectMatch 302 "^/admin(/.*)?\$" "/lightem-db\$1"
+RedirectMatch 302 "^/lightem-db\$" "/lightem-db/"
+Alias /lightem-db "$STATE/phpmyadmin"
+<Directory "$STATE/phpmyadmin">
+  Options -Indexes -Includes -ExecCGI
+  AllowOverride None
+  <RequireAll>
+    Require ip 127.0.0.1 ::1
+    Require expr "%{HTTP_HOST} =~ /^(?i:localhost|127[.]0[.]0[.]1|\\[::1\\])(:[0-9]+)?$/"
+  </RequireAll>
+  php_admin_value session.save_path "$STATE/run/phpmyadmin"
+  php_admin_flag session.use_strict_mode On
+  php_admin_flag session.cookie_httponly On
+  php_admin_value session.cookie_samesite Lax
+  <FilesMatch "(?i)\\.php$">
+    SetHandler application/x-httpd-php
+  </FilesMatch>
+  <FilesMatch "(?i)^(config.*\\.php|phpmyadmin-manifest\\.json|composer\\.(json|lock)|package(-lock)?\\.json|yarn\\.lock)$">
+    Require all denied
+  </FilesMatch>
+</Directory>
+<DirectoryMatch "(?i)^$STATE/phpmyadmin/(libraries|templates|vendor|setup|test|tests|sql|doc|examples)(/|$)">
+  AllowOverride None
+  Require all denied
+</DirectoryMatch>
+<FilesMatch "\\.php$">
+  SetHandler application/x-httpd-php
+</FilesMatch>
+<DirectoryMatch "^$WEBROOT/(uploads|item_pictures|profile_pictures|pos_db_backup|pos_second_screen|api/images|api/uploads|images)(/|$)">
+  AllowOverride None
+  <FilesMatch "(?i)\\.(php[0-9]*|phtml|phar)$">
+    Require all denied
+  </FilesMatch>
+</DirectoryMatch>
+<DirectoryMatch "^$WEBROOT/(src|vendor|pos_db_backup)(/|$)">
+  AllowOverride None
+  Require all denied
+</DirectoryMatch>
+<FilesMatch "^(\\.|config\\.php|import_db\\.php)">
+  Require all denied
+</FilesMatch>
+EOF
+  chown root:wheel "$STATE/config"
+  chmod 711 "$STATE/config"
+  chown root:_lightemdb "$STATE/config/database.cnf"
+  chown root:_lightemhttp "$STATE/config/php.ini" "$STATE/config/httpd.conf"
+  chmod 640 "$STATE/config/"*
+}
+register_service() {
+  local kind="$1" executable arguments username
+  if [ "$kind" = database ]; then
+    executable="$RUNTIME/bin/mysqld"
+    username='_lightemdb'
+    arguments="<string>--defaults-file=$STATE/config/database.cnf</string>"
+  else
+    executable="$RUNTIME/bin/httpd"
+    username=root
+    arguments="<string>-f</string><string>$STATE/config/httpd.conf</string><string>-DFOREGROUND</string>"
+  fi
+  cat > "/Library/LaunchDaemons/com.lightem.standalone.$kind.plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict><key>Label</key><string>com.lightem.standalone.$kind</string><key>UserName</key><string>$username</string><key>ProgramArguments</key><array><string>$executable</string>$arguments</array><key>RunAtLoad</key><true/><key>KeepAlive</key><true/><key>ThrottleInterval</key><integer>10</integer><key>EnvironmentVariables</key><dict><key>PHP_INI_SCAN_DIR</key><string></string></dict></dict></plist>
+EOF
+  chown root:wheel "/Library/LaunchDaemons/com.lightem.standalone.$kind.plist"
+  chmod 644 "/Library/LaunchDaemons/com.lightem.standalone.$kind.plist"
+  /usr/bin/plutil -lint "/Library/LaunchDaemons/com.lightem.standalone.$kind.plist"
+  /bin/launchctl bootstrap system "/Library/LaunchDaemons/com.lightem.standalone.$kind.plist"
+}
+# END STANDALONE CONFIGURATION
+
+# BEGIN STANDALONE DESKTOP ENDPOINT
+set_desktop_local_endpoint() {
+  local file="$APP/Contents/Resources/ip.txt"
+  safe_path "$file"
+  run_php -r '
+    $file=$argv[1];$origin="http://localhost:".$argv[2];
+    $text=is_file($file)?file_get_contents($file):"WEB: \nTENANT: \n";
+    if (!is_string($text)) exit(1);
+    $count=preg_match_all("/^[ \\t]*LOCAL[ \\t]*:[ \\t]*([^\\r\\n]*)/im",$text,$matches,PREG_OFFSET_CAPTURE);
+    if ($count>1) { fwrite(STDERR,"Multiple LOCAL entries in desktop server configuration; review the preserved settings.\n");exit(1); }
+    $value=$count===1?trim($matches[1][0][0]):(preg_match("/^[ \\t]*(WEB|TENANT)[ \\t]*:/im",$text)?"":trim($text));
+    if ($value!=="") {
+      // Older desktop configs used backslashes; normalize only for deciding
+      // whether an endpoint is our own loopback origin, never remote values.
+      $normalized=str_replace("\\","/",$value);
+      $uri=parse_url($normalized);
+      if (!is_array($uri) || strtolower((string)($uri["scheme"]??""))!=="http" || !in_array(strtolower((string)($uri["host"]??"")),["localhost","127.0.0.1","[::1]"],true) || !in_array($uri["port"]??80,[80,8080],true) || !in_array($uri["path"]??"",["","/"],true) || isset($uri["query"]) || isset($uri["fragment"]) || isset($uri["user"]) || isset($uri["pass"])) exit(0);
+    }
+    if ($count===1) {
+      [$line,$offset]=$matches[0][0];$updated=substr($text,0,$offset)."LOCAL: ".$origin.substr($text,$offset+strlen($line));
+    } elseif ($value!=="") { $updated="LOCAL: ".$origin."\nWEB: \nTENANT: \n"; }
+    else { $updated="LOCAL: ".$origin."\n".$text; }
+    if ($updated!==$text || !is_file($file)) {
+      if (file_put_contents($file,$updated)===false) exit(1);
+    }
+  ' "$file" "$HTTP_PORT"
+}
+# END STANDALONE DESKTOP ENDPOINT
+
+[ "$(id -u)" -eq 0 ] || die 'Use macOS Installer with administrator access'
+[ "${3:-/}" = / ] || die 'Install on the startup disk'
+safe_path "$STATE"; safe_path "$RUNTIME_BASE"; safe_path "$APP"
+mkdir -p "$STATE"
+chmod 711 "$STATE"
+touch "$LOG"; chmod 600 "$LOG"; exec >>"$LOG" 2>&1
+step 'Checking the standalone package'
+[ -f "$PAYLOAD/manifest.json" ] && [ -d "$PAYLOAD/Lightem Pos.app" ] || die 'The setup package is incomplete'
+BUILD_ID=$(/usr/bin/plutil -extract buildId raw -o - "$PAYLOAD/manifest.json")
+[[ "$BUILD_ID" =~ ^[1-9][0-9]{0,19}$ ]] || die 'The package build identifier is invalid'
+[ "$(/usr/bin/plutil -extract runtimeKind raw -o - "$PAYLOAD/manifest.json")" = standalone ] || die 'Use the standalone installer for this installation'
+RUNTIME="$RUNTIME_BASE/$BUILD_ID"
+if [ "$(uname -m)" = arm64 ] && ! /usr/bin/arch -x86_64 /usr/bin/true 2>/dev/null; then /usr/sbin/softwareupdate --install-rosetta --agree-to-license || die 'Rosetta is required for the bundled server runtime'; fi
+safe_path "$RUNTIME"
+mkdir -p "$RUNTIME_BASE"
+chown root:wheel /Library/Lightem "$RUNTIME_BASE"
+chmod 755 /Library/Lightem "$RUNTIME_BASE"
+if [ ! -e "$RUNTIME" ]; then /usr/bin/ditto "$PAYLOAD/runtime" "$RUNTIME"; chown -R root:wheel "$RUNTIME"; chmod -R u+rwX,go+rX,go-w "$RUNTIME"; fi
+run_php "$PAYLOAD/verify-runtime.php" --root "$RUNTIME" --platform darwin --sha256 "$(/usr/bin/plutil -extract runtimeSha256 raw -o - "$PAYLOAD/manifest.json")"
+run_php "$PAYLOAD/verify-phpmyadmin.php" --root "$PAYLOAD/phpmyadmin" --sha256 "$(/usr/bin/plutil -extract phpMyAdminSha256 raw -o - "$PAYLOAD/manifest.json")" --version "$(/usr/bin/plutil -extract phpMyAdminVersion raw -o - "$PAYLOAD/manifest.json")"
+safe_path "$PHPMYADMIN"; safe_path "$STATE/secrets/phpmyadmin-cookie.txt"
+if /usr/bin/pgrep -f '^/Applications/Lightem Pos.app/Contents/MacOS/' >/dev/null; then die 'Close Lightem POS on this computer and connected devices before setup'; fi
+for part in accounts secrets backups config run logs backend data database-backups; do safe_path "$STATE/$part"; mkdir -p "$STATE/$part"; done
+chmod 700 "$STATE/accounts" "$STATE/secrets" "$STATE/backups"
+mkdir -p "$BACKUP"
+safe_path "$STATE/standalone-runtime.json"
+classify_installation
+EXISTING_HTTP_PORT=$(existing_http_port) || die 'The existing standalone web port is invalid; its configuration was preserved'
+ACTIVE_HTTP_PORT="$EXISTING_HTTP_PORT"
+if [ "$PHASE" = none ] && [ "$MODE" != update ] && [ -d "$PHPMYADMIN" ] && [ -n "$(ls -A "$PHPMYADMIN")" ]; then
+  die 'An existing database browser without a standalone ownership marker was preserved; review is required before replacement'
+fi
+if [ -f "$WEBROOT/.lightem-managed-install.json" ]; then
+  run_php -r '$o=json_decode(file_get_contents($argv[1]),true,512,JSON_THROW_ON_ERROR);$n=json_decode(file_get_contents($argv[2]),true,512,JSON_THROW_ON_ERROR);if(($o["runtimeKind"]??"")!=="standalone" || version_compare($o["version"],$n["version"],">") || (strlen($o["buildId"])>strlen($n["buildId"])) || (strlen($o["buildId"])===strlen($n["buildId"])&&strcmp($o["buildId"],$n["buildId"])>0))exit(1);' "$WEBROOT/.lightem-managed-install.json" "$PAYLOAD/manifest.json" || die 'This backend is incompatible or newer than the installer'
+  run_php -r '$o=json_decode(file_get_contents($argv[1]),true,512,JSON_THROW_ON_ERROR);$n=json_decode(file_get_contents($argv[2]),true,512,JSON_THROW_ON_ERROR);if(($o["runtimeSha256"]??"")!==$n["runtimeSha256"])exit(1);' "$WEBROOT/.lightem-managed-install.json" "$PAYLOAD/manifest.json" || die 'A tested server-runtime upgrade is required before replacing this database engine'
+fi
+for part in backend config phpmyadmin installation.json standalone-runtime.json; do [ ! -e "$STATE/$part" ] || /usr/bin/ditto "$STATE/$part" "$BACKUP/$part"; done
+[ ! -d "$APP" ] || /usr/bin/ditto "$APP" "$BACKUP/Lightem Pos.app"
+step 'Checking registered Lightem services'
+for service in http database; do validate_service_ownership "$service"; done
+for service in http database; do [ ! -f "/Library/LaunchDaemons/com.lightem.standalone.$service.plist" ] || /usr/bin/ditto "/Library/LaunchDaemons/com.lightem.standalone.$service.plist" "$BACKUP/com.lightem.standalone.$service.plist"; done
+
+step 'Checking existing services and database ownership'
+port_belongs_to 3307 "$RUNTIME_BASE" || die 'Private database port 3307 belongs to another application'
+check_http_destination
+if [ "$MODE" = migrate ]; then
+  say 'Copying the XAMPP store without changing its services. Keep its MySQL running and pause sales until setup completes.'
+  check_legacy_source verify
+  /usr/bin/ditto "$LEGACY/htdocs" "$BACKUP/legacy-backend"
+elif [ "$MODE" = update ]; then
+  DB_LISTENERS=$(port_pids 3307) || die 'Cannot inspect the private database before update'
+  if [ -n "$DB_LISTENERS" ]; then run_php "$PAYLOAD/verify.php" --root "$WEBROOT" --payload "$PAYLOAD" --before-update; fi
+fi
+CHANGED=1
+stop_private_http
+ACTIVE_HTTP_PORT="$HTTP_PORT"
+check_http_destination
+stop_service database 3307 || die 'The private database did not stop'
+[ "$PHASE" = ready ] || record_phase initializing
+step 'Preparing private service accounts and storage'
+ensure_service_account _lightemhttp
+ensure_service_account _lightemdb
+mkdir -p "$STATE/logs/http" "$STATE/logs/database" "$STATE/run/http" "$STATE/run/database"
+safe_path "$STATE/run/database/tmp"
+mkdir -p "$STATE/run/database/tmp"
+chmod 711 "$STATE/logs" "$STATE/run"
+chown _lightemhttp:_lightemhttp "$STATE/logs/http" "$STATE/run/http" "$STATE/database-backups"
+chown _lightemdb:_lightemdb "$DATA" "$STATE/logs/database" "$STATE/run/database" "$STATE/run/database/tmp"
+chmod 700 "$DATA" "$STATE/logs/http" "$STATE/run/http" "$STATE/logs/database" "$STATE/run/database" "$STATE/run/database/tmp" "$STATE/database-backups"
+
+step 'Initializing or checking the private database'
+recover_incomplete_bootstrap
+if [ ! -d "$DATA/mysql" ]; then
+  [ -z "$(ls -A "$DATA")" ] || die 'An unrecognized database directory was preserved'
+  bootstrap_database
+fi
+if [ ! -f "$ROOT_SECRET" ]; then
+  [ "$MODE" != update ] || die 'Private administrator credentials are missing; the existing database was preserved'
+  run_php "$PAYLOAD/database-admin.php" --data-dir "$DATA" --credentials "$ROOT_SECRET" --prepare-init-file "$STATE/run/database-init.sql"
+elif [ "$MODE" != update ] && [ ! -f "$STATE/run/database-init.sql" ] && [ ! -f "$WEBROOT/.env" ]; then
+  run_php "$PAYLOAD/database-admin.php" --data-dir "$DATA" --credentials "$ROOT_SECRET" --prepare-init-file "$STATE/run/database-init.sql" --resume-init-file
+fi
+if [ -f "$STATE/run/database-init.sql" ]; then
+  chown root:_lightemdb "$STATE/run/database-init.sql"
+  chmod 640 "$STATE/run/database-init.sql"
+fi
+[ -f "$ROOT_SECRET" ] || die 'Private administrator credentials are missing; the database was preserved'
+write_configuration
+register_service database
+DB_REGISTERED=1
+for attempt in $(seq 1 40); do /usr/bin/nc -z 127.0.0.1 3307 && break; sleep 1; done
+run_php "$PAYLOAD/database-admin.php" --data-dir "$DATA" --credentials "$ROOT_SECRET" --database-port 3307
+rm -f "$STATE/run/database-init.sql"
+write_configuration
+
+step 'Installing the backend and preserving store data'
+for part in api src vendor; do
+  [ "$part" != vendor ] || rm -rf "$WEBROOT/vendor"
+  /usr/bin/ditto "$PAYLOAD/backend/$part" "$WEBROOT/$part"
+done
+CREDENTIALS="$STATE/secrets/initial-access-$RUN_ID.txt"
+if [ "$MODE" = migrate ]; then
+  check_legacy_source
+  for part in uploads item_pictures profile_pictures pos_db_backup pos_second_screen api/images api/uploads images; do [ ! -d "$LEGACY/htdocs/$part" ] || /usr/bin/ditto "$LEGACY/htdocs/$part" "$WEBROOT/$part"; done
+  run_php "$PAYLOAD/migrate.php" --source-root "$LEGACY/htdocs" --root "$WEBROOT" --payload "$PAYLOAD" --credentials "$CREDENTIALS" --bootstrap-password-file "$ROOT_SECRET" --database-port 3307 --data-dir "$DATA" --mysqldump-path "$RUNTIME/bin/mysqldump" --mysql-path "$RUNTIME/bin/mysql" --runtime-group _lightemhttp --backup-dir "$STATE/database-backups"
+elif [ "$MODE" = update ]; then
+  run_php "$PAYLOAD/provision.php" --root "$WEBROOT" --payload "$PAYLOAD" --adopt-existing
+else
+  run_php "$PAYLOAD/provision.php" --root "$WEBROOT" --payload "$PAYLOAD" --credentials "$CREDENTIALS" --bootstrap-password-file "$ROOT_SECRET" --database-port 3307 --mysqldump-path "$RUNTIME/bin/mysqldump" --runtime-group _lightemhttp --backup-dir "$STATE/database-backups"
+fi
+PROVISIONED=1
+chown -R root:_lightemhttp "$WEBROOT"
+chmod -R u+rwX,g+rX,o-rwx "$WEBROOT"
+for part in uploads item_pictures profile_pictures pos_db_backup pos_second_screen api/images api/uploads images; do
+  mkdir -p "$WEBROOT/$part"; chown -R _lightemhttp:_lightemhttp "$WEBROOT/$part"; chmod -R u+rwX,g+rwX,o-rwx "$WEBROOT/$part"
+done
+run_php "$PAYLOAD/verify.php" --root "$WEBROOT" --payload "$PAYLOAD"
+step 'Installing the local database browser'
+safe_path "$STATE/run/phpmyadmin"
+mkdir -p "$STATE/run/phpmyadmin"
+chown _lightemhttp:_lightemhttp "$STATE/run/phpmyadmin"
+chmod 700 "$STATE/run/phpmyadmin"
+rm -rf "$PHPMYADMIN"
+/usr/bin/ditto "$PAYLOAD/phpmyadmin" "$PHPMYADMIN"
+run_php "$PAYLOAD/phpmyadmin-config.php" --root "$PHPMYADMIN" --temp-dir "$STATE/run/phpmyadmin" --secret-file "$STATE/secrets/phpmyadmin-cookie.txt"
+chown -R root:_lightemhttp "$PHPMYADMIN"
+chmod -R u+rwX,g+rX,o-rwx "$PHPMYADMIN"
+chmod 640 "$PHPMYADMIN/config.inc.php"
+"$RUNTIME/bin/php" -n -l "$PHPMYADMIN/config.inc.php"
+step 'Starting the standalone web server'
+check_http_destination
+"$RUNTIME/bin/httpd" -t -f "$STATE/config/httpd.conf"
+register_service http
+HTTP_REGISTERED=1
+nonce=$(/usr/bin/openssl rand -hex 16)
+probe="$WEBROOT/lightem-check-$nonce.php"
+printf "<?php echo '%s';" "$nonce" > "$probe"
+chown root:_lightemhttp "$probe"; chmod 640 "$probe"
+answer=''
+for attempt in $(seq 1 30); do answer=$(/usr/bin/curl -fsS --max-time 2 "http://127.0.0.1:$HTTP_PORT/lightem-check-$nonce.php" || true); [ "$answer" != "$nonce" ] || break; sleep 1; done
+rm -f "$probe"
+[ "$answer" = "$nonce" ] || die 'The private web server did not execute the expected PHP backend'
+answer=$(/usr/bin/curl -fsS --max-time 15 "http://127.0.0.1:$HTTP_PORT/lightem-db/") || die 'The local database browser did not respond'
+case "$answer" in *'name="pma_username"'*) ;; *) die 'The local database browser did not display its credential login' ;; esac
+
+step 'Installing the desktop application'
+APP_CHANGED=1
+rm -rf "$APP"
+(umask 022; /usr/bin/ditto "$PAYLOAD/Lightem Pos.app" "$APP")
+if [ -d "$BACKUP/Lightem Pos.app/Contents/Resources" ]; then
+  # Remove editable packaged defaults before restoring an existing profile.
+  # Otherwise files absent in another tenant's profile would retain our defaults.
+  for file in ip.txt printer.txt printer_categories.json businessInfo.json pos-config.json; do
+    safe_path "$APP/Contents/Resources/$file"
+    rm -f "$APP/Contents/Resources/$file"
+  done
+  for file in ip.txt printer.txt printer_categories.json businessInfo.json pos-config.json business-info-backups; do
+    [ ! -e "$BACKUP/Lightem Pos.app/Contents/Resources/$file" ] || /usr/bin/ditto "$BACKUP/Lightem Pos.app/Contents/Resources/$file" "$APP/Contents/Resources/$file"
+  done
+fi
+run_php "$PAYLOAD/desktop-settings.php" --resources "$APP/Contents/Resources" --defaults "$PAYLOAD/Lightem Pos.app/Contents/Resources/images"
+set_desktop_local_endpoint
+consoleUser=$(/usr/bin/stat -f %Su /dev/console)
+if [ "$consoleUser" != root ] && [ "$consoleUser" != loginwindow ]; then
+  mkdir -p "$APP/Contents/Resources/business-info-backups"
+  for file in ip.txt printer.txt printer_categories.json businessInfo.json pos-config.json business-info-backups; do
+    if [ -e "$APP/Contents/Resources/$file" ]; then chown -R "$consoleUser":staff "$APP/Contents/Resources/$file"; chmod -R u+rwX "$APP/Contents/Resources/$file"; fi
+  done
+  if [ -f "${CREDENTIALS%.txt}.login.txt" ]; then /usr/bin/ditto "${CREDENTIALS%.txt}.login.txt" "/Users/$consoleUser/Desktop/Lightem initial login.txt"; chown "$consoleUser":staff "/Users/$consoleUser/Desktop/Lightem initial login.txt"; chmod 600 "/Users/$consoleUser/Desktop/Lightem initial login.txt"; fi
+fi
+write_state
+/usr/libexec/ApplicationFirewall/socketfilterfw --add "$RUNTIME/bin/httpd" >/dev/null 2>&1 || true
+/usr/libexec/ApplicationFirewall/socketfilterfw --unblockapp "$RUNTIME/bin/httpd" >/dev/null 2>&1 || true
+record_phase ready
+say "Standalone setup completed. Databases are private on port 3307; POS API is available to the local network on port $HTTP_PORT. Database browser: http://localhost:$HTTP_PORT/lightem-db/ (this computer only). Recovery: $BACKUP"
+exit 0

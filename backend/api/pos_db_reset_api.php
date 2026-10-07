@@ -14,6 +14,7 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
 require __DIR__ . "/pdo.php";
 require_once __DIR__ . "/report_db.php";
 require_once __DIR__ . "/pos_role_authorization.php";
+require_once __DIR__ . "/pos_legacy_optional_tables.php";
 
 try {
     posRoleAuthRequirePermission(
@@ -58,7 +59,7 @@ try {
         ];
 
         foreach ($tables as $table) {
-            $pdo->exec("TRUNCATE TABLE `$table`;");
+            posTruncateExistingResetTable($pdo, $table);
         }
 
             // --- INSERT NEW COUNTER VALUES WITH CODES FROM BUSINESS UNITS ---
@@ -123,7 +124,7 @@ try {
         ];
 
         foreach ($reportTables as $table) {
-            $reportPdo->exec("TRUNCATE TABLE `$table`;");
+            posTruncateExistingResetTable($reportPdo, $table);
         }
 
         $reportPdo->exec("SET FOREIGN_KEY_CHECKS = 1;");

@@ -37,6 +37,7 @@ const PosDiscountTypeSettings = ({ isDark, accent = "#3b82f6" }) => {
   const [discountTypes, setDiscountTypes] = useState([]);
   const [salesTypes, setSalesTypes] = useState([]);
   const [mappings, setMappings] = useState({});
+  const [customDiscountSetupAvailable, setCustomDiscountSetupAvailable] = useState(true);
 
   const [rowEdits, setRowEdits] = useState({});
   const [expandedId, setExpandedId] = useState(null);
@@ -72,6 +73,12 @@ const PosDiscountTypeSettings = ({ isDark, accent = "#3b82f6" }) => {
 
     setDiscountTypes(types);
     setSalesTypes(sTypes);
+    const setupAvailable = data?.custom_discount_setup_available !== false;
+    setCustomDiscountSetupAvailable(setupAvailable);
+    if (!setupAvailable) {
+      setShowAddForm(false);
+      setExpandedId(null);
+    }
 
     const mapObj = {};
     maps.forEach((row) => {
@@ -129,7 +136,7 @@ const PosDiscountTypeSettings = ({ isDark, accent = "#3b82f6" }) => {
 
   const saveRow = async (type) => {
     const edit = rowEdits[type.id];
-    if (!edit || !apiHost) return;
+    if (!edit || !apiHost || !customDiscountSetupAvailable) return;
 
     try {
       setSavingKey(`row-${type.id}`);
@@ -160,7 +167,7 @@ const PosDiscountTypeSettings = ({ isDark, accent = "#3b82f6" }) => {
   };
 
   const deleteType = async (type) => {
-    if (!apiHost) return;
+    if (!apiHost || !customDiscountSetupAvailable) return;
     if (!window.confirm(`Delete "${type.discount_name}"? This cannot be undone.`)) {
       return;
     }
@@ -187,7 +194,7 @@ const PosDiscountTypeSettings = ({ isDark, accent = "#3b82f6" }) => {
   };
 
   const createType = async () => {
-    if (!apiHost || !newType.discount_name.trim()) return;
+    if (!apiHost || !customDiscountSetupAvailable || !newType.discount_name.trim()) return;
 
     try {
       setSavingKey("create");
@@ -219,6 +226,7 @@ const PosDiscountTypeSettings = ({ isDark, accent = "#3b82f6" }) => {
   };
 
   const toggleExpand = (type) => {
+    if (!customDiscountSetupAvailable) return;
     if (expandedId === type.id) {
       setExpandedId(null);
       return;
@@ -243,7 +251,7 @@ const PosDiscountTypeSettings = ({ isDark, accent = "#3b82f6" }) => {
   };
 
   const saveMappingPanel = async (type) => {
-    if (!apiHost) return;
+    if (!apiHost || !customDiscountSetupAvailable) return;
 
     try {
       setSavingKey(`panel-${type.id}`);
@@ -314,7 +322,8 @@ const PosDiscountTypeSettings = ({ isDark, accent = "#3b82f6" }) => {
           <button
             type="button"
             onClick={() => setShowAddForm((prev) => !prev)}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] shadow-lg transition-all active:scale-95"
+            disabled={!customDiscountSetupAvailable}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] shadow-lg transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
             style={{ backgroundColor: accent, color: isDark ? "#0f172a" : "#ffffff" }}
           >
             <FiPlus size={14} />
@@ -322,7 +331,17 @@ const PosDiscountTypeSettings = ({ isDark, accent = "#3b82f6" }) => {
           </button>
         </div>
 
-        {showAddForm && (
+        {!customDiscountSetupAvailable && (
+          <p
+            role="status"
+            className={`mt-5 rounded-2xl border p-4 text-sm font-[Poppins-Regular] ${theme.panelSoft} ${theme.textPrimary}`}
+          >
+            Custom discount configuration is unavailable for this database.
+            Existing statutory discounts continue to work.
+          </p>
+        )}
+
+        {showAddForm && customDiscountSetupAvailable && (
           <div className={`mt-5 rounded-2xl border p-4 ${theme.panelSoft}`}>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
               <input
@@ -425,12 +444,18 @@ const PosDiscountTypeSettings = ({ isDark, accent = "#3b82f6" }) => {
                         </p>
                         <p className={`text-[11px] ${theme.textMuted}`}>
                           {type.calculation_type === "fixed" ? "Fixed amount" : "Percentage"} ·{" "}
-                          {activeSalesTypeCount[type.id] || 0}/{salesTypes.length} sales types active
+                          {customDiscountSetupAvailable
+                            ? `${activeSalesTypeCount[type.id] || 0}/${salesTypes.length} sales types active`
+                            : "Sales type configuration unavailable"}
                         </p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <fieldset
+                      disabled={!customDiscountSetupAvailable}
+                      aria-label={`Edit ${type.discount_name}`}
+                      className="flex min-w-0 items-center gap-2 border-0 p-0 disabled:opacity-50"
+                    >
                       <div className="relative">
                         <input
                           type="number"
@@ -510,10 +535,10 @@ const PosDiscountTypeSettings = ({ isDark, accent = "#3b82f6" }) => {
                           <FiTrash2 size={15} />
                         </button>
                       )}
-                    </div>
+                    </fieldset>
                   </div>
 
-                  {isExpanded && (
+                  {isExpanded && customDiscountSetupAvailable && (
                     <div className={`px-4 pb-5 sm:px-5 ${theme.panelSoft} border-t`} style={{ borderColor: "var(--app-border)" }}>
                       <div className="grid grid-cols-1 gap-2 pt-4 sm:grid-cols-2 lg:grid-cols-3">
                         {salesTypes.map((st) => {

@@ -8,10 +8,11 @@ const KioskDisplayScreen = () => {
 
   const imageUrl = useMemo(() => {
     try {
-      const origin = apiHost ? new URL(apiHost).origin : "http://localhost";
+      if (!apiHost) return undefined;
+      const origin = new URL(apiHost).origin;
       return `${origin}/pos_second_screen/display.jpg?t=${imageBust}`;
     } catch {
-      return `http://localhost/pos_second_screen/display.jpg?t=${imageBust}`;
+      return undefined;
     }
   }, [apiHost, imageBust]);
 
