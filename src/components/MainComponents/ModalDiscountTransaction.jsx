@@ -20,6 +20,11 @@ import { printWithPdfFallback } from "../../utils/printWithPdfFallback";
 import useGetDefaultPrinter from "../../hooks/useGetDefaultPrinter";
 import useBusinessInfo from "../../hooks/useBusinessInfo";
 import { computeDiscountLine } from "../../utils/discountLineMath";
+import {
+  calculateServiceChargeBase,
+  DEFAULT_SERVICE_CHARGE_BASIS,
+  normalizeServiceChargeBasis,
+} from "../../utils/serviceChargeMath";
 
 const peso = (value) =>
   Number(value || 0).toLocaleString("en-PH", {
@@ -1036,6 +1041,7 @@ const ModalDiscountTransaction = ({
   const [initialLoadedSignature, setInitialLoadedSignature] = useState("");
   const [showOverrideWarning, setShowOverrideWarning] = useState(false);
   const [serviceChargeEnabled, setServiceChargeEnabled] = useState(false);
+  const [serviceChargeBasis, setServiceChargeBasis] = useState(DEFAULT_SERVICE_CHARGE_BASIS);
   const [serviceCharges, setServiceCharges] = useState([]);
   // per-transaction toggle: chargeId → boolean (true = include this transaction)
   const [chargeToggles, setChargeToggles] = useState({});
@@ -1517,6 +1523,7 @@ const ModalDiscountTransaction = ({
 
         if (!cancelled) {
           setServiceChargeEnabled(Boolean(scResult?.data?.service_charge_enabled || false));
+          setServiceChargeBasis(normalizeServiceChargeBasis(scResult?.data?.service_charge_basis));
           const loadedCharges = Array.isArray(listResult?.charges) ? listResult.charges : [];
           setServiceCharges(loadedCharges);
           // initialise per-transaction toggles: all charges default OFF, cashier picks which to turn on
@@ -1531,6 +1538,7 @@ const ModalDiscountTransaction = ({
         console.error("Failed to load service charge settings:", error);
         if (!cancelled) {
           setServiceChargeEnabled(false);
+          setServiceChargeBasis(DEFAULT_SERVICE_CHARGE_BASIS);
           setServiceCharges([]);
           setDiscountMode("PerCustomer");
         }
@@ -1903,7 +1911,13 @@ const ModalDiscountTransaction = ({
       0,
     );
     const netOfVat = netAfterDiscount / 1.12;
-    const serviceChargeBase = netOfVat;
+    const serviceChargeBase = calculateServiceChargeBase({
+      basis: serviceChargeBasis,
+      items,
+      grossTotal,
+      totalDiscount,
+      totalVatExemption,
+    });
 
     const appliedCharges = serviceChargeEnabled
       ? (Array.isArray(serviceCharges) ? serviceCharges : [])
@@ -1949,6 +1963,7 @@ const ModalDiscountTransaction = ({
       netOfVat,
       totalAmountDue,
       serviceChargeEnabled,
+      serviceChargeBasis,
       appliedCharges,
       serviceChargeBase,
       totalOtherCharges,
@@ -1977,6 +1992,7 @@ const ModalDiscountTransaction = ({
     discountCeilingAmount,
     transaction,
     serviceChargeEnabled,
+    serviceChargeBasis,
     serviceCharges,
     chargeToggles,
     discountMode,
@@ -3076,9 +3092,9 @@ const ModalDiscountTransaction = ({
                     </div>
 
                     <div className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
-                      <span className="text-slate-500">Net of VAT</span>
+                      <span className="text-slate-500">Service charge base</span>
                       <span className="font-semibold">
-                        ₱ {peso(computed.netOfVat)}
+                        ₱ {peso(computed.serviceChargeBase)}
                       </span>
                     </div>
 

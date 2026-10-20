@@ -6,6 +6,11 @@ import {
   FiPercent, FiSave, FiLoader, FiToggleLeft, FiToggleRight, FiPlus, FiTrash2,
 } from "react-icons/fi";
 import useApiHost from "../../../hooks/useApiHost";
+import {
+  DEFAULT_SERVICE_CHARGE_BASIS,
+  normalizeServiceChargeBasis,
+  VAT_EXCLUSIVE_LESS_DISCOUNT,
+} from "../../../utils/serviceChargeMath";
 
 const RATE_TYPES = ["Percentage", "Fixed"];
 
@@ -23,6 +28,9 @@ const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
   const [globalEnabled, setGlobalEnabled]               = useState(false);
   const [initialGlobalEnabled, setInitialGlobalEnabled] = useState(false);
   const [isSavingGlobal, setIsSavingGlobal]             = useState(false);
+  const [calculationBasis, setCalculationBasis] = useState(DEFAULT_SERVICE_CHARGE_BASIS);
+  const [initialCalculationBasis, setInitialCalculationBasis] = useState(DEFAULT_SERVICE_CHARGE_BASIS);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   // Charge list (tbl_pos_list_of_other_charges)
   const [charges, setCharges]   = useState([]);
@@ -56,6 +64,7 @@ const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
   const loadAll = useCallback(async () => {
     if (!apiHost) return;
     setIsLoading(true);
+    setSettingsLoaded(false);
     setError("");
     try {
       const [scRes, listRes] = await Promise.all([
@@ -65,10 +74,17 @@ const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
       const sc   = await scRes.json();
       const list = await listRes.json();
 
+      if (!scRes.ok || !sc?.success) {
+        throw new Error(sc?.message || "Failed to load service charge settings.");
+      }
       if (sc?.success) {
         const v = Boolean(sc?.data?.service_charge_enabled || false);
+        const basis = normalizeServiceChargeBasis(sc?.data?.service_charge_basis);
         setGlobalEnabled(v);
         setInitialGlobalEnabled(v);
+        setCalculationBasis(basis);
+        setInitialCalculationBasis(basis);
+        setSettingsLoaded(true);
       }
       if (list?.success) {
         setCharges(Array.isArray(list.charges) ? list.charges : []);
@@ -89,7 +105,7 @@ const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
 
   // ── Save global toggle ────────────────────────────────────────────────────
   const saveGlobal = async () => {
-    if (!apiHost || isSavingGlobal) return;
+    if (!apiHost || !settingsLoaded || isSavingGlobal) return;
     setIsSavingGlobal(true);
     setError(""); setMessage("");
     try {
@@ -100,13 +116,16 @@ const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
           service_charge_enabled:    globalEnabled,
           service_charge_percentage: 0,
           service_charge_type:       "",
+          service_charge_basis:      calculationBasis,
         }),
       });
       const result = await res.json();
-      if (!result?.success) throw new Error(result?.message || "Failed to save.");
+      if (!res.ok || !result?.success) throw new Error(result?.message || "Failed to save.");
       const v = Boolean(result?.data?.service_charge_enabled || false);
+      const basis = normalizeServiceChargeBasis(result?.data?.service_charge_basis);
       setGlobalEnabled(v); setInitialGlobalEnabled(v);
-      flash("Master switch saved.");
+      setCalculationBasis(basis); setInitialCalculationBasis(basis);
+      flash("Service charge settings saved.");
     } catch (err) {
       flash(err.message || "Failed to save.", true);
     } finally {
@@ -209,7 +228,8 @@ const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
   const setLocal = (id, field, value) =>
     setLocalEdits((prev) => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
 
-  const globalChanged = globalEnabled !== initialGlobalEnabled;
+  const globalChanged =
+    globalEnabled !== initialGlobalEnabled || calculationBasis !== initialCalculationBasis;
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -241,7 +261,7 @@ const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
             <button
               type="button"
               onClick={() => { setMessage(""); setError(""); setGlobalEnabled(!globalEnabled); }}
-              disabled={isLoading || isSavingGlobal}
+              disabled={!settingsLoaded || isLoading || isSavingGlobal}
               className={`inline-flex items-center gap-3 rounded-2xl border px-4 py-3 transition-all ${
                 globalEnabled
                   ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-500"
@@ -256,13 +276,61 @@ const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
             <button
               type="button"
               onClick={saveGlobal}
-              disabled={!globalChanged || isSavingGlobal}
+              disabled={!settingsLoaded || !globalChanged || isLoading || isSavingGlobal}
+              aria-label="Save service charge settings"
               className="inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-black text-white transition disabled:opacity-50"
               style={{ backgroundColor: accent }}
             >
               {isSavingGlobal ? <FiLoader size={14} className="animate-spin" /> : <FiSave size={14} />}
               Save
             </button>
+          </div>
+        </div>
+
+        <div className={`mt-5 rounded-2xl border p-4 sm:p-5 ${t.panelSoft}`}>
+          <label
+            htmlFor="service-charge-basis"
+            className={`block text-sm font-[Poppins-SemiBold] ${t.primary}`}
+          >
+            Calculation basis
+          </label>
+          <p id="service-charge-basis-help" className={`mt-1 text-xs leading-relaxed ${t.muted}`}>
+            Choose how percentage charges are calculated. This applies to all percentage charge
+            types below. Fixed amounts stay the same.
+          </p>
+          <select
+            id="service-charge-basis"
+            aria-describedby="service-charge-basis-help"
+            value={calculationBasis}
+            onChange={(event) => {
+              setCalculationBasis(event.target.value);
+              setMessage(""); setError("");
+            }}
+            disabled={!settingsLoaded || isLoading || isSavingGlobal}
+            className={`mt-3 min-h-[44px] w-full rounded-xl border px-3 py-2 text-sm font-[Poppins-Regular] outline-none focus:ring-2 focus:ring-[var(--app-accent)] disabled:opacity-60 ${t.input}`}
+          >
+            <option value={DEFAULT_SERVICE_CHARGE_BASIS}>
+              After deductions, then remove VAT (current)
+            </option>
+            <option value={VAT_EXCLUSIVE_LESS_DISCOUNT}>
+              Remove VAT, then deduct discounts
+            </option>
+          </select>
+          <div className={`mt-4 text-xs leading-relaxed font-[Poppins-Regular] ${t.muted}`}>
+            <p>
+              {calculationBasis === VAT_EXCLUSIVE_LESS_DISCOUNT
+                ? "Remove VAT from VATable items, keep non-VAT items at full value, then subtract discounts."
+                : "Subtract discounts and VAT exemptions from the gross total, then divide by 1.12."}
+            </p>
+            <p className={`mt-2 font-[Poppins-Medium] ${t.primary}`}>
+              Example: ₱1,760 VAT-inclusive subtotal, ₱78.57 discount, ₱47.14 VAT exemption, 5% charge.
+            </p>
+            <p className="mt-1">
+              {calculationBasis === VAT_EXCLUSIVE_LESS_DISCOUNT
+                ? "Base: ₱1,492.86 · Service charge: ₱74.64 · Amount due: ₱1,708.93"
+                : "Base: ₱1,459.19 · Service charge: ₱72.96 · Amount due: ₱1,707.25"}
+            </p>
+            <p className="mt-2">Save to use this method for future billing calculations. Existing saved bills keep their charges.</p>
           </div>
         </div>
 
