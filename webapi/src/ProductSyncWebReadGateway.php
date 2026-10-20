@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . "/ProductGroupSyncMetadata.php";
+
 class ProductSyncWebReadGateway
 {
     private PDO $conn;
@@ -90,7 +92,7 @@ class ProductSyncWebReadGateway
         $stmt = $this->conn->prepare($sql);
         $stmt->execute();
 
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return (new ProductGroupSizeSync($this->conn))->pricingOptions($stmt->fetchAll(PDO::FETCH_ASSOC));
     }
 
     private function getOnlineBusunitSalesTypePricingRows(string $busunitCode): array
@@ -200,7 +202,7 @@ class ProductSyncWebReadGateway
 
         $stmt->execute();
 
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return (new ProductGroupSyncMetadata($this->conn))->annotate((new ProductGroupSizeSync($this->conn))->sourceRows($stmt->fetchAll(PDO::FETCH_ASSOC), $pricingCodes));
     }
 
     private function getBusunitNames(array $busunitCodes): array

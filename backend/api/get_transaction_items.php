@@ -4,6 +4,7 @@ header("Content-Type: application/json; charset=UTF-8");
 header("Access-Control-Allow-Methods: GET");
 
 require __DIR__ . '/report_db.php';
+require_once dirname(__DIR__) . '/src/PosOrderProductGroups.php';
 
 try {
     $pdo = getReportPdo($_GET['date'] ?? null);
@@ -16,6 +17,7 @@ try {
         // - Joins td (detailed) and pm (masterlist) for item details
         // - Joins tp (payments) to get payment method and amount
         $sql = "SELECT 
+                    td.ID,
                     td.product_id,
                     pm.item_name,
                     td.sales_quantity,
@@ -33,6 +35,7 @@ try {
         $stmt = $pdo->prepare($sql);
         $stmt->execute(['id' => $transaction_id]);
         $items = $stmt->fetchAll();
+        $items = (new PosOrderProductGroups($pdo))->annotateLines($items);
 
         if ($items) {
             echo json_encode([

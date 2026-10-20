@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/cors.php";
+require_once dirname(__DIR__) . '/src/PosOrderProductGroups.php';
 require_once __DIR__ . "/pos_report_mirror.php";
 
 
@@ -314,6 +315,7 @@ try {
     $updateDestination->close();
     $updateDestination = null;
 
+    (new PosOrderProductGroups($conn))->assertTransferSupported([(string) $source_transaction_id, (string) $destination_transaction_id]);
     $deleteSourceDetails = $conn->prepare("DELETE FROM tbl_pos_transactions_detailed WHERE transaction_id = ?");
     if (!$deleteSourceDetails) {
         throw new Exception("Prepare delete source details failed: " . $conn->error);

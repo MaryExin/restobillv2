@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . "/ProductGroupSyncMetadata.php";
+
 class ProductSyncLocalMutateGateway
 {
     private PDO $conn;
@@ -45,6 +47,8 @@ class ProductSyncLocalMutateGateway
         $syncedSalesTypeMappings = 0;
 
         try {
+            $groups = new ProductGroupSyncMetadata($this->conn);
+            $groups->assertReadyForEnabledSync($rows);
             $this->conn->beginTransaction();
 
             $this->deleteAllOfflinePricingBySalesType();
@@ -89,6 +93,13 @@ class ProductSyncLocalMutateGateway
                     continue;
                 }
 
+                if ($action === 'group_change') {
+                    if (!is_array($online) || (!array_key_exists('product_group', $online) && !array_key_exists('group_alias', $online))) {
+                        throw new InvalidArgumentException('Product grouping was not included in the export. Update the WEB sync files, refresh and try again.');
+                    }
+                    continue; // Configuration only; the existing product and price stay intact.
+                }
+
                 if ($action === 'inactive_product') {
                     $productAffected = $this->setOfflineProductInactive($productId);
                     $pricingAffected = $this->setAllOfflinePricingInactive($productId, $userId);
@@ -99,14 +110,15 @@ class ProductSyncLocalMutateGateway
                 }
             }
 
+            $syncedGroups = $groups->apply($rows, (string) $userId);
             $this->conn->commit();
 
-            $totalOps = $affected + $syncedSalesTypes + $syncedSalesTypeMappings;
+            $totalOps = $affected + $syncedSalesTypes + $syncedSalesTypeMappings + $syncedGroups;
 
             return [
                 'message' => 'Success',
                 'affected_rows' => $totalOps,
-                'summary_message' => "Synced {$totalOps} operation(s). Sales types: {$syncedSalesTypes}, BU pricing mappings: {$syncedSalesTypeMappings}, new products: {$insertedProducts}, price changes: {$updatedPrices}, inactivated: {$inactivatedProducts}.",
+                'summary_message' => "Synced {$totalOps} operation(s). Sales types: {$syncedSalesTypes}, BU pricing mappings: {$syncedSalesTypeMappings}, new products: {$insertedProducts}, price changes: {$updatedPrices}, inactivated: {$inactivatedProducts}, product groups: {$syncedGroups}.",
             ];
         } catch (Throwable $e) {
             if ($this->conn->inTransaction()) {

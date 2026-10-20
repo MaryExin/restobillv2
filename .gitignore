@@ -32,3 +32,10 @@ backend/.env.pos-developer
 *.sw?
 
 .vercel
+
+# Installer payloads include third-party binaries and machine-local build assets.
+installer/cache/
+installer/stage/
+
+# Local backend connection and signing secrets.
+backend/.env

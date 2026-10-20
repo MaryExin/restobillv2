@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . "/ProductGroupSyncMetadata.php";
+
 class ProductSyncLocalReadGateway
 {
     private PDO $conn;
@@ -48,7 +50,8 @@ class ProductSyncLocalReadGateway
                 $requestedPricingCodes = $allOfflinePricingCodes;
             }
 
-            $offlineProducts = $this->getOfflineProducts($busunitCode);
+            $groups = new ProductGroupSyncMetadata($this->conn);
+            $offlineProducts = $groups->annotate($this->getOfflineProducts($busunitCode));
             $offlinePricingRows = $this->getOfflinePricingRows($requestedPricingCodes);
 
             return [
@@ -60,6 +63,7 @@ class ProductSyncLocalReadGateway
                 'selected_pricing_codes' => $requestedPricingCodes,
                 'offline_existing_pricing_codes' => $allOfflinePricingCodes,
                 'offline_products' => $offlineProducts,
+                'product_groups_installed' => $groups->isLocalInstalled(),
                 'offline_pricing_rows' => $offlinePricingRows,
             ];
         } catch (Throwable $e) {
@@ -160,11 +164,12 @@ class ProductSyncLocalReadGateway
                 isDiscountable,
                 status
             FROM tbl_inventory_products_masterlist
-            WHERE category_code = :busunitcode
+            WHERE unit_code = :busunitcode OR category_code = :legacy_busunitcode
             ORDER BY item_name ASC, product_id ASC
         ");
         $stmt->execute([
             'busunitcode' => $busunitCode,
+            'legacy_busunitcode' => $busunitCode,
         ]);
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);

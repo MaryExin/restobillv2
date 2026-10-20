@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/cors.php";
+require_once dirname(__DIR__) . '/src/PosOrderProductGroups.php';
 
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
@@ -72,6 +73,7 @@ while($row = $result->fetch_assoc()) {
     $data[] = $row;
 }
 
+$data = (new PosOrderProductGroups($conn))->annotateLines($data);
 echo json_encode($data);
 $conn->close();
 ?>

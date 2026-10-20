@@ -1,3 +1,4 @@
+import { groupSavedOrderItems } from "../../utils/productGroups";
 import React, { forwardRef } from "react";
 
 const rowStyle = { display: "flex", justifyContent: "space-between", margin: "1px 0" };
@@ -5,7 +6,7 @@ const labelStyle = { fontWeight: 600 };
 const hrStyle = { margin: "4px 0", border: "none", borderTop: "1px dashed #000" };
 
 const Receipt = forwardRef(({ transaction, detailedproduct, businessInfo = {} }, ref) => {
-  const items = Array.isArray(detailedproduct) ? detailedproduct : [];
+  const items = groupSavedOrderItems(Array.isArray(detailedproduct) ? detailedproduct : []);
 
   const computedTotalSales = items.reduce((total, item) => {
     const price = parseFloat(item?.selling_price) || 0;

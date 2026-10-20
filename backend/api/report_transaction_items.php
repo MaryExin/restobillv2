@@ -31,6 +31,7 @@ posRoleAuthRequirePermission(
 );
 
 require_once __DIR__ . "/report_db.php";
+require_once dirname(__DIR__) . '/src/PosOrderProductGroups.php';
 
 try {
     $transactionId = trim((string)($_GET["id"] ?? ""));
@@ -46,6 +47,7 @@ try {
     $reportPdo = getReportPdo($_GET["date"] ?? null);
     $stmt = $reportPdo->prepare("
         SELECT
+            td.ID,
             td.product_id,
             pm.item_name,
             td.sales_quantity,
@@ -62,6 +64,7 @@ try {
     ");
     $stmt->execute(["id" => $transactionId]);
     $items = $stmt->fetchAll();
+    $items = (new PosOrderProductGroups($reportPdo))->annotateLines($items);
 
     if (!$items) {
         echo json_encode([

@@ -2,7 +2,6 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import useZustandLoginCred from "../../context/useZustandLoginCred";
-import { colorSchemes } from "../../constants/ColorSchemes";
 import "../../fonts/font-style.css";
 import useApiHost from "../../hooks/useApiHost";
 import useVersionLabel from "../../hooks/useVersionLabel";
@@ -15,7 +14,6 @@ const PosHomeScreenComponent = () => {
   const versionLabel = useVersionLabel();
 
   const [dateselection, setDateSelection] = useState(null);
-  const [userSelectedTheme, setUserSelectedTheme] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Fetch data
@@ -94,33 +92,6 @@ const PosHomeScreenComponent = () => {
       closedBy: dateselection?.closed_by_name || "N/A",
     };
   }, [dateselection, versionLabel]);
-
-  // Theme apply logic
-  useEffect(() => {
-    const applyPalette = (palette) => {
-      if (!palette?.colors) return;
-      const root = document.documentElement;
-      Object.entries(palette.colors).forEach(([key, value]) => {
-        root.style.setProperty(`--color-${key}`, value);
-      });
-    };
-
-    if (userSelectedTheme && userSelectedTheme.length > 0) {
-      const themeSelected = userSelectedTheme.filter(
-        (item) => item.userid === userId,
-      );
-      if (themeSelected.length > 0) {
-        const palette = colorSchemes.find(
-          (c) => c.name === themeSelected[0].theme,
-        );
-        applyPalette(palette || colorSchemes[0]);
-      } else {
-        applyPalette(colorSchemes[0]);
-      }
-    } else {
-      applyPalette(colorSchemes[0]);
-    }
-  }, [userSelectedTheme, userId]);
 
   return (
     <div className="flex justify-end">

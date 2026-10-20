@@ -6,6 +6,7 @@ class ShiftSalesSyncLocalExportGateway
 {
     private PDO $conn;
     private array $columnCache = [];
+    private bool $groupSnapshotsReadable = false;
     private string $primaryDatabaseName;
     private string $reportDatabaseName;
 
@@ -163,11 +164,14 @@ class ShiftSalesSyncLocalExportGateway
         }
 
         $transactionRefs = array_values($allTransactionRefs);
+        $details = $this->getOfflineDetailsByTransactionRefs($databaseName, $transactionRefs);
+        $groupSnapshotMetadata = $this->groupSnapshotsReadable ? ['product_group_snapshots_version' => 2] : [];
 
         return [
+            ...$groupSnapshotMetadata,
             'shifts' => $exportShifts,
             'transactions' => $this->getOfflineTransactionsByRefs($databaseName, $transactionRefs),
-            'details' => $this->getOfflineDetailsByTransactionRefs($databaseName, $transactionRefs),
+            'details' => $details,
             'discounts' => $this->getOfflineDiscountsByTransactionRefs($databaseName, $transactionRefs),
             'payments' => $this->getOfflinePaymentsByTransactionRefs($databaseName, $transactionRefs),
             'other_charges' => $this->getOfflineOtherChargesByTransactionRefs($databaseName, $transactionRefs),
@@ -312,7 +316,7 @@ class ShiftSalesSyncLocalExportGateway
         $scope = $this->buildScopedTransactionWhere($transactionRefs);
 
         if ($scope['where'] === '') {
-            return [];
+            return $this->attachGroupSnapshots([], $databaseName, $transactionRefs);
         }
 
         $detailTable = $this->qualifiedTable($databaseName, 'tbl_pos_transactions_detailed');
@@ -329,7 +333,101 @@ class ShiftSalesSyncLocalExportGateway
 
         $stmt->execute();
 
-        return $this->withTransactionScope($stmt->fetchAll(PDO::FETCH_ASSOC), $transactionRefs);
+        return $this->withTransactionScope($this->attachGroupSnapshots($stmt->fetchAll(PDO::FETCH_ASSOC), $databaseName, $transactionRefs), $transactionRefs);
+    }
+
+    /** Preserve a complete, server-frozen size/recipe snapshot for this dataset. */
+    private function attachGroupSnapshots(array $rows, string $databaseName, array $transactionRefs = []): array
+    {
+        $this->groupSnapshotsReadable = false;
+        $snapshots = $this->qualifiedTable($this->primaryDatabaseName, 'tbl_pos_product_group_selections');
+        try {
+            $hasSnapshots = $this->conn->query("SELECT pos_detail_id FROM {$snapshots} LIMIT 1")->fetchColumn() !== false;
+        } catch (PDOException $error) {
+            if ((string) $error->getCode() === '42S02' || (int) ($error->errorInfo[1] ?? 0) === 1146) return $rows;
+            throw $error;
+        }
+        if (!$hasSnapshots) {
+            $this->groupSnapshotsReadable = true;
+            return $rows;
+        }
+        $identity = static fn ($transaction, $category, $unit) => json_encode([(string) $transaction, (string) $category, (string) $unit]);
+        $references = $transactionRefs ?: $rows;
+        $selected = [];
+        foreach ($references as $reference) {
+            $selected[$identity($reference['transaction_id'], $reference['Category_Code'], $reference['Unit_Code'])] = $reference;
+        }
+        $report = strcasecmp($databaseName, $this->primaryDatabaseName) !== 0;
+        $sourceTransactions = [];
+        $sourceScopes = [];
+        if ($report && $selected) {
+            // The mirror retains detail IDs but remaps transaction IDs. Resolve
+            // the full selected transaction scopes, including an empty detail set.
+            $map = $this->qualifiedTable($this->reportDatabaseName, 'tbl_pos_report_transaction_map');
+            $transactionIds = array_values(array_unique(array_column($selected, 'transaction_id')));
+            $statement = $this->conn->prepare("SELECT source_transaction_id,report_transaction_id,Category_Code,Unit_Code FROM {$map}
+                WHERE report_transaction_id IN (" . implode(',', array_fill(0, count($transactionIds), '?')) . ')');
+            $statement->execute($transactionIds);
+            foreach ($statement->fetchAll(PDO::FETCH_ASSOC) as $mapping) {
+                $reportKey = $identity($mapping['report_transaction_id'], $mapping['Category_Code'], $mapping['Unit_Code']);
+                if (!isset($selected[$reportKey])) continue;
+                $sourceTransactions[$reportKey] = (string) $mapping['source_transaction_id'];
+                $sourceScopes[$identity($mapping['source_transaction_id'], $mapping['Category_Code'], $mapping['Unit_Code'])]
+                    = [(string) $mapping['source_transaction_id'], (string) $mapping['Category_Code'], (string) $mapping['Unit_Code']];
+            }
+        } elseif (!$report) {
+            foreach ($selected as $key => $reference) $sourceScopes[$key] = [(string) $reference['transaction_id'], (string) $reference['Category_Code'], (string) $reference['Unit_Code']];
+        }
+        $ids = array_values(array_unique(array_map(static fn ($row) => (string) $row['ID'], $rows)));
+        $clauses = $ids ? ['s.pos_detail_id IN (' . implode(',', array_fill(0, count($ids), '?')) . ')'] : [];
+        $values = $ids;
+        foreach ($sourceScopes as $scope) {
+            $clauses[] = '(s.transaction_id=? AND s.category_code=? AND s.unit_code=?)';
+            array_push($values, ...$scope);
+        }
+        $sourceDetails = $this->qualifiedTable($this->primaryDatabaseName, 'tbl_pos_transactions_detailed');
+        $saved = [];
+        $expected = [];
+        if ($clauses) {
+            $statement = $this->conn->prepare("SELECT s.*,d.product_id,d.sales_quantity,d.selling_price,d.unit_cost
+                FROM {$snapshots} s INNER JOIN {$sourceDetails} d ON d.ID=s.pos_detail_id
+                AND CONVERT(d.transaction_id USING utf8mb4) COLLATE utf8mb4_general_ci=CONVERT(s.transaction_id USING utf8mb4) COLLATE utf8mb4_general_ci
+                AND CONVERT(d.Category_Code USING utf8mb4) COLLATE utf8mb4_general_ci=CONVERT(s.category_code USING utf8mb4) COLLATE utf8mb4_general_ci
+                AND CONVERT(d.Unit_Code USING utf8mb4) COLLATE utf8mb4_general_ci=CONVERT(s.unit_code USING utf8mb4) COLLATE utf8mb4_general_ci
+                WHERE " . implode(' OR ', $clauses));
+            $statement->execute($values);
+            foreach ($statement->fetchAll(PDO::FETCH_ASSOC) as $snapshot) {
+                $id = (string) $snapshot['pos_detail_id'];
+                $saved[$id] = $snapshot;
+                if (isset($sourceScopes[$identity($snapshot['transaction_id'], $snapshot['category_code'], $snapshot['unit_code'])])) $expected[$id] = true;
+            }
+        }
+        foreach ($rows as &$row) {
+            $id = (string) $row['ID'];
+            $snapshot = $saved[$id] ?? null;
+            if (!$snapshot) continue;
+            $sourceTransaction = $report
+                ? ($sourceTransactions[$identity($row['transaction_id'], $row['Category_Code'], $row['Unit_Code'])] ?? null)
+                : (string) $row['transaction_id'];
+            $sameScope = (string) $row['Category_Code'] === (string) $snapshot['category_code'] && (string) $row['Unit_Code'] === (string) $snapshot['unit_code'];
+            if ($report && ($sourceTransaction !== (string) $snapshot['transaction_id'] || !$sameScope)) {
+                throw new RuntimeException('A grouped report line has a missing or inconsistent source transaction mapping. Refresh the report mirror before syncing.');
+            }
+            if ($sourceTransaction !== (string) $snapshot['transaction_id'] || !$sameScope) continue;
+            if ((string) $row['product_id'] !== (string) $snapshot['product_id']
+                || abs((float) $row['sales_quantity'] - (float) $snapshot['sales_quantity']) > .000001
+                || abs((float) $row['selling_price'] - (float) $snapshot['selling_price']) > .000001
+                || abs((float) $row['unit_cost'] - (float) $snapshot['unit_cost']) > .000001) {
+                throw new RuntimeException('A grouped report line differs from its original order. Refresh the report mirror before syncing.');
+            }
+            $row['group_selection'] = json_decode($snapshot['group_selection_json'], true, 512, JSON_THROW_ON_ERROR);
+            $row['group_line_label'] = $snapshot['line_label'];
+            unset($expected[$id]);
+        }
+        unset($row);
+        if ($expected) throw new RuntimeException('A grouped selection is incomplete in the export. Refresh the report mirror before syncing.');
+        $this->groupSnapshotsReadable = true;
+        return $rows;
     }
 
     private function getOfflineDiscountsByTransactionRefs(

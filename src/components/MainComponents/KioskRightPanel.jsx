@@ -43,6 +43,7 @@ const KioskCartItem = ({
           {item.name}
         </span>
 
+        {item.group_price_error && <p className="mt-1 text-xs text-redAccent">{item.group_price_error}</p>}
         {item.itemInstruction && (
           <p className="mt-1 break-words text-[10px] text-amber-500">
             Note: {item.itemInstruction}
@@ -113,8 +114,9 @@ const KioskCartItem = ({
 
           <input
             type="number"
-            min="0.01"
-            step="0.01"
+            min={item.group_selection ? "1" : "0.01"}
+            max={item.group_selection ? "10000" : undefined}
+            step={item.group_selection ? "1" : "0.01"}
             inputMode="decimal"
             value={item.quantity}
             onFocus={(e) => e.target.select()}

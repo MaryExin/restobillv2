@@ -1,3 +1,4 @@
+import { groupSavedOrderItems } from "./productGroups";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
@@ -19,7 +20,7 @@ export function BuildPrintableDiscountReceiptHtml({
 }) {
   const safeTransaction = transaction || {};
   const safeComputed = computed || {};
-  const safeItems = Array.isArray(items) ? items : [];
+  const safeItems = groupSavedOrderItems(Array.isArray(items) ? items : []);
 
   const companyName = String(businessInfo?.companyName || "COMPANY").trim();
   const storeName = String(businessInfo?.storeName || "STORE").trim();

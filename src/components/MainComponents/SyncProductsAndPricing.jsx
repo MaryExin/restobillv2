@@ -29,6 +29,7 @@ import useApiHost from "../../hooks/useApiHost";
 import useResolvedTenantHost from "../../hooks/useResolvedTenantHost";
 
 import ProductImage from "../Common/ProductImage";
+import { hasProductGroupChange, productGroupSyncDescription, productGroupSyncFields, productSyncAction } from "../../utils/productGroupSync";
 import ModalYesNoReusable from "../Modals/ModalYesNoReusable";
 import ModalSuccessNavToSelf from "../Modals/ModalSuccessNavToSelf";
 import TutorialTip from "../common/TutorialTip";
@@ -77,6 +78,11 @@ const sameNumber = (a, b, epsilon = 0.0001) => {
 };
 
 const badgeMap = {
+  group_change: {
+    label: "Group Change",
+    darkCls: "text-colorBrand border border-colorBrand",
+    lightCls: "text-colorBrand border border-colorBrand",
+  },
   price_change: {
     label: "Price Change",
     darkCls: "bg-amber-500/10 text-amber-300 border border-amber-500/30",
@@ -93,7 +99,7 @@ const badgeMap = {
     lightCls: "bg-rose-50 text-rose-700 border border-rose-200",
   },
   no_price_change: {
-    label: "No Price Change",
+    label: "No Changes",
     darkCls: "bg-slate-500/10 text-slate-300 border border-slate-500/20",
     lightCls: "bg-slate-100 text-slate-700 border border-slate-200",
   },
@@ -423,6 +429,15 @@ const ProductCard = ({
             </div>
 
             <div className="mt-4 grid gap-3">
+              {Object.prototype.hasOwnProperty.call(row.online || {}, "product_group") || row.offline?.product_group ? (
+                <DiffRow
+                  label="Product group"
+                  onlineValue={productGroupSyncDescription(row.online)}
+                  offlineValue={productGroupSyncDescription(row.offline)}
+                  changed={row.diff?.group_changed}
+                  isDark={isDark}
+                />
+              ) : null}
               <DiffRow
                 label="Selling Price"
                 onlineValue={row.online?.selling_price}
@@ -503,7 +518,7 @@ const ProgressLoader = ({ isDark, text = "Loading sync details..." }) => {
       </div>
       <div className="mt-2 text-slate-500">
         Reconciling ONLINE pricing availability, price changes, new products,
-        and OFFLINE-only products.
+        product groups, and OFFLINE-only products.
       </div>
     </div>
   );
@@ -523,7 +538,7 @@ const SyncingOverlay = ({ isDark }) => {
         >
           <div className="mx-auto mb-5 h-20 w-20 rounded-full border-4 border-blue-500/20 border-t-blue-500 animate-spin" />
           <div className="text-3xl font-black tracking-tight">
-            Syncing products, pricing, sales types, and mappings...
+            Syncing products, groups, pricing and sales types...
           </div>
           <div className="mt-3 text-sm text-slate-500">
             Please wait while selected changes are being applied.
@@ -728,7 +743,7 @@ const SyncProductsAndPricing = () => {
 
   const [viewMode, setViewMode] = useState("table");
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState("price_change");
+  const [filter, setFilter] = useState("all");
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [selectedPricingCodes, setSelectedPricingCodes] = useState([]);
   const [pendingPricingCodes, setPendingPricingCodes] = useState([]);
@@ -948,6 +963,7 @@ const SyncProductsAndPricing = () => {
         const localPricing = offlinePricingMap[rowKey] || null;
 
         const diff = {
+          group_changed: hasProductGroupChange(webRow, localProduct),
           price_changed: !sameNumber(webRow.selling_price, localPricing?.srp),
           cost_changed: !sameNumber(
             webRow.unit_cost,
@@ -964,12 +980,7 @@ const SyncProductsAndPricing = () => {
           ),
         };
 
-        let action = "no_price_change";
-        if (!localPricing) {
-          action = "new_product";
-        } else if (diff.price_changed || diff.cost_changed) {
-          action = "price_change";
-        }
+        const action = productSyncAction(diff, localPricing);
 
         builtRows.push({
           row_key: rowKey,
@@ -982,6 +993,7 @@ const SyncProductsAndPricing = () => {
           offline_status: String(localProduct?.status || "Missing"),
           offline_only: false,
           online: {
+            ...productGroupSyncFields(webRow),
             product_id: productId,
             pricing_code: pricingCode,
             pricing_label: String(
@@ -1004,6 +1016,7 @@ const SyncProductsAndPricing = () => {
             isDiscountable: String(webRow.isDiscountable || "No"),
           },
           offline: {
+            ...productGroupSyncFields(localProduct),
             item_name: localProduct?.item_name ?? null,
             item_category: localProduct?.item_category ?? null,
             unit_of_measure: localProduct?.unit_of_measure ?? null,
@@ -1050,6 +1063,7 @@ const SyncProductsAndPricing = () => {
           offline_only: true,
           online: null,
           offline: {
+            ...productGroupSyncFields(localProduct),
             item_name: localProduct?.item_name ?? null,
             item_category: localProduct?.item_category ?? null,
             unit_of_measure: localProduct?.unit_of_measure ?? null,
@@ -1084,6 +1098,7 @@ const SyncProductsAndPricing = () => {
     return {
       total: rows.length,
       priceChange: rows.filter((r) => r.action === "price_change").length,
+      groupChange: rows.filter((r) => r.action === "group_change").length,
       newProduct: rows.filter((r) => r.action === "new_product").length,
       inactive: rows.filter((r) => r.action === "inactive_product").length,
       noPriceChange: rows.filter((r) => r.action === "no_price_change").length,
@@ -1093,7 +1108,7 @@ const SyncProductsAndPricing = () => {
   useEffect(() => {
     const auto = rows
       .filter((r) =>
-        ["price_change", "new_product", "inactive_product"].includes(r.action),
+        ["price_change", "group_change", "new_product", "inactive_product"].includes(r.action),
       )
       .map((r) => r.row_key);
 
@@ -1117,6 +1132,7 @@ const SyncProductsAndPricing = () => {
           r.online?.item_category,
           r.offline?.item_name,
           r.online?.pricing_label,
+          productGroupSyncDescription(r.online),
         ]
           .map(normalize)
           .join(" ");
@@ -1285,16 +1301,28 @@ const SyncProductsAndPricing = () => {
       },
       {
         onSuccess: (exportPayload) => {
+          if (exportPayload?.message !== "Success") {
+            setIsSyncing(false);
+            setReturnmessage({ message: exportPayload?.error || exportPayload?.message || "The web export failed. Nothing was synced." });
+            setshowhidesuccess(true);
+            return;
+          }
           localMutate(exportPayload, {
             onSuccess: async (localResult) => {
               setIsSyncing(false);
+              if (localResult?.message !== "Success") {
+                setReturnmessage({ message: localResult?.error || localResult?.message || "The local sync failed." });
+                setshowhidesuccess(true);
+                return;
+              }
               setReturnmessage({
                 message:
                   localResult?.summary_message ||
                   `Synced ${localResult?.affected_rows || 0} operation(s).`,
               });
               setshowhidesuccess(true);
-              runRefresh();
+              refetchLocal?.();
+              reloadTenant();
             },
             onError: (err) => {
               setIsSyncing(false);
@@ -1326,6 +1354,7 @@ const SyncProductsAndPricing = () => {
     const priceChangeCount = selectedRows.filter(
       (r) => r.action === "price_change",
     ).length;
+    const groupChangeCount = selectedRows.filter((r) => r.action === "group_change").length;
     const newProductCount = selectedRows.filter(
       (r) => r.action === "new_product",
     ).length;
@@ -1336,10 +1365,11 @@ const SyncProductsAndPricing = () => {
     return `Do you want to sync ${selectedRows.length} selected row(s)?
 
 Price changes: ${priceChangeCount}
+Group changes: ${groupChangeCount}
 New products: ${newProductCount}
 Set inactive: ${inactiveCount}
 
-This will also replace OFFLINE lkp_sales_type and tbl_pricing_by_sales_type using WEB mappings for the selected business unit.`;
+This also updates the POS sales types and their price-list assignments for the selected business unit. Product groups follow the saved online setup.`;
   }, [selectedRows]);
 
   const localReadMessage = localReadData?.message || "";
@@ -1512,6 +1542,13 @@ This will also replace OFFLINE lkp_sales_type and tbl_pricing_by_sales_type usin
                 disabled={isSyncing}
               />
               <FilterChip
+                active={filter === "group_change"}
+                label="Group Change"
+                onClick={() => setFilter("group_change")}
+                isDark={isDark}
+                disabled={isSyncing}
+              />
+              <FilterChip
                 active={filter === "new_product"}
                 label="New Product"
                 tone="emerald"
@@ -1529,7 +1566,7 @@ This will also replace OFFLINE lkp_sales_type and tbl_pricing_by_sales_type usin
               />
               <FilterChip
                 active={filter === "no_price_change"}
-                label="No Price Change"
+                label="No Changes"
                 tone="slate"
                 onClick={() => setFilter("no_price_change")}
                 isDark={isDark}
@@ -1546,7 +1583,13 @@ This will also replace OFFLINE lkp_sales_type and tbl_pricing_by_sales_type usin
           </div>
         </header>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5 mb-8">
+        {localReadData?.product_groups_installed === false && rows.some((row) => row.online?.product_group?.enabled) ? (
+          <div className="mb-5">
+            <InfoStrip isDark={isDark} tone="amber" title="Product groups need the POS update"
+              message="Install the product-groups update before syncing enabled groups. Other products can still sync. Group names, sizes and variants are managed in the online Product Builds setup." />
+          </div>
+        ) : null}
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6 mb-8">
           <StatCard
             title="Target Business Unit"
             value={
@@ -1569,6 +1612,13 @@ This will also replace OFFLINE lkp_sales_type and tbl_pricing_by_sales_type usin
             isDark={isDark}
           />
           <StatCard
+            title="Group Changes"
+            value={summary.groupChange}
+            subtitle="Group, size, variant or portions changed"
+            icon={<FiPackage size={18} />}
+            isDark={isDark}
+          />
+          <StatCard
             title="New Products"
             value={summary.newProduct}
             subtitle="ONLINE rows missing OFFLINE"
@@ -1585,7 +1635,7 @@ This will also replace OFFLINE lkp_sales_type and tbl_pricing_by_sales_type usin
             isDark={isDark}
           />
           <StatCard
-            title="No Price Change"
+            title="No Changes"
             value={summary.noPriceChange}
             subtitle="For reference only"
             icon={<FaCheckCircle size={18} />}

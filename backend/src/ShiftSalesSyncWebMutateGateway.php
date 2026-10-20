@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/PosGroupSelectionSync.php';
+
 class ShiftSalesSyncWebMutateGateway
 {
     private PDO $conn;
@@ -30,6 +32,9 @@ class ShiftSalesSyncWebMutateGateway
         }
 
         try {
+            $groups = new PosGroupSelectionSync($this->conn);
+            $groups->assertPayload($data['details'] ?? [], $data['transactions'] ?? [], 'LIVE', $data['product_group_snapshots_version'] ?? null, array_values($this->destinationTables(false)));
+            if ($reportDataset !== null) $groups->assertPayload($reportDataset['details'] ?? [], $reportDataset['transactions'] ?? [], 'REPORT', $reportDataset['product_group_snapshots_version'] ?? null, array_values($this->destinationTables(true)));
             $this->conn->beginTransaction();
             $primarySummary = $this->syncDataset($data, $this->destinationTables(false));
             $reportSummary = $reportDataset !== null
@@ -845,6 +850,7 @@ class ShiftSalesSyncWebMutateGateway
             )
         ");
         $stmt->execute($params);
+        (new PosGroupSelectionSync($this->conn))->store($this->conn->lastInsertId(), $row, str_contains($table, '_bd') ? 'REPORT' : 'LIVE');
     }
 
     private function deleteWebTransactionDetailsForScope(array $row, string $table): void
@@ -854,6 +860,7 @@ class ShiftSalesSyncWebMutateGateway
             return;
         }
 
+        (new PosGroupSelectionSync($this->conn))->clear($row, str_contains($table, '_bd') ? 'REPORT' : 'LIVE');
         $stmt = $this->conn->prepare("
             DELETE FROM {$table}
             WHERE Category_Code = :Category_Code

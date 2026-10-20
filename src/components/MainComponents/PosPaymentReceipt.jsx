@@ -1,3 +1,4 @@
+import { groupSavedOrderItems } from "../../utils/productGroups";
 import React, { useEffect, useMemo, useState } from "react";
 import { posAuthenticatedFetch } from "../../utils/posAuthenticatedFetch";
 
@@ -538,7 +539,7 @@ const PosPaymentReceipt = React.forwardRef(
             </tr>
           </thead>
           <tbody>
-            {items.map((item, index) => {
+            {groupSavedOrderItems(items).map((item, index) => {
               const qty = Number(item.sales_quantity || 0);
               const price = Number(item.selling_price || 0);
               const lineTotal = qty * price;

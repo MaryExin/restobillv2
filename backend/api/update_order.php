@@ -14,6 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 $config = require __DIR__ . "/config.php";
 require_once __DIR__ . "/pos_report_mirror.php";
+require_once dirname(__DIR__) . '/src/PosOrderProductGroups.php';
 
 $conn = new mysqli(
     $config["host"],
@@ -182,6 +183,9 @@ try {
     $stmtUpdate->close();
     $stmtUpdate = null;
 
+    $productGroups = new PosOrderProductGroups($conn);
+    $cart_items = $productGroups->prepareItems($cart_items, (string) $Category_Code, (string) $Unit_Code, (string) $order_type, (string) $transaction_id);
+    $productGroups->clearOrder((string) $transaction_id, (string) $Category_Code, (string) $Unit_Code);
     $stmtDelete = $conn->prepare("DELETE FROM tbl_pos_transactions_detailed WHERE transaction_id=?");
     if (!$stmtDelete) {
         throw new Exception("Delete Prepare Error: " . $conn->error);
@@ -250,6 +254,7 @@ try {
             throw new Exception("Details Execute Error: " . $stmtDetails->error);
         }
 
+        $productGroups->storePart((string) $conn->insert_id, (string) $transaction_id, (string) $Category_Code, (string) $Unit_Code, $item);
         $lineTotal = $sales_quantity * $selling_price;
         $totalAmount += $lineTotal;
 

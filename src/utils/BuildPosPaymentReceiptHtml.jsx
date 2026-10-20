@@ -1,3 +1,4 @@
+import { groupSavedOrderItems } from "./productGroups";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
@@ -29,7 +30,7 @@ export function BuildPosPaymentReceiptHtml({
 
   const safeTransaction = transaction || {};
   const safeComputed = computed || {};
-  const safeItems = Array.isArray(items) ? items : [];
+  const safeItems = groupSavedOrderItems(Array.isArray(items) ? items : []);
   const safePayments = Array.isArray(payments) ? payments : [];
   const safeOtherCharges = Array.isArray(otherCharges) ? otherCharges : [];
   const safeCustomerCards = Array.isArray(customerCards) ? customerCards : [];

@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/PosGroupSelectionSync.php';
+
 class PosJournalEntriesGateway
 {
     private $conn;
@@ -400,7 +402,7 @@ class PosJournalEntriesGateway
                 AND UPPER(COALESCE(T1.order_status, '')) = 'ACTIVE'
                 ORDER BY T1.transaction_id ASC, T1.ID ASC";
 
-        return $this->fetchAllWithParams($sql, $params);
+        return (new PosGroupSelectionSync($this->conn))->annotate($this->fetchAllWithParams($sql, $params));
     }
 
     private function getTransactionDiscounts(array $transactionIds): array
@@ -498,6 +500,8 @@ class PosJournalEntriesGateway
 
     private function buildInventoryComponentsForDetail(array $detail, int $maxDepth = 1): array
     {
+        $sizeComponents = PosGroupSelectionSync::inventoryComponents($detail);
+        if ($sizeComponents !== null) return $sizeComponents;
         $productCode = trim((string) ($detail["product_id"] ?? ""));
         $quantity = $this->toFloat($detail["sales_quantity"] ?? 0);
 

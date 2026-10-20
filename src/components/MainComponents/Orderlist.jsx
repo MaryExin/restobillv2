@@ -50,6 +50,10 @@ import useBillingEnabled from "../../hooks/useBillingEnabled";
 import useZustandLayoutMode from "../../context/useZustandLayoutMode";
 import KioskRightPanel from "./KioskRightPanel";
 import RetailEmptyState from "./PosRetailComponents/RetailEmptyState";
+import { v4 as uuidv4 } from "uuid";
+import ProductGroupPicker from "./ProductGroupPicker";
+import { createGroupCartItem, groupCartMergeKey, groupChoiceProduct, groupMenuProducts, groupSavedOrderItems,
+  isGroupedProduct, productGroupKey, productGroupOptionKey, repriceGroupCartItem, resolveProductGroupAlias, serializeOrderCartItems, setGroupItemQuantity } from "../../utils/productGroups";
 
 const mapPricingProduct = (item, index) => ({
   id: item.product_id || `${item.sku || "ITEM"}-${index}`,
@@ -64,6 +68,14 @@ const mapPricingProduct = (item, index) => ({
   unit_cost: Number(item.unit_cost || 0),
   unit_of_measure: item.unit_of_measure || "",
   inventory_type: item.inventory_type || "",
+  product_group: item.product_group,
+  group_alias: item.group_alias,
+  group_size: item.group_size,
+  group_variant: item.group_variant,
+  group_sizes: item.group_sizes,
+  group_size_id: item.group_size_id,
+  group_recipe_configured: item.group_recipe_configured,
+  group_price_error: item.group_price_error || (item.product_group?.enabled && item.selling_price == null ? "Missing price" : null),
   raw: item,
 });
 
@@ -149,6 +161,9 @@ const Orderlist = ({
   const [selectcategory, setselectcategory] = useState("");
   const [selectedSubcategory, setSelectedSubcategory] = useState("");
   const [productlist, setproductlist] = useState([]);
+  const [groupProducts, setGroupProducts] = useState([]);
+  const [groupChoice, setGroupChoice] = useState(null);
+  const closeGroupChoice = React.useCallback(() => setGroupChoice(null), []);
 
   useEffect(() => {
     setSelectedSubcategory("");
@@ -640,6 +655,7 @@ const Orderlist = ({
         products: [],
       });
       setproductlist([]);
+      setGroupProducts([]);
       return;
     }
 
@@ -682,6 +698,7 @@ const Orderlist = ({
           });
 
           setproductlist(mappedProducts);
+          setGroupProducts(Array.isArray(result.group_products) ? result.group_products.map(mapPricingProduct) : []);
         } else {
           setPricingData({
             sales_type_id: "",
@@ -689,6 +706,7 @@ const Orderlist = ({
             products: [],
           });
           setproductlist([]);
+          setGroupProducts([]);
         }
       } catch (error) {
         console.error("Failed to fetch pricing products:", error);
@@ -699,6 +717,7 @@ const Orderlist = ({
             products: [],
           });
           setproductlist([]);
+          setGroupProducts([]);
         }
       } finally {
         if (!cancelled) setIsPricingLoading(false);
@@ -725,13 +744,19 @@ const Orderlist = ({
   // to a different pricing category. Items already loaded from a saved
   // transaction keep their original recorded price.
   const salesTypeRepriceRef = useRef(selectedSalesTypeObject?.sales_type_id);
+  const restoringSalesTypeRef = useRef("");
 
   useEffect(() => {
     const nextSalesTypeId = selectedSalesTypeObject?.sales_type_id;
     const prevSalesTypeId = salesTypeRepriceRef.current;
     salesTypeRepriceRef.current = nextSalesTypeId;
+    if (String(restoringSalesTypeRef.current) === String(nextSalesTypeId)) {
+      restoringSalesTypeRef.current = "";
+      return;
+    }
 
     if (!nextSalesTypeId || nextSalesTypeId === prevSalesTypeId) return;
+    setGroupChoice(null);
 
     const categoryCode = newtransaction?.business_info?.Category_Code || "";
     const unitCode = newtransaction?.business_info?.Unit_Code || "";
@@ -745,8 +770,8 @@ const Orderlist = ({
     const editableCodes = Array.from(
       new Set(
         (productcart.items || [])
-          .filter((item) => item.isLoadedFromDB !== true && item.code)
-          .map((item) => item.code),
+          .filter((item) => (item.group_selection || item.isLoadedFromDB !== true) && item.code)
+          .flatMap((item) => item.group_selection?.variants || [item.code]),
       ),
     );
 
@@ -782,9 +807,9 @@ const Orderlist = ({
 
         syncCartState((items) =>
           items.map((item) =>
-            item.isLoadedFromDB !== true && priceByCode.has(item.code)
-              ? { ...item, price: priceByCode.get(item.code) }
-              : item,
+            item.group_selection
+              ? { ...repriceGroupCartItem(item, (result.group_products || result.products || []).map(mapPricingProduct), result.pricing_category), isLoadedFromDB: item.isLoadedFromDB }
+              : item.isLoadedFromDB !== true && priceByCode.has(item.code) ? { ...item, price: priceByCode.get(item.code) } : item,
           ),
         );
       } catch (error) {
@@ -823,14 +848,19 @@ const Orderlist = ({
           );
 
           if (matched) {
-            setSelectedSalesType(String(matched.sales_type_id));
+            setSelectedSalesType((current) => {
+              const next = String(matched.sales_type_id);
+              if (current !== next) restoringSalesTypeRef.current = next;
+              return next;
+            });
           }
         }
 
         if (!Array.isArray(data.order_details)) return;
 
-        const mappedCart = data.order_details.map((item, index) => ({
-          lineId: item.ID ? `db-${item.ID}` : `db-${item.product_id}-${index}`,
+        const mappedCart = groupSavedOrderItems(data.order_details).map((item, index) => ({
+          lineId: item.group_selection ? `db-group-${item.group_selection.selection_id}` : item.ID ? `db-${item.ID}` : `db-${item.product_id}-${index}`,
+          group_selection: item.group_selection,
           code: item.product_id,
           name: item.item_name || item.product_id,
           price: Number(item.selling_price || 0),
@@ -860,6 +890,7 @@ const Orderlist = ({
         setcartforqr({
           customer: tableselected,
           items: mappedCart.map((item) => ({
+            ...item,
             code: item.code,
             quantity: item.quantity,
             itemInstruction: item.itemInstruction || "",
@@ -887,7 +918,7 @@ const Orderlist = ({
     products.forEach((item) => {
       const subcategory = getItemSubcategory(item);
 
-      if (!subcategory) {
+      if (item._isProductGroup || !subcategory) {
         standaloneItems.push(item);
         return;
       }
@@ -935,9 +966,11 @@ const Orderlist = ({
 
   // Tier 1 + Tier 2 view for the top-level (not drilled-in, not searching) grid.
   const menuDisplayItems = useMemo(() => {
-    if (!enableSubcategories) return productlist || [];
-    return groupProductsForMenuGrid(productlist || []);
-  }, [productlist, enableSubcategories]);
+    const sizeChoicesInCategory = groupProducts.filter((product) => product.group_size_id && product.item_category === selectcategory);
+    const grouped = groupMenuProducts([...(productlist || []), ...sizeChoicesInCategory], groupProducts);
+    if (!enableSubcategories) return grouped;
+    return groupProductsForMenuGrid(grouped);
+  }, [productlist, groupProducts, enableSubcategories, selectcategory]);
 
   // Drop a stale drill-down selection if the setting gets disabled.
   useEffect(() => {
@@ -946,13 +979,17 @@ const Orderlist = ({
     }
   }, [enableSubcategories, selectedSubcategory]);
 
-  const filteredProducts = useMemo(() => {
+  const rawFilteredProducts = useMemo(() => {
     const search = productsearch.trim().toLowerCase();
 
     if (search) {
-      return (productlist || []).filter((p) => {
+      const candidates = [...new Map([...(productlist || []), ...groupProducts].map((product) => [productGroupOptionKey(product), product])).values()];
+      return candidates.filter((p) => {
         const searchable = [
           p.item_name,
+          p.product_group?.name,
+          p.group_variant,
+          p.group_size,
           p.item_description,
           p.item_category,
           p.product_id,
@@ -981,10 +1018,13 @@ const Orderlist = ({
   }, [
     productsearch,
     productlist,
+    groupProducts,
     enableSubcategories,
     selectedSubcategory,
     menuDisplayItems,
   ]);
+
+  const filteredProducts = useMemo(() => groupMenuProducts(rawFilteredProducts, groupProducts), [rawFilteredProducts, groupProducts]);
 
   const filteredBillingData = useMemo(() => {
     return (billingData || []).filter((item) =>
@@ -1196,6 +1236,7 @@ const Orderlist = ({
   }, [transferProductItems, transferItemSelections]);
 
   const buildCartMergeKey = (item) => {
+    if (groupCartMergeKey(item)) return groupCartMergeKey(item);
     const code = String(item?.code || "")
       .trim()
       .toLowerCase();
@@ -1384,7 +1425,7 @@ const Orderlist = ({
 
     for (let i = 0; i < nextItems.length && remaining > 0; i += 1) {
       const entry = nextItems[i];
-      if (entry.isLoadedFromDB !== true) continue;
+      if (entry.isLoadedFromDB !== true || entry.group_selection) continue;
       if (String(entry.code) !== String(productCode)) continue;
 
       const originalQty = Number(originalByLineId[entry.lineId] || 0);
@@ -1407,6 +1448,19 @@ const Orderlist = ({
     if (isCartFromDB || !proxyItem) return;
 
     const mergedKey = proxyItem?.mergedKey || buildCartMergeKey(proxyItem);
+    if (proxyItem.group_selection) {
+      if (!Number.isInteger(delta)) return;
+      if (delta > 0) {
+        const selectionId = uuidv4();
+        syncCartState((items) => [...items, setGroupItemQuantity({ ...proxyItem, sourceLineId: undefined,
+          lineId: makeLineId("new"), isLoadedFromDB: false,
+          group_selection: { ...proxyItem.group_selection, selection_id: selectionId } }, delta)]);
+      } else {
+        syncCartState((items) => items.map((item) => item.lineId === proxyItem.sourceLineId
+          ? setGroupItemQuantity(item, Math.max(1, Number(item.quantity) + delta)) : item));
+      }
+      return;
+    }
 
     if (delta > 0) {
       syncCartState((items) => {
@@ -1540,7 +1594,15 @@ const Orderlist = ({
     setShowDeleteItemModal(false);
   };
 
-  const addToCart = (product) => {
+  const addToCart = (product, availableGroupProducts = groupProducts) => {
+    product = resolveProductGroupAlias(product, availableGroupProducts);
+    if (isGroupedProduct(product)) {
+      const choices = availableGroupProducts.filter((entry) => isGroupedProduct(entry) && productGroupKey(entry) === productGroupKey(product)
+        && resolveProductGroupAlias(entry, availableGroupProducts) === entry);
+      if (!choices.length) { alert("Reload the menu to get this product group’s choices."); return; }
+      setGroupChoice({ products: choices.map(groupChoiceProduct) });
+      return;
+    }
     syncCartState((items) => {
       const restoredResult = restoreLoadedQuantityByCode(
         items,
@@ -1554,12 +1616,12 @@ const Orderlist = ({
 
       const nextItems = [...restoredResult.items];
       const existing = nextItems.find(
-        (i) => i.code === product.product_id && i.isLoadedFromDB !== true,
+        (i) => i.code === product.product_id && i.isLoadedFromDB !== true && !i.group_selection,
       );
 
       if (existing) {
         return nextItems.map((i) =>
-          i.code === product.product_id && i.isLoadedFromDB !== true
+          i.code === product.product_id && i.isLoadedFromDB !== true && !i.group_selection
             ? { ...i, quantity: Number(i.quantity || 0) + 1 }
             : i,
         );
@@ -1585,12 +1647,22 @@ const Orderlist = ({
     setproductsearch("");
   };
 
+  const addGroupSelection = (choice) => {
+    try {
+      const item = createGroupCartItem({ ...choice, pricingCategory: pricingData.pricing_category,
+        selectionId: uuidv4(), lineId: makeLineId("group") });
+      syncCartState((items) => [...items, item]);
+      setGroupChoice(null);
+      setproductsearch("");
+    } catch (error) { alert(error.message); }
+  };
+
   const handleScanSubmit = async (scannedValue) => {
     const scannedCode = String(scannedValue || "").trim();
     if (!scannedCode) return;
 
     const normalizedCode = scannedCode.toLowerCase();
-    const existingMatch = (productlist || []).find(
+    const existingMatch = [...(productlist || []), ...groupProducts].find(
       (p) =>
         String(p.sku || "")
           .trim()
@@ -1633,7 +1705,8 @@ const Orderlist = ({
         ? result.products.map(mapPricingProduct)
         : [];
 
-      const scannedMatch = products.find(
+      const options = Array.isArray(result.group_products) ? result.group_products.map(mapPricingProduct) : [];
+      const scannedMatch = [...products, ...options].find(
         (p) =>
           String(p.sku || "")
             .trim()
@@ -1641,7 +1714,9 @@ const Orderlist = ({
       );
 
       if (scannedMatch) {
-        addToCart(scannedMatch);
+        setGroupProducts(options);
+        setPricingData((current) => ({ ...current, pricing_category: result.pricing_category || current.pricing_category }));
+        addToCart(scannedMatch, options);
       } else {
         alert(`No item found for scanned code: ${scannedCode}`);
         setproductsearch("");
@@ -1654,6 +1729,10 @@ const Orderlist = ({
 
   const updateQuantityByInput = (lineId, value) => {
     if (isCartFromDB) return;
+    if (productcart.items.find((item) => item.lineId === lineId)?.group_selection) {
+      syncCartState((items) => items.map((item) => item.lineId === lineId ? setGroupItemQuantity(item, value) : item));
+      return;
+    }
 
     const canEdit = (i) =>
       i.lineId === lineId &&
@@ -1698,6 +1777,10 @@ const Orderlist = ({
 
   const updateQuantity = (lineId, delta) => {
     if (isCartFromDB) return;
+    if (productcart.items.find((item) => item.lineId === lineId)?.group_selection) {
+      syncCartState((items) => items.map((item) => item.lineId === lineId ? setGroupItemQuantity(item, Math.max(1, Number(item.quantity) + delta)) : item));
+      return;
+    }
 
     const canEdit = (i) =>
       i.lineId === lineId &&
@@ -1955,6 +2038,8 @@ const Orderlist = ({
     : "DINE IN";
 
   const saveOrderToServer = async () => {
+    const invalidGroup = productcart.items.find((item) => item.group_price_error);
+    if (invalidGroup) { alert(invalidGroup.group_price_error); return { ok: false }; }
     if (productcart.items.length === 0) {
       alert("Cart is empty");
       return { ok: false };
@@ -1998,6 +2083,8 @@ const Orderlist = ({
         layoutMode === "Kiosk" ? kioskTableName : tableselected,
       );
       formData.append("order_type", orderTypeName);
+      formData.append("pricing_category", pricingData.pricing_category || "");
+      formData.append("sales_type_id", selectedSalesType || "");
       formData.append("customer_head_count", headCount);
       formData.append("discount_type", "");
       formData.append("payment_method", "");
@@ -2014,18 +2101,7 @@ const Orderlist = ({
       formData.append(
         "cart_items",
         JSON.stringify(
-          mergedCartItemsForSave.map((item) => ({
-            product_id: item.code,
-            sku: item.code,
-            sales_quantity: item.quantity,
-            landing_cost: 0,
-            unit_cost: Number(item.unit_cost || 0),
-            selling_price: Number(item.price || 0),
-            vatable: "Yes",
-            isDiscountable: item.isDiscountable,
-            order_status: "ACTIVE",
-            item_instruction: item.itemInstruction || "",
-          })),
+          serializeOrderCartItems(mergedCartItemsForSave),
         ),
       );
 
@@ -2041,7 +2117,7 @@ const Orderlist = ({
       const result = await response.json();
 
       if (result.status !== "success") {
-        alert("Failed to process order");
+        alert(result.message || "Failed to process order");
         return { ok: false };
       }
 
@@ -2069,6 +2145,10 @@ const Orderlist = ({
   const [isLoadingAppToPos, setIsLoadingAppToPos] = useState(false);
 
   const handleKioskPrintQR = async () => {
+    if (productcart.items.some((item) => item.group_selection)) {
+      alert("Print the order slip for product groups. Item QR codes cannot carry the selected size and variants.");
+      return;
+    }
     if (!window.electronAPI?.printEscPosQr) {
       alert("QR printing is not available in this environment.");
       return;
@@ -2494,6 +2574,10 @@ const Orderlist = ({
 
   const openTransferModal = async () => {
     if (!apiHost) return;
+    if (productcart.items.some((item) => item.group_selection)) {
+      alert("Product groups must stay together. Table transfer or split is unavailable for an order containing a group.");
+      return;
+    }
 
     setTransferLoading(true);
     setShowTransferModal(true);
@@ -2546,9 +2630,10 @@ const Orderlist = ({
         if (!isMounted) return;
 
         setDestinationTransferSummary(data?.summary || null);
-        setDestinationTransferItems(
-          Array.isArray(data?.order_details) ? data.order_details : [],
-        );
+        if ((data?.order_details || []).some((item) => item.group_selection)) {
+          throw new Error("The destination order contains product groups and cannot be split or merged here.");
+        }
+        setDestinationTransferItems(Array.isArray(data?.order_details) ? data.order_details : []);
       } catch (error) {
         console.error("Failed to load destination transfer preview:", error);
         if (!isMounted) return;
@@ -3067,6 +3152,7 @@ const Orderlist = ({
 
   return (
     <>
+      {groupChoice && <ProductGroupPicker {...groupChoice} onClose={closeGroupChoice} onAdd={addGroupSelection} />}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -3481,6 +3567,7 @@ const Orderlist = ({
 
                       if (
                         isFormField ||
+                        groupChoice ||
                         showDiscountModal ||
                         selectedInstructionItem ||
                         summaryCart ||
@@ -3631,7 +3718,7 @@ const Orderlist = ({
                               />
                             </div>
 
-                            {p._isFolder ? (
+                            {p._isFolder || p._isProductGroup ? (
                               /* TIER 1: SUBCATEGORY FOLDER CARD */
                               <div className="relative z-10 flex flex-col items-center justify-center flex-1 gap-3 p-6 text-center min-h-[168px]">
                                 <div
@@ -3655,7 +3742,7 @@ const Orderlist = ({
                                   className="text-[9px] font-bold uppercase tracking-widest"
                                   style={{ color: "var(--app-muted-text)" }}
                                 >
-                                  {p.variantCount} option
+                                  {p._isProductGroup ? "Choose size & variants · " : ""}{p.variantCount} option
                                   {p.variantCount === 1 ? "" : "s"}
                                 </p>
 
@@ -3667,7 +3754,7 @@ const Orderlist = ({
                                   }}
                                 >
                                   From ₱
-                                  {Number(p.minPrice || 0).toLocaleString()}
+                                  {Number(p._isProductGroup ? p.selling_price : p.minPrice || 0).toLocaleString()}
                                   <FaChevronRight size={8} />
                                 </div>
                               </div>
@@ -5511,6 +5598,7 @@ const Orderlist = ({
                             </div>
 
                             {/* SPECIAL INSTRUCTIONS (Kung meron) */}
+                            {item.group_price_error && <p className="mt-1 text-xs text-redAccent">{item.group_price_error}</p>}
                             {item.itemInstruction && (
                               <div className="px-3 py-1 mt-1 border-l-2 rounded-r-lg bg-rose-500/5 border-rose-500/50">
                                 <p className="text-[10px] text-rose-500 font-bold italic leading-tight uppercase">
@@ -6358,6 +6446,7 @@ const CartList = ({
               </span>
             </div>
 
+            {item.group_price_error && <p className="mt-1 text-xs text-redAccent">{item.group_price_error}</p>}
             {item.itemInstruction && (
               <p className="mt-1.5 break-words text-xs text-amber-500">
                 Note: {item.itemInstruction}
@@ -6399,8 +6488,9 @@ const CartList = ({
 
                   <input
                     type="number"
-                    min="0.01"
-                    step="0.01"
+                    min={item.group_selection ? "1" : "0.01"}
+                    max={item.group_selection ? "10000" : undefined}
+                    step={item.group_selection ? "1" : "0.01"}
                     inputMode="decimal"
                     value={item.quantity}
                     onFocus={(e) => e.target.select()}

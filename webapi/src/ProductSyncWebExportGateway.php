@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . "/ProductGroupSyncMetadata.php";
+
 class ProductSyncWebExportGateway
 {
     private PDO $conn;
@@ -118,7 +120,7 @@ class ProductSyncWebExportGateway
                         'expiry_days' => (int) ($webRow['expiry_days'] ?? 0),
                         'item_brand' => (string) ($webRow['item_brand'] ?? ''),
                         'isDiscountable' => (string) ($webRow['isDiscountable'] ?? 'No'),
-                    ] : null,
+                    ] + array_intersect_key($webRow, array_flip(['product_group', 'group_size', 'group_variant', 'group_price_error', 'group_sizes', 'group_alias'])) : null,
                 ];
             }
 
@@ -229,7 +231,7 @@ class ProductSyncWebExportGateway
 
         $stmt->execute();
 
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return (new ProductGroupSyncMetadata($this->conn))->annotate((new ProductGroupSizeSync($this->conn))->sourceRows($stmt->fetchAll(PDO::FETCH_ASSOC), $pricingCodes));
     }
 
     private function pairKey(string $productId, string $pricingCode): string

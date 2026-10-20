@@ -70,6 +70,21 @@ const toRgba = (hex, alpha = 1) => {
   return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
 };
 
+// Choose readable text for the configured button fill, including light accents.
+const accentForeground = (hex) => {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return "#ffffff";
+  const luminance = ({ r, g, b }) => [r, g, b].reduce((sum, channel, index) => {
+    const value = channel / 255;
+    return sum + (value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4)
+      * [0.2126, 0.7152, 0.0722][index];
+  }, 0);
+  const background = luminance(rgb);
+  const whiteContrast = 1.05 / (background + 0.05);
+  const darkContrast = (background + 0.05) / (luminance({ r: 15, g: 23, b: 42 }) + 0.05);
+  return whiteContrast >= darkContrast ? "#ffffff" : "#0f172a";
+};
+
 const normalizeThemeSettings = (data = {}) => ({
   Theme_Name: data.Theme_Name || DEFAULT_THEME_SETTINGS.Theme_Name,
 
@@ -191,6 +206,7 @@ const applyCssVariables = (mode, themeSettings) => {
   );
 
   root.style.setProperty("--app-accent", active.primary);
+  root.style.setProperty("--app-on-accent", accentForeground(active.primary));
   root.style.setProperty("--app-accent-secondary", active.secondary);
   root.style.setProperty("--app-accent-soft", toRgba(active.primary, 0.12));
   root.style.setProperty("--app-accent-glow", toRgba(active.primary, 0.35));

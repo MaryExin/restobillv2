@@ -1,5 +1,6 @@
 "use client";
 import { useEffect } from "react";
+import useApiHost from "../../hooks/useApiHost";
 import { normalizePosApiHost } from "../../utils/posRoleFetch";
 
 const backupHeaders = () => {
@@ -10,7 +11,11 @@ const backupHeaders = () => {
 };
 
 const GlobalSync = () => {
+  const apiHost = useApiHost();
+
   useEffect(() => {
+    if (!apiHost) return undefined;
+    const apiBase = normalizePosApiHost(apiHost);
     let cancelled = false;
     let backupTimer;
     let retryTimer;
@@ -25,9 +30,6 @@ const GlobalSync = () => {
 
     const performSilentBackup = async () => {
       try {
-        const apiBase = normalizePosApiHost(
-          localStorage.getItem("apiendpoint") || "http://localhost",
-        );
         const res = await fetch(
           `${apiBase}/api/pos_db_backup_api.php?action=scheduled_export`,
           { method: "POST", headers: backupHeaders() },
@@ -52,9 +54,6 @@ const GlobalSync = () => {
 
     const initSync = async () => {
       try {
-        const apiBase = normalizePosApiHost(
-          localStorage.getItem("apiendpoint") || "http://localhost",
-        );
         const res = await fetch(
           `${apiBase}/api/pos_db_backup_api.php?action=get_settings`,
           { headers: backupHeaders() },
@@ -98,7 +97,7 @@ const GlobalSync = () => {
       clearTimeout(retryTimer);
       window.removeEventListener("storage", restartSync);
     };
-  }, []);
+  }, [apiHost]);
 
   return null;
 };

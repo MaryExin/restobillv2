@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/cors.php";
+require_once dirname(__DIR__) . '/src/PosOrderProductGroups.php';
 
 /**
  * PRICING SELECTION API
@@ -212,6 +213,9 @@ try {
     $stmtProducts = $pdo->prepare($sqlProducts);
     $stmtProducts->execute($params);
     $products = $stmtProducts->fetchAll();
+    $productGroups = new PosOrderProductGroups($pdo);
+    $products = $productGroups->annotateProducts($products);
+    $groupProducts = $productGroups->groupProducts($category_code, $unit_code, (string) $pricing_category);
 
     /* ------------------------------
         7. RESPONSE
@@ -229,7 +233,8 @@ try {
             "limit" => $limit
         ],
         "count" => count($products),
-        "products" => $products
+        "products" => $products,
+        "group_products" => $groupProducts
     ]);
 
 } catch (Exception $e) {

@@ -36,6 +36,7 @@ date_default_timezone_set("Asia/Manila");
 ------------------------------ */
 $config = require __DIR__ . "/config.php";
 require_once __DIR__ . "/pos_report_mirror.php";
+require_once dirname(__DIR__) . '/src/PosOrderProductGroups.php';
 
 try {
     $dsn = "mysql:host={$config['host']};dbname={$config['db']};charset={$config['charset']}";
@@ -482,6 +483,7 @@ try {
         8. UPDATE DETAIL ITEMS
     ------------------------------ */
     if (!empty($cartItems)) {
+        (new PosOrderProductGroups($pdo))->assertBillingPrices($cartItems, (string) $transaction_id, $category_code, $unit_code);
         $sqlDetail = "UPDATE tbl_pos_transactions_detailed
                       SET selling_price = :price
                       WHERE ID = :id";

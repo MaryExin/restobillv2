@@ -5,7 +5,7 @@ return [
     "host" => "localhost",
     "user" => "root",
     "pass" => "",
-    "db"   => "db_cnc_pos",
-    "report_db" => "reports_database",
+    "db"   => 'grumpyjoe_pos',
+    "report_db" => 'grumpyjoe_pos_report',
     "charset" => "utf8mb4"
 ];

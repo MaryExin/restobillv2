@@ -17,6 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require __DIR__ . "/bootstrap.php";
 require_once __DIR__ . "/pos_report_mirror.php";
 require_once __DIR__ . "/pos_report_mirror_activation.php";
+require_once dirname(__DIR__) . '/src/PosOrderProductGroups.php';
 
 date_default_timezone_set('Asia/Manila');
 
@@ -187,6 +188,8 @@ try {
 
     $pdo->beginTransaction();
     $manualTransactionStarted = true;
+    $productGroups = new PosOrderProductGroups($pdo);
+    $cart_items = $productGroups->prepareItems($cart_items, $Category_Code, $Unit_Code, $order_type);
 
     $transaction_id = allocateDocumentCounter(
         $pdo,
@@ -356,6 +359,7 @@ try {
             ":order_status" => $detail_status
         ]);
 
+        $productGroups->storePart((string) $pdo->lastInsertId(), (string) $transaction_id, $Category_Code, $Unit_Code, $item);
         $lineTotal = round($sales_quantity * $selling_price, 2);
         $totalAmount += $lineTotal;
 

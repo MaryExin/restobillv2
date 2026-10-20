@@ -1,4 +1,5 @@
 <?php
+require_once dirname(__DIR__) . '/src/PosOrderProductGroups.php';
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
@@ -181,6 +182,7 @@ try {
         ":Unit_Code" => $unitCode,
     ]);
     $items = $stmtItems->fetchAll(PDO::FETCH_ASSOC);
+    $items = (new PosOrderProductGroups($pdo))->annotateLines($items);
 
     /* ---------------------------------------
        2. PAYMENTS
