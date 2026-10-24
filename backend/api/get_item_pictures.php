@@ -13,7 +13,7 @@ $config = require_once 'config.php';
 try {
     // Establish connection using PDO
     $pdo = new PDO(
-        "mysql:host={$config['host']};dbname={$config['db']};charset={$config['charset']}",
+        "mysql:host={$config['host']};dbname={$config['db']};charset={$config['charset']}" . ";port=" . (int)($config['port'] ?? 3306),
         $config['user'],
         $config['pass'],
         [

@@ -23,7 +23,7 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
 $config = require __DIR__ . "/config.php";
 
 try {
-    $dsn = "mysql:host={$config['host']};dbname={$config['db']};charset={$config['charset']}";
+    $dsn = "mysql:host={$config['host']};dbname={$config['db']};charset={$config['charset']}" . ";port=" . (int)($config['port'] ?? 3306);
     $pdo = new PDO($dsn, $config['user'], $config['pass'], [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC

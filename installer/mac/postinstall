@@ -1,0 +1,420 @@
+#!/bin/bash
+set -Eeuo pipefail
+umask 077
+
+PAYLOAD='/Library/Application Support/Lightem/setup'
+STATE='/Library/Application Support/Lightem'
+XAMPP='/Applications/XAMPP/xamppfiles'
+WEBROOT="$XAMPP/htdocs"
+APP='/Applications/Lightem Pos.app'
+LOG='/var/log/lightem-setup.log'
+ERROR_SUMMARY="$STATE/last-setup-error.txt"
+STEP='Preparing setup log'
+# Keep Installer output separate from the private, potentially sensitive full log.
+exec 3>&2
+RUN_ID="$(date -u +%Y%m%d%H%M%S)-$$"
+BACKUP="$STATE/backups/$RUN_ID"
+CREDENTIALS="$STATE/credentials/initial-access-$RUN_ID.txt"
+MOUNT=''
+CHANGED=0
+EXISTING=0
+PROVISIONED=0
+SERVICES_TOUCHED=0
+APACHE_WAS_RUNNING=0
+MYSQL_WAS_RUNNING=0
+APACHE_STOP_REQUESTED=0
+RECOVERY=''
+RECOVERED_SETTINGS=0
+# BEGIN XAMPP INSTALLER: keep vendor files accessible without exposing setup secrets.
+run_xampp_installer() (
+  umask 022
+  "$1" --mode unattended --unattendedmodeui none
+)
+# END XAMPP INSTALLER
+# BEGIN APACHE SHUTDOWN: exercised independently by the installer tests.
+apache_listener_present() {
+  /usr/sbin/lsof -nP -iTCP:80 -sTCP:LISTEN >/dev/null 2>&1
+}
+apache_processes_present() {
+  /usr/bin/pgrep -f '^/Applications/XAMPP/xamppfiles/bin/httpd([[:space:]]|$)' >/dev/null 2>&1
+}
+wait_for_apache_shutdown() {
+  local elapsed=0 listener workers
+  while true; do
+    if apache_listener_present; then listener=0; else listener=$?; fi
+    if apache_processes_present; then workers=0; else workers=$?; fi
+    if [ "$listener" -gt 1 ] || [ "$workers" -gt 1 ]; then
+      say 'Could not verify Apache shutdown; files will not be replaced.'
+      return 2
+    fi
+    if [ "$listener" -eq 1 ] && [ "$workers" -eq 1 ]; then return 0; fi
+    if [ "$elapsed" -ge 30 ]; then
+      say 'Apache still has a listener or running workers after 30 seconds.'
+      return 1
+    fi
+    if [ "$elapsed" -eq 0 ]; then say 'Waiting for Apache listeners and workers to exit.'; fi
+    sleep 1
+    elapsed=$((elapsed + 1))
+  done
+}
+stop_apache_and_wait() {
+  APACHE_STOP_REQUESTED=1
+  "$XAMPP/xampp" stopapache || return "$?"
+  wait_for_apache_shutdown
+}
+# END APACHE SHUTDOWN
+# BEGIN BACKEND CLASSIFICATION: exercised independently by the installer tests.
+backend_files_complete() {
+  local part
+  for part in api/bootstrap.php api/login.php api/pos_lan_health.php api/read_transaction_records.php api/config.php src/Database.php src/JWTCodec.php src/UserGateway.php vendor/autoload.php .env; do
+    [ -f "$WEBROOT/$part" ] || return 1
+  done
+}
+prepare_existing_backend() {
+  EXISTING=0
+  RECOVERED_SETTINGS=0
+  if [ -f "$WEBROOT/.lightem-managed-install.json" ] && ! backend_files_complete; then
+    step 'Recovering settings for an incomplete existing installation'
+    RECOVERY="$STATE/recovery/$RUN_ID"
+    [ ! -L "$STATE/recovery" ] || die 'The recovery directory must not be a symbolic link.'
+    mkdir -p "$STATE/recovery"
+    chmod 700 "$STATE/recovery"
+    "$PHP" "$PAYLOAD/recover.php" --root "$WEBROOT" --payload "$PAYLOAD" --backups "$STATE/backups" --destination "$RECOVERY" || return "$?"
+    EXISTING=1
+    RECOVERED_SETTINGS=1
+  elif [ -e "$WEBROOT/api" ] || [ -e "$WEBROOT/src" ] || [ -e "$WEBROOT/vendor" ] || [ -e "$WEBROOT/.env" ] || [ -e "$WEBROOT/.lightem-managed-install.json" ]; then
+    [ -f "$WEBROOT/api/bootstrap.php" ] && [ -f "$WEBROOT/api/read_transaction_records.php" ] && [ -f "$WEBROOT/src/JWTCodec.php" ] || die 'The web root contains an unrelated or incomplete application; setup will not overwrite it.'
+    "$PHP" "$PAYLOAD/verify.php" --root "$WEBROOT" --payload "$PAYLOAD" --before-update || return "$?"
+    EXISTING=1
+  fi
+}
+restore_existing_settings() {
+  if [ "$RECOVERED_SETTINGS" -eq 1 ]; then
+    /usr/bin/ditto "$RECOVERY/.env" "$WEBROOT/.env"
+    /usr/bin/ditto "$RECOVERY/api/config.php" "$WEBROOT/api/config.php"
+  elif [ "$EXISTING" -eq 1 ]; then
+    /usr/bin/ditto "$BACKUP/backend/api/config.php" "$WEBROOT/api/config.php"
+  fi
+  if [ "$EXISTING" -eq 1 ] && [ -d "$BACKUP/backend/api/images" ]; then
+    /usr/bin/ditto "$BACKUP/backend/api/images" "$WEBROOT/api/images"
+  fi
+}
+# END BACKEND CLASSIFICATION
+# BEGIN XAMPP MANAGER: exercised independently without launching the GUI.
+xampp_manager_user_access() {
+  /usr/bin/sudo -n -u "$1" -- /bin/test "$2" "$3"
+}
+verify_xampp_manager_access() {
+  local user file top="${XAMPP%/*}" manager="$XAMPP/manager-osx.app"
+  user=$(/usr/bin/stat -f %Su /dev/console)
+  case "$user" in root|loginwindow|'') user=nobody ;; esac
+  # Test as a regular user: root-only checks miss denied ACLs and Finder access.
+  # This only reads permissions; it never opens the GUI or requests a password.
+  for file in "$top" "$XAMPP" "$manager" "$manager/Contents" "$manager/Contents/MacOS" "$manager/Contents/Resources"; do
+    xampp_manager_user_access "$user" -x "$file" && xampp_manager_user_access "$user" -r "$file" || die 'XAMPP Manager is still inaccessible to a regular user; inspect the directory permissions and access controls.'
+  done
+  for file in "$manager/Contents/Info.plist" "$manager/Contents/Resources/installbuilder.icns" "$manager/Contents/MacOS/installbuilder.sh" "$manager/Contents/MacOS/Application Manager"; do
+    xampp_manager_user_access "$user" -r "$file" || die 'XAMPP Manager files are still unreadable to a regular user; inspect their permissions and access controls.'
+  done
+  for file in "$manager/Contents/MacOS/installbuilder.sh" "$manager/Contents/MacOS/Application Manager"; do
+    xampp_manager_user_access "$user" -x "$file" || die 'XAMPP Manager cannot be opened by a regular user; inspect the launcher permissions and access controls.'
+  done
+}
+repair_xampp_manager() {
+  local top="${XAMPP%/*}" manager="$XAMPP/manager-osx.app" part file wrapper actual backup_dir backup temporary
+  local stock_sha='a371be1db4f6410bf23e47fde81dd9838e04b378010788c4481d8c0ef0adcae3'
+  local patched_sha='bf6097f435a575723e49d44c9936cb7fee6c38c8a084c72903f8c5397e279036'
+  wrapper="$manager/Contents/MacOS/installbuilder.sh"
+  backup_dir="$STATE/xampp-manager"
+  backup="$backup_dir/installbuilder-stock.sh"
+
+  # Validate every affected path before changing permissions or the launcher.
+  # These are vendor shortcuts, never permission changes through arbitrary links.
+  for file in "$top" "$XAMPP" "$manager" "$manager/Contents" "$manager/Contents/MacOS" "$manager/Contents/Resources"; do
+    [ -d "$file" ] && [ ! -L "$file" ] || die 'XAMPP Manager contains a missing or redirected directory; its files were not changed.'
+  done
+  for part in bin cgi-bin etc htdocs logs manager-osx.app; do
+    [ -L "$top/$part" ] && [ "$(/usr/bin/readlink "$top/$part")" = "xamppfiles/$part" ] || die 'An XAMPP shortcut has an unexpected target; its files were not changed.'
+    [ -d "$XAMPP/$part" ] && [ ! -L "$XAMPP/$part" ] || die 'An XAMPP shortcut target is missing or redirected; its files were not changed.'
+  done
+  for file in "$manager/Contents/Info.plist" "$manager/Contents/Resources/installbuilder.icns" "$wrapper" "$manager/Contents/MacOS/Application Manager" "$manager/Contents/MacOS/osx-x86_64"; do
+    [ -f "$file" ] && [ ! -L "$file" ] || die 'XAMPP Manager contains a missing or redirected file; its files were not changed.'
+  done
+  actual=$(/usr/bin/shasum -a 256 "$wrapper" | /usr/bin/awk '{print $1}')
+  case "$actual" in
+    "$stock_sha"|"$patched_sha") ;;
+    *) die 'XAMPP Manager has a customized launcher. Setup will preserve it; restore the XAMPP 8.2.4 launcher before retrying.' ;;
+  esac
+  [ -d "$STATE" ] && [ ! -L "$STATE" ] || die 'The installer state directory is missing or redirected.'
+  [ ! -L "$backup_dir" ] && { [ ! -e "$backup_dir" ] || [ -d "$backup_dir" ]; } || die 'The XAMPP Manager backup directory is invalid.'
+  if [ -e "$backup" ] || [ -L "$backup" ]; then
+    [ -f "$backup" ] && [ ! -L "$backup" ] && [ "$(/usr/bin/shasum -a 256 "$backup" | /usr/bin/awk '{print $1}')" = "$stock_sha" ] || die 'The existing XAMPP Manager backup is invalid; it was preserved.'
+  fi
+
+  if [ "$actual" = "$stock_sha" ]; then
+    mkdir -p "$backup_dir"
+    chmod 700 "$backup_dir"
+    if [ ! -f "$backup" ]; then
+      ( umask 077; /bin/cp "$wrapper" "$backup" )
+    fi
+    chmod 600 "$backup"
+    # Only the exact stock unsigned launcher is patched. Its existing owner
+    # check and administrator authorization helper stay unchanged.
+    temporary=$(mktemp "$manager/Contents/MacOS/.lightem-manager.XXXXXX")
+    /usr/bin/awk '
+      /^elif \[ "\$\{machine_platform\}" == "i386" \];then$/ {
+        print "elif [ \"${machine_platform}\" == \"arm\" ] || [ \"${machine_platform}\" == \"arm64\" ];then"
+        print "  executable=\"osx-x86_64\""
+      }
+      { print }
+    ' "$wrapper" > "$temporary"
+    if [ "$(/usr/bin/shasum -a 256 "$temporary" | /usr/bin/awk '{print $1}')" != "$patched_sha" ]; then
+      rm -f "$temporary"
+      die 'XAMPP Manager launcher verification failed; the original was preserved.'
+    fi
+    chown "$(/usr/bin/stat -f '%u:%g' "$wrapper")" "$temporary"
+    chmod 755 "$temporary"
+    /bin/mv "$temporary" "$wrapper"
+  fi
+
+  for file in "$top" "$XAMPP" "$manager" "$manager/Contents" "$manager/Contents/MacOS" "$manager/Contents/Resources"; do chmod a+rx "$file"; done
+  for file in "$manager/Contents/Info.plist" "$manager/Contents/Resources/installbuilder.icns"; do chmod a+r "$file"; done
+  for file in "$wrapper" "$manager/Contents/MacOS/Application Manager"; do chmod a+rx "$file"; done
+  for part in bin cgi-bin etc htdocs logs manager-osx.app; do chmod -h 755 "$top/$part"; done
+  # osx-x86_64 deliberately remains root-only; the standard helper opens it
+  # after authorization. Databases, backend secrets, and other runtime files
+  # retain their original permissions.
+  verify_xampp_manager_access
+}
+# END XAMPP MANAGER
+# BEGIN SETUP DIAGNOSTICS: exercised independently by the installer tests.
+say() { echo "[$(date -u +%FT%TZ)] $*"; }
+step() { STEP="$1"; say "$STEP."; }
+report_failure() {
+  local status="$1" message="$2" summary
+  # Callers provide fixed messages only. Never expose command text, PHP output,
+  # environment values, or credentials through macOS Installer's public log.
+  summary="Lightem setup failed during: $STEP. $message (exit $status). Full log: $LOG"
+  printf '%s\n' "$summary" >&3 || true
+  say "ERROR: $summary" || true
+  if [ -d "$STATE" ] && [ ! -L "$ERROR_SUMMARY" ]; then
+    ( umask 077; printf '%s\n' "$summary" > "$ERROR_SUMMARY" && chmod 600 "$ERROR_SUMMARY" ) || true
+  fi
+}
+die() { report_failure 1 "$*"; exit 1; }
+unexpected_failure() {
+  local status="$1"
+  trap - ERR
+  report_failure "$status" 'A required setup operation failed; see the protected full log for details.'
+  exit "$status"
+}
+cleanup() {
+  local status=$?
+  # Rollback must attempt every restoration and retain the original failure.
+  trap - EXIT ERR
+  set +e +u
+  if [ -n "$MOUNT" ]; then /usr/bin/hdiutil detach "$MOUNT" >/dev/null 2>&1 || true; fi
+  if [ "$status" -ne 0 ] && [ "$CHANGED" -eq 1 ]; then
+    say 'Restoring the previous backend and app after setup failure.'
+    if stop_apache_and_wait; then
+      if [ "$EXISTING" -eq 1 ] || [ "$PROVISIONED" -eq 0 ]; then
+        for part in api src vendor .env .htaccess .lightem-managed-install.json; do
+          if [ -e "$BACKUP/backend/$part" ]; then
+            rm -rf "$WEBROOT/$part"
+            /usr/bin/ditto "$BACKUP/backend/$part" "$WEBROOT/$part"
+          else
+            rm -rf "$WEBROOT/$part"
+          fi
+        done
+      else
+        say 'Retaining the completed fresh database configuration for a safe retry.'
+      fi
+      if [ -d "$BACKUP/Lightem Pos.app" ]; then
+        rm -rf "$APP"
+        /usr/bin/ditto "$BACKUP/Lightem Pos.app" "$APP"
+      fi
+    else
+      say "Backend recovery deferred because Apache shutdown was not confirmed. Backups retained: $BACKUP"
+    fi
+  fi
+  if [ "$status" -ne 0 ] && [ "$SERVICES_TOUCHED" -eq 1 ]; then
+    if [ "$APACHE_WAS_RUNNING" -eq 1 ]; then
+      if [ "$APACHE_STOP_REQUESTED" -eq 0 ] || wait_for_apache_shutdown; then
+        "$XAMPP/xampp" startapache || true
+      else
+        say 'Apache service recovery deferred until the pending shutdown completes.'
+      fi
+    else
+      stop_apache_and_wait || say 'Apache shutdown could not be confirmed during service recovery.'
+    fi
+    if [ "$MYSQL_WAS_RUNNING" -eq 0 ]; then "$XAMPP/xampp" stopmysql || true; fi
+  fi
+  if [ "${RECOVERED_SETTINGS:-0}" -eq 1 ] && [ -n "$RECOVERY" ]; then rm -rf "$RECOVERY"; fi
+  [ "$status" -eq 0 ] || say "Setup stopped. Recovery files: $BACKUP. Log: $LOG"
+  exit "$status"
+}
+trap cleanup EXIT
+trap 'unexpected_failure "$?"' ERR
+# END SETUP DIAGNOSTICS
+
+mkdir -p "$STATE"
+touch "$LOG"
+chmod 600 "$LOG"
+exec >>"$LOG" 2>&1
+[ ! -L "$ERROR_SUMMARY" ] || die 'The setup error summary path is a symbolic link.'
+rm -f "$ERROR_SUMMARY"
+
+say 'Starting Lightem POS install/update.'
+step 'Checking setup package and device'
+[ "$(id -u)" -eq 0 ] || die 'This package must be run through macOS Installer with administrator access.'
+[ "${3:-/}" = / ] || die 'Install Lightem on the current startup disk.'
+[ -f "$PAYLOAD/manifest.json" ] && [ -d "$PAYLOAD/Lightem Pos.app" ] || die 'Incomplete setup package.'
+
+step 'Checking Rosetta compatibility'
+# The matching XAMPP release is Intel; macOS supplies Rosetta on Apple Silicon.
+if [ "$(/usr/bin/uname -m)" = arm64 ] && ! /usr/bin/arch -x86_64 /usr/bin/true 2>/dev/null; then
+  say 'Installing Rosetta. A first-time Apple Silicon installation needs internet for this Apple component.'
+  /usr/sbin/softwareupdate --install-rosetta --agree-to-license || die 'Rosetta is required. Install it while online, then run this package again.'
+fi
+
+step 'Checking XAMPP installation'
+if [ ! -d "$XAMPP" ]; then
+  [ ! -e /Applications/XAMPP ] || die 'An incomplete XAMPP installation already exists. Repair or move it first.'
+  for port in 80 3306; do
+    if /usr/sbin/lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then die "Port $port is in use. Stop the conflicting server first."; fi
+  done
+  expected='eb9888f2e3b131ae9a5fbec063a6b642a7285e065a8e5f5e97c699b71e2d7ac5'
+  actual=$(/usr/bin/shasum -a 256 "$PAYLOAD/xampp-installer.dmg" | /usr/bin/awk '{print $1}')
+  [ "$actual" = "$expected" ] || die 'The bundled XAMPP installer checksum is invalid.'
+  MOUNT=$(mktemp -d /private/tmp/lightem-xampp.XXXXXX)
+  /usr/bin/hdiutil attach -readonly -nobrowse -mountpoint "$MOUNT" "$PAYLOAD/xampp-installer.dmg"
+  step 'Installing XAMPP 8.2.4-0'
+  run_xampp_installer "$MOUNT/xampp-osx-8.2.4-0-installer.app/Contents/MacOS/installbuilder.sh"
+  /usr/bin/hdiutil detach "$MOUNT"
+  rmdir "$MOUNT" || true
+  MOUNT=''
+fi
+step 'Validating XAMPP runtime'
+[ -f "$XAMPP/lib/VERSION" ] && [ "$(cat "$XAMPP/lib/VERSION")" = '8.2.4-0' ] || die 'This setup requires XAMPP 8.2.4-0; it will not replace a different installed version.'
+PHP="$XAMPP/bin/php"
+[ "$("$PHP" -r 'echo PHP_VERSION;')" = '8.2.4' ] || die 'Unexpected PHP version.'
+
+step 'Checking XAMPP Manager and shortcuts'
+repair_xampp_manager
+
+step 'Checking local server ports'
+# Never connect the provisioning tool to a different server on the same ports.
+for port in 80 3306; do
+  for pid in $(/usr/sbin/lsof -nP -t -iTCP:"$port" -sTCP:LISTEN 2>/dev/null || true); do
+    exe=$(/usr/sbin/lsof -a -p "$pid" -d txt -Fn 2>/dev/null | /usr/bin/sed -n 's/^n//p' | /usr/bin/head -1)
+    case "$exe" in "$XAMPP/"*) ;; *) die "Port $port belongs to another server." ;; esac
+  done
+done
+if /usr/sbin/lsof -nP -iTCP:80 -sTCP:LISTEN >/dev/null 2>&1; then APACHE_WAS_RUNNING=1; fi
+if /usr/sbin/lsof -nP -iTCP:3306 -sTCP:LISTEN >/dev/null 2>&1; then MYSQL_WAS_RUNNING=1; fi
+step 'Starting Apache and MySQL'
+SERVICES_TOUCHED=1
+"$XAMPP/xampp" startmysql
+"$XAMPP/xampp" startapache
+for attempt in $(seq 1 40); do
+  if /usr/bin/nc -z 127.0.0.1 3306 && /usr/bin/nc -z 127.0.0.1 80; then break; fi
+  sleep 1
+done
+/usr/bin/nc -z 127.0.0.1 3306 && /usr/bin/nc -z 127.0.0.1 80 || die 'Apache/MySQL did not start.'
+
+step 'Checking existing backend and databases'
+if [ -f "$WEBROOT/.lightem-managed-install.json" ]; then
+  "$PHP" -r '$old=json_decode(file_get_contents($argv[1]),true,512,JSON_THROW_ON_ERROR);$new=json_decode(file_get_contents($argv[2]),true,512,JSON_THROW_ON_ERROR);$a=ltrim((string)$old["buildId"],"0");$b=ltrim((string)$new["buildId"],"0");if(version_compare($old["version"],$new["version"],">") || strlen($a)>strlen($b) || (strlen($a)===strlen($b)&&strcmp($a,$b)>0)) {fwrite(STDERR,"A newer build is already installed.\n");exit(1);}' "$WEBROOT/.lightem-managed-install.json" "$PAYLOAD/manifest.json" || die 'Downgrade refused.'
+fi
+prepare_existing_backend
+if /usr/bin/pgrep -f '^/Applications/Lightem Pos.app/Contents/MacOS/' >/dev/null; then die 'Close Lightem POS and run this installer again.'; fi
+
+step 'Backing up existing backend and application'
+mkdir -p "$BACKUP/backend"
+for part in api src vendor .env .htaccess .lightem-managed-install.json; do
+  [ ! -e "$WEBROOT/$part" ] || /usr/bin/ditto "$WEBROOT/$part" "$BACKUP/backend/$part"
+done
+[ ! -d "$APP" ] || /usr/bin/ditto "$APP" "$BACKUP/Lightem Pos.app"
+step 'Stopping Apache before installing backend'
+stop_apache_and_wait || die 'Apache shutdown could not be confirmed; no backend files were replaced. See the full log for details.'
+CHANGED=1
+step 'Installing backend and PHP dependencies'
+for part in api src vendor; do
+  if [ "$part" = vendor ]; then rm -rf "$WEBROOT/$part"; fi
+  /usr/bin/ditto "$PAYLOAD/backend/$part" "$WEBROOT/$part"
+done
+restore_existing_settings
+step 'Configuring backend and databases'
+if [ "$EXISTING" -eq 1 ]; then
+  "$PHP" "$PAYLOAD/provision.php" --root "$WEBROOT" --payload "$PAYLOAD" --credentials "$CREDENTIALS" --adopt-existing
+else
+  mkdir -p "$STATE/credentials"
+  chmod 700 "$STATE/credentials"
+  "$PHP" "$PAYLOAD/provision.php" --root "$WEBROOT" --payload "$PAYLOAD" --credentials "$CREDENTIALS"
+fi
+PROVISIONED=1
+step 'Setting backend file permissions'
+chown -R root:daemon "$WEBROOT/api" "$WEBROOT/src" "$WEBROOT/vendor"
+chmod -R u+rwX,g+rX,o-rwx "$WEBROOT/api" "$WEBROOT/src" "$WEBROOT/vendor"
+chown root:daemon "$WEBROOT/.env"
+chmod 640 "$WEBROOT/.env"
+chown root:daemon "$WEBROOT/.htaccess"
+chmod 640 "$WEBROOT/.htaccess"
+for part in uploads item_pictures profile_pictures pos_db_backup pos_second_screen api/images api/uploads images; do
+  mkdir -p "$WEBROOT/$part"
+  chown -R daemon:daemon "$WEBROOT/$part"
+  chmod -R u+rwX,g+rwX,o-rwx "$WEBROOT/$part"
+done
+step 'Verifying backend and database configuration'
+"$PHP" "$PAYLOAD/verify.php" --root "$WEBROOT" --payload "$PAYLOAD"
+step 'Restarting Apache and checking PHP over HTTP'
+"$XAMPP/xampp" startapache
+for attempt in $(seq 1 20); do /usr/bin/nc -z 127.0.0.1 80 && break; sleep 1; done
+
+# Confirm HTTP reaches these PHP files, without leaving a public diagnostic API.
+nonce=$(/usr/bin/openssl rand -hex 16)
+probe="$WEBROOT/lightem-check-$nonce.php"
+echo "<?php echo '$nonce';" > "$probe"
+chmod 644 "$probe"
+answer=$(/usr/bin/curl -fsS --max-time 10 "http://127.0.0.1/lightem-check-$nonce.php" || true)
+rm -f "$probe"
+[ "$answer" = "$nonce" ] || die 'Apache PHP health check failed.'
+
+step 'Installing the POS application'
+rm -rf "$APP"
+/usr/bin/ditto "$PAYLOAD/Lightem Pos.app" "$APP"
+RESOURCES="$APP/Contents/Resources"
+for file in ip.txt printer.txt printer_categories.json businessInfo.json pos-config.json; do
+  old="$BACKUP/Lightem Pos.app/Contents/Resources/$file"
+  [ ! -f "$old" ] || /usr/bin/ditto "$old" "$RESOURCES/$file"
+done
+mkdir -p "$RESOURCES/business-info-backups"
+consoleUser=$(/usr/bin/stat -f %Su /dev/console)
+if [ "$consoleUser" != root ] && [ "$consoleUser" != loginwindow ]; then
+  for file in ip.txt printer.txt printer_categories.json businessInfo.json pos-config.json business-info-backups; do
+    if [ -e "$RESOURCES/$file" ]; then chown -R "$consoleUser":staff "$RESOURCES/$file"; chmod -R u+rwX "$RESOURCES/$file"; fi
+  done
+  if [ "$EXISTING" -eq 0 ] && [ -f "${CREDENTIALS%.txt}.login.txt" ]; then
+    /usr/bin/ditto "${CREDENTIALS%.txt}.login.txt" "/Users/$consoleUser/Desktop/Lightem initial login.txt"
+    chown "$consoleUser":staff "/Users/$consoleUser/Desktop/Lightem initial login.txt"
+    chmod 600 "/Users/$consoleUser/Desktop/Lightem initial login.txt"
+  fi
+fi
+
+step 'Configuring automatic Apache and MySQL startup'
+# Start only the local web/database services at boot, never FTP.
+for service in apache mysql; do
+  label="com.lightem.xampp.$service"
+  plist="/Library/LaunchDaemons/$label.plist"
+  cat > "$plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict><key>Label</key><string>$label</string><key>ProgramArguments</key><array><string>$XAMPP/xampp</string><string>start$service</string></array><key>RunAtLoad</key><true/></dict></plist>
+EOF
+  chown root:wheel "$plist"
+  chmod 644 "$plist"
+  /bin/launchctl bootout "system/$label" >/dev/null 2>&1 || true
+  /bin/launchctl bootstrap system "$plist"
+done
+say "Lightem POS setup complete. Previous files: $BACKUP"
+exit 0

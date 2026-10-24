@@ -6,7 +6,12 @@ const {
   session,
   screen,
   dialog,
+  Menu,
+  MenuItem,
+  shell,
 } = require("electron");
+const { registerSystemUpdater } = require("./system-updater.cjs");
+const { readStandaloneRoutingConfig, addConfiguredOriginToCsp } = require("./standalone-routing.cjs");
 
 const { spawn } = require("child_process");
 const net = require("net");
@@ -193,6 +198,16 @@ function getPrinterConfigMap() {
 
 function getIpConfigMap() {
   return parsePrinterConfigMap(readTextFileSafe(getIpFilePath()));
+}
+
+function getStandaloneRoutingConfig() {
+  return readStandaloneRoutingConfig({
+    isPackaged: app.isPackaged,
+    platform: process.platform,
+    packageName: require("../package.json").name,
+    metadataPath: path.join(process.resourcesPath, "system-release.json"),
+    getLocalOrigin: () => getIpConfigMap().LOCAL,
+  });
 }
 
 function readJsonFileSafe(filePath, fallback = {}) {
@@ -2433,6 +2448,8 @@ app.whenReady().then(() => {
       nextCsp +=
         "; connect-src 'self' https: http://localhost http://127.0.0.1 http://192.168.10.11 ws: wss:";
     }
+
+    nextCsp = addConfiguredOriginToCsp(nextCsp, getStandaloneRoutingConfig());
 
     callback({
       responseHeaders: {
@@ -4784,6 +4801,8 @@ app.whenReady().then(() => {
     }
   });
 
+  ipcMain.handle("get-standalone-backend", () => getStandaloneRoutingConfig());
+
   ipcMain.handle("get-api-host", () => {
     try {
       const ipPath = getIpFilePath();
@@ -5446,6 +5465,20 @@ app.whenReady().then(() => {
   });
 
   createWindow();
+  const systemUpdater = registerSystemUpdater({ app, dialog, shell, BrowserWindow });
+  const menu = Menu.getApplicationMenu() || Menu.buildFromTemplate([
+    { role: "fileMenu" }, { role: "editMenu" }, { role: "viewMenu" }, { role: "windowMenu" },
+  ]);
+  menu.append(new MenuItem({
+    label: "System updates",
+    submenu: [{
+      label: "Check for updates…",
+      accelerator: "CmdOrCtrl+Shift+U",
+      click: () => { void systemUpdater.check({ interactive: true }); },
+    }],
+  }));
+  Menu.setApplicationMenu(menu);
+  void systemUpdater.check();
 });
 
 app.on("activate", () => {

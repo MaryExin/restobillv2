@@ -17,6 +17,7 @@ import * as XLSX from "xlsx";
 import useReportDateAccess from "../../../hooks/useReportDateAccess";
 import { getCurrentUserRole } from "../../../utils/getCurrentUserRole";
 import { posAuthenticatedFetch } from "../../../utils/posAuthenticatedFetch";
+import { standaloneFetch } from "../../../utils/standaloneFetch";
 
 const peso = (value) =>
   `₱${Number(value || 0).toLocaleString(undefined, {
@@ -267,7 +268,7 @@ const HourlySalesModal = ({ isOpen, onClose }) => {
   }, [dateFrom, dateTo, selectedSalesType]);
 
   useEffect(() => {
-    fetch(`http://localhost/api/sales_type_list.php`)
+    standaloneFetch(`http://localhost/api/sales_type_list.php`)
       .then((res) => res.json())
       .then((result) => {
         const list = Array.isArray(result?.data) ? result.data : [];

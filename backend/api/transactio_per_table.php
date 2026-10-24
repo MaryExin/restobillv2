@@ -20,7 +20,8 @@ try {
         $config["host"],
         $config["user"],
         $config["pass"],
-        $config["db"]
+        $config["db"],
+        (int)($config['port'] ?? 3306)
     );
 
     $date = $_GET['date'] ?? '';

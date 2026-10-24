@@ -8,7 +8,8 @@ $conn = new mysqli(
     $config["host"],
     $config["user"],
     $config["pass"],
-    $config["db"]
+    $config["db"],
+    (int)($config['port'] ?? 3306)
 );
 
 if ($conn->connect_error) {

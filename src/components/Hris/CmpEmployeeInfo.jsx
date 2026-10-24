@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import { useCustomSecuredMutation } from "../../hooks/useCustomSecuredMutation";
 import { useSecuredMutation } from "../../hooks/useSecuredMutation";
 import useCustomQuery from "../../hooks/useCustomQuery";
+import { standaloneFetch } from "../../utils/standaloneFetch";
 
 import ModalYesNoReusable from "../Modals/ModalYesNoReusable";
 import ModalSuccessNavToSelf from "../Modals/ModalSuccessNavToSelf";
@@ -1006,7 +1007,7 @@ const CmpEmployeeInfo = () => {
     }
 
     try {
-      const response = await fetch(employeeInfoUploadUrl, {
+      const response = await standaloneFetch(employeeInfoUploadUrl, {
         method: "POST",
         headers: {
           Authorization: "Bearer " + localStorage.getItem("access_token"),
@@ -1097,7 +1098,7 @@ const CmpEmployeeInfo = () => {
     }
 
     try {
-      const response = await fetch(editEmployeeInfoUrl, {
+      const response = await standaloneFetch(editEmployeeInfoUrl, {
         method: "POST",
         headers: {
           Authorization: "Bearer " + localStorage.getItem("access_token"),

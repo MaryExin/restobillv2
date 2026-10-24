@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "version": "5.2.3",
+  "archive": {
+    "file": "phpMyAdmin-5.2.3-all-languages.zip",
+    "directory": "phpMyAdmin-5.2.3-all-languages",
+    "url": "https://files.phpmyadmin.net/phpMyAdmin/5.2.3/phpMyAdmin-5.2.3-all-languages.zip",
+    "checksumUrl": "https://files.phpmyadmin.net/phpMyAdmin/5.2.3/phpMyAdmin-5.2.3-all-languages.zip.sha256",
+    "sha256": "2d2e13c735366d318425c78e4ee2cc8fc648d77faba3ddea2cd516e43885733f",
+    "size": 16431330
+  },
+  "exclude": ["setup"],
+  "preparedSha256": "e9791713627039b60b9c5d86b0a9795a8dd09da51410624ebae2a112b60a8823"
+}

@@ -234,7 +234,7 @@ try {
     $reportShiftTable = qualifiedTableName($reportDbName, "tbl_pos_shifting_records");
     $mirrorReportShift = strcasecmp($posDbName, $reportDbName) !== 0;
 
-    $dsn = "mysql:host={$config['host']};dbname={$posDbName};charset={$charset}";
+    $dsn = "mysql:host={$config['host']};dbname={$posDbName};charset={$charset}" . ";port=" . (int)($config['port'] ?? 3306);
     $pdo = new PDO(
         $dsn,
         $config['user'],

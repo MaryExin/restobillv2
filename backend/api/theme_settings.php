@@ -138,7 +138,7 @@ function saveUploadedImage($file, $folderName = "theme")
 
 try {
     $pdo = new PDO(
-        "mysql:host={$config['host']};dbname={$config['db']};charset={$config['charset']}",
+        "mysql:host={$config['host']};dbname={$config['db']};charset={$config['charset']}" . ";port=" . (int)($config['port'] ?? 3306),
         $config["user"],
         $config["pass"],
         [

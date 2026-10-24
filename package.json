@@ -15,7 +15,15 @@
     "build": "vite build",
     "pack": "npm run build && electron-builder --dir",
     "dist": "npm run build && electron-builder --win nsis",
-    "dist:mac": "npm run build && electron-builder --mac"
+    "dist:mac": "npm run build && electron-builder --mac",
+    "installer:win": "node installer/scripts/build.cjs --platform win32",
+    "installer:mac": "node installer/scripts/build.cjs --platform darwin",
+    "installer:release": "node installer/scripts/release.cjs",
+    "installer:bundle": "node installer/scripts/bundle.cjs",
+    "standalone": "node installer/scripts/standalone.cjs",
+    "setup:win": "node installer/scripts/launcher.cjs --platform win32",
+    "setup:mac": "node installer/scripts/launcher.cjs --platform darwin",
+    "installer:test": "node --test installer/tests/*.test.cjs"
   },
   "dependencies": {
     "@emotion/react": "^11.11.0",

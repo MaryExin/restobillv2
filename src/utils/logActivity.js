@@ -17,6 +17,7 @@
 import useZustandLoginCred from "../context/useZustandLoginCred";
 import useZustandIMSBusunitCode from "../context/useZustandIMSBusunitCode";
 import { parseIpConfigText } from "./parseIpConfig";
+import { standaloneFetch } from "./standaloneFetch";
 
 // ── Activity type constants (type_of_activity column) ────────────────────────
 export const LOG = Object.freeze({
@@ -79,7 +80,7 @@ export async function logActivity(
       _logged_by: firstName || userId || "",
     });
 
-    await fetch(`${apiHost}/api/pos_activity_logs.php`, {
+    await standaloneFetch(`${apiHost}/api/pos_activity_logs.php`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

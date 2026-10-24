@@ -12,7 +12,7 @@ if (isset($reportDateFrom) || isset($reportDateTo)) {
   $dbConfig = resolveReportDbConfig($config, $reportDateFrom ?? null, $reportDateTo ?? null);
 }
 
-$dsn = "mysql:host={$dbConfig['host']};dbname={$dbConfig['db']};charset={$dbConfig['charset']}";
+$dsn = "mysql:host={$dbConfig['host']};dbname={$dbConfig['db']};charset={$dbConfig['charset']}" . ";port=" . (int)($dbConfig['port'] ?? 3306);
 
 $options = [
   PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,

@@ -6,7 +6,7 @@ header("Access-Control-Allow-Methods: GET");
 $config = require 'config.php'; 
 
 try {
-    $dsn = "mysql:host={$config['host']};dbname={$config['db']};charset={$config['charset']}";
+    $dsn = "mysql:host={$config['host']};dbname={$config['db']};charset={$config['charset']}" . ";port=" . (int)($config['port'] ?? 3306);
     $conn = new PDO($dsn, $config['user'], $config['pass']);
     $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 } catch(PDOException $e) {

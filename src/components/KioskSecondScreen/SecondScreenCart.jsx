@@ -326,13 +326,13 @@ const SecondScreenCart = () => {
 
   const apiHost = useApiHost();
   const serverOrigin = useMemo(() => {
-    if (!apiHost) return "http://localhost";
-    try { return new URL(apiHost).origin; } catch { return "http://localhost"; }
+    if (!apiHost) return "";
+    try { return new URL(apiHost).origin; } catch { return ""; }
   }, [apiHost]);
 
   const [imageBust, setImageBust] = useState(() => new Date().getTime());
   const displayImageUrl = useMemo(
-    () => `${serverOrigin}/pos_second_screen/display.jpg?t=${imageBust}`,
+    () => serverOrigin ? `${serverOrigin}/pos_second_screen/display.jpg?t=${imageBust}` : undefined,
     [serverOrigin, imageBust],
   );
   const API_URL   = `${serverOrigin}/api/get_announcement.php`;

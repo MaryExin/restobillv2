@@ -35,8 +35,7 @@ $database = new Database(
     $config['db'] ?? '',
     $config['user'] ?? '',
     $config['pass'] ?? '',
-    $config['driver'] ?? 'sqlite',
-    $config['sqlite_path'] ?? ''
+    $config['port'] ?? 3306
 );
 
 $user_gateway = new UserGateway($database);

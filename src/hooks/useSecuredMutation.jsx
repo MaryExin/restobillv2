@@ -1,7 +1,8 @@
 import { useMutation } from "@tanstack/react-query";
+import { standaloneFetch } from "../utils/standaloneFetch";
 
 const customMutation = async (url, dataObj, requestMethod) => {
-  const response = await fetch(url, {
+  const response = await standaloneFetch(url, {
     method: requestMethod,
     headers: {
       "Content-Type": "application/json",

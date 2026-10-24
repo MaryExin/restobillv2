@@ -16,6 +16,7 @@ if ($requiresMutationAuthorization) {
 }
 
 require __DIR__ . "/pdo.php";
+require_once __DIR__ . "/pos_legacy_optional_tables.php";
 if ($requiresMutationAuthorization) {
     require_once __DIR__ . "/pos_role_authorization.php";
 }
@@ -62,12 +63,14 @@ function fetchMappings(PDO $pdo)
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
-function respondFullState(PDO $pdo, $message = "OK")
+function respondFullState(PDO $pdo, $message = "OK", ?bool $mappingAvailable = null)
 {
+    $mappingAvailable ??= posLegacyOptionalTableAvailable($pdo, 'tbl_pos_discount_type_sales_type');
     respond(true, $message, [
         "discount_types" => fetchDiscountTypes($pdo),
         "sales_types" => fetchActiveSalesTypes($pdo),
-        "mappings" => fetchMappings($pdo),
+        "mappings" => $mappingAvailable ? fetchMappings($pdo) : [],
+        "custom_discount_setup_available" => $mappingAvailable,
     ]);
 }
 
@@ -109,15 +112,23 @@ try {
         );
     }
 
+    $mappingAvailable = posLegacyOptionalTableAvailable($pdo, 'tbl_pos_discount_type_sales_type');
+    if ($requiresMutationAuthorization && !$mappingAvailable) {
+        respond(false, "This existing database does not support custom discount setup. Its schema has been kept unchanged.", [
+            "custom_discount_setup_available" => false,
+        ], 409);
+    }
+
     if ($method === "GET") {
         $salesTypeId = trim((string)($_GET["sales_type_id"] ?? ""));
         $salesTypeDescription = trim((string)($_GET["sales_type_description"] ?? ""));
         if ($salesTypeId !== "" || $salesTypeDescription !== "") {
             respond(true, "Active discount types loaded.", [
-                "discount_types" => fetchActiveTypesForSalesType($pdo, $salesTypeId, $salesTypeDescription),
+                "discount_types" => $mappingAvailable ? fetchActiveTypesForSalesType($pdo, $salesTypeId, $salesTypeDescription) : [],
+                "custom_discount_setup_available" => $mappingAvailable,
             ]);
         }
-        respondFullState($pdo);
+        respondFullState($pdo, "OK", $mappingAvailable);
     }
 
     if ($method !== "POST") {

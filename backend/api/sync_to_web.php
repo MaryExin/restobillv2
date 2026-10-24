@@ -1,7 +1,7 @@
 <?php
 $config = require 'config.php';
 try {
-    $dsn = "mysql:host={$config['host']};dbname={$config['db']};charset={$config['charset']}";
+    $dsn = "mysql:host={$config['host']};dbname={$config['db']};charset={$config['charset']}" . ";port=" . (int)($config['port'] ?? 3306);
     $pdo = new PDO($dsn, $config['user'], $config['pass'], [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
 
     $stmt = $pdo->query("SELECT * FROM tbl_sync_queue WHERE sync_status = 'Pending' LIMIT 10");

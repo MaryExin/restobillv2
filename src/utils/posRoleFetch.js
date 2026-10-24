@@ -3,6 +3,7 @@ import {
   POS_ROLE_ACCESS_SETTINGS_PATH,
   storePosRoleAccessConfig,
 } from "./posRoleAccessConfig";
+import { standaloneFetch } from "./standaloneFetch";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 
@@ -44,7 +45,7 @@ export const securedPosFetch = (url, options = {}) => {
       ? window.localStorage.getItem("access_token")
       : "";
   if (token) headers.set("Authorization", `Bearer ${token}`);
-  return fetch(url, { ...options, headers });
+  return standaloneFetch(url, { ...options, headers });
 };
 
 const parseResponse = async (response) => {
@@ -82,7 +83,7 @@ export const posRoleAccessRequest = async (
     if (token) headers.set("Authorization", `Bearer ${token}`);
     if (body !== undefined) headers.set("Content-Type", "application/json");
 
-    const response = await fetch(buildPosRoleAccessUrl(apiHost), {
+    const response = await standaloneFetch(buildPosRoleAccessUrl(apiHost), {
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),

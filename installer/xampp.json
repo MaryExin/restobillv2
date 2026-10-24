@@ -1,0 +1,14 @@
+{
+  "version": "8.2.4-0",
+  "phpVersion": "8.2.4",
+  "win32": {
+    "file": "xampp-windows-x64-8.2.4-0-VS16-installer.exe",
+    "url": "https://downloads.sourceforge.net/project/xampp/XAMPP%20Windows/8.2.4/xampp-windows-x64-8.2.4-0-VS16-installer.exe",
+    "sha256": "6f3e20916627060365a90dfd361ea42bffcda0cf5890e937217c4c3fcb9f0ed0"
+  },
+  "darwin": {
+    "file": "xampp-osx-8.2.4-0-installer.dmg",
+    "url": "https://downloads.sourceforge.net/project/xampp/XAMPP%20Mac%20OS%20X/8.2.4/xampp-osx-8.2.4-0-installer.dmg",
+    "sha256": "eb9888f2e3b131ae9a5fbec063a6b642a7285e065a8e5f5e97c699b71e2d7ac5"
+  }
+}
