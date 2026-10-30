@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { lazy, Suspense, useState, useEffect, useMemo } from "react";
 import {
   FiX,
   FiLayers,
@@ -25,7 +25,7 @@ import {
   FiList,
   FiFileText,
 } from "react-icons/fi";
-import { motion, AnimatePresence } from "framer-motion";
+
 import { useTheme } from "../../context/ThemeContext";
 import { useNavigate } from "react-router-dom";
 import useZustandLoginCred from "../../context/useZustandLoginCred";
@@ -35,32 +35,32 @@ import {
   usePosRoleAccessVersion,
 } from "../../hooks/usePosRoleAccessConfig";
 
-// Import Components
-import PosMyAccount from "./PosSettingsModal/PosMyAccount";
-import PosAppearance from "./PosSettingsModal/PosAppearance";
-import PosUserAccounts from "./PosSettingsModal/PosUserAccounts";
-import PosUserRoles from "./PosSettingsModal/PosUserRoles";
-import PosSystemLogs from "./PosSettingsModal/PosSystemLogs";
-import PosExpenses from "./PosSettingsModal/PosExpenses";
-import PosReportingModal from "./PosSettingsModal/PosReportingModal";
-import PosDataSecurity from "./PosSettingsModal/PosDataSecurity";
-import PosDiscountCeiling from "./PosSettingsModal/PosDiscountCeiling"
-import PosDiscountMode from "./PosSettingsModal/PosDiscountMode";
-import PosServiceCharge from "./PosSettingsModal/PosServiceCharge";
-import PosCustomerInfo from "./PosSettingsModal/PosCustomerInfo";
-import PrinterSettings from "./PosSettingsModal/PrinterSettings";
-import PosPrintSettings from "./PosSettingsModal/PosPrintSettings";
-import PosModeOfPayment from "./PosSettingsModal/PosModeOfPayment";
-import PosPictureSettings from "./PosSettingsModal/PosPictureSettings";
-import PosProductSubcategories from "./PosSettingsModal/PosProductSubcategories";
-import PosPricingDashboard from "./PosSettingsModal/PosPricingDashboard";
-import PosLayoutMode from "./PosSettingsModal/PosLayoutMode";
-import PosSecondScreen from "./PosSettingsModal/PosSecondScreen";
-import PosTableLayout from "./PosSettingsModal/PosTableLayout";
-import PosLoyaltyConfig from "./PosSettingsModal/PosLoyaltyConfig";
-import PosSalesTypeOrder from "./PosSettingsModal/PosSalesTypeOrder";
-import PosReportMirrorSettings from "./PosSettingsModal/PosReportMirrorSettings";
-import PosTutorialGuide from "./PosSettingsModal/PosTutorialGuide";
+// Load only the selected settings tab.
+const PosMyAccount = lazy(() => import("./PosSettingsModal/PosMyAccount"));
+const PosAppearance = lazy(() => import("./PosSettingsModal/PosAppearance"));
+const PosUserAccounts = lazy(() => import("./PosSettingsModal/PosUserAccounts"));
+const PosUserRoles = lazy(() => import("./PosSettingsModal/PosUserRoles"));
+const PosSystemLogs = lazy(() => import("./PosSettingsModal/PosSystemLogs"));
+const PosExpenses = lazy(() => import("./PosSettingsModal/PosExpenses"));
+const PosReportingModal = lazy(() => import("./PosSettingsModal/PosReportingModal"));
+const PosDataSecurity = lazy(() => import("./PosSettingsModal/PosDataSecurity"));
+const PosDiscountCeiling = lazy(() => import("./PosSettingsModal/PosDiscountCeiling"));
+const PosDiscountMode = lazy(() => import("./PosSettingsModal/PosDiscountMode"));
+const PosServiceCharge = lazy(() => import("./PosSettingsModal/PosServiceCharge"));
+const PosCustomerInfo = lazy(() => import("./PosSettingsModal/PosCustomerInfo"));
+const PrinterSettings = lazy(() => import("./PosSettingsModal/PrinterSettings"));
+const PosPrintSettings = lazy(() => import("./PosSettingsModal/PosPrintSettings"));
+const PosModeOfPayment = lazy(() => import("./PosSettingsModal/PosModeOfPayment"));
+const PosPictureSettings = lazy(() => import("./PosSettingsModal/PosPictureSettings"));
+const PosProductSubcategories = lazy(() => import("./PosSettingsModal/PosProductSubcategories"));
+const PosPricingDashboard = lazy(() => import("./PosSettingsModal/PosPricingDashboard"));
+const PosLayoutMode = lazy(() => import("./PosSettingsModal/PosLayoutMode"));
+const PosSecondScreen = lazy(() => import("./PosSettingsModal/PosSecondScreen"));
+const PosTableLayout = lazy(() => import("./PosSettingsModal/PosTableLayout"));
+const PosLoyaltyConfig = lazy(() => import("./PosSettingsModal/PosLoyaltyConfig"));
+const PosSalesTypeOrder = lazy(() => import("./PosSettingsModal/PosSalesTypeOrder"));
+const PosReportMirrorSettings = lazy(() => import("./PosSettingsModal/PosReportMirrorSettings"));
+const PosTutorialGuide = lazy(() => import("./PosSettingsModal/PosTutorialGuide"));
 
 const MASTER_PASS    = "LESI_POSPASS@2023";
 const PROTECTED_TABS = new Set(["Mode of Payment", "Discount Mode", "Layout Mode"]);
@@ -94,11 +94,53 @@ const ALL_NAV_ITEMS = [
   { id: "Second Screen", icon: FiMonitor },
   { id: "Tutorial Guide", icon: FiFileText },
 ];
+const ADAPTIVE_PALETTE = [
+  { name: "Crimson", light: "#ef4444", dark: "#fca5a5" },
+  { name: "Ocean", light: "#2563eb", dark: "#93c5fd" },
+  { name: "Forest", light: "#16a34a", dark: "#86efac" },
+  { name: "Grape", light: "#9333ea", dark: "#d8b4fe" },
+  { name: "Amber", light: "#d97706", dark: "#fcd34d" },
+];
+
+// Keep the component identity stable while a form or theme updates. Defining
+// this inside Settings replaced every navigation button on each render.
+const NavChip = ({ nav, activeTab, isDark, accentColor, onNavigate, mobile = false }) => {
+  const Icon = nav.icon;
+  const isActive = activeTab === nav.id && !nav.route;
+  return (
+    <button
+      onClick={() => onNavigate(nav)}
+      className={`group flex items-center gap-3 rounded-2xl border transition-colors duration-150 ${
+        mobile ? "w-full px-4 py-4" : "px-4 py-3 whitespace-nowrap"
+      } ${
+        isActive
+          ? "text-white shadow-[0_0_20px_rgba(0,0,0,0.12)]"
+          : isDark
+            ? "bg-slate-900/50 border-slate-800 text-slate-400 hover:text-white"
+            : "bg-white border-slate-200 text-slate-600 hover:text-slate-900 shadow-sm"
+      }`}
+      style={isActive ? {
+        backgroundColor: accentColor,
+        borderColor: accentColor,
+        color: isDark ? "#0f172a" : "#ffffff",
+      } : undefined}
+    >
+      <Icon size={16} />
+      <span className="text-[11px] font-black tracking-[0.16em] uppercase">{nav.id}</span>
+      {mobile && (
+        <FiChevronRight
+          className={`ml-auto ${isActive ? "" : isDark ? "text-slate-500" : "text-slate-400"}`}
+          size={16}
+        />
+      )}
+    </button>
+  );
+};
 
 const PosSettings = ({ isOpen, onClose, branchInfo, initialTab = null }) => {
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
-  const { roles } = useZustandLoginCred();
+  const roles = useZustandLoginCred((state) => state.roles);
   const roleAccessVersion = usePosRoleAccessVersion();
   const developerMode = usePosDeveloperSession();
   const navItems = useMemo(
@@ -112,15 +154,7 @@ const PosSettings = ({ isOpen, onClose, branchInfo, initialTab = null }) => {
   );
   const isDark = theme === "dark";
 
-  const adaptivePalette = [
-    { name: "Crimson", light: "#ef4444", dark: "#fca5a5" },
-    { name: "Ocean", light: "#2563eb", dark: "#93c5fd" },
-    { name: "Forest", light: "#16a34a", dark: "#86efac" },
-    { name: "Grape", light: "#9333ea", dark: "#d8b4fe" },
-    { name: "Amber", light: "#d97706", dark: "#fcd34d" },
-  ];
-
-  const [selectedColorObj, setSelectedColorObj] = useState(adaptivePalette[1]);
+  const [selectedColorObj, setSelectedColorObj] = useState(ADAPTIVE_PALETTE[1]);
   const [activeTab, setActiveTab] = useState("My Account");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [deniedTab, setDeniedTab] = useState(null);
@@ -151,8 +185,6 @@ const PosSettings = ({ isOpen, onClose, branchInfo, initialTab = null }) => {
   }, [isOpen, navItems, initialTab]);
 
   const accentColor = "var(--branch-primary)";
-  const accentSecondary = "var(--branch-secondary)";
-  const accentTertiary = "var(--branch-tertiary)";
 
   const getContrastText = () => (isDark ? "#0f172a" : "#ffffff");
 
@@ -333,7 +365,7 @@ const PosSettings = ({ isOpen, onClose, branchInfo, initialTab = null }) => {
           accentColor={accentColor}
           selectedColorObj={selectedColorObj}
           setSelectedColorObj={setSelectedColorObj}
-          adaptivePalette={adaptivePalette}
+          adaptivePalette={ADAPTIVE_PALETTE}
           getContrastText={getContrastText}
         />
       );
@@ -388,85 +420,25 @@ const PosSettings = ({ isOpen, onClose, branchInfo, initialTab = null }) => {
     return null;
   };
 
-  const NavChip = ({ nav, mobile = false }) => {
-    const Icon = nav.icon;
-    const isActive = activeTab === nav.id && !nav.route;
-
-    return (
-      <button
-        onClick={() => handleNavClick(nav)}
-        className={`group flex items-center gap-3 rounded-2xl border transition-all duration-300 ${
-          mobile ? "w-full px-4 py-4" : "px-4 py-3 whitespace-nowrap"
-        } ${
-          isActive
-            ? "text-white shadow-[0_0_20px_rgba(0,0,0,0.12)]"
-            : isDark
-              ? "bg-slate-900/50 border-slate-800 text-slate-400 hover:text-white"
-              : "bg-white border-slate-200 text-slate-600 hover:text-slate-900 shadow-sm"
-        }`}
-        style={
-          isActive
-            ? {
-                backgroundColor: accentColor,
-                borderColor: accentColor,
-                color: getContrastText(),
-              }
-            : {
-                borderColor: isDark ? undefined : undefined,
-              }
-        }
-      >
-        <Icon size={16} />
-        <span className="text-[11px] font-black tracking-[0.16em] uppercase">
-          {nav.id}
-        </span>
-
-        {mobile && (
-          <FiChevronRight
-            className={`ml-auto ${
-              isActive ? "" : isDark ? "text-slate-500" : "text-slate-400"
-            }`}
-            size={16}
-          />
-        )}
-      </button>
-    );
-  };
-
   return (
     <div className="fixed inset-0 z-[100]">
       <div
-        className="absolute inset-0 bg-black/75 backdrop-blur-xl"
+        className="absolute inset-0 bg-black/75"
         onClick={onClose}
       />
 
       <div className="relative z-10 flex items-center justify-center w-full h-full p-0 sm:p-6">
-        <motion.div
-          initial={{ scale: 0.96, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.97, opacity: 0 }}
+        <div
           className={`relative w-full h-full sm:h-[95vh] sm:max-w-[1450px] overflow-hidden sm:rounded-[36px] border ${
             isDark
               ? "bg-[#020617] border-white/10 text-slate-200"
               : "bg-slate-50 border-slate-200 text-slate-900"
           } shadow-2xl`}
         >
-          <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <div
-              className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full blur-[120px]"
-              style={{
-                backgroundColor: accentColor,
-                opacity: isDark ? 0.12 : 0.16,
-              }}
-            />
-            <div
-              className="absolute bottom-[-10%] left-[-10%] w-[35%] h-[35%] rounded-full blur-[120px]"
-              style={{
-                backgroundColor: accentSecondary,
-                opacity: isDark ? 0.1 : 0.12,
-              }}
-            />
-          </div>
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{ backgroundColor: accentColor, opacity: isDark ? 0.03 : 0.025 }}
+          />
 
           <div className="relative z-10 flex flex-col h-full">
             <div className="flex items-center justify-between px-5 py-5 border-b sm:px-8 sm:py-6 border-white/5">
@@ -580,7 +552,8 @@ const PosSettings = ({ isOpen, onClose, branchInfo, initialTab = null }) => {
                 <div className="flex-1 px-4 pb-6 overflow-y-auto no-scrollbar">
                   <div className="flex flex-col gap-3">
                     {navItems.map((nav) => (
-                      <NavChip key={nav.id} nav={nav} />
+                      <NavChip key={nav.id} nav={nav} activeTab={activeTab} isDark={isDark}
+                        accentColor={accentColor} onNavigate={handleNavClick} />
                     ))}
                   </div>
                 </div>
@@ -621,17 +594,19 @@ const PosSettings = ({ isOpen, onClose, branchInfo, initialTab = null }) => {
 
                     <div className="h-[calc(100%-88px)] overflow-y-auto no-scrollbar p-4 sm:p-6 lg:p-8">
                       <div className="max-w-[1100px] mx-auto">
-                        <AnimatePresence mode="wait">
-                          <motion.div
-                            key={`${activeTab}-${isDark}`}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -8 }}
-                            transition={{ duration: 0.22 }}
+                        {/* Switch tabs immediately; theme updates must preserve
+                            the active form and its pending edits and requests. */}
+                        <div key={activeTab}>
+                          <Suspense
+                            fallback={
+                              <p role="status" className="py-8 font-[Poppins-Regular]">
+                                Loading {activeTab}…
+                              </p>
+                            }
                           >
                             {renderActiveContent()}
-                          </motion.div>
-                        </AnimatePresence>
+                          </Suspense>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -640,23 +615,16 @@ const PosSettings = ({ isOpen, onClose, branchInfo, initialTab = null }) => {
             </div>
           </div>
 
-          <AnimatePresence>
+          <>
             {isMobileMenuOpen && (
               <>
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="absolute inset-0 z-40 bg-black/60 lg:hidden"
+                <div
+                  className="ui-fade-in absolute inset-0 z-40 bg-black/60 lg:hidden"
                   onClick={() => setIsMobileMenuOpen(false)}
                 />
 
-                <motion.div
-                  initial={{ x: "-100%" }}
-                  animate={{ x: 0 }}
-                  exit={{ x: "-100%" }}
-                  transition={{ type: "tween", duration: 0.25 }}
-                  className={`absolute inset-y-0 left-0 z-50 w-[88%] max-w-[360px] lg:hidden border-r ${
+                <div
+                  className={`ui-slide-in-left absolute inset-y-0 left-0 z-50 w-[88%] max-w-[360px] lg:hidden border-r ${
                     isDark
                       ? "bg-[#020617] border-white/10"
                       : "bg-slate-50 border-slate-200"
@@ -695,20 +663,21 @@ const PosSettings = ({ isOpen, onClose, branchInfo, initialTab = null }) => {
                   <div className="p-4 overflow-y-auto no-scrollbar">
                     <div className="flex flex-col gap-3">
                       {navItems.map((nav) => (
-                        <NavChip key={nav.id} nav={nav} mobile />
+                        <NavChip key={nav.id} nav={nav} activeTab={activeTab} isDark={isDark}
+                          accentColor={accentColor} onNavigate={handleNavClick} mobile />
                       ))}
                     </div>
                   </div>
-                </motion.div>
+                </div>
               </>
             )}
-          </AnimatePresence>
-        </motion.div>
+          </>
+        </div>
       </div>
 
       {/* ── Password Gate Modal ─────────────────────────────────────────────── */}
       {gateOpen && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70">
           <div className="w-full max-w-sm mx-4 bg-white rounded-[2rem] p-8 shadow-2xl flex flex-col items-center gap-5">
             {gateError ? (
               /* ── Oops screen ── */

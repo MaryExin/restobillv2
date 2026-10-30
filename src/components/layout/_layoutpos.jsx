@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+
 import {
   FaHome,
   FaBoxOpen,
@@ -18,10 +18,8 @@ import { IoMdClose } from "react-icons/io";
 
 import OpenNewDay from "../PosCoreComponents/Actions/OpenNewDay";
 import SwitchUser from "../PosCoreComponents/Actions/SwitchUser";
-import PosReadingModal from "../MainComponents/PosReadingModal";
-import PosReports from "../PosCoreComponents/PosReports";
 import ModalYesNoReusable from "../Modals/ModalYesNoReusable";
-import PosSettings from "../MainComponents/PosSettings";
+import lazyDialog from "../common/lazyDialog";
 
 import Billing from "../../assets/Billing.jpg";
 
@@ -45,6 +43,16 @@ import {
 } from "../../hooks/usePosRoleAccessConfig";
 import { getConfiguredRoleLabel } from "../../utils/posRoleAccessConfig";
 import { posAuthenticatedFetch } from "../../utils/posAuthenticatedFetch";
+
+const PosReadingModal = lazyDialog(
+  () => import("../MainComponents/PosReadingModal"),
+  "open",
+);
+const PosReports = lazyDialog(
+  () => import("../PosCoreComponents/PosReports"),
+  "open",
+);
+const PosSettings = lazyDialog(() => import("../MainComponents/PosSettings"));
 
 const POS_HOME_BG = "./pos-home-bg.png";
 const HEADER_HEIGHT = 96;
@@ -531,146 +539,16 @@ const LayoutPos = ({ children }) => {
         }}
       />
 
-      <motion.div
+      {/* Static brand lighting avoids continuous full-screen compositing while
+          cashiers work in Settings, Reports, or other dashboard dialogs. */}
+      <div
+        aria-hidden="true"
         className="pointer-events-none absolute inset-0"
-        animate={{
-          opacity: [0.45, 0.72, 0.45],
-          scale: [1, 1.06, 1],
-        }}
-        transition={{
-          duration: 4.8,
-          repeat: Infinity,
-          ease: "easeInOut",
-        }}
         style={{
-          background: `radial-gradient(circle at center, ${hexToRgba(
+          background: `radial-gradient(ellipse at center, ${hexToRgba(
             brandPrimary,
-            0.38,
-          )} 0%, ${hexToRgba(brandSecondary, 0.24)} 12%, ${hexToRgba(
-            brandPrimary,
-            0.12,
-          )} 24%, rgba(8,24,64,0.02) 42%, rgba(0,0,0,0) 58%)`,
-          filter: "blur(16px)",
-          transformOrigin: "center center",
-        }}
-      />
-
-      <motion.div
-        className="pointer-events-none absolute inset-0"
-        animate={{
-          opacity: [0.16, 0.3, 0.16],
-          scale: [1, 1.1, 1],
-        }}
-        transition={{
-          duration: 7,
-          repeat: Infinity,
-          ease: "easeInOut",
-        }}
-        style={{
-          background: `radial-gradient(circle at center, ${hexToRgba(
-            brandSecondary,
-            0.28,
-          )} 0%, ${hexToRgba(brandPrimary, 0.16)} 18%, ${hexToRgba(
-            brandSecondary,
-            0.08,
-          )} 34%, rgba(0,0,0,0) 60%)`,
-          filter: "blur(36px)",
-          transformOrigin: "center center",
-        }}
-      />
-
-      <motion.div
-        className="pointer-events-none absolute inset-0"
-        animate={{
-          rotate: [0, 360],
-          opacity: [0.08, 0.16, 0.08],
-        }}
-        transition={{
-          rotate: {
-            duration: 28,
-            repeat: Infinity,
-            ease: "linear",
-          },
-          opacity: {
-            duration: 6,
-            repeat: Infinity,
-            ease: "easeInOut",
-          },
-        }}
-        style={{
-          background: `
-            conic-gradient(
-              from 0deg at center,
-              rgba(255,255,255,0) 0deg,
-              ${hexToRgba(brandSecondary, 0.0)} 18deg,
-              ${hexToRgba(brandSecondary, 0.16)} 34deg,
-              rgba(255,255,255,0.00) 54deg,
-              rgba(255,255,255,0.00) 78deg,
-              ${hexToRgba(brandPrimary, 0.1)} 96deg,
-              rgba(255,255,255,0.00) 118deg,
-              rgba(255,255,255,0.00) 156deg,
-              ${hexToRgba(brandSecondary, 0.14)} 174deg,
-              rgba(255,255,255,0.00) 198deg,
-              rgba(255,255,255,0.00) 236deg,
-              ${hexToRgba(brandPrimary, 0.12)} 258deg,
-              rgba(255,255,255,0.00) 278deg,
-              rgba(255,255,255,0.00) 316deg,
-              ${hexToRgba(brandSecondary, 0.1)} 336deg,
-              rgba(255,255,255,0.00) 360deg
-            )
-          `,
-          mixBlendMode: "screen",
-          filter: "blur(22px)",
-          transformOrigin: "center center",
-        }}
-      />
-
-      <motion.div
-        className="pointer-events-none absolute inset-0"
-        animate={{
-          rotate: [360, 0],
-          opacity: [0.05, 0.11, 0.05],
-          scale: [1, 1.03, 1],
-        }}
-        transition={{
-          rotate: {
-            duration: 40,
-            repeat: Infinity,
-            ease: "linear",
-          },
-          opacity: {
-            duration: 8,
-            repeat: Infinity,
-            ease: "easeInOut",
-          },
-          scale: {
-            duration: 8,
-            repeat: Infinity,
-            ease: "easeInOut",
-          },
-        }}
-        style={{
-          background: `
-            conic-gradient(
-              from 90deg at center,
-              rgba(255,255,255,0) 0deg,
-              ${hexToRgba(brandPrimary, 0.0)} 35deg,
-              ${hexToRgba(brandPrimary, 0.08)} 52deg,
-              rgba(255,255,255,0.00) 70deg,
-              rgba(255,255,255,0.00) 120deg,
-              ${hexToRgba(brandSecondary, 0.07)} 145deg,
-              rgba(255,255,255,0.00) 168deg,
-              rgba(255,255,255,0.00) 220deg,
-              ${hexToRgba(brandPrimary, 0.06)} 242deg,
-              rgba(255,255,255,0.00) 268deg,
-              rgba(255,255,255,0.00) 315deg,
-              ${hexToRgba(brandSecondary, 0.07)} 335deg,
-              rgba(255,255,255,0.00) 360deg
-            )
-          `,
-          mixBlendMode: "screen",
-          filter: "blur(32px)",
-          transformOrigin: "center center",
+            0.18,
+          )} 0%, ${hexToRgba(brandSecondary, 0.08)} 34%, transparent 68%)`,
         }}
       />
 
@@ -682,25 +560,19 @@ const LayoutPos = ({ children }) => {
         }`}
       />
 
-      <AnimatePresence>
+      <>
         {showPasswordModal && (
-          <motion.div
-            className={`fixed inset-0 z-[100] flex items-center justify-center px-4 backdrop-blur-sm ${
+          <div
+            className={"ui-fade-in " + (`fixed inset-0 z-[100] flex items-center justify-center px-4 backdrop-blur-sm ${
               isDark ? "bg-black/55" : "bg-slate-900/30"
-            }`}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            }`)}
           >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.96, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 10 }}
-              className={`w-full max-w-md rounded-[28px] border p-6 shadow-[0_30px_80px_rgba(0,0,0,0.25)] ${
+            <div
+              className={"ui-scale-in " + (`w-full max-w-md rounded-[28px] border p-6 shadow-[0_30px_80px_rgba(0,0,0,0.25)] ${
                 isDark
                   ? "border-white/10 bg-slate-950"
                   : "border-white/70 bg-white"
-              }`}
+              }`)}
             >
               <div className="mb-5 flex items-center justify-between">
                 <div>
@@ -781,10 +653,10 @@ const LayoutPos = ({ children }) => {
                   </button>
                 </div>
               </div>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
+      </>
 
       <div className="relative z-10 h-screen w-full overflow-hidden">
         <header

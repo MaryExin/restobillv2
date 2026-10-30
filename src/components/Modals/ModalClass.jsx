@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
 import { FiX } from "react-icons/fi";
 import { useCustomSecuredMutation } from "../../hooks/useCustomSecuredMutation";
 import ModalYesNoReusable from "../Modals/ModalYesNoReusable";
@@ -61,11 +60,8 @@ const ModalClass = ({
 
       {/* Backdrop and Modal */}
       <div className="fixed inset-0 z-40 bg-zinc-900 bg-opacity-50 flex items-center justify-center">
-        <motion.div
-          className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden"
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ type: "spring", stiffness: 300, damping: 25 }}
+        <div
+          className="ui-scale-in relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden"
         >
           {/* Header */}
           <div className="relative bg-gradient-to-br from-colorBrand to-colorBrandTertiary p-4 flex items-center justify-center">
@@ -110,7 +106,7 @@ const ModalClass = ({
               </button>
             </div>
           </div>
-        </motion.div>
+        </div>
       </div>
     </>
   );

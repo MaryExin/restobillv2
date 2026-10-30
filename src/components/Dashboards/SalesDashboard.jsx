@@ -8,7 +8,7 @@ import React, {
   useCallback,
   useRef,
 } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+
 import { LinearProgress } from "@mui/material";
 import useApiHost from "../../hooks/useApiHost";
 import {
@@ -1284,10 +1284,8 @@ const dailyChart = useMemo(() => {
   );
 
   const KpiCard = ({ icon, label, value, sub }) => (
-    <motion.div
-      className={`${T.glowBg} p-5`}
-      whileHover={{ y: -2 }}
-      transition={{ type: "spring", stiffness: 240, damping: 22 }}
+    <div
+      className={"hover:-translate-y-0.5 transition-transform duration-150 motion-reduce:transform-none " + (`${T.glowBg} p-5`)}
     >
       <div className="flex items-center justify-between">
         <div
@@ -1317,33 +1315,26 @@ const dailyChart = useMemo(() => {
       >
         {value}
       </div>
-    </motion.div>
+    </div>
   );
 
   const FilterSheet = () => (
-    <AnimatePresence>
+    <>
       {isFilterOpen && (
-        <motion.div
-          className="fixed inset-0 z-[9999]"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+        <div
+          className="ui-fade-in fixed inset-0 z-[9999]"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) closeWithApply();
           }}
         >
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
 
-          <motion.div
-            className={`absolute bottom-0 left-0 right-0 p-4 ${
+          <div
+            className={"ui-slide-in-bottom " + (`absolute bottom-0 left-0 right-0 p-4 ${
               theme === "dark"
                 ? "bg-slate-950/90 border-t border-white/5"
                 : "bg-white/90 border-t border-slate-200/70"
-            } backdrop-blur-xl rounded-t-[28px] shadow-2xl`}
-            initial={{ y: 24, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 18, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 260, damping: 26 }}
+            } backdrop-blur-xl rounded-t-[28px] shadow-2xl`)}
             onMouseDown={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
@@ -1543,10 +1534,10 @@ const dailyChart = useMemo(() => {
                 </div>
               </div>
             </div>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
       )}
-    </AnimatePresence>
+    </>
   );
 
   return (
@@ -2018,47 +2009,44 @@ const dailyChart = useMemo(() => {
         )}
 
         <div className="fixed bottom-4 right-4 z-[9998] flex flex-col gap-2 lg:hidden">
-          <motion.button
+          <button
             type="button"
             onClick={() => setIsFilterOpen(true)}
-            className="flex items-center gap-2 px-4 py-3 text-xs font-extrabold text-white rounded-full shadow-2xl"
+            className="active:scale-[0.98] transition-transform duration-150 motion-reduce:transform-none flex items-center gap-2 px-4 py-3 text-xs font-extrabold text-white rounded-full shadow-2xl"
             style={{
               background:
                 "linear-gradient(135deg, rgba(59,130,246,1) 0%, rgba(99,102,241,1) 100%)",
             }}
-            whileTap={{ scale: 0.98 }}
           >
             <FiFilter />
             Filters
-          </motion.button>
+          </button>
 
-          <motion.button
+          <button
             type="button"
             onClick={() => exportReport("daily")}
-            className="flex items-center gap-2 px-4 py-3 text-xs font-extrabold text-white rounded-full shadow-2xl"
+            className="active:scale-[0.98] transition-transform duration-150 motion-reduce:transform-none flex items-center gap-2 px-4 py-3 text-xs font-extrabold text-white rounded-full shadow-2xl"
             style={{
               background:
                 "linear-gradient(135deg, rgba(34,197,94,1) 0%, rgba(16,185,129,1) 100%)",
             }}
-            whileTap={{ scale: 0.98 }}
           >
             <FiDownload />
             Daily CSV
-          </motion.button>
+          </button>
 
-          <motion.button
+          <button
             type="button"
             onClick={printDailyReport}
-            className="flex items-center gap-2 px-4 py-3 text-xs font-extrabold text-white rounded-full shadow-2xl"
+            className="active:scale-[0.98] transition-transform duration-150 motion-reduce:transform-none flex items-center gap-2 px-4 py-3 text-xs font-extrabold text-white rounded-full shadow-2xl"
             style={{
               background:
                 "linear-gradient(135deg, rgba(234,179,8,1) 0%, rgba(245,158,11,1) 100%)",
             }}
-            whileTap={{ scale: 0.98 }}
           >
             <FiPrinter />
             Daily Print
-          </motion.button>
+          </button>
         </div>
       </div>
 

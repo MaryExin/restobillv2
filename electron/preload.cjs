@@ -1,5 +1,14 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
+const cartUpdateListeners = new Map();
+
+function offCartUpdate(callback) {
+  const listener = cartUpdateListeners.get(callback);
+  if (!listener) return;
+  ipcRenderer.removeListener("kiosk:cart-updated", listener);
+  cartUpdateListeners.delete(callback);
+}
+
 contextBridge.exposeInMainWorld("appConfig", {
   getApiHost: () => ipcRenderer.invoke("get-api-host"),
   getWebApiHost: () => ipcRenderer.invoke("get-web-api-host"),
@@ -53,8 +62,18 @@ contextBridge.exposeInMainWorld("kioskAPI", {
   closeSecondScreen: () => ipcRenderer.invoke("kiosk:close-second-screen"),
   setFullScreen: (value) => ipcRenderer.invoke("kiosk:set-fullscreen", value),
   updateCart: (data) => ipcRenderer.invoke("kiosk:update-cart", data),
-  onCartUpdate: (cb) =>
-    ipcRenderer.on("kiosk:cart-updated", (_event, data) => cb(data)),
-  offCartUpdate: (cb) =>
-    ipcRenderer.removeListener("kiosk:cart-updated", cb),
+  onCartUpdate: (cb) => {
+    offCartUpdate(cb);
+    const listener = (_event, data) => cb(data);
+    cartUpdateListeners.set(cb, listener);
+    ipcRenderer.on("kiosk:cart-updated", listener);
+    // Keep the exact IPC listener in this context for reliable React cleanup.
+    return () => {
+      ipcRenderer.removeListener("kiosk:cart-updated", listener);
+      if (cartUpdateListeners.get(cb) === listener) {
+        cartUpdateListeners.delete(cb);
+      }
+    };
+  },
+  offCartUpdate,
 });

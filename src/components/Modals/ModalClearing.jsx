@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useRef } from "react";
-import { motion } from "framer-motion";
 import { FiXCircle, FiCreditCard } from "react-icons/fi";
 
 import ModalYesNoReusable from "./ModalYesNoReusable";
@@ -170,20 +169,16 @@ const ModalClearing = ({
             <div className="flex flex-col bg-slate-50 rounded-xl shadow-2xl h-[80vh]  overflow-y-auto scrollbar">
               {/* Header */}
               <div className="relative flex justify-center items-center bg-gradient-to-br from-colorBrand to-colorBrandSecondary rounded-t-xl p-5 text-white">
-                <motion.div
+                <div
                   onClick={() => setIsModalClearing(false)}
-                  className="absolute right-4 top-4 cursor-pointer hover:scale-110 transition"
-                  whileHover={{ rotate: 90 }}
+                  className="hover:opacity-90 transition-opacity duration-150 absolute right-4 top-4 cursor-pointer hover:scale-110 transition"
                 >
                   <FiXCircle size={28} />
-                </motion.div>
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.5, rotate: -180 }}
-                  animate={{ opacity: 1, scale: 1, rotate: 0 }}
-                  transition={{ duration: 0.5 }}
+                </div>
+                <div className="ui-scale-in"
                 >
                   <FiCreditCard size={48} />
-                </motion.div>
+                </div>
               </div>
 
               {/* Main Form */}
@@ -380,22 +375,18 @@ const ModalClearing = ({
 
                   {/* Submit Button */}
                   <div className="flex justify-end">
-                    <motion.button
+                    <button
                       onClick={() => setYesNoModalOpen(true)}
-                      className="px-5 py-2 bg-gradient-to-br from-colorBrand via-colorBrandSecondary to-colorBrandTertiary text-white rounded hover:scale-95 transition"
-                      whileHover={{ scale: 1.02 }}
+                      className="hover:opacity-90 transition-opacity duration-150 px-5 py-2 bg-gradient-to-br from-colorBrand via-colorBrandSecondary to-colorBrandTertiary text-white rounded hover:scale-95 transition"
                     >
                       Save
-                    </motion.button>
+                    </button>
                   </div>
 
                   <h1>Balance due:</h1>
                   {/* Balance Highlight */}
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.6, duration: 0.4 }}
-                    className="flex items-center mt-4 bg-white border-2 border-colorBrand shadow-lg text-white px-4 py-2 rounded-lg w-auto mx-auto space-x-3 "
+                  <div
+                    className="ui-scale-in flex items-center mt-4 bg-white border-2 border-colorBrand shadow-lg text-white px-4 py-2 rounded-lg w-auto mx-auto space-x-3 "
                   >
                     <FiCreditCard
                       className="text-softPrimary animate-pulse"
@@ -423,7 +414,7 @@ const ModalClearing = ({
                         { minimumFractionDigits: 2, maximumFractionDigits: 2 },
                       )}
                     </span>
-                  </motion.div>
+                  </div>
                 </div>
               </div>
             </div>

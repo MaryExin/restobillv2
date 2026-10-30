@@ -1,9 +1,8 @@
-import React, { Suspense } from "react";
+import React, { lazy, Suspense } from "react";
 import ReactDOM from "react-dom/client";
 import { Helmet, HelmetProvider } from "react-helmet-async";
 import App from "./App.jsx";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import "./index.css";
 import "./fonts/font-style.css";
 import { ToastProvider } from "./context/ToastContext.jsx";
@@ -14,6 +13,13 @@ import AppAlertProvider from "./hooks/AppAlertProvider.jsx";
 import { setupAlertOverride } from "./hooks/setupAlertOverride.jsx";
 
 const queryClient = new QueryClient();
+const ReactQueryDevtools = import.meta.env.DEV
+  ? lazy(() =>
+      import("@tanstack/react-query-devtools").then((module) => ({
+        default: module.ReactQueryDevtools,
+      })),
+    )
+  : null;
 const Logo = import.meta.env.VITE_LOGO;
 
 // setup global alert override once before render
@@ -74,7 +80,11 @@ ReactDOM.createRoot(document.getElementById("root")).render(
                 >
                   <QueryClientProvider client={queryClient}>
                     <App />
-                    <ReactQueryDevtools />
+                    {ReactQueryDevtools && (
+                      <Suspense fallback={null}>
+                        <ReactQueryDevtools />
+                      </Suspense>
+                    )}
                   </QueryClientProvider>
                 </div>
 

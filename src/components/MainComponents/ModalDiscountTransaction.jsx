@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import {
   FiX,
   FiPrinter,
@@ -13,10 +12,13 @@ import {
   FiCheck,
   FiShoppingCart,
   FiPlus,
+  FiGitBranch,
+  FiCornerUpLeft,
 } from "react-icons/fi";
 import ButtonComponent from "./Common/ButtonComponent";
 import { BuildPrintableDiscountReceiptHtml } from "../../utils/BuildPrintableDiscountReceiptHtml";
 import { printWithPdfFallback } from "../../utils/printWithPdfFallback";
+import { getOrderItemDisplayName } from "../../utils/orderItemDisplayName";
 import useGetDefaultPrinter from "../../hooks/useGetDefaultPrinter";
 import useBusinessInfo from "../../hooks/useBusinessInfo";
 import { computeDiscountLine } from "../../utils/discountLineMath";
@@ -25,6 +27,7 @@ import {
   DEFAULT_SERVICE_CHARGE_BASIS,
   normalizeServiceChargeBasis,
 } from "../../utils/serviceChargeMath";
+import { buildInitialServiceChargeToggles } from "../../utils/serviceChargeDefaults";
 
 const peso = (value) =>
   Number(value || 0).toLocaleString("en-PH", {
@@ -33,6 +36,8 @@ const peso = (value) =>
   });
 
 const roundMoney = (value) => Math.round(Number(value || 0) * 100) / 100;
+const isCorkageCharge = (charge) => String(charge?.particulars || "").trim().toLowerCase() === "corkage";
+const isAutoCharge = (charge) => String(charge?.reference || "").trim().toUpperCase() === "AUTO";
 
 const applyDiscountCeiling = (breakdown, ceilingAmount) => {
   const rawTotalDiscount = breakdown.reduce(
@@ -221,21 +226,14 @@ const OrderedItemsSummaryModal = ({
     : "bg-white border border-slate-200 text-slate-900";
 
   return (
-    <AnimatePresence>
-      <motion.div
-        className={`fixed inset-0 z-[100001] flex items-center justify-center p-3 backdrop-blur-md ${
+    <>
+      <div
+        className={(`fixed inset-0 z-[100001] flex items-center justify-center p-3 backdrop-blur-md ${
           isDark ? "bg-slate-950/80" : "bg-slate-200/70"
-        }`}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+        }`) + " ui-fade-in"}
       >
-        <motion.div
-          initial={{ scale: 0.985, opacity: 0, y: 10 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-          exit={{ scale: 0.985, opacity: 0, y: 10 }}
-          transition={{ duration: 0.16 }}
-          className={`w-full max-w-[900px] overflow-hidden rounded-[1rem] shadow-2xl ${modalClass}`}
+        <div
+          className={(`w-full max-w-[900px] overflow-hidden rounded-[1rem] shadow-2xl ${modalClass}`) + " ui-scale-in"}
         >
           <div
             className={`relative px-4 py-3 ${
@@ -378,7 +376,7 @@ const OrderedItemsSummaryModal = ({
                       >
                         <div className="min-w-0">
                           <p className="truncate font-bold">
-                            {item.item_name || item.product_id}
+                            {getOrderItemDisplayName(item.item_name || item.product_id)}
                           </p>
                           <p className="mt-0.5 text-[10px] text-slate-500">
                             ₱ {peso(price)} each
@@ -434,9 +432,9 @@ const OrderedItemsSummaryModal = ({
               </button>
             </div>
           </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+        </div>
+      </div>
+    </>
   );
 };
 
@@ -459,21 +457,14 @@ const DiscountTypePickerModal = ({
   const hasOptions = statutoryOptions.length > 0 || customOptions.length > 0;
 
   return (
-    <AnimatePresence>
-      <motion.div
-        className={`fixed inset-0 z-[100001] flex items-center justify-center p-3 backdrop-blur-md ${
+    <>
+      <div
+        className={(`fixed inset-0 z-[100001] flex items-center justify-center p-3 backdrop-blur-md ${
           isDark ? "bg-slate-950/80" : "bg-slate-200/70"
-        }`}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+        }`) + " ui-fade-in"}
       >
-        <motion.div
-          initial={{ scale: 0.985, opacity: 0, y: 10 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-          exit={{ scale: 0.985, opacity: 0, y: 10 }}
-          transition={{ duration: 0.16 }}
-          className={`w-full max-w-[900px] overflow-hidden rounded-[1rem] shadow-2xl ${modalClass}`}
+        <div
+          className={(`w-full max-w-[900px] overflow-hidden rounded-[1rem] shadow-2xl ${modalClass}`) + " ui-scale-in"}
         >
           <div
             className={`relative px-4 py-3 ${
@@ -575,9 +566,9 @@ const DiscountTypePickerModal = ({
               </button>
             </div>
           </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+        </div>
+      </div>
+    </>
   );
 };
 
@@ -615,25 +606,18 @@ const CustomerInfoModal = ({
   };
 
   return (
-    <AnimatePresence>
-      <motion.div
-        className={`fixed inset-0 z-[100002] flex items-center justify-center p-3 backdrop-blur-md ${
+    <>
+      <div
+        className={(`fixed inset-0 z-[100002] flex items-center justify-center p-3 backdrop-blur-md ${
           isDark ? "bg-slate-950/80" : "bg-slate-200/70"
-        }`}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+        }`) + " ui-fade-in"}
       >
-        <motion.div
-          initial={{ scale: 0.985, opacity: 0, y: 10 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-          exit={{ scale: 0.985, opacity: 0, y: 10 }}
-          transition={{ duration: 0.16 }}
-          className={`w-full max-w-[1000px] max-h-[calc(100vh-1.5rem)] overflow-auto rounded-[1rem] shadow-2xl ${
+        <div
+          className={(`w-full max-w-[1000px] max-h-[calc(100vh-1.5rem)] overflow-auto rounded-[1rem] shadow-2xl ${
             isDark
               ? "border border-white/10 bg-slate-900 text-white"
               : "border border-slate-200 bg-white text-slate-900"
-          }`}
+          }`) + " ui-scale-in"}
         >
           <div className="p-5 md:p-6">
             <div className="flex items-start justify-between gap-4 mb-5">
@@ -850,9 +834,9 @@ const CustomerInfoModal = ({
               </button>
             </div>
           </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+        </div>
+      </div>
+    </>
   );
 };
 
@@ -1011,6 +995,8 @@ const ModalDiscountTransaction = ({
   apiHost,
   isDark,
   billingNo,
+  onSplitRequest,
+  onUnsplitRequest,
 }) => {
   const defaultPrinterName = useGetDefaultPrinter();
   const { businessInfo, isBusInfoLoading } = useBusinessInfo();
@@ -1043,6 +1029,11 @@ const ModalDiscountTransaction = ({
   const [serviceChargeEnabled, setServiceChargeEnabled] = useState(false);
   const [serviceChargeBasis, setServiceChargeBasis] = useState(DEFAULT_SERVICE_CHARGE_BASIS);
   const [serviceCharges, setServiceCharges] = useState([]);
+  const [corkageAmount, setCorkageAmount] = useState("");
+  const [savedChargeRows, setSavedChargeRows] = useState(null);
+  const [chargeTransaction, setChargeTransaction] = useState(null);
+  const [isChargeSettingsLoading, setIsChargeSettingsLoading] = useState(false);
+  const [chargeSettingsError, setChargeSettingsError] = useState("");
   // per-transaction toggle: chargeId → boolean (true = include this transaction)
   const [chargeToggles, setChargeToggles] = useState({});
   const [discountMode, setDiscountMode] = useState("PerCustomer");
@@ -1219,6 +1210,10 @@ const ModalDiscountTransaction = ({
   };
 
   const resetForm = () => {
+    setCorkageAmount("");
+    setSavedChargeRows(null);
+    setChargeTransaction(null);
+    setChargeToggles({});
     setCustomerCount(1);
     setCustomerCards([]);
     setQualifiedPrompt("");
@@ -1304,8 +1299,13 @@ const ModalDiscountTransaction = ({
   useEffect(() => {
     if (!isOpen || !apiHost || !transaction?.transaction_id) return;
 
+    let cancelled = false;
     setIsLoading(true);
     setErrorMessage("");
+    setCorkageAmount("");
+    setSavedChargeRows(null);
+    setChargeTransaction(null);
+    setChargeToggles({});
 
     fetch(`${apiHost}/api/transaction_discount_items.php`, {
       method: "POST",
@@ -1322,8 +1322,24 @@ const ModalDiscountTransaction = ({
     })
       .then((res) => res.json())
       .then((data) => {
+        if (cancelled) return;
+        if (!data?.success) throw new Error(data?.message || "Failed to load transaction items.");
+        if (!Array.isArray(data.other_charge_rows)) {
+          throw new Error("Update the billing backend to load and save corkage.");
+        }
+        const chargeRows = data.other_charge_rows;
+        setSavedChargeRows(chargeRows);
+        const savedCorkage = roundMoney(chargeRows
+          .filter((charge) => isAutoCharge(charge) && isCorkageCharge(charge))
+          .reduce((sum, charge) => sum + Number(charge.amount || 0), 0));
+        setCorkageAmount(savedCorkage > 0 ? String(savedCorkage) : "");
         const nextItems = Array.isArray(data?.items) ? data.items : [];
         const txn = data?.transaction_summary || {};
+        setChargeTransaction({
+          order_type: txn.order_type ?? transaction?.order_type ?? "",
+          billing_no: txn.billing_no ?? billingNo ?? transaction?.billing_no ?? transaction?.billingNo ?? "",
+          invoice_no: txn.invoice_no ?? transaction?.invoice_no ?? "",
+        });
         const discountCounts = data?.discount_counts || {
           senior: 0,
           pwd: 0,
@@ -1459,8 +1475,9 @@ const ModalDiscountTransaction = ({
         setIsLoading(false);
       })
       .catch((error) => {
+        if (cancelled) return;
         console.error(error);
-        setErrorMessage("Failed to load transaction items.");
+        setErrorMessage(error.message || "Failed to load transaction items.");
         setItems([]);
         setCustomerCards([]);
         setExistingDiscountLoaded(false);
@@ -1469,6 +1486,7 @@ const ModalDiscountTransaction = ({
         setShowOverrideWarning(false);
         setIsLoading(false);
       });
+    return () => { cancelled = true; };
   }, [isOpen, apiHost, transaction, billingNo]);
 
   useEffect(() => {
@@ -1511,6 +1529,8 @@ const ModalDiscountTransaction = ({
     let cancelled = false;
 
     const fetchServiceChargeSettings = async () => {
+      setIsChargeSettingsLoading(true);
+      setChargeSettingsError("");
       try {
         const [scRes, listRes, modeRes] = await Promise.all([
           fetch(`${apiHost}/api/pos_service_charge.php`),
@@ -1520,18 +1540,19 @@ const ModalDiscountTransaction = ({
         const scResult   = await scRes.json();
         const listResult = await listRes.json();
         const modeResult = await modeRes.json();
+        if (!scRes.ok || !listRes.ok || !modeRes.ok
+          || scResult?.success !== true || typeof scResult?.data?.service_charge_enabled !== "boolean"
+          || listResult?.success !== true || !Array.isArray(listResult.charges)
+          || modeResult?.success !== true || !["PerCustomer", "PerProduct"].includes(modeResult?.data?.discount_mode)) {
+          throw new Error("Failed to load billing charge settings. Close and reopen billing to retry.");
+        }
 
         if (!cancelled) {
           setServiceChargeEnabled(Boolean(scResult?.data?.service_charge_enabled || false));
           setServiceChargeBasis(normalizeServiceChargeBasis(scResult?.data?.service_charge_basis));
-          const loadedCharges = Array.isArray(listResult?.charges) ? listResult.charges : [];
+          const loadedCharges = (Array.isArray(listResult?.charges) ? listResult.charges : [])
+            .filter((charge) => !isCorkageCharge(charge));
           setServiceCharges(loadedCharges);
-          // initialise per-transaction toggles: all charges default OFF, cashier picks which to turn on
-          const toggleInit = {};
-          loadedCharges.forEach((c) => {
-            toggleInit[Number(c.ID)] = false;
-          });
-          setChargeToggles(toggleInit);
           setDiscountMode(modeResult?.data?.discount_mode === "PerProduct" ? "PerProduct" : "PerCustomer");
         }
       } catch (error) {
@@ -1540,8 +1561,11 @@ const ModalDiscountTransaction = ({
           setServiceChargeEnabled(false);
           setServiceChargeBasis(DEFAULT_SERVICE_CHARGE_BASIS);
           setServiceCharges([]);
+          setChargeSettingsError(error.message || "Failed to load billing charge settings.");
           setDiscountMode("PerCustomer");
         }
+      } finally {
+        if (!cancelled) setIsChargeSettingsLoading(false);
       }
     };
 
@@ -1551,6 +1575,11 @@ const ModalDiscountTransaction = ({
       cancelled = true;
     };
   }, [isOpen, apiHost]);
+
+  useEffect(() => {
+    if (!isOpen || !Array.isArray(savedChargeRows) || !chargeTransaction) return;
+    setChargeToggles(buildInitialServiceChargeToggles(serviceCharges, savedChargeRows, chargeTransaction));
+  }, [isOpen, savedChargeRows, serviceCharges, chargeTransaction]);
 
   useEffect(() => {
     if (!isOpen || !apiHost) return;
@@ -1628,6 +1657,14 @@ const ModalDiscountTransaction = ({
     hadExistingDiscountBreakdown,
     initialLoadedSignature,
   ]);
+
+  const corkageText = String(corkageAmount ?? "").trim();
+  const corkageValue = Number(corkageText || 0);
+  const corkageError = !/^\d*(?:\.\d{0,2})?$/.test(corkageText)
+    || !Number.isFinite(corkageValue) || corkageValue < 0
+    || !Number.isSafeInteger(Math.round(corkageValue * 100))
+    ? "Enter a corkage amount of 0 or more, with up to 2 decimal places."
+    : "";
 
   const computed = useMemo(() => {
     const isPerProduct = discountMode === "PerProduct";
@@ -1919,9 +1956,9 @@ const ModalDiscountTransaction = ({
       totalVatExemption,
     });
 
-    const appliedCharges = serviceChargeEnabled
+    const billingCharges = serviceChargeEnabled
       ? (Array.isArray(serviceCharges) ? serviceCharges : [])
-          .filter((c) => Boolean(c.is_enabled) && chargeToggles[Number(c.ID)] !== false)
+          .filter((c) => Boolean(c.is_enabled) && chargeToggles[Number(c.ID)] === true)
           .map((c) => {
             const rate = Number(c.amount || 0);
             const computed =
@@ -1939,8 +1976,18 @@ const ModalDiscountTransaction = ({
           .filter((c) => c.computedAmount > 0)
       : [];
 
-    const totalOtherCharges = appliedCharges.reduce((s, c) => s + c.computedAmount, 0);
-    const totalAmountDue = Math.max(netAfterDiscount + totalOtherCharges, 0);
+    const corkage = corkageError ? 0 : roundMoney(corkageValue);
+    if (corkage > 0) {
+      billingCharges.push({ id: "corkage", particulars: "Corkage", rate_type: "Fixed", rate: corkage, computedAmount: corkage });
+    }
+    const preservedCharges = (savedChargeRows || []).filter((charge) => !isAutoCharge(charge))
+      .map((charge) => ({
+        id: `saved-${charge.ID}`, particulars: String(charge.particulars || ""),
+        rate_type: "Fixed", rate: Number(charge.amount || 0), computedAmount: roundMoney(charge.amount),
+      })).filter((charge) => Number.isFinite(charge.computedAmount) && charge.computedAmount > 0);
+    const appliedCharges = [...preservedCharges, ...billingCharges];
+    const totalOtherCharges = roundMoney(appliedCharges.reduce((s, c) => s + c.computedAmount, 0));
+    const totalAmountDue = roundMoney(Math.max(netAfterDiscount + totalOtherCharges, 0));
 
     const discountTypeSummary = discountBreakdown
       .filter(
@@ -1965,6 +2012,9 @@ const ModalDiscountTransaction = ({
       serviceChargeEnabled,
       serviceChargeBasis,
       appliedCharges,
+      billingCharges,
+      preservedCharges,
+      corkage,
       serviceChargeBase,
       totalOtherCharges,
       safeCustomerCount,
@@ -1995,6 +2045,9 @@ const ModalDiscountTransaction = ({
     serviceChargeBasis,
     serviceCharges,
     chargeToggles,
+    corkageValue,
+    corkageError,
+    savedChargeRows,
     discountMode,
     discountSharingMode,
     selectedProductIds,
@@ -2160,11 +2213,16 @@ const ModalDiscountTransaction = ({
     }
   };
 
-  const isPrintDisabled = Boolean(qualifiedPrompt) || isPrinting;
+  const billingLoadError = errorMessage || chargeSettingsError;
+  const isPrintDisabled = Boolean(qualifiedPrompt || corkageError || billingLoadError)
+    || isPrinting || isLoading || isChargeSettingsLoading || !Array.isArray(savedChargeRows);
 
   const saveBillingBeforePrint = async () => {
     if (!apiHost || !transaction?.transaction_id) {
       throw new Error("Missing transaction data.");
+    }
+    if (corkageError || billingLoadError || isLoading || isChargeSettingsLoading || !Array.isArray(savedChargeRows)) {
+      throw new Error(corkageError || billingLoadError || "Wait for billing details to finish loading.");
     }
 
     if (!validateQualifiedCounts(customerCount, discountState)) {
@@ -2227,6 +2285,9 @@ const ModalDiscountTransaction = ({
       Discount: Number(computed?.totalDiscount || 0),
       OtherCharges: Number(computed?.totalOtherCharges || 0),
       TotalAmountDue: Number(computed?.totalAmountDue || 0),
+      billing_charges: computed.billingCharges.map((charge) => ({
+        particulars: charge.particulars, amount: charge.computedAmount,
+      })),
 
       VATableSales: Number(computed?.vatableSales || 0),
       VATableSales_VAT: Number(computed?.vatableSalesVat || 0),
@@ -2243,6 +2304,7 @@ const ModalDiscountTransaction = ({
 
       cart_items: (items || []).map((item) => ({
         databaseID: item.ID || item.id || item.databaseID,
+        sales_quantity: Number(item.sales_quantity || 0),
         selling_price: Number(item.selling_price || 0),
       })),
     };
@@ -2259,6 +2321,9 @@ const ModalDiscountTransaction = ({
 
     if (!response.ok || result.status !== "success") {
       throw new Error(result.message || "Failed to save billing.");
+    }
+    if (result.billing_charges_saved !== true) {
+      throw new Error("Update the billing backend to save corkage and other charges before printing.");
     }
 
     setLatestBillingNo(result.billing_no || "");
@@ -2354,29 +2419,6 @@ const ModalDiscountTransaction = ({
         );
       }
 
-      // Always sync AUTO charges after billing — this deletes any stale charges from a
-      // prior billing print even when all charges are now OFF, preventing the payment
-      // modal from inflating Amount Due with leftover DB rows.
-      try {
-        const activeCharges = Array.isArray(computed?.appliedCharges)
-          ? computed.appliedCharges
-              .filter((c) => Number(c.computedAmount || 0) > 0)
-              .map((c) => ({ particulars: c.particulars, amount: c.computedAmount }))
-          : [];
-        await fetch(`${apiHost}/api/pos_save_transaction_charges.php`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            transaction_id: transaction?.transaction_id || "",
-            Category_Code: transaction?.Category_Code || "",
-            Unit_Code: transaction?.Unit_Code || "",
-            charges: activeCharges,
-          }),
-        });
-      } catch (e) {
-        console.warn("Failed to save billing charges:", e);
-      }
-
       // Save per-product discount selection when mode is Per Product
       if (discountMode === "PerProduct") {
         try {
@@ -2457,21 +2499,14 @@ const ModalDiscountTransaction = ({
 
   return (
     <>
-      <AnimatePresence>
-        <motion.div
-          className={`fixed inset-0 z-[100000] flex items-center justify-center p-2 backdrop-blur-md ${
+      <>
+        <div
+          className={(`fixed inset-0 z-[100000] flex items-center justify-center p-2 backdrop-blur-md ${
             isDark ? "bg-slate-950/80" : "bg-slate-200/70"
-          }`}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+          }`) + " ui-fade-in"}
         >
-          <motion.div
-            initial={{ scale: 0.985, opacity: 0, y: 10 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 0.985, opacity: 0, y: 10 }}
-            transition={{ duration: 0.16 }}
-            className={`w-full max-w-[980px] max-h-[calc(100vh-1rem)] sm:max-h-[calc(100vh-2rem)] overflow-hidden rounded-[1rem] shadow-2xl flex flex-col ${containerClass}`}
+          <div
+            className={(`w-full max-w-[980px] max-h-[calc(100vh-1rem)] sm:max-h-[calc(100vh-2rem)] overflow-hidden rounded-[1rem] shadow-2xl flex flex-col ${containerClass}`) + " ui-scale-in"}
           >
             <div
               className={`relative px-4 py-3 ${
@@ -2518,6 +2553,7 @@ const ModalDiscountTransaction = ({
             </div>
 
             <div className="space-y-3 p-3 overflow-y-auto flex-1 min-h-0">
+              {billingLoadError && <p role="alert" className="rounded-xl bg-redAccent/10 p-3 text-sm text-redAccent font-[Poppins-Regular]">{billingLoadError}</p>}
               {hadExistingDiscountBreakdown ? (
                 <div
                   className={`rounded-[1rem] border px-3 py-3 ${
@@ -2822,7 +2858,7 @@ const ModalDiscountTransaction = ({
 
                                   {/* Item name */}
                                   <span className={`flex-1 font-semibold truncate ${isOn ? "" : "line-through"}`}>
-                                    {item.item_name || item.product_id || `Item #${itemKey}`}
+                                    {getOrderItemDisplayName(item.item_name || item.product_id || `Item #${itemKey}`)}
                                   </span>
 
                                   {/* Qty stepper (only when maxQty >= 2) */}
@@ -3102,7 +3138,7 @@ const ModalDiscountTransaction = ({
                       .filter((c) => Boolean(c.is_enabled))
                       .map((c) => {
                         const id      = Number(c.ID);
-                        const isOn    = chargeToggles[id] !== false;
+                        const isOn    = chargeToggles[id] === true;
                         const applied = computed.appliedCharges?.find((a) => a.id === id);
                         return (
                           <div key={id} className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
@@ -3112,6 +3148,7 @@ const ModalDiscountTransaction = ({
                                 onClick={() =>
                                   setChargeToggles((prev) => ({ ...prev, [id]: !isOn }))
                                 }
+                                disabled={isPrinting || isLoading || isChargeSettingsLoading || !chargeTransaction}
                                 className={`flex-shrink-0 rounded-md px-2 py-0.5 text-[10px] font-black uppercase tracking-wide transition ${
                                   isOn
                                     ? "bg-emerald-500/15 text-emerald-500"
@@ -3132,6 +3169,40 @@ const ModalDiscountTransaction = ({
                         );
                       })
                     }
+
+                    {computed.preservedCharges.map((charge) => (
+                      <div key={charge.id} className="flex items-center justify-between gap-2 border-b border-dashed border-slate-300/20 pb-2">
+                        <span className="text-slate-500">{charge.particulars}</span>
+                        <span className="font-[Poppins-SemiBold]">₱ {peso(charge.computedAmount)}</span>
+                      </div>
+                    ))}
+
+                    <div className="space-y-2 border-b border-dashed border-slate-300/20 pb-3 font-[Poppins-Regular]">
+                      <div className="flex items-center justify-between gap-3">
+                        <label htmlFor="corkage-amount" className="text-sm font-[Poppins-Medium]">Corkage</label>
+                        <div className="flex items-center gap-2">
+                          <span aria-hidden="true">₱</span>
+                          <input
+                            id="corkage-amount"
+                            type="number"
+                            inputMode="decimal"
+                            min="0"
+                            step="0.01"
+                            value={corkageAmount}
+                            onChange={(event) => setCorkageAmount(event.target.value)}
+                            onFocus={handleSelectAllOnFocus}
+                            disabled={isPrinting || isLoading || !Array.isArray(savedChargeRows)}
+                            aria-invalid={Boolean(corkageError)}
+                            aria-describedby="corkage-help"
+                            placeholder="0.00"
+                            className={`w-32 rounded-lg px-3 py-2 text-right text-sm outline-none focus:ring-2 focus:ring-colorBrand ${inputClass}`}
+                          />
+                        </div>
+                      </div>
+                      <p id="corkage-help" role={corkageError ? "alert" : undefined} className={`text-xs ${corkageError ? "text-redAccent" : "opacity-70"}`}>
+                        {corkageError || "Added after discounts and other charges. Leave blank for none."}
+                      </p>
+                    </div>
 
                     <div className="flex items-center justify-between gap-2 rounded-lg bg-blue-500/10 px-3 py-2.5">
                       <span className="text-sm font-black">
@@ -3166,6 +3237,22 @@ const ModalDiscountTransaction = ({
                 </select>
               </div>
 
+              {onSplitRequest && (
+                <button type="button" onClick={onSplitRequest}
+                  disabled={isPrinting || isLoading || isSavingCustomerInfo}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-softPrimary px-4 py-3 text-sm text-colorBrand font-[Poppins-Medium] disabled:opacity-50">
+                  <FiGitBranch size={16} /> Split bill
+                </button>
+              )}
+
+              {onUnsplitRequest && (
+                <button type="button" onClick={onUnsplitRequest}
+                  disabled={isPrinting || isLoading || isSavingCustomerInfo}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-softPrimary px-4 py-3 text-sm text-colorBrand font-[Poppins-Medium] disabled:opacity-50">
+                  <FiCornerUpLeft size={16} /> Unsplit bill
+                </button>
+              )}
+
               <div className="grid grid-cols-2 gap-2.5">
                 <ButtonComponent
                   onClick={onClose}
@@ -3190,9 +3277,9 @@ const ModalDiscountTransaction = ({
                 </ButtonComponent>
               </div>
             </div>
-          </motion.div>
-        </motion.div>
-      </AnimatePresence>
+          </div>
+        </div>
+      </>
 
       <OrderedItemsSummaryModal
         isOpen={showItemsModal}

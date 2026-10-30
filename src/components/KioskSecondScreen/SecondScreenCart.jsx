@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import useApiHost from "../../hooks/useApiHost";
+import { getOrderItemDisplayName } from "../../utils/orderItemDisplayName";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -59,7 +60,7 @@ const CartPanel = ({ groupedItems, totalItems, totalPrice, count }) => {
               style={{ ...style, paddingLeft: "20px", paddingRight: "20px" }}
             >
               <div className="col-span-7 font-semibold leading-snug uppercase text-slate-800 break-words whitespace-normal pt-0.5">
-                {item.name || item.code}
+                {getOrderItemDisplayName(item) || item.code}
               </div>
               <div className="col-span-2 text-center font-black text-cyan-600">
                 {item.quantity}
@@ -80,7 +81,7 @@ const CartPanel = ({ groupedItems, totalItems, totalPrice, count }) => {
                 }}
               >
                 <div className="col-span-7 italic font-medium leading-snug uppercase text-cyan-600/80 break-words whitespace-normal pt-0.5">
-                  + {addon.name || addon.code}
+                  + {getOrderItemDisplayName(addon) || addon.code}
                 </div>
                 <div className="col-span-2 text-center font-bold text-slate-500">{addon.quantity}</div>
                 <div className="col-span-3 text-right font-bold text-slate-500 tracking-tight">
@@ -299,8 +300,6 @@ const SecondScreenCart = () => {
   useEffect(() => {
     if (!window.kioskAPI?.onCartUpdate) return;
     const handler = (data) => {
-      setImageBust(new Date().getTime());
-      setImageError(false);
       if (data?.phase === "payment") {
         setScreenPhase("payment");
         setActivePaymentMethod(data?.paymentMethod || null);
@@ -320,8 +319,11 @@ const SecondScreenCart = () => {
         setPaymentSummary(null);
       }
     };
-    window.kioskAPI.onCartUpdate(handler);
-    return () => window.kioskAPI.offCartUpdate?.(handler);
+    const unsubscribe = window.kioskAPI.onCartUpdate(handler);
+    return () => {
+      if (typeof unsubscribe === "function") unsubscribe();
+      else window.kioskAPI.offCartUpdate?.(handler);
+    };
   }, []);
 
   const apiHost = useApiHost();

@@ -1,5 +1,6 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { getOrderItemDisplayName } from "./orderItemDisplayName";
 
 const peso = (value) =>
   Number(value || 0).toLocaleString("en-PH", {
@@ -359,7 +360,7 @@ export function BuildPrintableDiscountReceiptHtml({
                       .trim()
                       .toLowerCase() === "yes";
 
-                  const itemLabel = String(
+                  const itemLabel = getOrderItemDisplayName(
                     item.item_name || item.product_id || "-",
                   ).toUpperCase();
 

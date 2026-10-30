@@ -481,6 +481,9 @@ const PosLoginComponent = () => {
               <img
                 src={loginBackgroundImage}
                 alt="Login visual"
+                loading="lazy"
+                decoding="async"
+                fetchpriority="low"
                 className="h-full w-full object-cover"
                 onError={() =>
                   console.error(

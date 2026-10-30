@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import QRCode from "qrcode.react";
 import {
   FaSearch,
@@ -9,7 +8,6 @@ import {
   FaPlus,
   FaMinus,
   FaFilter,
-  FaPizzaSlice,
   FaHamburger,
   FaIceCream,
   FaCoffee,
@@ -18,7 +16,6 @@ import {
   FaReceipt,
   FaCheckCircle,
   FaEdit,
-  FaLayerGroup,
   FaChevronRight,
 } from "react-icons/fa";
 import { IoMdClose } from "react-icons/io";
@@ -50,11 +47,26 @@ import useBillingEnabled from "../../hooks/useBillingEnabled";
 import useZustandLayoutMode from "../../context/useZustandLayoutMode";
 import KioskRightPanel from "./KioskRightPanel";
 import RetailEmptyState from "./PosRetailComponents/RetailEmptyState";
+import ProductVariantModal from "./ProductVariantModal";
+import useMenuProductVariants from "../../hooks/useMenuProductVariants";
+import useCoffeeAddonOptions from "../../hooks/useCoffeeAddonOptions";
+import CoffeeAddonModal from "./CoffeeAddonModal";
+import { isCclAddon, isCoffeeAddonDrink } from "../../utils/menuCoffeeAddons";
+import { getCoffeeAddonInstruction } from "../../utils/coffeeAddonCart";
+import useMenuCombinationHalves from "../../hooks/useMenuPizzaHalves";
+import { getMenuVariantDetails, groupMenuProductVariants } from "../../utils/menuProductVariants";
+import { isPizzaVariantGroup, createPizzaCombination, getPizzaCombinationChoices, getPizzaCombinationSizes, getPizzaCombinationInstruction } from "../../utils/menuPizzaCombination";
+import { isPlatterVariantGroup, createPlatterCombination, getPlatterCombinationPair, getPlatterCombinationChoices, getPlatterCombinationInstruction } from "../../utils/menuPlatterCombination";
+import { isChickenVariantGroup, getChickenCombinationSizes, getChickenCombinationChoices, createChickenCombination, getChickenCombinationInstruction } from "../../utils/menuChickenCombination";
+import { orderCombinationKey, isSameOrderCombination, groupOrderCombinationCartRows, getOrderCombinationSourceItem, isGroupedOrderItem } from "../../utils/orderCombinationCart";
+import { getOrderItemDisplayName } from "../../utils/orderItemDisplayName";
 
 const mapPricingProduct = (item, index) => ({
   id: item.product_id || `${item.sku || "ITEM"}-${index}`,
   product_id: item.product_id || "",
   item_name: item.item_name || "NO NAME",
+  item_description: item.item_description ?? "",
+  bar_code: item.bar_code ?? "",
   selling_price: Number(item.selling_price || 0),
   sku: item.sku || "",
   item_category: item.item_category || "",
@@ -66,6 +78,23 @@ const mapPricingProduct = (item, index) => ({
   inventory_type: item.inventory_type || "",
   raw: item,
 });
+
+const mapPricingVariant = (item, index) => ({
+  ...mapPricingProduct(item, index),
+  // A missing price must not become a selectable, free product in the modal.
+  selling_price: item.selling_price == null || String(item.selling_price).trim() === ""
+    ? null
+    : Number(item.selling_price),
+});
+
+const hasMenuPrice = (product) => {
+  const price = product?.selling_price;
+  return (typeof price === "number" || typeof price === "string") &&
+    String(price).trim() !== "" && Number.isFinite(Number(price)) && Number(price) >= 0;
+};
+
+const makeLineId = (prefix = "LINE") =>
+  `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
 const Orderlist = ({
   tableselected,
@@ -149,6 +178,11 @@ const Orderlist = ({
   const [selectcategory, setselectcategory] = useState("");
   const [selectedSubcategory, setSelectedSubcategory] = useState("");
   const [productlist, setproductlist] = useState([]);
+  const [selectedVariantGroup, setSelectedVariantGroup] = useState(null);
+  const [selectedCoffeeDrink, setSelectedCoffeeDrink] = useState(null);
+  const [isFlavorCombination, setIsFlavorCombination] = useState(false);
+  const activeCombinationRef = useRef(null);
+  const activeCoffeeOptionsRef = useRef(null);
 
   useEffect(() => {
     setSelectedSubcategory("");
@@ -272,9 +306,6 @@ const Orderlist = ({
     warmupPrinter();
   }, []);
 
-  const makeLineId = (prefix = "LINE") =>
-    `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-
   useEffect(() => {
     if (!apiHost) return;
 
@@ -297,7 +328,8 @@ const Orderlist = ({
             ? result.sales_types
             : [];
           const itemCategories = Array.isArray(result.item_categories)
-            ? result.item_categories
+            ? result.item_categories.filter((category) =>
+              !/\s+HALF\s*$/iu.test(String(category?.item_category || "")))
             : [];
 
           setNewTransaction({
@@ -578,7 +610,6 @@ const Orderlist = ({
 
   const getCategoryIcon = (name) => {
     const lower = (name || "").toLowerCase();
-    if (lower.includes("pizza")) return <FaPizzaSlice />;
     if (lower.includes("burger") || lower.includes("meat"))
       return <FaHamburger />;
     if (lower.includes("dessert") || lower.includes("ice"))
@@ -616,6 +647,56 @@ const Orderlist = ({
     );
   }, [salesTypeList, selectedSalesType]);
 
+  const variantOptions = useMenuProductVariants({
+    group: selectedVariantGroup,
+    apiHost,
+    categoryCode: newtransaction?.business_info?.Category_Code || "",
+    unitCode: newtransaction?.business_info?.Unit_Code || "",
+    salesType: selectedSalesTypeObject?.sales_type || selectedSalesTypeObject?.description || "",
+    mapProduct: mapPricingVariant,
+  });
+
+  const coffeeOptions = useCoffeeAddonOptions({
+    product: selectedCoffeeDrink,
+    apiHost,
+    categoryCode: newtransaction?.business_info?.Category_Code || "",
+    unitCode: newtransaction?.business_info?.Unit_Code || "",
+    salesType: selectedSalesTypeObject?.sales_type || selectedSalesTypeObject?.description || "",
+    mapProduct: mapPricingVariant,
+  });
+  activeCoffeeOptionsRef.current = { drink: selectedCoffeeDrink, options: coffeeOptions };
+
+  const combinationHalves = useMenuCombinationHalves({
+    group: isFlavorCombination ? selectedVariantGroup : null,
+    apiHost,
+    categoryCode: newtransaction?.business_info?.Category_Code || "",
+    unitCode: newtransaction?.business_info?.Unit_Code || "",
+    salesType: selectedSalesTypeObject?.sales_type || selectedSalesTypeObject?.description || "",
+    mapProduct: mapPricingVariant,
+  });
+
+  activeCombinationRef.current = {
+    group: selectedVariantGroup, enabled: isFlavorCombination,
+    variants: variantOptions, halves: combinationHalves,
+  };
+
+  useEffect(() => {
+    setSelectedVariantGroup(null);
+    setIsFlavorCombination(false);
+    setSelectedCoffeeDrink(null);
+    activeCoffeeOptionsRef.current = null;
+  }, [
+    apiHost,
+    newtransaction?.business_info?.Category_Code,
+    newtransaction?.business_info?.Unit_Code,
+    selectedSalesType,
+    tableselected,
+    transactionId,
+    layoutMode,
+  ]);
+
+  const previousPricingSearchRef = useRef(productsearch);
+
   useEffect(() => {
     if (!apiHost) return;
 
@@ -627,6 +708,8 @@ const Orderlist = ({
       "";
 
     const trimmedProductSearch = productsearch.trim();
+    const searchChanged = previousPricingSearchRef.current !== productsearch;
+    previousPricingSearchRef.current = productsearch;
 
     if (
       !categoryCode ||
@@ -640,10 +723,12 @@ const Orderlist = ({
         products: [],
       });
       setproductlist([]);
+      setIsPricingLoading(false);
       return;
     }
 
     let cancelled = false;
+    const controller = new AbortController();
 
     const fetchPricingProducts = async () => {
       try {
@@ -653,6 +738,7 @@ const Orderlist = ({
           `${apiHost}/api/get_pricing_selection.php`,
           {
             method: "POST",
+            signal: controller.signal,
             headers: {
               "Content-Type": "application/json",
             },
@@ -691,6 +777,7 @@ const Orderlist = ({
           setproductlist([]);
         }
       } catch (error) {
+        if (cancelled || error.name === "AbortError") return;
         console.error("Failed to fetch pricing products:", error);
         if (!cancelled) {
           setPricingData({
@@ -705,10 +792,17 @@ const Orderlist = ({
       }
     };
 
-    fetchPricingProducts();
+    // Category/service changes and clearing search stay immediate. Typing and
+    // scanner input settle briefly so they do not issue a request per character.
+    const timeoutId = searchChanged && trimmedProductSearch
+      ? window.setTimeout(fetchPricingProducts, 180)
+      : null;
+    if (timeoutId === null) fetchPricingProducts();
 
     return () => {
       cancelled = true;
+      window.clearTimeout(timeoutId);
+      controller.abort();
     };
   }, [
     apiHost,
@@ -873,6 +967,12 @@ const Orderlist = ({
       });
   }, [apiHost, transactionId, tableselected, salesTypeList]);
 
+  // The ordering menu sells whole products. Keep the original catalog for
+  // barcode lookup and let the flavor picker fetch its real portion SKUs.
+  const orderableProducts = useMemo(() => (productlist || []).filter(
+    (product) => !isCclAddon(product) && getMenuVariantDetails(product).portion !== "half",
+  ), [productlist]);
+
   // A product belongs to a subcategory folder if either field is populated.
   const getItemSubcategory = (item) =>
     String(item?.subcategory_item_category || item?.parent_group || "").trim();
@@ -923,7 +1023,7 @@ const Orderlist = ({
     if (!enableSubcategories) return [];
     const seen = new Set();
     const list = [];
-    (productlist || []).forEach((p) => {
+    orderableProducts.forEach((p) => {
       const sub = getItemSubcategory(p);
       if (sub && !seen.has(sub)) {
         seen.add(sub);
@@ -931,13 +1031,13 @@ const Orderlist = ({
       }
     });
     return list;
-  }, [productlist, enableSubcategories]);
+  }, [orderableProducts, enableSubcategories]);
 
   // Tier 1 + Tier 2 view for the top-level (not drilled-in, not searching) grid.
   const menuDisplayItems = useMemo(() => {
-    if (!enableSubcategories) return productlist || [];
-    return groupProductsForMenuGrid(productlist || []);
-  }, [productlist, enableSubcategories]);
+    if (!enableSubcategories) return orderableProducts;
+    return groupProductsForMenuGrid(orderableProducts);
+  }, [orderableProducts, enableSubcategories]);
 
   // Drop a stale drill-down selection if the setting gets disabled.
   useEffect(() => {
@@ -950,37 +1050,42 @@ const Orderlist = ({
     const search = productsearch.trim().toLowerCase();
 
     if (search) {
-      return (productlist || []).filter((p) => {
+      const searchTerms = search.split(/\s+/u);
+      return groupMenuProductVariants(orderableProducts.filter((p) => {
         const searchable = [
           p.item_name,
           p.item_description,
           p.item_category,
+          p.subcategory_item_category,
           p.product_id,
           p.sku,
           p.bar_code,
           p.unit_of_measure,
           p.inventory_type,
         ]
-          .map((value) => String(value || "").toLowerCase())
-          .join(" ");
+          .map((value) => String(value ?? "").toLowerCase());
 
-        return searchable.includes(search);
-      });
+        // Match every word anywhere in the product details, in any order.
+        // Keep these fields aligned with PosProductSearch.php.
+        return searchTerms.every((term) =>
+          searchable.some((value) => value.includes(term)),
+        );
+      }));
     }
 
     // Drill-down view: only this subcategory's variants (Tier 1 -> Tier 2 click-through).
     if (enableSubcategories && selectedSubcategory) {
-      return (productlist || []).filter(
+      return groupMenuProductVariants(orderableProducts.filter(
         (p) => getItemSubcategory(p) === selectedSubcategory,
-      );
+      ));
     }
 
     // Top-level view: subcategory folder cards + standalone items when enabled;
     // menuDisplayItems is already the flat productlist when the setting is off.
-    return menuDisplayItems;
+    return groupMenuProductVariants(menuDisplayItems);
   }, [
     productsearch,
-    productlist,
+    orderableProducts,
     enableSubcategories,
     selectedSubcategory,
     menuDisplayItems,
@@ -1140,14 +1245,22 @@ const Orderlist = ({
   }, [selectedMergeTables, customMergeTableName]);
 
   const cartSummaryItems = productcart.items;
+  // Display rows may combine halves; all saves, stock and price calculations
+  // continue to use the original productcart rows above.
+  const displayCartItems = useMemo(
+    () => groupOrderCombinationCartRows(cartSummaryItems),
+    [cartSummaryItems],
+  );
   const isCartFromDB = false;
 
-  const loadedCartItems = cartSummaryItems.filter(
-    (item) => item.isLoadedFromDB === true,
+  const loadedCartItems = useMemo(
+    () => cartSummaryItems.filter((item) => item.isLoadedFromDB === true),
+    [cartSummaryItems],
   );
 
-  const additionalCartItems = cartSummaryItems.filter(
-    (item) => item.isLoadedFromDB !== true,
+  const additionalCartItems = useMemo(
+    () => cartSummaryItems.filter((item) => item.isLoadedFromDB !== true),
+    [cartSummaryItems],
   );
 
   const transferProductItems = useMemo(() => {
@@ -1243,8 +1356,12 @@ const Orderlist = ({
   }, [loadedCartItems, additionalCartItems, originalLoadedItems]);
 
   const visibleAdditionalCartItems = useMemo(
-    () => additionalCartItems,
+    () => groupOrderCombinationCartRows(additionalCartItems),
     [additionalCartItems],
+  );
+  const visibleRecentCartItems = useMemo(
+    () => groupOrderCombinationCartRows(recentDisplayItems),
+    [recentDisplayItems],
   );
 
   const mergedCartItemsForSave = useMemo(() => {
@@ -1271,7 +1388,7 @@ const Orderlist = ({
   const groupedSummaryOrders = useMemo(() => {
     const grouped = {};
 
-    cartSummaryItems.forEach((item) => {
+    displayCartItems.forEach((item) => {
       const rawCategory = String(item.item_category || "").trim();
       const category = rawCategory || "Recent Orders";
 
@@ -1290,7 +1407,7 @@ const Orderlist = ({
           String(a.name || "").localeCompare(String(b.name || "")),
         ),
       }));
-  }, [cartSummaryItems]);
+  }, [displayCartItems]);
 
   const hasLoadedItemsChanged = useMemo(() => {
     if (originalLoadedItems.length === 0) return false;
@@ -1317,7 +1434,7 @@ const Orderlist = ({
     additionalCartItems.length === 0 &&
     !hasLoadedItemsChanged;
 
-  const syncCartState = (updater) => {
+  const syncCartState = useCallback((updater) => {
     setproductcart((prev) => ({
       ...prev,
       items: updater(prev.items),
@@ -1327,7 +1444,7 @@ const Orderlist = ({
       ...prev,
       items: updater(prev.items),
     }));
-  };
+  }, []);
 
   const addOrUpdateRecentProxyItem = (proxyItem, delta = 1) => {
     const mergedKey = proxyItem?.mergedKey || buildCartMergeKey(proxyItem);
@@ -1365,10 +1482,11 @@ const Orderlist = ({
     setproductsearch("");
   };
 
-  const restoreLoadedQuantityByCode = (
+  const restoreLoadedQuantityByCode = useCallback((
     items,
     productCode,
     qtyToRestore = 1,
+    instruction = "",
   ) => {
     let remaining = Math.max(0, Number(qtyToRestore || 0));
     if (remaining <= 0) {
@@ -1386,6 +1504,7 @@ const Orderlist = ({
       const entry = nextItems[i];
       if (entry.isLoadedFromDB !== true) continue;
       if (String(entry.code) !== String(productCode)) continue;
+      if (String(entry.itemInstruction || "") !== instruction) continue;
 
       const originalQty = Number(originalByLineId[entry.lineId] || 0);
       const currentQty = Number(entry.quantity || 0);
@@ -1401,10 +1520,16 @@ const Orderlist = ({
       items: nextItems,
       restored: Math.max(0, Number(qtyToRestore || 0) - remaining),
     };
-  };
+  }, [originalLoadedItems]);
 
-  const updateRecentDisplayQuantity = (lineId, delta, proxyItem) => {
+  const updateRecentDisplayQuantity = (lineId, delta, proxyItem, updatePair = true) => {
+    proxyItem = getOrderCombinationSourceItem(proxyItem);
     if (isCartFromDB || !proxyItem) return;
+
+    if (updatePair && orderCombinationKey(proxyItem)) {
+      const partner = recentDisplayItems.find((item) => item.code !== proxyItem.code && isSameOrderCombination(item, proxyItem));
+      if (partner) updateRecentDisplayQuantity(partner.lineId, delta, partner, false);
+    }
 
     const mergedKey = proxyItem?.mergedKey || buildCartMergeKey(proxyItem);
 
@@ -1414,6 +1539,7 @@ const Orderlist = ({
           items,
           proxyItem.code,
           delta,
+          proxyItem.itemInstruction || "",
         );
 
         const remaining = Math.max(
@@ -1452,9 +1578,8 @@ const Orderlist = ({
       return;
     }
 
-    let remaining = Math.abs(delta);
-
     syncCartState((items) => {
+      let remaining = Math.abs(delta);
       const nextItems = items.map((entry) => ({ ...entry }));
 
       for (let i = 0; i < nextItems.length && remaining > 0; i += 1) {
@@ -1484,7 +1609,9 @@ const Orderlist = ({
   };
 
   const updateRecentDisplayQuantityByInput = (lineId, value, proxyItem) => {
+    proxyItem = getOrderCombinationSourceItem(proxyItem);
     if (isCartFromDB || !proxyItem || value === "") return;
+    if (orderCombinationKey(proxyItem)) value = Math.floor(Number(value) || 0);
 
     const nextQuantity = Math.max(
       0,
@@ -1499,6 +1626,7 @@ const Orderlist = ({
   };
 
   const removeRecentDisplayItem = (lineId, proxyItem) => {
+    proxyItem = getOrderCombinationSourceItem(proxyItem);
     if (isCartFromDB || !proxyItem) return;
 
     const sourceLineId = String(proxyItem?.sourceLineId || "").trim();
@@ -1507,6 +1635,7 @@ const Orderlist = ({
     syncCartState((items) =>
       items.filter((entry) => {
         if (entry.isLoadedFromDB !== true) return true;
+        if (isSameOrderCombination(entry, proxyItem)) return false;
 
         if (sourceLineId) {
           return String(entry.lineId || "") !== sourceLineId;
@@ -1540,7 +1669,26 @@ const Orderlist = ({
     setShowDeleteItemModal(false);
   };
 
-  const addToCart = (product) => {
+  const addToCart = useCallback((product, regularCoffee = false) => {
+    if (isCclAddon(product)) {
+      alert("This add-on is not available for ordering.");
+      setproductsearch("");
+      return;
+    }
+    if (!regularCoffee && isCoffeeAddonDrink(product)) {
+      setSelectedCoffeeDrink({ ...product });
+      return;
+    }
+    if (getMenuVariantDetails(product).portion === "half") {
+      // Barcode scans also go through this function. A portion barcode opens
+      // the whole-order picker instead of inserting an unpaired cart line.
+      const [family] = groupMenuProductVariants([product]);
+      if (family?._isVariantGroup) {
+        setSelectedVariantGroup({ ...family });
+        setIsFlavorCombination(isPizzaVariantGroup(family) || isPlatterVariantGroup(family) || isChickenVariantGroup(family));
+      }
+      return;
+    }
     syncCartState((items) => {
       const restoredResult = restoreLoadedQuantityByCode(
         items,
@@ -1554,12 +1702,12 @@ const Orderlist = ({
 
       const nextItems = [...restoredResult.items];
       const existing = nextItems.find(
-        (i) => i.code === product.product_id && i.isLoadedFromDB !== true,
+        (i) => i.code === product.product_id && i.isLoadedFromDB !== true && !i.itemInstruction,
       );
 
       if (existing) {
         return nextItems.map((i) =>
-          i.code === product.product_id && i.isLoadedFromDB !== true
+          i.code === product.product_id && i.isLoadedFromDB !== true && !i.itemInstruction
             ? { ...i, quantity: Number(i.quantity || 0) + 1 }
             : i,
         );
@@ -1583,6 +1731,104 @@ const Orderlist = ({
     });
 
     setproductsearch("");
+  }, [syncCartState, restoreLoadedQuantityByCode]);
+
+  const addCoffeeSelection = (requestedAddon) => {
+    const current = activeCoffeeOptionsRef.current;
+    if (!current || !selectedCoffeeDrink || current.drink !== selectedCoffeeDrink ||
+      current.options.isLoading || current.options.error) return;
+    const drink = current.options.product;
+    if (!drink || String(drink.product_id) !== String(selectedCoffeeDrink.product_id) ||
+      !isCoffeeAddonDrink(drink) || !hasMenuPrice(drink)) return;
+
+    if (requestedAddon == null) {
+      // Regular keeps the original drink SKU and adds no extra charge or row.
+      addToCart(drink, true);
+    } else {
+      const addon = current.options.addons.find((item) =>
+        String(item.product_id) === String(requestedAddon.product_id));
+      if (!addon || !isCclAddon(addon) || !hasMenuPrice(addon) ||
+        String(addon.product_id) === String(drink.product_id)) return;
+      const itemInstruction = getCoffeeAddonInstruction(drink, addon);
+      if (!itemInstruction) return;
+      // Keep each real SKU/price for saving and inventory; group only its display.
+      const lines = [drink, addon].map((product) => ({
+        lineId: makeLineId("new"), code: product.product_id, name: product.item_name,
+        price: Number(product.selling_price), unit_cost: Number(product.unit_cost) || 0,
+        quantity: 1, isDiscountable: product.isDiscountable, vatable: product.vatable,
+        item_category: product.item_category || "", isLoadedFromDB: false, itemInstruction,
+      }));
+      syncCartState((items) => {
+        const next = items.map((item) => ({ ...item }));
+        for (const line of lines) {
+          const existing = next.find((item) => !item.isLoadedFromDB &&
+            buildCartMergeKey(item) === buildCartMergeKey(line));
+          if (existing) existing.quantity = Number(existing.quantity || 0) + 1;
+          else next.push(line);
+        }
+        return next;
+      });
+      setproductsearch("");
+    }
+    activeCoffeeOptionsRef.current = null;
+    setSelectedCoffeeDrink(null);
+  };
+
+  const addFlavorCombination = (first, second) => {
+    const current = activeCombinationRef.current;
+    // An old picker callback must not add after closing/reopening. Resolve IDs
+    // against current prices even if the catalog refreshed after selection.
+    if (!current?.enabled || current.group !== selectedVariantGroup
+      || current.variants.isLoading || current.variants.error
+      || current.halves.isLoading || current.halves.error) return;
+    const group = { ...current.group, variants: current.variants.variants };
+    let combination;
+    let itemInstruction;
+    if (isChickenVariantGroup(group)) {
+      const size = getChickenCombinationSizes(group).find((entry) =>
+        entry.options.some((option) => option.half.product_id === first?.product_id));
+      const chosen = size?.options.find((option) => option.half.product_id === first?.product_id);
+      if (!chosen) return;
+      const other = getChickenCombinationChoices(group, size.servingSize, current.halves.products, chosen.half)
+        .find((product) => product.product_id === second?.product_id);
+      combination = createChickenCombination(chosen.half, other);
+      if (combination) itemInstruction = getChickenCombinationInstruction(...combination.products);
+    } else if (isPlatterVariantGroup(group)) {
+      const pair = getPlatterCombinationPair(group);
+      if (!pair || pair.half.product_id !== first?.product_id) return;
+      const other = getPlatterCombinationChoices(group, current.halves.products)
+        .find((product) => product.product_id === second?.product_id);
+      combination = createPlatterCombination(pair.half, other);
+      if (combination) itemInstruction = getPlatterCombinationInstruction(...combination.products);
+    } else {
+      const size = getPizzaCombinationSizes(group).find((entry) => entry.half.product_id === first?.product_id);
+      if (!size) return;
+      const other = getPizzaCombinationChoices(group, size.sizeValue, current.halves.products)
+        .find((product) => product.product_id === second?.product_id);
+      combination = createPizzaCombination(size.half, other);
+      if (combination) itemInstruction = getPizzaCombinationInstruction(...combination.products);
+    }
+    if (!combination) return;
+    // Insert both real HALF SKUs atomically, retaining each inventory record.
+    const lines = combination.products.map((product) => ({
+      lineId: makeLineId("new"), code: product.product_id, name: product.item_name,
+      price: Number(product.selling_price), unit_cost: Number(product.unit_cost) || 0,
+      quantity: 1, isDiscountable: product.isDiscountable, vatable: product.vatable,
+      item_category: product.item_category || "", isLoadedFromDB: false, itemInstruction,
+    }));
+    syncCartState((items) => {
+      const next = items.map((item) => ({ ...item }));
+      for (const line of lines) {
+        const existing = next.find((item) => !item.isLoadedFromDB && buildCartMergeKey(item) === buildCartMergeKey(line));
+        if (existing) existing.quantity = Number(existing.quantity || 0) + 1;
+        else next.push(line);
+      }
+      return next;
+    });
+    activeCombinationRef.current = null;
+    setproductsearch("");
+    setSelectedVariantGroup(null);
+    setIsFlavorCombination(false);
   };
 
   const handleScanSubmit = async (scannedValue) => {
@@ -1654,9 +1900,11 @@ const Orderlist = ({
 
   const updateQuantityByInput = (lineId, value) => {
     if (isCartFromDB) return;
+    const target = productcart.items.find((item) => item.lineId === lineId);
+    if (orderCombinationKey(target) && value !== "") value = Math.floor(Number(value) || 0);
 
     const canEdit = (i) =>
-      i.lineId === lineId &&
+      (i.lineId === lineId || isSameOrderCombination(i, target)) &&
       (layoutMode === "Kiosk" || i.isLoadedFromDB !== true);
 
     setproductcart((prev) => ({
@@ -1698,9 +1946,10 @@ const Orderlist = ({
 
   const updateQuantity = (lineId, delta) => {
     if (isCartFromDB) return;
+    const target = productcart.items.find((item) => item.lineId === lineId);
 
     const canEdit = (i) =>
-      i.lineId === lineId &&
+      (i.lineId === lineId || isSameOrderCombination(i, target)) &&
       (layoutMode === "Kiosk" || i.isLoadedFromDB !== true);
 
     setproductcart((prev) => ({
@@ -1734,15 +1983,16 @@ const Orderlist = ({
 
   const removeItem = (lineId) => {
     if (isCartFromDB) return;
+    const target = productcart.items.find((item) => item.lineId === lineId);
 
     setproductcart((prev) => ({
       ...prev,
-      items: prev.items.filter((i) => i.lineId !== lineId),
+      items: prev.items.filter((i) => i.lineId !== lineId && !isSameOrderCombination(i, target)),
     }));
 
     setcartforqr((prev) => ({
       ...prev,
-      items: prev.items.filter((i) => i.lineId !== lineId),
+      items: prev.items.filter((i) => i.lineId !== lineId && !isSameOrderCombination(i, target)),
     }));
   };
 
@@ -1762,20 +2012,26 @@ const Orderlist = ({
   };
 
   const openItemInstructionModal = (item) => {
+    item = getOrderCombinationSourceItem(item);
     setSelectedInstructionItem(item);
-    setItemInstructionText(item?.itemInstruction || "");
+    setItemInstructionText(orderCombinationKey(item)
+      ? item.itemInstruction.split("\n").slice(1).join("\n")
+      : item?.itemInstruction || "");
     setShowItemInstructionModal(true);
   };
 
   const saveItemInstruction = () => {
     if (!selectedInstructionItem) return;
+    const itemInstruction = orderCombinationKey(selectedInstructionItem)
+      ? [selectedInstructionItem.itemInstruction.split("\n")[0], itemInstructionText.trim()].filter(Boolean).join("\n")
+      : itemInstructionText;
 
     setproductcart((prev) => ({
       ...prev,
       items: prev.items.map((item) =>
-        item.lineId === selectedInstructionItem.lineId &&
+        (item.lineId === selectedInstructionItem.lineId || isSameOrderCombination(item, selectedInstructionItem)) &&
         item.isLoadedFromDB !== true
-          ? { ...item, itemInstruction: itemInstructionText }
+          ? { ...item, itemInstruction }
           : item,
       ),
     }));
@@ -1783,9 +2039,9 @@ const Orderlist = ({
     setcartforqr((prev) => ({
       ...prev,
       items: prev.items.map((item) =>
-        item.lineId === selectedInstructionItem.lineId &&
+        (item.lineId === selectedInstructionItem.lineId || isSameOrderCombination(item, selectedInstructionItem)) &&
         item.isLoadedFromDB !== true
-          ? { ...item, itemInstruction: itemInstructionText }
+          ? { ...item, itemInstruction }
           : item,
       ),
     }));
@@ -2041,7 +2297,7 @@ const Orderlist = ({
       const result = await response.json();
 
       if (result.status !== "success") {
-        alert("Failed to process order");
+        alert(result.message || "Failed to process order");
         return { ok: false };
       }
 
@@ -2201,7 +2457,7 @@ const Orderlist = ({
         cartItems.forEach((incoming) => {
           const existingIndex = next.findIndex(
             (item) =>
-              String(item.code) === String(incoming.code) &&
+              buildCartMergeKey(item) === buildCartMergeKey(incoming) &&
               item.isLoadedFromDB !== true,
           );
           if (existingIndex >= 0) {
@@ -2375,7 +2631,7 @@ const Orderlist = ({
     setShowDesktopCartActions(false);
   };
 
-  const totalItems = cartSummaryItems.reduce(
+  const totalItems = displayCartItems.reduce(
     (sum, i) => sum + Number(i.quantity || 0),
     0,
   );
@@ -2393,13 +2649,13 @@ const Orderlist = ({
     const handleKeyDown = (e) => {
       if (e.key !== "F12") return;
       e.preventDefault();
-      if (totalItems === 0 || summaryCart || isKioskCharging) return;
+      if (totalItems === 0 || summaryCart || isKioskCharging || selectedVariantGroup || selectedCoffeeDrink) return;
       handleKioskCharge();
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isRetailPosMode, totalItems, summaryCart, isKioskCharging]);
+  }, [isRetailPosMode, totalItems, summaryCart, isKioskCharging, selectedVariantGroup, selectedCoffeeDrink]);
 
   // Retail POS: land straight in the scan box on open so the register is
   // always ready for the next barcode without an extra click.
@@ -2418,7 +2674,7 @@ const Orderlist = ({
       phase: "transaction",
       isClear,
       tableName: kioskTableName,
-      items: cartSummaryItems.map((item) => ({
+      items: displayCartItems.map((item) => ({
         name: item.name,
         quantity: Number(item.quantity || 0),
         price: Number(item.price || 0),
@@ -2426,7 +2682,7 @@ const Orderlist = ({
       totalItems,
       totalPrice,
     });
-  }, [layoutMode, cartSummaryItems, totalItems, totalPrice, kioskTableName]);
+  }, [layoutMode, displayCartItems, totalItems, totalPrice, kioskTableName]);
 
   const additionalTotalItems = additionalCartItems.reduce(
     (sum, i) => sum + Number(i.quantity || 0),
@@ -2656,10 +2912,13 @@ const Orderlist = ({
       ? Math.min(safeMax, Math.max(0, numericValue))
       : 0;
 
-    setTransferItemSelections((prev) => ({
-      ...prev,
-      [item.transferKey]: safeValue,
-    }));
+    setTransferItemSelections((prev) => {
+      const next = { ...prev, [item.transferKey]: safeValue };
+      for (const partner of transferProductItems) {
+        if (isSameOrderCombination(item, partner)) next[partner.transferKey] = Math.min(safeValue, partner.quantity);
+      }
+      return next;
+    });
   };
 
   const buildTransferMergeKey = (item) => {
@@ -3004,6 +3263,97 @@ const Orderlist = ({
     }
   };
 
+  // Cart changes do not change menu cards. Reuse their element tree so a tap
+  // updates the cart without reconciling every product (or starting JS gestures).
+  const menuGridNode = useMemo(() => (
+    <div role="group" aria-label="Available menu" className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+      {filteredProducts &&
+        filteredProducts.map((p, i) => (
+          <button
+            key={
+              p._isFolder
+                ? `folder-${p.subcategory_item_category}`
+                : p._isVariantGroup
+                  ? `variant-${p.familyKey}`
+                  : p.product_id || `${p.sku || p.item_name}-${i}`
+            }
+            onClick={() =>
+              p._isFolder
+                ? setSelectedSubcategory(p.subcategory_item_category)
+                : p._isVariantGroup
+                  ? (setIsFlavorCombination(false), setSelectedVariantGroup({ ...p }))
+                  : addToCart(p)
+            }
+            className="group relative flex w-full flex-col overflow-hidden rounded-xl border text-left active:opacity-80 hover:border-[var(--app-accent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--app-accent)]"
+            style={{
+              borderColor: "var(--app-border)",
+              backgroundColor: "var(--app-surface)",
+              color: "var(--app-text)",
+            }}
+          >
+            <div className="flex min-h-[84px] w-full items-center gap-4 p-4">
+              {enableItemPictures && !p._isFolder && !p._isVariantGroup && (
+                <img
+                  src={`${apiHost}/item_pictures/${p.item_name}.jpg`}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  className="h-14 w-14 shrink-0 rounded-lg object-cover"
+                  onError={(e) => {
+                    const fallbackSrc = `${apiHost}/item_pictures/default.jpg`;
+                    if (e.currentTarget.getAttribute("src") !== fallbackSrc) {
+                      e.currentTarget.src = fallbackSrc;
+                    }
+                  }}
+                />
+              )}
+              <div className="min-w-0 flex-1">
+                <h4 className="break-words text-sm font-[Poppins-SemiBold] leading-snug">
+                  {p.item_name}
+                </h4>
+                {p._isFolder || p._isVariantGroup ? (
+                  <p className="mt-1 text-xs font-[Poppins-Regular]" style={{ color: "var(--app-muted-text)" }}>
+                    {p._isVariantGroup
+                      ? p.sizeKind === "oz" || p.sizeKind === "scoop" || p.sizeKind === "apparel" ? "Choose size"
+                        : p.sizeKind === "serving"
+                        ? isChickenVariantGroup(p) || p.hasFlavorOptions ? "Choose size & flavor" : "Choose size"
+                        : isPlatterVariantGroup(p) ? "Choose flavors" : "Choose size & flavors"
+                      : `${p.variantCount} option${p.variantCount === 1 ? "" : "s"}`}
+                  </p>
+                ) : (
+                  <span
+                    className="mt-1 inline-block text-[10px] font-[Poppins-Medium]"
+                    style={{ color: String(p.isDiscountable || "").trim().toLowerCase() !== "no" ? "#16a34a" : "var(--app-muted-text)" }}
+                  >
+                    {String(p.isDiscountable || "").trim().toLowerCase() !== "no" ? "Discountable" : "Non-Discountable"}
+                  </span>
+                )}
+              </div>
+              <div className="flex shrink-0 items-center gap-2 text-right" style={{ color: "var(--app-accent)" }}>
+                {p._isFolder || p._isVariantGroup ? (
+                  <>
+                    <span className="text-xs font-[Poppins-Medium]">
+                      {p._isVariantGroup ? "View options" : "View menu"}
+                    </span>
+                    <FaChevronRight size={12} aria-hidden="true" />
+                  </>
+                ) : (
+                  <div>
+                    <span className="block text-lg font-[Poppins-SemiBold]">
+                      ₱{Number(p.selling_price || 0).toLocaleString()}
+                    </span>
+                    <span className="block text-xs font-[Poppins-Medium]">
+                      {isCoffeeAddonDrink(p) ? "Choose Regular or a flavor" : "+ Add"}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </button>
+        ))}
+    </div>
+  ), [filteredProducts, enableItemPictures, apiHost, addToCart]);
+
   // Retail POS: the scanned cart list renders in the roomy center column
   // (below the search bar) instead of the narrow right sidebar, so cashiers
   // have more space to review/adjust items while scanning.
@@ -3037,7 +3387,7 @@ const Orderlist = ({
             Recent Orders
           </h4>
           <CartList
-            items={recentDisplayItems}
+            items={visibleRecentCartItems}
             updateQuantity={updateRecentDisplayQuantity}
             updateQuantityByInput={updateRecentDisplayQuantityByInput}
             removeItem={requestRemoveItem}
@@ -3067,32 +3417,16 @@ const Orderlist = ({
 
   return (
     <>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className={`fixed inset-0 z-[100] flex items-center justify-center ${
-          isRetailPosMode
-            ? ""
-            : `p-0 backdrop-blur-xl sm:p-4 ${
-                isDark ? "bg-slate-950/80" : "bg-slate-200/70"
-              }`
-        }`}
+      <div
+        className="fixed inset-0 z-[100] flex ui-fade-in"
       >
         <div
-          className={`flex h-full w-full flex-col overflow-hidden transition-colors ${
-            isRetailPosMode
-              ? isDark
-                ? "bg-slate-900"
-                : "bg-white"
-              : `max-w-7xl shadow-2xl sm:rounded-3xl ${
-                  isDark
-                    ? "border border-white/10 bg-slate-900/50"
-                    : "border border-slate-200 bg-white"
-                }`
+          className={`flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden transition-colors ${
+            isDark ? "bg-slate-900" : "bg-white"
           }`}
         >
           <div
-            className={`flex items-center justify-between px-6 py-4 transition-colors ${
+            className={`flex shrink-0 items-center justify-between px-6 py-4 transition-colors ${
               isDark
                 ? "border-b border-white/5 bg-white/5"
                 : "border-b border-slate-200 bg-slate-50"
@@ -3268,7 +3602,8 @@ const Orderlist = ({
           <div className="relative flex flex-1 min-h-0">
             {!isRetailPosMode && (
               <aside
-                className={`no-scrollbar absolute z-20 h-full min-h-0 w-64 overflow-auto transition-transform duration-300 md:relative ${
+                aria-label="Menu categories"
+                className={`absolute z-20 flex h-full min-h-0 w-64 shrink-0 flex-col overflow-hidden transition-transform duration-300 md:relative ${
                   showMobileCats
                     ? "translate-x-0"
                     : "-translate-x-full md:translate-x-0"
@@ -3279,7 +3614,7 @@ const Orderlist = ({
                 }`}
               >
                 {layoutMode !== "Kiosk" && (
-                  <div className="px-4 pt-4 mb-2">
+                  <div className="shrink-0 px-4 pt-4 mb-2">
                     <label
                       className={`mb-2 block px-1 text-[10px] font-bold uppercase tracking-[0.2em] ${
                         isDark ? "text-slate-500" : "text-slate-400"
@@ -3345,16 +3680,16 @@ const Orderlist = ({
                 )}
 
                 {!isRetailPosMode && (
-                  <div className="flex flex-col h-full p-4">
+                  <div className="flex min-h-0 flex-1 flex-col p-4">
                     <h3
-                      className={`mb-4 px-2 text-[10px] font-bold uppercase tracking-widest ${
+                      className={`mb-4 shrink-0 px-2 text-[10px] font-bold uppercase tracking-widest ${
                         isDark ? "text-slate-500" : "text-slate-500"
                       }`}
                     >
                       Menu Sections
                     </h3>
 
-                    <div className="flex-1 space-y-2 overflow-y-auto no-scrollbar">
+                    <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain no-scrollbar">
                       {categorylist.map((cat, idx) => (
                         <button
                           key={idx}
@@ -3362,7 +3697,7 @@ const Orderlist = ({
                             setselectcategory(cat.item_category);
                             setShowMobileCats(false);
                           }}
-                          className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-semibold transition-all `}
+                          className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-semibold"
                           style={{
                             backgroundColor:
                               selectcategory === cat.item_category
@@ -3372,10 +3707,6 @@ const Orderlist = ({
                               selectcategory === cat.item_category
                                 ? "#ffffff"
                                 : "var(--app-text)",
-                            boxShadow:
-                              selectcategory === cat.item_category
-                                ? "0 12px 28px var(--app-accent-glow)"
-                                : "none",
                           }}
                         >
                           <span>{getCategoryIcon(cat.item_category)}</span>
@@ -3484,6 +3815,8 @@ const Orderlist = ({
                         showDiscountModal ||
                         selectedInstructionItem ||
                         summaryCart ||
+                        selectedVariantGroup ||
+                        selectedCoffeeDrink ||
                         showTransferModal ||
                         showTransferConfirmModal
                       ) {
@@ -3592,214 +3925,16 @@ const Orderlist = ({
                 </div>
               ) : (
                 <div className="flex-1 min-h-0 overflow-hidden">
-                  <div className="h-full p-6 pt-2 overflow-y-auto no-scrollbar">
-                    <div className="grid grid-cols-2 gap-6 p-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4">
-                      {filteredProducts &&
-                        filteredProducts.map((p, i) => (
-                          <motion.button
-                            key={
-                              p._isFolder
-                                ? `folder-${p.subcategory_item_category}`
-                                : p.product_id || `${p.sku || p.item_name}-${i}`
-                            }
-                            whileHover={{ y: -8, scale: 1.02, rotate: 0.5 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={() =>
-                              p._isFolder
-                                ? setSelectedSubcategory(
-                                    p.subcategory_item_category,
-                                  )
-                                : addToCart(p)
-                            }
-                            className="group relative flex w-full flex-col overflow-hidden rounded-[2.5rem] border transition-all duration-500 shadow-lg hover:shadow-2xl"
-                            style={{
-                              borderColor: isDark
-                                ? "rgba(255,255,255,0.1)"
-                                : "var(--app-border)",
-                              backgroundColor: isDark
-                                ? "rgba(30, 41, 59, 0.5)"
-                                : "var(--app-surface)",
-                              backdropFilter: "blur(12px)",
-                              minWidth: "140px",
-                            }}
-                          >
-                            {/* THEME-BASED GLOW BORDER */}
-                            <div className="absolute inset-0 transition-opacity duration-500 opacity-0 pointer-events-none group-hover:opacity-100">
-                              <div
-                                className="absolute inset-0 animate-pulse opacity-10"
-                                style={{ background: "var(--app-accent)" }}
-                              />
-                            </div>
-
-                            {p._isFolder ? (
-                              /* TIER 1: SUBCATEGORY FOLDER CARD */
-                              <div className="relative z-10 flex flex-col items-center justify-center flex-1 gap-3 p-6 text-center min-h-[168px]">
-                                <div
-                                  className="flex items-center justify-center w-14 h-14 rounded-2xl"
-                                  style={{
-                                    backgroundColor: "var(--app-accent)",
-                                    opacity: 0.85,
-                                  }}
-                                >
-                                  <FaLayerGroup size={22} color="#fff" />
-                                </div>
-
-                                <h4
-                                  className="line-clamp-2 break-words text-[13px] font-black leading-tight uppercase tracking-tight"
-                                  style={{ color: "var(--app-text)" }}
-                                >
-                                  {p.item_name}
-                                </h4>
-
-                                <p
-                                  className="text-[9px] font-bold uppercase tracking-widest"
-                                  style={{ color: "var(--app-muted-text)" }}
-                                >
-                                  {p.variantCount} option
-                                  {p.variantCount === 1 ? "" : "s"}
-                                </p>
-
-                                <div
-                                  className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black"
-                                  style={{
-                                    backgroundColor: "var(--app-accent)",
-                                    color: "#fff",
-                                  }}
-                                >
-                                  From ₱
-                                  {Number(p.minPrice || 0).toLocaleString()}
-                                  <FaChevronRight size={8} />
-                                </div>
-                              </div>
-                            ) : (
-                              <>
-                                {/* SAFE +1 POP-UP */}
-                                <motion.div
-                                  className="absolute inset-0 flex items-center justify-center pointer-events-none z-[100] opacity-0"
-                                  initial={false}
-                                  whileTap={{
-                                    opacity: [0, 1, 0],
-                                    y: [0, -100],
-                                    scale: [0.5, 1.5, 1],
-                                    transition: {
-                                      duration: 0.6,
-                                      ease: "easeOut",
-                                    },
-                                  }}
-                                >
-                                  <span
-                                    className="text-3xl italic font-black drop-shadow-lg"
-                                    style={{ color: "var(--app-accent)" }}
-                                  >
-                                    +1
-                                  </span>
-                                </motion.div>
-
-                                {/* 1. SQUARE IMAGE SECTION */}
-                                {enableItemPictures && (
-                                  <div className="relative flex items-center justify-center w-full overflow-hidden aspect-square shrink-0 bg-slate-800/10">
-                                    <img
-                                      src={`${apiHost}/item_pictures/${p.item_name}.jpg`}
-                                      alt={p.item_name}
-                                      className="object-cover w-full h-full transition-transform duration-700 group-hover:scale-125"
-                                      onError={(e) => {
-                                        /* DITO ANG SOLUSYON:
-                        Magdagdag ng timestamp (?t=) para ma-bypass ang cache sa production/app mode.
-                      */
-                                        e.target.src = `${apiHost}/item_pictures/default.jpg?t=${Date.now()}`;
-                                        e.target.onerror = null;
-                                      }}
-                                    />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60" />
-
-                                    <div className="absolute top-3 left-3 px-2 py-1 rounded-lg bg-black/40 backdrop-blur-md border border-white/10 text-[8px] font-black text-white uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all">
-                                      {p.item_category || "Hot Item"}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* 2. PREMIUM INFO SECTION */}
-                                <div className="relative z-10 flex flex-col justify-between flex-1 p-4 pb-6 text-left">
-                                  <div className="flex-1 min-h-[32px]">
-                                    <span
-                                      className="mb-1 inline-flex items-center rounded-full px-2 py-0.5 text-[7px] font-black uppercase tracking-widest"
-                                      style={
-                                        String(p.isDiscountable || "")
-                                          .trim()
-                                          .toLowerCase() !== "no"
-                                          ? {
-                                              backgroundColor:
-                                                "rgba(34,197,94,0.15)",
-                                              color: "#22c55e",
-                                            }
-                                          : {
-                                              backgroundColor:
-                                                "rgba(148,163,184,0.15)",
-                                              color:
-                                                "var(--app-muted-text)",
-                                            }
-                                      }
-                                    >
-                                      {String(p.isDiscountable || "")
-                                        .trim()
-                                        .toLowerCase() !== "no"
-                                        ? "Discountable"
-                                        : "Non-Discountable"}
-                                    </span>
-
-                                    <h4
-                                      className="line-clamp-2 break-words text-[12px] font-black leading-tight mb-1 uppercase tracking-tight transition-colors duration-300"
-                                      style={{ color: "var(--app-text)" }}
-                                    >
-                                      {p.item_name}
-                                    </h4>
-                                  </div>
-
-                                  <div className="flex items-end justify-between mt-2 shrink-0">
-                                    <div
-                                      className="flex items-center justify-center w-6 h-6 transition-all rounded-full opacity-0 group-hover:opacity-100"
-                                      style={{
-                                        backgroundColor: "var(--app-accent)",
-                                        opacity: 0.1,
-                                      }}
-                                    >
-                                      <FaPlus
-                                        size={8}
-                                        style={{ color: "var(--app-accent)" }}
-                                      />
-                                    </div>
-
-                                    <div className="text-right">
-                                      <p
-                                        className="mb-0 text-[7px] font-black uppercase tracking-[0.2em]"
-                                        style={{
-                                          color: "var(--app-muted-text)",
-                                        }}
-                                      >
-                                        Price
-                                      </p>
-                                      <p
-                                        className="text-[18px] font-black leading-none"
-                                        style={{ color: "var(--app-accent)" }}
-                                      >
-                                        ₱
-                                        {Number(
-                                          p.selling_price || 0,
-                                        ).toLocaleString()}
-                                      </p>
-                                    </div>
-                                  </div>
-                                </div>
-                              </>
-                            )}
-
-                            <div
-                              className="absolute bottom-0 left-0 w-0 h-1 transition-all duration-500 group-hover:w-full"
-                              style={{ backgroundColor: "var(--app-accent)" }}
-                            />
-                          </motion.button>
-                        ))}
+                  <div className="h-full overflow-y-auto overscroll-contain px-4 pb-4 no-scrollbar">
+                    <div className="flex items-center justify-between gap-3 px-1 pb-3">
+                      <h3 className="text-sm font-[Poppins-SemiBold]" style={{ color: "var(--app-text)" }}>
+                        Available menu
+                      </h3>
+                      <span className="text-xs font-[Poppins-Regular]" style={{ color: "var(--app-muted-text)" }}>
+                        {filteredProducts?.length || 0} item{filteredProducts?.length === 1 ? "" : "s"}
+                      </span>
                     </div>
+                    {menuGridNode}
                   </div>
                 </div>
               )}
@@ -3809,7 +3944,7 @@ const Orderlist = ({
               <KioskRightPanel
                 customerName={kioskTableName}
                 transactionId={transactionId}
-                cartItems={cartSummaryItems}
+                cartItems={displayCartItems}
                 totalItems={totalItems}
                 totalPrice={totalPrice}
                 isDark={isDark}
@@ -4033,20 +4168,14 @@ const Orderlist = ({
                   </div>
                 )}
 
-                <AnimatePresence>
+                <>
                   {showDeleteItemModal && (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="fixed inset-0 z-[370] flex items-center justify-center p-4"
+                    <div
+                      className="fixed inset-0 z-[370] flex items-center justify-center p-4 ui-fade-in"
                       style={{ backgroundColor: "rgba(0,0,0,0.55)" }}
                     >
-                      <motion.div
-                        initial={{ scale: 0.95, y: 10 }}
-                        animate={{ scale: 1, y: 0 }}
-                        exit={{ scale: 0.95, y: 10 }}
-                        className="w-full max-w-sm p-8 text-center transition-colors border shadow-2xl rounded-3xl"
+                      <div
+                        className="w-full max-w-sm p-8 text-center transition-colors border shadow-2xl rounded-3xl ui-scale-in"
                         style={{
                           borderColor: "var(--app-border)",
                           backgroundColor: "var(--app-surface)",
@@ -4085,19 +4214,15 @@ const Orderlist = ({
                             No
                           </button>
                         </div>
-                      </motion.div>
-                    </motion.div>
+                      </div>
+                    </div>
                   )}
-                </AnimatePresence>
+                </>
 
-                <AnimatePresence>
+                <>
                   {showDesktopCartActions && (
-                    <motion.div
-                      initial={{ opacity: 0, x: 30 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 30 }}
-                      transition={{ duration: 0.2 }}
-                      className="absolute inset-y-0 right-0 z-20 flex w-[88%] max-w-[320px] flex-col border-l p-5 shadow-2xl backdrop-blur-xl transition-colors"
+                    <div
+                      className="absolute inset-y-0 right-0 z-20 flex w-[88%] max-w-[320px] flex-col border-l p-5 shadow-2xl backdrop-blur-xl transition-colors ui-slide-in-right"
                       style={{
                         borderColor: "var(--app-border)",
                         backgroundColor: "var(--app-surface)",
@@ -4217,24 +4342,18 @@ const Orderlist = ({
                           <FaTrash size={16} /> Clear Cart
                         </button>
                       </div>
-                    </motion.div>
+                    </div>
                   )}
-                </AnimatePresence>
+                </>
 
-                <AnimatePresence>
+                <>
                   {showTransferModal && (
-                    <motion.div
-                      className="fixed inset-0 z-[500] flex items-center justify-center px-3 py-3 backdrop-blur-sm sm:px-4"
+                    <div
+                      className="fixed inset-0 z-[500] flex items-center justify-center px-3 py-3 backdrop-blur-sm sm:px-4 ui-fade-in"
                       style={{ backgroundColor: "rgba(0,0,0,0.55)" }}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
                     >
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.97, y: 8 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.97, y: 8 }}
-                        className="w-full max-w-[820px] rounded-[1.5rem] border p-4 shadow-2xl sm:p-5"
+                      <div
+                        className="w-full max-w-[820px] rounded-[1.5rem] border p-4 shadow-2xl sm:p-5 ui-scale-in"
                         style={{
                           backgroundColor: "var(--app-surface)",
                           borderColor: "var(--app-border)",
@@ -4789,7 +4908,7 @@ const Orderlist = ({
                                           <div className="flex items-start justify-between gap-3">
                                             <div className="flex-1 min-w-0">
                                               <p className="text-sm font-extrabold">
-                                                {item.name}
+                                                {getOrderItemDisplayName(item)}
                                               </p>
                                               <div className="mt-1 flex flex-wrap gap-2 text-[11px]">
                                                 <span
@@ -4825,7 +4944,7 @@ const Orderlist = ({
                                                         "var(--app-muted-text)",
                                                     }}
                                                   >
-                                                    {item.item_category}
+                                                    {getOrderItemDisplayName(item.item_category)}
                                                   </span>
                                                 ) : null}
                                               </div>
@@ -5222,12 +5341,12 @@ const Orderlist = ({
                             Confirm Transfer
                           </button>
                         </div>
-                      </motion.div>
-                    </motion.div>
+                      </div>
+                    </div>
                   )}
-                </AnimatePresence>
+                </>
 
-                <AnimatePresence>
+                <>
                   {showTransferConfirmModal && (
                     <ModalYesNoReusable
                       header={
@@ -5248,7 +5367,7 @@ const Orderlist = ({
                       triggerYesNoEvent={handleConfirmTransferTable}
                     />
                   )}
-                </AnimatePresence>
+                </>
               </aside>
             )}
           </div>
@@ -5272,18 +5391,14 @@ const Orderlist = ({
             </button>
           </div>
         </div>
-      </motion.div>
+      </div>
 
-      <AnimatePresence>
+      <>
         {showCartMobile && (
-          <motion.div
-            initial={{ y: "100%" }}
-            animate={{ y: 0 }}
-            exit={{ y: "100%" }}
-            transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className={`fixed inset-0 z-[150] flex flex-col lg:hidden transition-colors ${
+          <div
+            className={(`fixed inset-0 z-[150] flex flex-col lg:hidden transition-colors ${
               isDark ? "bg-slate-950" : "bg-slate-50"
-            }`}
+            }`) + " ui-slide-in-bottom"}
           >
             <div
               className={`p-6 flex justify-between items-center transition-colors ${
@@ -5323,7 +5438,7 @@ const Orderlist = ({
                     Loaded Items
                   </h4>
                   <CartList
-                    items={recentDisplayItems}
+                    items={visibleRecentCartItems}
                     updateQuantity={updateRecentDisplayQuantity}
                     updateQuantityByInput={updateRecentDisplayQuantityByInput}
                     removeItem={requestRemoveItem}
@@ -5448,27 +5563,21 @@ const Orderlist = ({
                 <FaTrash size={18} /> Clear Cart
               </button>
             </div>
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
+      </>
 
-      <AnimatePresence>
+      <>
         {summaryCart && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[380] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          <div
+            className="fixed inset-0 z-[380] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm ui-fade-in"
           >
-            <motion.div
-              initial={{ scale: 0.95, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 20 }}
-              className={`w-full max-w-sm overflow-hidden rounded-[2rem] shadow-2xl transition-colors ${
+            <div
+              className={(`w-full max-w-sm overflow-hidden rounded-[2rem] shadow-2xl transition-colors ${
                 isDark
                   ? "bg-slate-900 border border-white/10"
                   : "bg-white border border-slate-200"
-              }`}
+              }`) + " ui-scale-in"}
             >
               {/* ORDER SLIP HEADER */}
               <div className="p-8 text-center border-b-2 border-dashed border-slate-300/50">
@@ -5490,7 +5599,7 @@ const Orderlist = ({
                   {groupedSummaryOrders.map((group) => (
                     <div key={group.category}>
                       <p className="text-[10px] font-black text-blue-500 mb-4 uppercase tracking-[0.3em] text-center italic">
-                        -- {group.category} --
+                        -- {getOrderItemDisplayName(group.category)} --
                       </p>
 
                       {group.items.map((item, idx) => (
@@ -5501,7 +5610,7 @@ const Orderlist = ({
                               <span
                                 className={`text-base font-black leading-tight uppercase flex-1 ${isDark ? "text-white" : "text-slate-800"}`}
                               >
-                                {item.quantity}x {item.name}
+                                {item.quantity}x {getOrderItemDisplayName(item)}
                               </span>
                               <span
                                 className={`text-base font-black shrink-0 ${isDark ? "text-blue-500" : "text-blue-600"}`}
@@ -5511,10 +5620,13 @@ const Orderlist = ({
                             </div>
 
                             {/* SPECIAL INSTRUCTIONS (Kung meron) */}
-                            {item.itemInstruction && (
+                            {isGroupedOrderItem(item) && (
+                              <span className="text-xs font-[Poppins-Medium] text-colorBrandSecondary">{item.combinationLabel}</span>
+                            )}
+                            {(isGroupedOrderItem(item) ? item.displayInstruction : item.itemInstruction) && (
                               <div className="px-3 py-1 mt-1 border-l-2 rounded-r-lg bg-rose-500/5 border-rose-500/50">
                                 <p className="text-[10px] text-rose-500 font-bold italic leading-tight uppercase">
-                                  ** {item.itemInstruction}
+                                  ** {isGroupedOrderItem(item) ? item.displayInstruction : item.itemInstruction}
                                 </p>
                               </div>
                             )}
@@ -5571,30 +5683,24 @@ const Orderlist = ({
                   Go Back
                 </button>
               </div>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
+      </>
 
-      <AnimatePresence>
+      <>
         {showSaveSuccessModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className={`fixed inset-0 z-[340] flex items-center justify-center p-4 ${
+          <div
+            className={(`fixed inset-0 z-[340] flex items-center justify-center p-4 ${
               isDark ? "bg-black/70" : "bg-slate-900/40"
-            }`}
+            }`) + " ui-fade-in"}
           >
-            <motion.div
-              initial={{ scale: 0.95, y: 10 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 10 }}
-              className={`rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl transition-colors ${
+            <div
+              className={(`rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl transition-colors ${
                 isDark
                   ? "bg-slate-900 border border-white/10"
                   : "bg-white border border-slate-200"
-              }`}
+              }`) + " ui-scale-in"}
             >
               <div className="flex items-center justify-center mx-auto mb-4 text-blue-400 rounded-full w-14 h-14 bg-blue-500/10">
                 <FaCheckCircle size={24} />
@@ -5622,30 +5728,24 @@ const Orderlist = ({
               >
                 OK
               </button>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
+      </>
 
-      <AnimatePresence>
+      <>
         {showSaveConfirmModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className={`fixed inset-0 z-[410] flex items-center justify-center p-4 ${
+          <div
+            className={(`fixed inset-0 z-[410] flex items-center justify-center p-4 ${
               isDark ? "bg-black/70" : "bg-slate-900/40"
-            }`}
+            }`) + " ui-fade-in"}
           >
-            <motion.div
-              initial={{ scale: 0.95, y: 10 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 10 }}
-              className={`rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl transition-colors ${
+            <div
+              className={(`rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl transition-colors ${
                 isDark
                   ? "bg-slate-900 border border-white/10"
                   : "bg-white border border-slate-200"
-              }`}
+              }`) + " ui-scale-in"}
             >
               <h3
                 className={`text-xl font-black mb-2 ${
@@ -5682,29 +5782,24 @@ const Orderlist = ({
                   No
                 </button>
               </div>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
+      </>
 
-      <AnimatePresence>
+      <>
         {showqrModal && !showConfirmModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className={`fixed inset-0 z-[400] backdrop-blur-xl flex items-center justify-center p-4 ${
+          <div
+            className={(`fixed inset-0 z-[400] backdrop-blur-xl flex items-center justify-center p-4 ${
               isDark ? "bg-slate-950/60" : "bg-slate-200/60"
-            }`}
+            }`) + " ui-fade-in"}
           >
-            <motion.div
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              className={`backdrop-blur-3xl rounded-[3rem] p-8 max-w-sm w-full text-center shadow-2xl transition-colors ${
+            <div
+              className={(`backdrop-blur-3xl rounded-[3rem] p-8 max-w-sm w-full text-center shadow-2xl transition-colors ${
                 isDark
                   ? "bg-white/10 border border-white/20"
                   : "bg-white border border-slate-200"
-              }`}
+              }`) + " ui-scale-in"}
             >
               <div
                 className={`w-16 h-1 mx-auto mb-8 rounded-full ${
@@ -5798,29 +5893,23 @@ const Orderlist = ({
               >
                 Close
               </ButtonComponent>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
-      <AnimatePresence>
+      </>
+      <>
         {showConfirmModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className={`fixed inset-0 z-[410] flex items-center justify-center p-4 ${
+          <div
+            className={(`fixed inset-0 z-[410] flex items-center justify-center p-4 ${
               isDark ? "bg-black/70" : "bg-slate-900/40"
-            }`}
+            }`) + " ui-fade-in"}
           >
-            <motion.div
-              initial={{ scale: 0.95, y: 10 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 10 }}
-              className={`rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl transition-colors ${
+            <div
+              className={(`rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl transition-colors ${
                 isDark
                   ? "bg-slate-900 border border-white/10"
                   : "bg-white border border-slate-200"
-              }`}
+              }`) + " ui-scale-in"}
             >
               <h3
                 className={`text-xl font-black mb-2 ${
@@ -5857,30 +5946,24 @@ const Orderlist = ({
                   No
                 </ButtonComponent>
               </div>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
+      </>
 
-      <AnimatePresence>
+      <>
         {showClearCartModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className={`fixed inset-0 z-[320] flex items-center justify-center p-4 ${
+          <div
+            className={(`fixed inset-0 z-[320] flex items-center justify-center p-4 ${
               isDark ? "bg-black/70" : "bg-slate-900/40"
-            }`}
+            }`) + " ui-fade-in"}
           >
-            <motion.div
-              initial={{ scale: 0.95, y: 10 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 10 }}
-              className={`rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl transition-colors ${
+            <div
+              className={(`rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl transition-colors ${
                 isDark
                   ? "bg-slate-900 border border-white/10"
                   : "bg-white border border-slate-200"
-              }`}
+              }`) + " ui-scale-in"}
             >
               <h3
                 className={`text-xl font-black mb-2 ${
@@ -5917,30 +6000,24 @@ const Orderlist = ({
                   No
                 </button>
               </div>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
+      </>
 
-      <AnimatePresence>
+      <>
         {showItemInstructionModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className={`fixed inset-0 z-[360] flex items-center justify-center p-4 ${
+          <div
+            className={(`fixed inset-0 z-[360] flex items-center justify-center p-4 ${
               isDark ? "bg-black/70" : "bg-slate-900/40"
-            }`}
+            }`) + " ui-fade-in"}
           >
-            <motion.div
-              initial={{ scale: 0.95, y: 10 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 10 }}
-              className={`rounded-3xl p-6 max-w-md w-full shadow-2xl transition-colors ${
+            <div
+              className={(`rounded-3xl p-6 max-w-md w-full shadow-2xl transition-colors ${
                 isDark
                   ? "bg-slate-900 border border-white/10"
                   : "bg-white border border-slate-200"
-              }`}
+              }`) + " ui-scale-in"}
             >
               <div className="flex items-center justify-between mb-4">
                 <h3
@@ -6029,11 +6106,11 @@ const Orderlist = ({
                   Cancel
                 </button>
               </div>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
-      <AnimatePresence>
+      </>
+      <>
         {showDiscountModal && discountTransaction && (
           <ModalDiscountTransaction
             isOpen={showDiscountModal}
@@ -6048,26 +6125,20 @@ const Orderlist = ({
             }
           />
         )}
-      </AnimatePresence>
-      <AnimatePresence>
+      </>
+      <>
         {showBillingModal && (
-          <motion.div
-            className={`fixed inset-0 z-[99999] flex items-center justify-center p-4 backdrop-blur-md ${
+          <div
+            className={(`fixed inset-0 z-[99999] flex items-center justify-center p-4 backdrop-blur-md ${
               isDark ? "bg-slate-950/80" : "bg-slate-200/70"
-            }`}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            }`) + " ui-fade-in"}
           >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className={`rounded-[2.5rem] shadow-2xl max-w-md w-full overflow-hidden transition-colors ${
+            <div
+              className={(`rounded-[2.5rem] shadow-2xl max-w-md w-full overflow-hidden transition-colors ${
                 isDark
                   ? "bg-slate-900 border border-white/10"
                   : "bg-white border border-slate-200"
-              }`}
+              }`) + " ui-scale-in"}
             >
               <div
                 className={`relative p-6 transition-colors ${
@@ -6178,19 +6249,16 @@ const Orderlist = ({
                     </div>
                   ) : filteredBillingData.length > 0 ? (
                     filteredBillingData.map((item, index) => (
-                      <motion.div
+                      <div
                         key={index}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.05 }}
                         onClick={(e) => {
                           onOpenDiscountModal(item, e);
                         }}
-                        className={`group flex items-center justify-between p-4 rounded-2xl transition-all cursor-pointer ${
+                        className={(`group flex items-center justify-between p-4 rounded-2xl transition-all cursor-pointer ${
                           isDark
                             ? "bg-slate-800/40 border border-white/5 hover:border-blue-500/50 hover:bg-slate-800"
                             : "bg-slate-50 border border-slate-200 hover:border-blue-400 hover:bg-white"
-                        }`}
+                        }`) + " ui-slide-in-left"}
                       >
                         <div>
                           <p
@@ -6223,7 +6291,7 @@ const Orderlist = ({
                             </>
                           )}
                         </div>
-                      </motion.div>
+                      </div>
                     ))
                   ) : (
                     <div className="py-12 text-center">
@@ -6267,10 +6335,56 @@ const Orderlist = ({
                   </button>
                 </div>
               </div>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
+      </>
+
+      {selectedCoffeeDrink && (
+        <CoffeeAddonModal
+          key={selectedCoffeeDrink.product_id}
+          drinkName={selectedCoffeeDrink.item_name}
+          product={coffeeOptions.product}
+          addons={coffeeOptions.addons}
+          isLoading={coffeeOptions.isLoading}
+          error={coffeeOptions.error}
+          onRetry={coffeeOptions.retry}
+          onSelect={addCoffeeSelection}
+          onClose={() => {
+            activeCoffeeOptionsRef.current = null;
+            setSelectedCoffeeDrink(null);
+          }}
+        />
+      )}
+
+      {selectedVariantGroup && (
+        <ProductVariantModal
+          key={selectedVariantGroup.familyKey}
+          group={{ ...selectedVariantGroup, variants: variantOptions.variants }}
+          isLoading={variantOptions.isLoading}
+          error={variantOptions.error}
+          onRetry={variantOptions.retry}
+          combinationMode={isFlavorCombination}
+          onCombinationModeChange={setIsFlavorCombination}
+          combinationOptions={combinationHalves}
+          onSelectCombination={addFlavorCombination}
+          onClose={() => {
+            activeCombinationRef.current = null;
+            setSelectedVariantGroup(null);
+            setIsFlavorCombination(false);
+          }}
+          onSelect={(product) => {
+            if (variantOptions.isLoading || variantOptions.error) return;
+            const selected = variantOptions.variants.find(
+              (variant) => variant.product_id === product.product_id,
+            );
+            if (!selected || getMenuVariantDetails(selected).portion === "half") return;
+            addToCart(selected);
+            setSelectedVariantGroup(null);
+            setIsFlavorCombination(false);
+          }}
+        />
+      )}
 
       <style jsx>{`
         .custom-scrollbar::-webkit-scrollbar {
@@ -6283,13 +6397,6 @@ const Orderlist = ({
         .custom-scrollbar::-webkit-scrollbar-thumb {
           background: ${isDark ? "#1e293b" : "#cbd5e1"};
           border-radius: 10px;
-        }
-        .no-scrollbar::-webkit-scrollbar {
-          display: none;
-        }
-        .no-scrollbar {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
         }
       `}</style>
     </>
@@ -6340,8 +6447,13 @@ const CartList = ({
                   className="block text-xs font-medium leading-tight"
                   style={{ color: "var(--app-text)" }}
                 >
-                  {item.name}
+                  {getOrderItemDisplayName(item)}
                 </span>
+                {isGroupedOrderItem(item) && (
+                  <span className="mt-1 block text-[10px] font-[Poppins-Medium]" style={{ color: "var(--app-accent)" }}>
+                    {item.combinationLabel}
+                  </span>
+                )}
                 <span
                   className="block mt-0.5 text-xs"
                   style={{ color: "var(--app-muted-text)" }}
@@ -6358,9 +6470,9 @@ const CartList = ({
               </span>
             </div>
 
-            {item.itemInstruction && (
+            {(isGroupedOrderItem(item) ? item.displayInstruction : item.itemInstruction) && (
               <p className="mt-1.5 break-words text-xs text-amber-500">
-                Note: {item.itemInstruction}
+                Note: {isGroupedOrderItem(item) ? item.displayInstruction : item.itemInstruction}
               </p>
             )}
 
@@ -6399,9 +6511,9 @@ const CartList = ({
 
                   <input
                     type="number"
-                    min="0.01"
-                    step="0.01"
-                    inputMode="decimal"
+                    min={isGroupedOrderItem(item) ? "1" : "0.01"}
+                    step={isGroupedOrderItem(item) ? "1" : "0.01"}
+                    inputMode={isGroupedOrderItem(item) ? "numeric" : "decimal"}
                     value={item.quantity}
                     onFocus={(e) => e.target.select()}
                     onChange={(e) =>

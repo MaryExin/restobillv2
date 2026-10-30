@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import { HiCash, HiCalculator, HiX } from "react-icons/hi";
 import { LinearProgress } from "@mui/material";
 import ModalYesNoReusable from "./ModalYesNoReusable";
@@ -130,12 +129,8 @@ const ModalCashClosing = ({
   return (
     <>
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-5 lg:px-0">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.9 }}
-          transition={{ duration: 0.3 }}
-          className="bg-white rounded-2xl lg:mt-10 shadow-xl w-full max-w-2xl overflow-hidden"
+        <div
+          className="ui-scale-in bg-white rounded-2xl lg:mt-10 shadow-xl w-full max-w-2xl overflow-hidden"
         >
           {/* Header */}
           <div className="flex justify-between  items-center bg-gradient-to-br from-colorBrand to-colorBrandSecondary p-4">
@@ -249,7 +244,7 @@ const ModalCashClosing = ({
               </button>
             </div>
           </div>
-        </motion.div>
+        </div>
       </div>
 
       {/* Confirmation Modal */}

@@ -18,6 +18,12 @@ function getSerialPort() {
 const path = require("path");
 const fs = require("fs");
 
+let orderItemDisplayNameModule;
+function loadOrderItemDisplayName() {
+  orderItemDisplayNameModule ??= import("./orderItemDisplayName.mjs");
+  return orderItemDisplayNameModule;
+}
+
 const OPEN_DEVTOOLS_IN_PACKAGED = false;
 const DEV_SERVER_URL = "http://localhost:5173";
 
@@ -53,6 +59,22 @@ protocol.registerSchemesAsPrivileged([
 
 let win = null;
 let secondScreenWin = null;
+
+// Reopening the installed POS should focus the running terminal instead of
+// allocating another Chromium process tree on a low-memory laptop.
+const hasSingleInstanceLock =
+  !app.isPackaged || app.requestSingleInstanceLock();
+
+if (!hasSingleInstanceLock) {
+  app.quit();
+}
+
+app.on("second-instance", () => {
+  if (!win || win.isDestroyed()) return;
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
+});
 
 const DEFAULT_BUSINESS_INFO = {
   companyName: "",
@@ -2029,7 +2051,7 @@ async function checkEscposConnectionWithFallback() {
   };
 }
 
-function buildEscposOrderReceiptBuffer({
+async function buildEscposOrderReceiptBuffer({
   table,
   items,
   total,
@@ -2038,6 +2060,7 @@ function buildEscposOrderReceiptBuffer({
   transactionId,
   categoryLabel,
 }) {
+  const { getOrderItemDisplayName } = await loadOrderItemDisplayName();
   const LINE_WIDTH = 42;
   const repeat = (char, length) => String(char || "").repeat(length || 0);
   const formatLeftRight = (left, right) => {
@@ -2083,16 +2106,20 @@ function buildEscposOrderReceiptBuffer({
   else if (printMode === "new") status = "NEW ORDER";
   else if (transactionId) status = "ADDITIONAL ORDER";
 
-  const heading = categoryLabel
-    ? `ORDER SUMMARY - ${String(categoryLabel).toUpperCase()}`
+  const displayCategoryLabel = String(categoryLabel || "")
+    .split(" / ").map((category) => getOrderItemDisplayName(category)).join(" / ");
+  const heading = displayCategoryLabel
+    ? `ORDER SUMMARY - ${displayCategoryLabel.toUpperCase()}`
     : "ORDER SUMMARY";
 
   // Header
   chunks.push(initPrinter);
   chunks.push(alignCenter);
   chunks.push(boldOn);
-  chunks.push(txt(heading));
-  chunks.push(nl());
+  wrapText(heading, LINE_WIDTH).forEach((line) => {
+    chunks.push(txt(line));
+    chunks.push(nl());
+  });
   chunks.push(boldOff);
   chunks.push(normalSize);
   chunks.push(txt(`Transaction ID: ${transactionId || "-"}`));
@@ -2128,8 +2155,11 @@ function buildEscposOrderReceiptBuffer({
       // Category header: -- BEVERAGES --
       chunks.push(alignCenter);
       chunks.push(boldOn);
-      chunks.push(txt(`-- ${cat} --`));
-      chunks.push(nl());
+      wrapText(`-- ${getOrderItemDisplayName(cat).toUpperCase()} --`, LINE_WIDTH)
+        .forEach((line) => {
+          chunks.push(txt(line));
+          chunks.push(nl());
+        });
       chunks.push(boldOff);
       chunks.push(alignLeft);
 
@@ -2141,7 +2171,7 @@ function buildEscposOrderReceiptBuffer({
 
         if (nameWidth >= 8) {
           // Note fits inline: ITEM NAME            2X ** note
-          const nameLines = wrapText(String(item?.name || "").toUpperCase(), nameWidth);
+          const nameLines = wrapText(getOrderItemDisplayName(item?.name || "").toUpperCase(), nameWidth);
           nameLines.forEach((line, index) => {
             if (index === 0) {
               chunks.push(txt(formatLeftRight(line, rightPart)));
@@ -2153,7 +2183,7 @@ function buildEscposOrderReceiptBuffer({
         } else {
           // Note too long — name+qty on first line, note on next
           const fallbackNameWidth = LINE_WIDTH - qty.length - 1;
-          const nameLines = wrapText(String(item?.name || "").toUpperCase(), fallbackNameWidth);
+          const nameLines = wrapText(getOrderItemDisplayName(item?.name || "").toUpperCase(), fallbackNameWidth);
           nameLines.forEach((line, index) => {
             if (index === 0) {
               chunks.push(txt(formatLeftRight(line, qty)));
@@ -2239,7 +2269,8 @@ function escposQrStorePrint(value = "", size = 8, errorLevel = 48) {
   return Buffer.concat([model, qrSize, qrError, store, print]);
 }
 
-function buildTsplQrItemsBuffer(data = {}) {
+async function buildTsplQrItemsBuffer(data = {}) {
+  const { getOrderItemDisplayName } = await loadOrderItemDisplayName();
   const items = Array.isArray(data.items) ? data.items : [];
   const table = String(data.table || "").trim();
 
@@ -2262,7 +2293,7 @@ function buildTsplQrItemsBuffer(data = {}) {
   const chunks = [];
   items.forEach((item, index) => {
     const name = cleanText(
-      String(item.name || item.originalName || item.code || "ITEM")
+      getOrderItemDisplayName(item.name || item.originalName || item.code || "ITEM")
         .replace(/\bB1T1\s*Copy\b/gi, "")
         .replace(/\bB1T1\b/gi, "")
         .replace(/\bBuy\s*1\s*Take\s*1\b/gi, ""),
@@ -2294,7 +2325,8 @@ function buildTsplQrItemsBuffer(data = {}) {
   return Buffer.concat(chunks);
 }
 
-function buildEscposQrItemsBuffer(data = {}) {
+async function buildEscposQrItemsBuffer(data = {}) {
+  const { getOrderItemDisplayName } = await loadOrderItemDisplayName();
   const LINE_WIDTH = 42;
   const items = Array.isArray(data.items) ? data.items : [];
   const table = String(data.table || "").trim();
@@ -2322,7 +2354,7 @@ function buildEscposQrItemsBuffer(data = {}) {
   chunks.push(initPrinter);
 
   items.forEach((item, index) => {
-    const name = String(item.name || item.originalName || item.code || "ITEM")
+    const name = getOrderItemDisplayName(item.name || item.originalName || item.code || "ITEM")
       .replace(/\bB1T1\s*Copy\b/gi, "")
       .replace(/\bB1T1\b/gi, "")
       .replace(/\bBuy\s*1\s*Take\s*1\b/gi, "")
@@ -2335,8 +2367,10 @@ function buildEscposQrItemsBuffer(data = {}) {
 
     chunks.push(alignCenter);
     chunks.push(boldOn);
-    chunks.push(txt(centerText(name.toUpperCase())));
-    chunks.push(nl());
+    escposWrapText(name.toUpperCase(), LINE_WIDTH).forEach((line) => {
+      chunks.push(txt(centerText(line)));
+      chunks.push(nl());
+    });
     chunks.push(boldOff);
 
     if (code) { chunks.push(txt(centerText(code))); chunks.push(nl()); }
@@ -2368,6 +2402,8 @@ function buildEscposQrItemsBuffer(data = {}) {
 }
 
 app.whenReady().then(() => {
+  if (!hasSingleInstanceLock) return;
+
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     const existingHeaders = details.responseHeaders || {};
     const existingCspHeader =
@@ -2469,8 +2505,8 @@ app.whenReady().then(() => {
       const qrLanguage = getPrinterLanguage("qr");
       const payload =
         qrLanguage === "tspl"
-          ? buildTsplQrItemsBuffer(data)
-          : buildEscposQrItemsBuffer(data);
+          ? await buildTsplQrItemsBuffer(data)
+          : await buildEscposQrItemsBuffer(data);
 
       const map = getPrinterConfigMap();
       const rawConn = map["printEscPosQr"] || map["qr"];
@@ -2618,7 +2654,7 @@ app.whenReady().then(() => {
 
       // No category routing configured — single-printer fallback
       if (!hasBT && !hasLAN && !hasUSB) {
-        const payload = buildEscposOrderReceiptBuffer({
+        const payload = await buildEscposOrderReceiptBuffer({
           table,
           items,
           total,
@@ -2658,7 +2694,7 @@ app.whenReady().then(() => {
 
       if (btItems.length > 0) {
         const label = [...new Set(btItems.map(getItemCat))].join(" / ");
-        const buf = buildEscposOrderReceiptBuffer({
+        const buf = await buildEscposOrderReceiptBuffer({
           table,
           items: btItems,
           total: itemTotal(btItems),
@@ -2676,7 +2712,7 @@ app.whenReady().then(() => {
 
       if (lanItems.length > 0) {
         const label = [...new Set(lanItems.map(getItemCat))].join(" / ");
-        const buf = buildEscposOrderReceiptBuffer({
+        const buf = await buildEscposOrderReceiptBuffer({
           table,
           items: lanItems,
           total: itemTotal(lanItems),
@@ -2694,7 +2730,7 @@ app.whenReady().then(() => {
 
       if (usbItems.length > 0) {
         const label = [...new Set(usbItems.map(getItemCat))].join(" / ");
-        const buf = buildEscposOrderReceiptBuffer({
+        const buf = await buildEscposOrderReceiptBuffer({
           table,
           items: usbItems,
           total: itemTotal(usbItems),
@@ -2711,7 +2747,7 @@ app.whenReady().then(() => {
       }
 
       if (otherItems.length > 0) {
-        const buf = buildEscposOrderReceiptBuffer({
+        const buf = await buildEscposOrderReceiptBuffer({
           table,
           items: otherItems,
           total: itemTotal(otherItems),
@@ -2752,7 +2788,7 @@ app.whenReady().then(() => {
 
       const { table, items, total, instructions, transactionId } = data || {};
 
-      const payload = buildEscposOrderReceiptBuffer({
+      const payload = await buildEscposOrderReceiptBuffer({
         table,
         items,
         total,
@@ -2777,6 +2813,7 @@ app.whenReady().then(() => {
     const LINE_WIDTH = 42;
 
     try {
+      const { getOrderItemDisplayName } = await loadOrderItemDisplayName();
       console.log("[ESC/POS DISCOUNT] Payload:", data);
 
       const chunks = [];
@@ -2988,7 +3025,7 @@ app.whenReady().then(() => {
               .trim()
               .toLowerCase() === "yes";
 
-          const itemLabel = String(
+          const itemLabel = getOrderItemDisplayName(
             item?.item_name || item?.product_id || item?.name || "-",
           ).toUpperCase();
 
@@ -2996,11 +3033,11 @@ app.whenReady().then(() => {
           const qtyText = `${qty} ${item?.unit_of_measure || ""}`.trim();
           const amtText = peso(lineTotal);
 
-          const nameLines = escposWrapText(itemText, 20);
+          const nameLines = escposWrapText(`* ${itemText}`, 20);
 
           nameLines.forEach((entry, index) => {
             if (index === 0) {
-              chunks.push(txt(formatItemRow(`* ${entry}`, qtyText, amtText)));
+              chunks.push(txt(formatItemRow(entry, qtyText, amtText)));
             } else {
               chunks.push(txt(entry));
             }
@@ -3112,6 +3149,7 @@ app.whenReady().then(() => {
     const LINE_WIDTH = 42;
 
     try {
+      const { getOrderItemDisplayName } = await loadOrderItemDisplayName();
       console.log("[ESC/POS PAYMENT] Payload:", data);
 
       const chunks = [];
@@ -3372,7 +3410,7 @@ app.whenReady().then(() => {
         const price = Number(item?.selling_price || 0);
         const lineTotal = qty * price;
         const isDiscountable = escposYesNoToBool(item?.isDiscountable);
-        const itemLabel = String(
+        const itemLabel = getOrderItemDisplayName(
           item?.item_name || item?.product_id || "-",
         ).toUpperCase();
 
@@ -4006,6 +4044,7 @@ app.whenReady().then(() => {
     const LINE_WIDTH = 42;
 
     try {
+      const { getOrderItemDisplayName } = await loadOrderItemDisplayName();
       console.log("[ESC/POS SALES PER PRODUCT] Payload:", data);
 
       const chunks = [];
@@ -4157,7 +4196,7 @@ app.whenReady().then(() => {
       chunks.push(boldOff);
 
       safeItems.forEach((item) => {
-        const itemName = String(item?.name || "-").toUpperCase();
+        const itemName = getOrderItemDisplayName(item?.name || "-").toUpperCase();
         const qtyText = String(Number(item?.qty || 0));
         const amtText = escposPeso(item?.amount || 0);
 
@@ -4283,6 +4322,7 @@ app.whenReady().then(() => {
     const safeNumber = (value) => Number(value || 0);
 
     try {
+      const { getOrderItemDisplayName } = await loadOrderItemDisplayName();
       console.log("[ESC/POS BILLING] Payload:", data);
 
       const chunks = [];
@@ -4397,7 +4437,7 @@ app.whenReady().then(() => {
         chunks.push(alignLeft);
       } else {
         items.forEach((item) => {
-          const name = String(item?.item_name || "");
+          const name = getOrderItemDisplayName(item?.item_name || "");
           const qty =
             `${item?.sales_quantity || 0} ${item?.unit_of_measure || ""}`.trim();
           const lineTotal =
@@ -4526,6 +4566,7 @@ app.whenReady().then(() => {
     };
 
     try {
+      const { getOrderItemDisplayName } = await loadOrderItemDisplayName();
       console.log("[ESC/POS VOID/REFUND] Payload:", data);
 
       const {
@@ -4629,7 +4670,7 @@ app.whenReady().then(() => {
 
         safeItems.forEach((item) => {
           const isDiscountable = escposYesNoToBool(item?.isDiscountable);
-          const name     = `${String(item.item_name || item.product_id || "-").toUpperCase()}${isDiscountable ? " (D)" : ""}`;
+          const name     = `${getOrderItemDisplayName(item.item_name || item.product_id || "-").toUpperCase()}${isDiscountable ? " (D)" : ""}`;
           const qty      = String(Number(item.sales_quantity || 0));
           const lineTotal =
             Number(item.subtotal || 0) ||
@@ -5301,7 +5342,9 @@ app.whenReady().then(() => {
     }
   });
 
-  ipcMain.handle("scan-lan-printers", async () => {
+  let lanPrinterScanPromise = null;
+
+  async function scanLanPrinters() {
     try {
       const ifaces = os.networkInterfaces();
       let localIp = "";
@@ -5319,28 +5362,37 @@ app.whenReady().then(() => {
       const parts = localIp.split(".");
       const subnet = `${parts[0]}.${parts[1]}.${parts[2]}`;
       const found = [];
+      let nextHost = 1;
 
+      // Bound socket/timer allocation while keeping the full subnet scan.
       await Promise.all(
-        Array.from({ length: 254 }, (_, i) => {
-          const ip = `${subnet}.${i + 1}`;
-          return new Promise((resolve) => {
-            const sock = new net.Socket();
-            sock.setTimeout(300);
-            sock.on("connect", () => {
-              found.push(ip);
-              sock.destroy();
-              resolve();
+        Array.from({ length: 16 }, async () => {
+          while (nextHost <= 254) {
+            const ip = `${subnet}.${nextHost++}`;
+            await new Promise((resolve) => {
+              const sock = new net.Socket();
+              let finished = false;
+              const done = () => {
+                if (finished) return;
+                finished = true;
+                sock.destroy();
+                resolve();
+              };
+              sock.setTimeout(300);
+              sock.once("connect", () => {
+                found.push(ip);
+                done();
+              });
+              sock.once("timeout", done);
+              sock.once("error", done);
+              sock.once("close", done);
+              try {
+                sock.connect(9100, ip);
+              } catch {
+                done();
+              }
             });
-            sock.on("timeout", () => {
-              sock.destroy();
-              resolve();
-            });
-            sock.on("error", () => {
-              sock.destroy();
-              resolve();
-            });
-            sock.connect(9100, ip);
-          });
+          }
         }),
       );
 
@@ -5352,6 +5404,16 @@ app.whenReady().then(() => {
     } catch {
       return [];
     }
+  }
+
+  ipcMain.handle("scan-lan-printers", () => {
+    // Share an in-flight scan when multiple requests arrive together.
+    if (!lanPrinterScanPromise) {
+      lanPrinterScanPromise = scanLanPrinters().finally(() => {
+        lanPrinterScanPromise = null;
+      });
+    }
+    return lanPrinterScanPromise;
   });
 
   // ── Kiosk: second-screen management ──────────────────────────────────────
@@ -5449,7 +5511,7 @@ app.whenReady().then(() => {
 });
 
 app.on("activate", () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
+  if (hasSingleInstanceLock && BrowserWindow.getAllWindows().length === 0) {
     createWindow();
   }
 });

@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import {
   FiX,
   FiTag,
@@ -22,6 +21,7 @@ import useGetDefaultPrinter from "../../hooks/useGetDefaultPrinter";
 import useBusinessInfo from "../../hooks/useBusinessInfo";
 import { resolveDiscountLineAmount } from "../../utils/discountLineMath";
 import { posAuthenticatedFetch } from "../../utils/posAuthenticatedFetch";
+import { getOrderItemDisplayName } from "../../utils/orderItemDisplayName";
 
 // Read fresh from localStorage on every call so a mid-shift user switch
 // (SwitchUser) is reflected immediately, instead of a stale value captured
@@ -209,25 +209,18 @@ const ModalShell = ({
   if (!isOpen) return null;
 
   return (
-    <AnimatePresence>
-      <motion.div
-        className={`fixed inset-0 ${zIndex} flex items-center justify-center p-3 md:p-5 backdrop-blur-md ${
+    <>
+      <div
+        className={(`fixed inset-0 ${zIndex} flex items-center justify-center p-3 md:p-5 backdrop-blur-md ${
           isDark ? "bg-slate-950/80" : "bg-slate-900/20"
-        }`}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+        }`) + " ui-fade-in"}
       >
-        <motion.div
-          initial={{ scale: 0.97, opacity: 0, y: 14 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-          exit={{ scale: 0.97, opacity: 0, y: 14 }}
-          transition={{ duration: 0.18 }}
-          className={`relative flex w-full ${maxWidth} max-h-[calc(100vh-1.5rem)] flex-col overflow-auto rounded-[30px] border shadow-[0_30px_100px_rgba(15,23,42,0.35)] ${
+        <div
+          className={(`relative flex w-full ${maxWidth} max-h-[calc(100vh-1.5rem)] flex-col overflow-auto rounded-[30px] border shadow-[0_30px_100px_rgba(15,23,42,0.35)] ${
             isDark
               ? "border-white/10 bg-[#0f172a] text-white"
               : "border-slate-200 bg-white text-slate-900"
-          }`}
+          }`) + " ui-scale-in"}
         >
           {onClose ? (
             <button
@@ -242,9 +235,9 @@ const ModalShell = ({
             </button>
           ) : null}
           {children}
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+        </div>
+      </div>
+    </>
   );
 };
 
@@ -1639,7 +1632,7 @@ const DiscountSetupModal = ({
 
                         {/* Item name */}
                         <span className="flex-1 font-semibold">
-                          {item.item_name || item.product_id || id}
+                          {getOrderItemDisplayName(item.item_name || item.product_id || id)}
                         </span>
 
                         {/* Qty stepper (only when maxQty >= 2) */}
@@ -2032,23 +2025,17 @@ const InputPaymentsModal = ({
   };
 
   return (
-    <AnimatePresence>
+    <>
       {isOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[100001] flex items-center justify-center bg-black/50 p-4"
+        <div
+          className="fixed inset-0 z-[100001] flex items-center justify-center bg-black/50 p-4 ui-fade-in"
         >
-          <motion.div
-            initial={{ opacity: 0, y: 18, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 18, scale: 0.98 }}
-            className={`max-h-[92vh] w-full max-w-[980px] overflow-hidden rounded-[30px] shadow-2xl ${
+          <div
+            className={(`max-h-[92vh] w-full max-w-[980px] overflow-hidden rounded-[30px] shadow-2xl ${
               isDark
                 ? "border border-white/10 bg-slate-900 text-white"
                 : "border border-slate-200 bg-white text-slate-900"
-            }`}
+            }`) + " ui-scale-in"}
           >
             <div
               className={`px-5 py-3 ${
@@ -2401,10 +2388,10 @@ const InputPaymentsModal = ({
                 </div>
               </div>
             </div>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
       )}
-    </AnimatePresence>
+    </>
   );
 };
 
@@ -3041,6 +3028,7 @@ export default function TransactionPaymentModal({
         .map((row) => ({
           particulars: String(row.particulars || "").trim(),
           amount: Number(toNum(row.amount)),
+          reference: String(row.reference || "").trim(),
         })),
     [otherCharges],
   );
@@ -4635,6 +4623,11 @@ export default function TransactionPaymentModal({
         loyalty_discount_amount: Number(computed.loyaltyDiscountAmount || 0),
 
         TotalSales: Number(computed.grossTotal || 0),
+        cart_items: (items || []).map((item) => ({
+          databaseID: item.ID || item.id || item.databaseID,
+          sales_quantity: Number(item.sales_quantity || 0),
+          selling_price: Number(item.selling_price || 0),
+        })),
         Discount: Number(computed.totalDiscount || 0),
         OtherCharges: Number(computed.totalOtherCharges || 0),
         TotalAmountDue: Number(computed.totalAmountDue || 0),
@@ -4966,7 +4959,7 @@ export default function TransactionPaymentModal({
                         >
                           <div className="min-w-0">
                             <p className="text-sm font-bold truncate">
-                              {item.item_name || item.product_id}
+                              {getOrderItemDisplayName(item.item_name || item.product_id)}
                             </p>
                             <p className="mt-1 text-[11px] text-slate-500">
                               {isDiscountable
@@ -5047,7 +5040,7 @@ export default function TransactionPaymentModal({
                   value={negativePeso(computed.totalVatExemption)}
                     isDark={isDark}
                     valueClassName="text-red-500"
-                  />
+                />
                   {Array.isArray(computed.autoBillingCharges) &&
                     computed.autoBillingCharges.map((c, i) => (
                       <SummaryRow

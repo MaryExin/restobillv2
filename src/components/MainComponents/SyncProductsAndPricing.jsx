@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useMemo, useState, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { FixedSizeList as List } from "react-window";
 import {
   FaArrowLeft,
@@ -291,15 +290,12 @@ const ProductCard = ({
   const badgeCls = isDark ? badge.darkCls : badge.lightCls;
 
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 14 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={`rounded-[2rem] overflow-hidden border ${
+    <div
+      className={(`rounded-[2rem] overflow-hidden border ${
         isDark
           ? "bg-slate-900/30 border-white/5"
           : "bg-white border-slate-200 shadow-sm"
-      } ${disabled ? "opacity-80" : ""}`}
+      } ${disabled ? "opacity-80" : ""}`) + " ui-enter"}
     >
       <div className="p-4 md:p-5">
         <div className="flex flex-col gap-4 md:flex-row">
@@ -480,7 +476,7 @@ const ProductCard = ({
           </div>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 };
 
@@ -1985,7 +1981,7 @@ This will also replace OFFLINE lkp_sales_type and tbl_pricing_by_sales_type usin
             </div>
           ) : viewMode === "card" ? (
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-              <AnimatePresence mode="popLayout">
+              <>
                 {filteredRows.map((row) => (
                   <ProductCard
                     key={row.row_key}
@@ -1997,7 +1993,7 @@ This will also replace OFFLINE lkp_sales_type and tbl_pricing_by_sales_type usin
                     disabled={isSyncing}
                   />
                 ))}
-              </AnimatePresence>
+              </>
             </div>
           ) : (
             <div

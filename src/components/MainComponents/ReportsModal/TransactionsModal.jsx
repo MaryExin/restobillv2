@@ -27,6 +27,7 @@ import { useTheme } from "../../../context/ThemeContext";
 import useReportDateAccess from "../../../hooks/useReportDateAccess";
 import { getCurrentUserRole } from "../../../utils/getCurrentUserRole";
 import { posAuthenticatedFetch } from "../../../utils/posAuthenticatedFetch";
+import { getOrderItemDisplayName } from "../../../utils/orderItemDisplayName";
 
 // --- 1. CUSTOM DROP-DOWN CALENDAR ---
 const CustomCalendar = ({
@@ -188,7 +189,7 @@ const DetailsModal = ({ transaction, isOpen, onClose, isDark }) => {
                   <div className="flex items-center gap-4">
                     <div className={`h-9 w-9 rounded-xl flex items-center justify-center text-[11px] font-black border ${isDark ? "bg-white/5 text-blue-400 border-white/5" : "bg-white text-blue-600 border-slate-200 shadow-sm"}`}>{item.sales_quantity}x</div>
                     <div>
-                      <p className={`text-sm font-black uppercase ${isDark ? "text-white" : "text-[#2e4a7d]"}`}>{item.item_name}</p>
+                      <p className={`text-sm font-black uppercase ${isDark ? "text-white" : "text-[#2e4a7d]"}`}>{getOrderItemDisplayName(item.item_name)}</p>
                       <p className="text-[10px] text-slate-500 font-bold">₱{parseFloat(item.selling_price).toLocaleString()}</p>
                     </div>
                   </div>

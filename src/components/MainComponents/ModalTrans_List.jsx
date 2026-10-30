@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import { useReactToPrint } from "react-to-print";
 import {
   FiX,
@@ -7,17 +6,22 @@ import {
   FiClock,
   FiCheckCircle,
   FiPercent,
+  FiGitBranch,
+  FiCornerUpLeft,
 } from "react-icons/fi";
 import Receipt from "./Receipt";
 import { useTheme } from "../../context/ThemeContext";
 import useApiHost from "../../hooks/useApiHost";
 import ModalDiscountTransaction from "./ModalDiscountTransaction";
+import SplitBillModal from "./SplitBillModal";
+import UnsplitBillModal from "./UnsplitBillModal";
 
 const ModalTrans_List = ({
   tableselected,
   data = [],
   setshowtranslistpertable,
   dateFrom,
+  onTransactionsChanged,
 }) => {
   const apiHost = useApiHost();
   const [activeTab, setActiveTab] = useState("pending");
@@ -26,11 +30,76 @@ const ModalTrans_List = ({
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [discountTransaction, setDiscountTransaction] = useState(null);
+  const [transactions, setTransactions] = useState(data);
+  const [splitTransaction, setSplitTransaction] = useState(null);
+  const [splitResult, setSplitResult] = useState(null);
+  const [unsplitTransaction, setUnsplitTransaction] = useState(null);
+  const [unsplitResult, setUnsplitResult] = useState(null);
   const componentRef = useRef(null);
+  const refreshVersion = useRef(0);
   const { isDark } = useTheme();
 
-  const filteredData = Array.isArray(data)
-    ? data.filter((item) =>
+  useEffect(() => { setTransactions(data); }, [data]);
+
+  const refreshTransactions = () => {
+    const version = ++refreshVersion.current;
+    onTransactionsChanged?.();
+    const params = new URLSearchParams({ date: dateFrom, table_number: tableselected });
+    fetch(`${apiHost}/api/transactio_per_table.php?${params}`)
+      .then(async (response) => {
+        const refreshed = await response.json();
+        if (version === refreshVersion.current && response.ok && (Array.isArray(refreshed) || Array.isArray(refreshed?.data))) {
+          setTransactions(Array.isArray(refreshed) ? refreshed : refreshed.data);
+        }
+      })
+      .catch((error) => console.error("Refresh split transactions failed:", error));
+  };
+
+  const closeStaleBill = () => {
+    setShowDiscountModal(false);
+    setDiscountTransaction(null);
+    setSelectedTransaction(null);
+    setdetailedproduct([]);
+    setSplitTransaction(null);
+    setUnsplitTransaction(null);
+    setActiveTab("pending");
+  };
+
+  const onSplitSuccess = (result) => {
+    const child = { ...result.transaction, split_source_transaction_id: result.source_transaction_id };
+    closeStaleBill();
+    setSplitResult({ ...result, transaction: child });
+    setUnsplitResult(null);
+    // Update immediately even if refreshing the table list fails afterward.
+    setTransactions((current) => {
+      const rows = Array.isArray(current) ? current : [];
+      return [
+        ...rows.filter((item) => String(item.transaction_id) !== String(result.source_transaction_id)
+          && String(item.transaction_id) !== String(result.transaction_id)),
+        { ...rows.find((item) => String(item.transaction_id) === String(result.source_transaction_id)), ...result.source_transaction },
+        child,
+      ];
+    });
+    refreshTransactions();
+  };
+
+  const onUnsplitSuccess = (result) => {
+    closeStaleBill();
+    setSplitResult(null);
+    setUnsplitResult(result);
+    setTransactions((current) => {
+      const rows = Array.isArray(current) ? current : [];
+      return [
+        ...rows.filter((item) => String(item.transaction_id) !== String(result.removed_transaction_id)
+          && String(item.transaction_id) !== String(result.source_transaction_id)),
+        { ...rows.find((item) => String(item.transaction_id) === String(result.source_transaction_id)), ...result.source_transaction },
+      ];
+    });
+    refreshTransactions();
+  };
+
+  const filteredData = Array.isArray(transactions)
+    ? transactions.filter((item) =>
         activeTab === "paid"
           ? item.remarks?.toLowerCase() === "paid"
           : item.remarks?.toLowerCase() !== "paid",
@@ -117,24 +186,18 @@ const ModalTrans_List = ({
 
   return (
     <>
-      <AnimatePresence>
-        <motion.div
-          className={`fixed inset-0 z-[99999] flex items-center justify-center p-4 backdrop-blur-md ${
+      <>
+        <div
+          className={(`fixed inset-0 z-[99999] flex items-center justify-center p-4 backdrop-blur-md ${
             isDark ? "bg-slate-950/80" : "bg-slate-200/70"
-          }`}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+          }`) + " ui-fade-in"}
         >
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0, y: 20 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 0.9, opacity: 0, y: 20 }}
-            className={`rounded-[2.5rem] shadow-2xl max-w-md w-full overflow-hidden transition-colors ${
+          <div
+            className={(`rounded-[2.5rem] shadow-2xl max-w-md w-full overflow-hidden transition-colors ${
               isDark
                 ? "bg-slate-900 border border-white/10"
                 : "bg-white border border-slate-200"
-            }`}
+            }`) + " ui-scale-in"}
           >
             <div
               className={`relative p-6 transition-colors ${
@@ -202,6 +265,32 @@ const ModalTrans_List = ({
             </div>
 
             <div className="px-6 pb-8">
+              {splitResult && (
+                <div role="status" className="mb-4 rounded-xl border border-softPrimary p-3 text-sm font-[Poppins-Regular]">
+                  <p>Bill split successfully. New transaction: {splitResult.transaction_id}.</p>
+                  <button type="button" onClick={() => {
+                    setDiscountTransaction(splitResult.transaction);
+                    setShowDiscountModal(true);
+                  }} className="mt-2 rounded-lg bg-colorBrand px-3 py-2 text-xs font-[Poppins-Medium] text-colorBrandLighter">
+                    Bill new transaction
+                  </button>
+                  <button type="button" onClick={() => setUnsplitTransaction(splitResult.transaction)}
+                    className="ml-2 mt-2 rounded-lg border border-softPrimary px-3 py-2 text-xs font-[Poppins-Medium]">
+                    Unsplit
+                  </button>
+                </div>
+              )}
+              {unsplitResult && (
+                <div role="status" className="mb-4 rounded-xl border border-softPrimary p-3 text-sm font-[Poppins-Regular]">
+                  <p>Split bill {unsplitResult.removed_transaction_id} discarded. Products returned to transaction {unsplitResult.source_transaction_id}.</p>
+                  <button type="button" onClick={() => {
+                    setDiscountTransaction(unsplitResult.source_transaction);
+                    setShowDiscountModal(true);
+                  }} className="mt-2 rounded-lg bg-colorBrand px-3 py-2 text-xs font-[Poppins-Medium] text-colorBrandLighter">
+                    Bill original transaction
+                  </button>
+                </div>
+              )}
               <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                 {isLoadingDetails ? (
                   <div className="py-12 text-center">
@@ -220,17 +309,14 @@ const ModalTrans_List = ({
                   </div>
                 ) : filteredData.length > 0 ? (
                   filteredData.map((item, index) => (
-                    <motion.div
+                    <div
                       key={item.transaction_id || index}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.05 }}
                       onClick={(e) => onOpenDiscountModal(item, e)}
-                      className={`group flex items-center justify-between p-4 rounded-2xl transition-all cursor-pointer ${
+                      className={(`group flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl transition-all cursor-pointer ${
                         isDark
                           ? "bg-slate-800/40 border border-white/5 hover:border-blue-500/50 hover:bg-slate-800"
                           : "bg-slate-50 border border-slate-200 hover:border-blue-400 hover:bg-white"
-                      }`}
+                      }`) + " ui-slide-in-left"}
                     >
                       <div>
                         <p className="text-xs font-bold uppercase tracking-tighter text-slate-500">
@@ -245,9 +331,24 @@ const ModalTrans_List = ({
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         {activeTab === "pending" && (
                           <>
+                            {Number(item.split_source_transaction_id) > 0 && (
+                              <button type="button" onClick={(event) => { event.stopPropagation(); setUnsplitTransaction(item); }}
+                                className="flex items-center gap-1 rounded-xl border border-softPrimary px-2 py-3 text-xs text-colorBrand font-[Poppins-Medium]"
+                                title={`Return all products to transaction ${item.split_source_transaction_id}`}>
+                                <FiCornerUpLeft size={16} /> Unsplit
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={(event) => { event.stopPropagation(); setSplitTransaction(item); }}
+                              className="flex items-center gap-1 rounded-xl border border-softPrimary px-2 py-3 text-xs text-colorBrand font-[Poppins-Medium]"
+                              title="Move selected products to a separate bill"
+                            >
+                              <FiGitBranch size={16} /> Split bill
+                            </button>
                             <button
                               type="button"
                               onClick={(e) => onOpenDiscountModal(item, e)}
@@ -259,7 +360,7 @@ const ModalTrans_List = ({
                           </>
                         )}
                       </div>
-                    </motion.div>
+                    </div>
                   ))
                 ) : (
                   <div className="py-12 text-center">
@@ -279,11 +380,11 @@ const ModalTrans_List = ({
                 )}
               </div>
             </div>
-          </motion.div>
-        </motion.div>
-      </AnimatePresence>
+          </div>
+        </div>
+      </>
 
-      <AnimatePresence>
+      <>
         {showDiscountModal && discountTransaction && (
           <ModalDiscountTransaction
             isOpen={showDiscountModal}
@@ -292,6 +393,9 @@ const ModalTrans_List = ({
             apiHost={apiHost}
             isDark={isDark}
             dateFrom={dateFrom}
+            onSplitRequest={activeTab === "pending" ? () => setSplitTransaction(discountTransaction) : undefined}
+            onUnsplitRequest={activeTab === "pending" && Number(discountTransaction.split_source_transaction_id) > 0
+              ? () => setUnsplitTransaction(discountTransaction) : undefined}
             billingNo={
               discountTransaction?.billing_no ||
               discountTransaction?.billingNo ||
@@ -299,7 +403,17 @@ const ModalTrans_List = ({
             }
           />
         )}
-      </AnimatePresence>
+      </>
+
+      {splitTransaction && (
+        <SplitBillModal transaction={splitTransaction} apiHost={apiHost}
+          onClose={() => setSplitTransaction(null)} onSuccess={onSplitSuccess} />
+      )}
+
+      {unsplitTransaction && (
+        <UnsplitBillModal transaction={unsplitTransaction} apiHost={apiHost}
+          onClose={() => setUnsplitTransaction(null)} onSuccess={onUnsplitSuccess} />
+      )}
 
       {selectedTransaction && detailedproduct.length > 0 && (
         <div style={{ display: "none" }}>

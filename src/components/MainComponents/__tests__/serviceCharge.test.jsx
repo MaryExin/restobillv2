@@ -9,13 +9,6 @@ vi.mock("../../../hooks/useGetDefaultPrinter", () => ({ default: () => "Test pri
 vi.mock("../../../hooks/useBusinessInfo", () => ({
   default: () => ({ businessInfo: { business_name: "Test restaurant" }, isBusInfoLoading: false }),
 }));
-vi.mock("framer-motion", async () => {
-  const ReactModule = await import("react");
-  const motion = Object.fromEntries(["div", "button", "span", "p", "section", "aside"].map((tag) => [tag,
-    ReactModule.forwardRef(({ initial, animate, exit, transition, whileHover, whileTap, layout, ...props }, ref) =>
-      ReactModule.createElement(tag, { ...props, ref }))]));
-  return { motion, AnimatePresence: ({ children }) => children };
-});
 
 const LEGACY_BASIS = "net_after_deductions";
 const RECEIPT_BASIS = "vat_exclusive_less_discount";
@@ -67,13 +60,13 @@ function mockApi({ basis = LEGACY_BASIS, enabled = true, charges = [], loadError
       transaction_summary: { customer_head_count: 4 },
       discount_counts: { senior: 1, pwd: 0, naac: 0, soloParent: 0, manual: 0 },
       discount_rows: [],
+      other_charge_rows: [],
     });
     if (endpoint === "/api/pos_discount_types.php") return response({ success: true, data: { discount_types: [] } });
     if (endpoint === "/api/pos_discount_ceiling.php") return response({ success: true, data: { discount_ceiling: 0 } });
     if (endpoint === "/api/pos_discount_mode.php") return response({ success: true, data: { discount_mode: "PerCustomer" } });
     if (endpoint === "/api/pos_customer_info_settings.php") return response({ success: true, data: { customer_info_enabled: false } });
-    if (endpoint === "/api/billing.php") return response({ status: "success", billing_no: "TEST-BILL" });
-    if (endpoint === "/api/pos_save_transaction_charges.php") return response({ success: true });
+    if (endpoint === "/api/billing.php") return response({ status: "success", billing_no: "TEST-BILL", billing_charges_saved: true });
     throw new Error(`Unexpected test API call: ${options.method || "GET"} ${endpoint}`);
   });
   vi.stubGlobal("fetch", fetch);
@@ -210,11 +203,10 @@ describe("Billing calculation and saved charges", () => {
     expect(computed.appliedCharges).toEqual([expect.objectContaining({
       id: 1, particulars: "SERVICE CHARGE", computedAmount: serviceAmount,
     })]);
-    await waitFor(() => expect(requestBody(fetch, "pos_save_transaction_charges.php")).toEqual({
-      transaction_id: transaction.transaction_id,
-      Category_Code: "TEST", Unit_Code: "TEST-BRANCH",
-      charges: [{ particulars: "SERVICE CHARGE", amount: serviceAmount }],
-    }));
+    expect(billing.billing_charges).toEqual([
+      { particulars: "SERVICE CHARGE", amount: serviceAmount },
+    ]);
+    expect(fetch.mock.calls.some(([url]) => url.includes("pos_save_transaction_charges.php"))).toBe(false);
     expect(window.alert).not.toHaveBeenCalled();
   });
 

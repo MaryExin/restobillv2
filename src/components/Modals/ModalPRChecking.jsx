@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { AnimatePresence, motion } from "framer-motion";
 import { array } from "zod";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -4722,21 +4721,13 @@ const ModalPRChecking = ({
         />
       )}
 
-      <AnimatePresence>
+      <>
         {isPayeeError && (
-          <motion.div
-            className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25 }}
+          <div
+            className="ui-fade-in fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50"
           >
-            <motion.div
-              className="bg-white p-6 rounded-xl shadow-lg max-w-sm w-full"
-              initial={{ opacity: 0, y: 40, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 40, scale: 0.95 }}
-              transition={{ duration: 0.25, ease: "easeOut" }}
+            <div
+              className="ui-scale-in bg-white p-6 rounded-xl shadow-lg max-w-sm w-full"
             >
               <h2 className="text-lg font-semibold text-red-600 mb-2">
                 Missing Supplier
@@ -4754,10 +4745,10 @@ const ModalPRChecking = ({
                   OK
                 </button>
               </div>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
+      </>
     </>
   );
 };

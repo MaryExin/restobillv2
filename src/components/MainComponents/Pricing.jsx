@@ -19,7 +19,6 @@ import { FiCalendar } from "react-icons/fi";
 import { useSecuredMutation } from "../../hooks/useSecuredMutation";
 import { useNavigate } from "react-router-dom";
 import useZustandLoginCred from "../../context/useZustandLoginCred";
-import { motion } from "framer-motion";
 import { useExecuteToast } from "../../context/ToastContext";
 
 export default function Pricing() {
@@ -593,22 +592,18 @@ export default function Pricing() {
                 ))}
               </ul>
 
-              <motion.button
+              <button
                 onClick={() => setSubscription(plan.id)}
                 disabled={plan.activeButton}
-                whileHover={!plan.activeButton ? { scale: 1.05 } : {}}
-                whileTap={!plan.activeButton ? { scale: 0.95 } : {}}
-                className={`w-full py-4 px-6 rounded-xl font-semibold transition-all duration-300 relative overflow-hidden group ${
+                className={(`w-full py-4 px-6 rounded-xl font-semibold transition-all duration-300 relative overflow-hidden group ${
                   plan.activeButton
                     ? "bg-gradient-to-r from-gray-700 to-gray-800 text-gray-400 cursor-not-allowed shadow-sm border-2 border-dashed border-gray-600"
                     : `${plan.buttonStyle} hover:shadow-xl active:shadow-md`
-                }`}
+                }`) + " transition-transform duration-150 enabled:hover:scale-[1.02] enabled:active:scale-[0.98]"}
               >
                 {plan.activeButton && (
-                  <motion.div
+                  <div
                     className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"
-                    animate={{ x: ["-100%", "100%"] }}
-                    transition={{ repeat: Infinity, duration: 2 }}
                   />
                 )}
 
@@ -640,7 +635,7 @@ export default function Pricing() {
                     plan.button
                   )}
                 </span>
-              </motion.button>
+              </button>
             </div>
           ))}
         </div>

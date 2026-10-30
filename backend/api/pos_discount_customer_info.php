@@ -11,6 +11,7 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
 
 require __DIR__ . "/pdo.php";
 require_once __DIR__ . "/pos_report_mirror.php";
+require_once __DIR__ . "/../src/PosCurrentBillItems.php";
 
 function respond($success, $message, $data = null, $statusCode = 200)
 {
@@ -125,6 +126,14 @@ try {
     }
 
     $pdo->beginTransaction();
+
+    $header = $pdo->prepare("SELECT remarks, status, order_status
+        FROM tbl_pos_transactions
+        WHERE transaction_id = ? AND Category_Code = ? AND Unit_Code = ? FOR UPDATE");
+    $header->execute([$transactionId, $categoryCode, $unitCode]);
+    $transaction = $header->fetch(PDO::FETCH_ASSOC);
+    if (!$transaction) throw new InvalidArgumentException('Transaction not found for this branch.');
+    posAssertBillNotCancelled($transaction);
 
     $firstCustomerId = "";
     foreach ($customerInfo as $card) {

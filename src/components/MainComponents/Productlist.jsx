@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaSearch,
@@ -16,8 +16,10 @@ import {
 } from "react-icons/fa";
 import { useTheme } from "../../context/ThemeContext";
 import useApiHost from "../../hooks/useApiHost";
-import ProductImage from "../Common/ProductImage";
+import ProductImage from "../common/ProductImage";
 import TutorialTip from "../common/TutorialTip";
+
+const PRODUCTS_PER_PAGE = 60;
 
 const ProductList = () => {
   const { theme } = useTheme();
@@ -32,6 +34,8 @@ const ProductList = () => {
 
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const productGridRef = useRef(null);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("ALL");
   const [enablePictures, setEnablePictures] = useState(false);
@@ -89,13 +93,14 @@ const ProductList = () => {
       (p) => p.item_category === currentCat,
     );
     const ids = targetProducts.map((p) => p.product_id);
+    const idSet = new Set(ids);
 
     if (ids.length === 0) return;
 
     const previousState = [...products];
     setProducts((prev) =>
       prev.map((p) =>
-        ids.includes(p.product_id) ? { ...p, status: newStatus } : p,
+        idSet.has(p.product_id) ? { ...p, status: newStatus } : p,
       ),
     );
 
@@ -236,15 +241,59 @@ const ProductList = () => {
   }, [products]);
 
   const filteredProducts = useMemo(() => {
+    const normalizedSearch = search.toLowerCase();
     return products.filter((p) => {
       const matchesSearch = (p.item_name || "")
         .toLowerCase()
-        .includes(search.toLowerCase());
+        .includes(normalizedSearch);
       const matchesCategory =
         selectedCategory === "ALL" || p.item_category === selectedCategory;
       return matchesSearch && matchesCategory;
     });
   }, [products, search, selectedCategory]);
+
+  // Keep the full dataset for searching, category statistics and bulk updates,
+  // while limiting the number of mounted cards and decoded product images.
+  const pageCount = Math.max(1, Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE));
+  const currentPage = Math.min(page, pageCount);
+  const pageStart = (currentPage - 1) * PRODUCTS_PER_PAGE;
+  const visibleProducts = filteredProducts.slice(pageStart, pageStart + PRODUCTS_PER_PAGE);
+
+  const changePage = (nextPage) => {
+    setPage(nextPage);
+    productGridRef.current?.scrollIntoView({ block: "start" });
+  };
+
+  const paginationControls = pageCount > 1 && (
+    <nav
+      aria-label="Product pages"
+      className="flex flex-wrap items-center justify-between gap-3 py-4 font-[Poppins-Regular] text-sm"
+      style={{ color: "var(--app-text)" }}
+    >
+      <span>
+        {pageStart + 1}–{Math.min(pageStart + PRODUCTS_PER_PAGE, filteredProducts.length)} of {filteredProducts.length} products
+      </span>
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          disabled={currentPage === 1}
+          onClick={() => changePage(currentPage - 1)}
+          className="rounded-xl border px-3 py-2 disabled:opacity-40"
+        >
+          Previous
+        </button>
+        <span>Page {currentPage} of {pageCount}</span>
+        <button
+          type="button"
+          disabled={currentPage === pageCount}
+          onClick={() => changePage(currentPage + 1)}
+          className="rounded-xl border px-3 py-2 disabled:opacity-40"
+        >
+          Next
+        </button>
+      </div>
+    </nav>
+  );
 
   const displayStats = useMemo(() => {
     if (selectedCategory !== "ALL") {
@@ -405,7 +454,10 @@ const ProductList = () => {
                   type="text"
                   placeholder="Search products..."
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setPage(1);
+                  }}
                   className={`pl-12 pr-6 py-3 rounded-2xl text-sm w-full md:w-[280px] outline-none border-2 transition-all ${
                     isDark
                       ? "bg-slate-800 border-white/10 text-white focus:border-blue-500"
@@ -450,7 +502,10 @@ const ProductList = () => {
               return (
                 <button
                   key={cat}
-                  onClick={() => setSelectedCategory(cat)}
+                  onClick={() => {
+                    setSelectedCategory(cat);
+                    setPage(1);
+                  }}
                   className={`relative flex items-center gap-3 px-6 py-3 rounded-2xl text-[11px] font-black uppercase tracking-wider transition-all duration-300 whitespace-nowrap group ${
                     isActive
                       ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-[0_10px_25px_-5px_rgba(59,130,246,0.5)] scale-105 z-10"
@@ -490,7 +545,8 @@ const ProductList = () => {
       </div>
 
       <div className="flex-grow p-6 overflow-auto">
-        <div className="max-w-[1600px] mx-auto">
+        <div ref={productGridRef} className="max-w-[1600px] mx-auto scroll-mt-60">
+          {paginationControls}
           {isLoading && products.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-4 py-40">
               <div className="w-12 h-12 border-[5px] border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
@@ -500,7 +556,7 @@ const ProductList = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-              {filteredProducts.map((item) => {
+              {visibleProducts.map((item) => {
                 const isActive = item.status === "1";
 
                 return (
@@ -697,6 +753,7 @@ const ProductList = () => {
               })}
             </div>
           )}
+          {paginationControls}
         </div>
       </div>
 

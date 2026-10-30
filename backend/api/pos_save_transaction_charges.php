@@ -13,6 +13,7 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
 
 require __DIR__ . "/pdo.php";
 require_once __DIR__ . "/pos_report_mirror.php";
+require_once __DIR__ . "/../src/PosCurrentBillItems.php";
 
 function respond(bool $success, string $message, int $status = 200): void {
     http_response_code($status);
@@ -44,6 +45,15 @@ try {
     }, $rawCharges)));
 
     $pdo->beginTransaction();
+
+    // Serialize with split/unsplit before an older billing screen saves.
+    $header = $pdo->prepare("SELECT remarks, status, order_status
+        FROM tbl_pos_transactions
+        WHERE transaction_id = ? AND Category_Code = ? AND Unit_Code = ? FOR UPDATE");
+    $header->execute([$transactionId, $categoryCode, $unitCode]);
+    $transaction = $header->fetch(PDO::FETCH_ASSOC);
+    if (!$transaction) throw new InvalidArgumentException('Transaction not found for this branch.');
+    posAssertBillNotCancelled($transaction);
 
     // Delete existing AUTO-saved billing charges for this transaction
     $pdo->prepare("

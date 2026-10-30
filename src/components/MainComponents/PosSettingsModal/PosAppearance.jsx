@@ -12,7 +12,7 @@ import {
   FiUpload,
   FiTrash2,
 } from "react-icons/fi";
-import { motion, AnimatePresence } from "framer-motion";
+
 import useApiHost from "../../../hooks/useApiHost";
 import { securedPosFetch } from "../../../utils/posRoleFetch";
 import { useTheme } from "../../../context/ThemeContext";
@@ -455,24 +455,18 @@ const PalettePickerModal = ({
   }, [palettes, search]);
 
   return (
-    <AnimatePresence>
+    <>
       {open ? (
-        <motion.div
-          className="fixed inset-0 z-[200] flex items-center justify-center p-4"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+        <div
+          className="ui-fade-in fixed inset-0 z-[200] flex items-center justify-center p-4"
         >
           <div
             className="absolute inset-0 bg-black/60 backdrop-blur-md"
             onClick={onClose}
           />
 
-          <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 12, scale: 0.98 }}
-            className="relative z-10 max-h-[90vh] w-full max-w-6xl overflow-hidden rounded-[32px] border"
+          <div
+            className="ui-scale-in relative z-10 max-h-[90vh] w-full max-w-6xl overflow-hidden rounded-[32px] border"
             style={{
               background: `linear-gradient(135deg, ${ui.panelStrong} 0%, ${ui.panelSoft} 100%)`,
               borderColor: ui.border,
@@ -548,13 +542,11 @@ const PalettePickerModal = ({
                   const isSelected = selectedName === palette.name;
 
                   return (
-                    <motion.button
+                    <button
                       key={palette.name}
                       type="button"
-                      whileHover={{ y: -4 }}
-                      whileTap={{ scale: 0.98 }}
                       onClick={() => onPick(palette)}
-                      className="overflow-hidden rounded-[28px] border text-left transition-all"
+                      className="enabled:hover:-translate-y-0.5 transition-transform duration-150 enabled:active:scale-[0.98] overflow-hidden rounded-[28px] border text-left transition-all"
                       style={{
                         borderColor: isSelected
                           ? pagePalette.primary
@@ -640,7 +632,7 @@ const PalettePickerModal = ({
                           />
                         </div>
                       </div>
-                    </motion.button>
+                    </button>
                   );
                 })}
               </div>
@@ -658,10 +650,10 @@ const PalettePickerModal = ({
                 </div>
               ) : null}
             </div>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
       ) : null}
-    </AnimatePresence>
+    </>
   );
 };
 

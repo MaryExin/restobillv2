@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import { HiX, HiCog, HiChartPie, HiCash, HiPencilAlt } from "react-icons/hi";
 import { roundDecimals } from "../../constants/RoundDecimals";
 import useZustandAPIEndpoint from "../../context/useZustandAPIEndpoint";
@@ -104,11 +103,8 @@ const ModalSetDiscount = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.9 }}
-        className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col"
+      <div
+        className="ui-scale-in bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col"
       >
         {/* Header */}
         <div className="flex items-center justify-between bg-gradient-to-br from-colorBrand to-colorBrandSecondary p-4">
@@ -271,7 +267,7 @@ const ModalSetDiscount = ({
             </button>
           </div>
         </form>
-      </motion.div>
+      </div>
     </div>
   );
 };

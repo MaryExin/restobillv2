@@ -36,6 +36,8 @@ date_default_timezone_set("Asia/Manila");
 ------------------------------ */
 $config = require __DIR__ . "/config.php";
 require_once __DIR__ . "/pos_report_mirror.php";
+require_once __DIR__ . "/../src/PosBillingCharges.php";
+require_once __DIR__ . "/../src/PosCurrentBillItems.php";
 
 try {
     $dsn = "mysql:host={$config['host']};dbname={$config['db']};charset={$config['charset']}";
@@ -86,6 +88,10 @@ $cartItems = isset($input['cart_items']) && is_array($input['cart_items'])
 $discountBreakdown = isset($input['discount_breakdown']) && is_array($input['discount_breakdown'])
     ? $input['discount_breakdown']
     : [];
+
+// Optional for older POS clients, which continue using their existing charge
+// save endpoint. New clients save the header and charge rows atomically here.
+$hasBillingCharges = array_key_exists('billing_charges', $input);
 
 $hasCustomerInfoPayload = isset($input['customer_info']) && is_array($input['customer_info']);
 $customerInfo = $hasCustomerInfoPayload
@@ -324,6 +330,8 @@ try {
         throw new Exception("category_code and unit_code are required.");
     }
 
+    $billingCharges = $hasBillingCharges ? posNormalizeBillingCharges($input['billing_charges']) : [];
+
     $discountCeiling = getDiscountCeiling($pdo);
     if ($discountCeiling > 0 && $discount > $discountCeiling) {
         $discountBreakdown = applyDiscountCeilingToBreakdown($discountBreakdown, $discountCeiling);
@@ -340,7 +348,8 @@ try {
         5. LOCK AND READ MAIN ROW FIRST
     ------------------------------ */
     $stmtCurrent = $pdo->prepare("
-        SELECT transaction_id, billing_no, invoice_no, remarks, cashier
+        SELECT transaction_id, Category_Code, Unit_Code, Project_Code, transaction_date,
+               billing_no, invoice_no, remarks, status, order_status, cashier
         FROM tbl_pos_transactions
         WHERE transaction_id = :tid
           AND Category_Code = :cc
@@ -358,6 +367,12 @@ try {
 
     if (!$currentTxn) {
         throw new Exception("Main transaction not found.");
+    }
+
+    posAssertCurrentBillItems($pdo, $currentTxn, $totalSales, $cartItems ?: null, true);
+
+    if ($hasBillingCharges) {
+        $otherCharges = posSaveBillingCharges($pdo, $currentTxn, $billingCharges, $input['OtherCharges'] ?? null);
     }
 
     $existingBillingNo = isset($currentTxn['billing_no']) ? (int)$currentTxn['billing_no'] : 0;
@@ -484,7 +499,10 @@ try {
     if (!empty($cartItems)) {
         $sqlDetail = "UPDATE tbl_pos_transactions_detailed
                       SET selling_price = :price
-                      WHERE ID = :id";
+                      WHERE ID = :id
+                        AND transaction_id = :tid
+                        AND Category_Code = :cc
+                        AND Unit_Code = :uc";
         $stmtDetail = $pdo->prepare($sqlDetail);
 
         foreach ($cartItems as $item) {
@@ -497,7 +515,10 @@ try {
 
             $stmtDetail->execute([
                 ':price' => $sellingPrice,
-                ':id'    => $detailId
+                ':id'    => $detailId,
+                ':tid'   => $transaction_id,
+                ':cc'    => $category_code,
+                ':uc'    => $unit_code
             ]);
         }
     }
@@ -882,7 +903,7 @@ try {
 
     $pdo->commit();
 
-    echo json_encode([
+    $response = [
         "status" => "success",
         "message" => "Transaction saved successfully.",
         "billing_no" => $finalBillingNo,
@@ -893,7 +914,11 @@ try {
         "discount_rows_inactivated" => $inactivatedDiscountRows,
         "discount_rows_skipped" => $skippedDiscountRows,
         "discount_insert_reason" => $discountInsertReason
-    ]);
+    ];
+    if ($hasBillingCharges) {
+        $response['billing_charges_saved'] = true;
+    }
+    echo json_encode($response);
 
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) {

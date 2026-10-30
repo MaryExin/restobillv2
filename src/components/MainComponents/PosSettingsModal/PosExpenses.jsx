@@ -14,7 +14,7 @@ import {
   FiInbox,
   FiFileText,
 } from "react-icons/fi";
-import { motion, AnimatePresence } from "framer-motion";
+
 import useApiHost from "../../../hooks/useApiHost";
 
 const POS_LEDGER_PATH =
@@ -496,14 +496,11 @@ const PosExpenses = ({ isDark, accent = "#3b82f6" }) => {
       </div>
 
       {/* PETTY CASH MODAL */}
-      <AnimatePresence>
+      <>
         {isPettyModalOpen && (
           <div className="fixed inset-0 z-[120] flex items-center justify-center p-6 bg-black/70 backdrop-blur-md">
-            <motion.div
-              initial={{ scale: 0.94, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.94, opacity: 0 }}
-              className={`w-full max-w-md rounded-[32px] border p-6 sm:p-8 ${theme.panel}`}
+            <div
+              className={`ui-scale-in w-full max-w-md rounded-[32px] border p-6 sm:p-8 ${theme.panel}`}
             >
               <div className="flex items-center justify-between mb-6">
                 <div>
@@ -572,10 +569,10 @@ const PosExpenses = ({ isDark, accent = "#3b82f6" }) => {
                   {isSubmitting ? "Saving..." : "Add to Drawer"}
                 </button>
               </div>
-            </motion.div>
+            </div>
           </div>
         )}
-      </AnimatePresence>
+      </>
     </div>
   );
 };

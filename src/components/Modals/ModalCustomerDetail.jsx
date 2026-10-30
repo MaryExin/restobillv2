@@ -1,7 +1,6 @@
 // ModalCustomerDetail.jsx
 import React, { useEffect, useState, useMemo } from "react";
 import { FixedSizeList as List } from "react-window";
-import { motion } from "framer-motion";
 import { FaTimes, FaTag, FaCalendarAlt, FaSearch } from "react-icons/fa";
 import { useSecuredMutation } from "../../hooks/useSecuredMutation";
 import { LinearProgress } from "@mui/material";
@@ -86,41 +85,29 @@ export default function ModalCustomerDetail({
   return (
     <>
       {/* Overlay */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-zinc-800 bg-opacity-75 z-50"
+      <div
+        className="ui-fade-in fixed inset-0 bg-zinc-800 bg-opacity-75 z-50"
       />
 
       {/* Modal Container */}
       <div className="fixed inset-0 flex justify-center items-start pt-10 z-50 px-4 lg:px-0">
-        <motion.div
-          initial={{ y: -50, opacity: 0, scale: 0.9 }}
-          animate={{ y: 0, opacity: 1, scale: 1 }}
-          exit={{ y: -50, opacity: 0, scale: 0.9 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
-          className="w-full md:w-3/4 lg:w-1/2 bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+        <div
+          className="ui-scale-in w-full md:w-3/4 lg:w-1/2 bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
         >
           {/* Header */}
           <div className="relative bg-gradient-to-br from-colorBrand to-colorBrandTertiary p-6 flex items-center justify-center">
-            <motion.h2
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.4 }}
-              className="text-2xl font-bold text-white flex items-center space-x-2"
+            <h2
+              className="ui-scale-in text-2xl font-bold text-white flex items-center space-x-2"
             >
               <FaTag className="w-6 h-6 text-white" />
               <span>Purchase History</span>
-            </motion.h2>
-            <motion.div
+            </h2>
+            <div
               onClick={() => setIsModalCustomerDetail(false)}
-              className="absolute top-4 right-4 p-2 rounded-full hover:bg-white/30 cursor-pointer"
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
+              className="hover:opacity-90 active:opacity-80 transition-opacity duration-150 absolute top-4 right-4 p-2 rounded-full hover:bg-white/30 cursor-pointer"
             >
               <FaTimes className="w-6 h-6 text-white" />
-            </motion.div>
+            </div>
           </div>
 
           {/* Loading Bar */}
@@ -170,14 +157,11 @@ export default function ModalCustomerDetail({
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            <motion.h3
-              initial={{ x: -20, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              transition={{ duration: 0.4 }}
-              className="text-zinc-600 text-xl font-semibold"
+            <h3
+              className="ui-slide-in-left text-zinc-600 text-xl font-semibold"
             >
               Summary of Purchases
-            </motion.h3>
+            </h3>
 
             {filteredCategory.map((ctg, idx) => {
               const itemsForCategory = filteredData.filter(
@@ -185,23 +169,17 @@ export default function ModalCustomerDetail({
               );
 
               return (
-                <motion.div
+                <div
                   key={idx}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 * idx, duration: 0.4 }}
-                  className="border border-zinc-200 rounded-lg overflow-hidden"
+                  className="ui-enter border border-zinc-200 rounded-lg overflow-hidden"
                 >
                   {/* Category Header */}
-                  <motion.div
-                    initial={{ backgroundColor: "#F3F4F6" }}
-                    whileHover={{ backgroundColor: "#E5E7EB" }}
-                    transition={{ duration: 0.3 }}
-                    className="flex items-center space-x-2 p-3 bg-zinc-100 cursor-default"
+                  <div
+                    className="ui-fade-in hover:opacity-90 transition-opacity duration-150 flex items-center space-x-2 p-3 bg-zinc-100 cursor-default"
                   >
                     <FaTag className="w-5 h-5 text-colorBrand" />
                     <span className="font-semibold text-zinc-700">{ctg}</span>
-                  </motion.div>
+                  </div>
 
                   {/* Column Labels (desktop only) */}
                   <div className="hidden lg:flex text-xs text-zinc-600 bg-zinc-50 p-2">
@@ -226,17 +204,10 @@ export default function ModalCustomerDetail({
                     {({ index: rowIndex, style }) => {
                       const item = itemsForCategory[rowIndex];
                       return (
-                        <motion.div
+                        <div
                           key={rowIndex}
-                          initial={{ opacity: 0, x: 20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{
-                            delay: 0.02 * rowIndex,
-                            duration: 0.3,
-                          }}
-                          // whileHover={{ scale: 1.01 }}
                           style={style}
-                          className="flex flex-col lg:flex-row items-start lg:items-center text-xs lg:space-x-3 px-3 py-2 hover:bg-zinc-50 cursor-pointer"
+                          className="ui-slide-in-right flex flex-col lg:flex-row items-start lg:items-center text-xs lg:space-x-3 px-3 py-2 hover:bg-zinc-50 cursor-pointer"
                         >
                           <div className="flex items-center w-full lg:w-36">
                             <FaCalendarAlt className="w-4 h-4 text-colorBrand mr-1" />
@@ -265,15 +236,15 @@ export default function ModalCustomerDetail({
                           <div className="w-full lg:w-20 text-zinc-700">
                             {`${item.uomval} ${item.uom}`}
                           </div>
-                        </motion.div>
+                        </div>
                       );
                     }}
                   </List>
-                </motion.div>
+                </div>
               );
             })}
           </div>
-        </motion.div>
+        </div>
       </div>
     </>
   );

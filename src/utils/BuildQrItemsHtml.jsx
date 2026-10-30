@@ -1,6 +1,7 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { QRCodeSVG } from "qrcode.react";
+import { getOrderItemDisplayName } from "./orderItemDisplayName";
 
 const peso = (value) =>
   Number(value || 0).toLocaleString("en-PH", {
@@ -12,7 +13,7 @@ export function BuildQrItemsHtml({ items, table, transactionId }) {
   const safeItems = Array.isArray(items) ? items : [];
 
   const slips = safeItems.map((item, index) => {
-    const name = String(item?.name || item?.originalName || item?.code || "ITEM")
+    const name = getOrderItemDisplayName(item?.name || item?.originalName || item?.code || "ITEM")
       .replace(/\s+/g, " ")
       .trim()
       .toUpperCase();

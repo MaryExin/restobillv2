@@ -14,7 +14,7 @@
     "dev:electron:debug": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron --inspect=5858 .\"",
     "build": "vite build",
     "pack": "npm run build && electron-builder --dir",
-    "dist": "npm run build && electron-builder --win nsis",
+    "dist": "npm run build && electron-builder --win nsis --x64",
     "dist:mac": "npm run build && electron-builder --mac"
   },
   "dependencies": {
@@ -42,7 +42,6 @@
     "escpos-usb": "^3.0.0-alpha.4",
     "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
-    "framer-motion": "^10.15.0",
     "hamburger-react": "^2.5.1",
     "install": "^0.13.0",
     "jspdf": "^4.2.1",

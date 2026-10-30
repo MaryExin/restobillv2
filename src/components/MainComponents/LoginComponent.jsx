@@ -16,7 +16,6 @@ import useLoginAttempts from "../../context/useLoginAttempts ";
 import useOtpAttempts from "../../context/useOtpAttempts";
 import useZustandAPIEndpoint from "../../context/useZustandAPIEndpoint";
 import { useCustomSecuredMutation } from "../../hooks/useCustomSecuredMutation";
-import { motion } from "framer-motion";
 import { BsFillBuildingFill, BsFillBuildingsFill } from "react-icons/bs";
 import ModalTrialExpiration from "../common/ModalTrial";
 
@@ -371,42 +370,13 @@ const LoginComponent = () => {
         {/* Animated Background Elements */}
         <div className="absolute inset-0 overflow-hidden">
           {/* Floating geometric shapes */}
-          <motion.div
-            animate={{
-              x: [0, 30, 0],
-              y: [0, -20, 0],
-              rotate: [0, 180, 360],
-            }}
-            transition={{
-              duration: 20,
-              repeat: Infinity,
-              ease: "linear",
-            }}
+          <div
             className="absolute top-20 left-20 w-16 h-16 border border-blue-500/20 rounded-lg"
           />
-          <motion.div
-            animate={{
-              x: [0, -25, 0],
-              y: [0, 15, 0],
-              rotate: [0, -180, -360],
-            }}
-            transition={{
-              duration: 25,
-              repeat: Infinity,
-              ease: "linear",
-            }}
+          <div
             className="absolute bottom-32 right-32 w-12 h-12 bg-blue-500/10 rounded-full blur-sm"
           />
-          <motion.div
-            animate={{
-              scale: [1, 1.2, 1],
-              opacity: [0.1, 0.3, 0.1],
-            }}
-            transition={{
-              duration: 8,
-              repeat: Infinity,
-              ease: "easeInOut",
-            }}
+          <div
             className="absolute top-1/2 left-10 w-8 h-8 bg-gradient-to-r from-blue-400/20 to-purple-400/20 rounded-full blur-sm"
           />
         </div>
@@ -419,20 +389,14 @@ const LoginComponent = () => {
           }}
         />
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="max-w-md w-full p-8 relative z-10"
+        <div
+          className="max-w-md w-full p-8 relative z-10 ui-enter"
         >
           {isChangePasswordMode ? (
             /* CHANGE PASSWORD SCREEN */
             <>
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.4 }}
-                className="space-y-8 bg-gray-900/50 backdrop-blur-2xl border border-gray-700/50 p-8 rounded-2xl shadow-2xl"
+              <div
+                className="space-y-8 bg-gray-900/50 backdrop-blur-2xl border border-gray-700/50 p-8 rounded-2xl shadow-2xl ui-scale-in"
               >
                 {isLoadingChangePassword && (
                   <div className="mb-4">
@@ -451,14 +415,11 @@ const LoginComponent = () => {
                 )}
 
                 <div className="text-center space-y-4">
-                  <motion.div
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ duration: 0.5, delay: 0.1 }}
-                    className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-2xl mb-4 border border-gray-700/50"
+                  <div
+                    className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-2xl mb-4 border border-gray-700/50 ui-scale-in"
                   >
                     <FiLock className="w-8 h-8 text-blue-400" />
-                  </motion.div>
+                  </div>
                   <h1 className="text-2xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
                     Create New Password
                   </h1>
@@ -506,14 +467,12 @@ const LoginComponent = () => {
                       </button>
                     </div>
                     {newPassword.length > 0 && newPassword.length < 4 && (
-                      <motion.p
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="text-red-400 text-sm flex items-center"
+                      <p
+                        className="text-red-400 text-sm flex items-center ui-enter"
                       >
                         <span className="w-1.5 h-1.5 bg-red-400 rounded-full mr-2"></span>
                         Password must be at least 4 characters
-                      </motion.p>
+                      </p>
                     )}
                   </div>
 
@@ -546,37 +505,31 @@ const LoginComponent = () => {
                       </button>
                     </div>
                     {confirmPassword.length > 0 && newPassword !== confirmPassword && (
-                      <motion.p
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="text-red-400 text-sm flex items-center"
+                      <p
+                        className="text-red-400 text-sm flex items-center ui-enter"
                       >
                         <span className="w-1.5 h-1.5 bg-red-400 rounded-full mr-2"></span>
                         Passwords do not match
-                      </motion.p>
+                      </p>
                     )}
                     {confirmPassword.length > 0 && newPassword === confirmPassword && newPassword.length >= 4 && (
-                      <motion.p
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="text-emerald-400 text-sm flex items-center"
+                      <p
+                        className="text-emerald-400 text-sm flex items-center ui-enter"
                       >
                         <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full mr-2"></span>
                         Passwords match
-                      </motion.p>
+                      </p>
                     )}
                   </div>
 
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
+                  <button
                     onClick={handleChangePasswordSubmit}
                     disabled={
                       isLoadingChangePassword || 
                       newPassword.length < 4 || 
                       newPassword !== confirmPassword
                     }
-                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-700 disabled:to-gray-800 disabled:cursor-not-allowed transition-all duration-300 py-3 rounded-xl text-white font-semibold shadow-lg hover:shadow-xl"
+                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-700 disabled:to-gray-800 disabled:cursor-not-allowed transition-all duration-300 py-3 rounded-xl text-white font-semibold shadow-lg hover:shadow-xl transition-transform duration-150 enabled:hover:scale-[1.02] enabled:active:scale-[0.98]"
                   >
                     {isLoadingChangePassword ? (
                       <div className="flex items-center justify-center">
@@ -589,7 +542,7 @@ const LoginComponent = () => {
                     ) : (
                       "Change Password"
                     )}
-                  </motion.button>
+                  </button>
                 </form>
 
                 <div className="text-center">
@@ -607,7 +560,7 @@ const LoginComponent = () => {
                     Back to Login
                   </button>
                 </div>
-              </motion.div>
+              </div>
             </>
           ) : validAuth ? (
             /* OTP SCREEN */
@@ -620,11 +573,8 @@ const LoginComponent = () => {
                   button="Accept"
                 />
               )}
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.4 }}
-                className="space-y-8 bg-gray-900/50 backdrop-blur-2xl border border-gray-700/50 p-8 rounded-2xl shadow-2xl"
+              <div
+                className="space-y-8 bg-gray-900/50 backdrop-blur-2xl border border-gray-700/50 p-8 rounded-2xl shadow-2xl ui-scale-in"
               >
                 {isLoadingOtp && (
                   <div className="mb-4">
@@ -643,14 +593,11 @@ const LoginComponent = () => {
                 )}
 
                 <div className="text-center space-y-4">
-                  <motion.div
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ duration: 0.5, delay: 0.1 }}
-                    className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-2xl mb-4 border border-gray-700/50"
+                  <div
+                    className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-2xl mb-4 border border-gray-700/50 ui-scale-in"
                   >
                     <FiShield className="w-8 h-8 text-blue-400" />
-                  </motion.div>
+                  </div>
                   <h1 className="text-2xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
                     {isResetMode ? "Reset Password Verification" : "Verify Your Identity"}
                   </h1>
@@ -683,23 +630,19 @@ const LoginComponent = () => {
                       />
                     </div>
                     {otp.length !== 6 && otp.length > 0 && (
-                      <motion.p
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="text-red-400 text-sm flex items-center"
+                      <p
+                        className="text-red-400 text-sm flex items-center ui-enter"
                       >
                         <span className="w-1.5 h-1.5 bg-red-400 rounded-full mr-2"></span>
                         OTP must be 6 digits
-                      </motion.p>
+                      </p>
                     )}
                   </div>
 
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
+                  <button
                     onClick={handleOTPSubmission}
                     disabled={isLoadingOtp || otpDisabled || otp.length !== 6}
-                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-700 disabled:to-gray-800 disabled:cursor-not-allowed transition-all duration-300 py-3 rounded-xl text-white font-semibold shadow-lg hover:shadow-xl"
+                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-700 disabled:to-gray-800 disabled:cursor-not-allowed transition-all duration-300 py-3 rounded-xl text-white font-semibold shadow-lg hover:shadow-xl transition-transform duration-150 enabled:hover:scale-[1.02] enabled:active:scale-[0.98]"
                   >
                     {isLoadingOtp ? (
                       <div className="flex items-center justify-center">
@@ -712,7 +655,7 @@ const LoginComponent = () => {
                     ) : (
                       "Verify Code"
                     )}
-                  </motion.button>
+                  </button>
                 </form>
 
                 <div className="text-center">
@@ -732,7 +675,7 @@ const LoginComponent = () => {
                     </button>
                   </p>
                 </div>
-              </motion.div>
+              </div>
             </>
           ) : (
             /* LOGIN FORM */
@@ -745,19 +688,13 @@ const LoginComponent = () => {
                   setIsModalOpen={setInvalidAuth}
                 />
               )}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.1 }}
-                className="space-y-8"
+              <div
+                className="space-y-8 ui-enter"
               >
                 {/* Logo Section */}
                 <div className="text-center space-y-4">
-                  <motion.div
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ duration: 0.5, delay: 0.2 }}
-                    className="inline-flex items-center justify-center w-20 h-20 bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-700/50 mb-6"
+                  <div
+                    className="inline-flex items-center justify-center w-20 h-20 bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-700/50 mb-6 ui-scale-in"
                   >
                     <img
                       src={
@@ -767,7 +704,7 @@ const LoginComponent = () => {
                       alt="Logo"
                       className="w-12 h-12 object-contain"
                     />
-                  </motion.div>
+                  </div>
                   <div>
                     <h1 className="text-4xl font-black mb-2 bg-gradient-to-r from-white via-gray-200 to-gray-300 bg-clip-text text-transparent">
                       Welcome Back
@@ -783,11 +720,8 @@ const LoginComponent = () => {
                   className="space-y-6"
                 >
                   {/* Company Code Field */}
-                  <motion.div
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.5, delay: 0.3 }}
-                    className="space-y-2"
+                  <div
+                    className="space-y-2 ui-slide-in-left"
                   >
                     <label className="block text-sm font-medium text-gray-300">
                       Company Code
@@ -812,36 +746,30 @@ const LoginComponent = () => {
                     {apiEndPointData &&
                       apiEndPointData.length > 0 &&
                       (apiEndPointData?.[0]?.isExpiry === 0 ? (
-                        <motion.p
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="text-emerald-400 text-sm flex items-center"
+                        <p
+                          className="text-emerald-400 text-sm flex items-center ui-enter"
                         >
                           <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full mr-2"></span>
                           Company verified successfully
-                        </motion.p>
+                        </p>
                       ) : (
-                        <motion.p
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="text-yellow-400 text-sm flex items-center"
+                        <p
+                          className="text-yellow-400 text-sm flex items-center ui-enter"
                         >
                           <span className="w-1.5 h-1.5 bg-yellow-400 rounded-full mr-2"></span>
                           Company verified successfully, but the plan has
                           expired.
-                        </motion.p>
+                        </p>
                       ))}
                     {companyCode !== "" &&
                       apiEndPointData &&
                       apiEndPointData.length === 0 && (
-                        <motion.p
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="text-red-400 text-sm flex items-center"
+                        <p
+                          className="text-red-400 text-sm flex items-center ui-enter"
                         >
                           <span className="w-1.5 h-1.5 bg-red-400 rounded-full mr-2"></span>
                           Company not found.
-                        </motion.p>
+                        </p>
                       )}
                     {apiEndPointIsLoading && (
                       <div className="flex items-center justify-center mt-3">
@@ -851,14 +779,11 @@ const LoginComponent = () => {
                         </span>
                       </div>
                     )}
-                  </motion.div>
+                  </div>
 
                   {/* Email Field */}
-                  <motion.div
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.5, delay: 0.4 }}
-                    className="space-y-2"
+                  <div
+                    className="space-y-2 ui-slide-in-left"
                   >
                     <label className="block text-sm font-medium text-gray-300">
                       Email Address
@@ -874,24 +799,19 @@ const LoginComponent = () => {
                       />
                     </div>
                     {errors.username && (
-                      <motion.p
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="text-red-400 text-sm flex items-center"
+                      <p
+                        className="text-red-400 text-sm flex items-center ui-enter"
                       >
                         <span className="w-1.5 h-1.5 bg-red-400 rounded-full mr-2"></span>
                         {errors.username.message}
-                      </motion.p>
+                      </p>
                     )}
-                  </motion.div>
+                  </div>
 
                   {/* Password Field - Only show in login mode */}
                   {!isResetMode && (
-                    <motion.div
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.5, delay: 0.5 }}
-                      className="space-y-2"
+                    <div
+                      className="space-y-2 ui-slide-in-left"
                     >
                       <label className="block text-sm font-medium text-gray-300">
                         Password
@@ -922,29 +842,22 @@ const LoginComponent = () => {
                         </button>
                       </div>
                       {errors.password && (
-                        <motion.p
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="text-red-400 text-sm flex items-center"
+                        <p
+                          className="text-red-400 text-sm flex items-center ui-enter"
                         >
                           <span className="w-1.5 h-1.5 bg-red-400 rounded-full mr-2"></span>
                           {errors.password.message}
-                        </motion.p>
+                        </p>
                       )}
-                    </motion.div>
+                    </div>
                   )}
 
                   {/* Login Button - Only show in login mode */}
                   {apiEndPointData && apiEndPointData?.[0]?.isExpiry === 0 && !isResetMode && (
-                    <motion.button
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.5, delay: 0.6 }}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
+                    <button
                       onClick={onLoginSubmit}
                       disabled={isLoading || loginDisabled}
-                      className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-700 disabled:to-gray-800 disabled:cursor-not-allowed transition-all duration-300 py-3 rounded-xl text-white font-semibold shadow-lg hover:shadow-xl"
+                      className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-700 disabled:to-gray-800 disabled:cursor-not-allowed transition-all duration-300 py-3 rounded-xl text-white font-semibold shadow-lg hover:shadow-xl ui-enter transition-transform duration-150 enabled:hover:scale-[1.02] enabled:active:scale-[0.98]"
                     >
                       {isLoading ? (
                         <div className="flex items-center justify-center">
@@ -954,17 +867,12 @@ const LoginComponent = () => {
                       ) : (
                         "Sign In"
                       )}
-                    </motion.button>
+                    </button>
                   )}
                   
                   {/* Reset Button */}
                   {apiEndPointData && apiEndPointData?.[0]?.isExpiry === 0 && (
-                    <motion.button
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.5, delay: 0.6 }}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
+                    <button
                       onClick={() => {
                         if (isResetMode) {
                           // If already in reset mode, send OTP
@@ -975,15 +883,13 @@ const LoginComponent = () => {
                         }
                       }}
                       disabled={isLoadingReset || resetDisabled}
-                      className={
-                        isResetMode
+                      className={(isResetMode
                           ? `w-full bg-gradient-to-r from-cyan-500 to-blue-600
                              hover:from-cyan-600 hover:to-blue-700
                              disabled:from-gray-700 disabled:to-gray-800
                              disabled:cursor-not-allowed transition-all duration-300
                              py-3 rounded-xl text-white font-semibold shadow-lg hover:shadow-xl`
-                          : "w-full"
-                      }
+                          : "w-full") + " ui-enter transition-transform duration-150 enabled:hover:scale-[1.02] enabled:active:scale-[0.98]"}
                     >
                       {isLoadingReset ? (
                         <div className="flex items-center justify-center">
@@ -993,26 +899,21 @@ const LoginComponent = () => {
                       ) : (
                         isResetMode ? "Send Reset OTP" : "Reset Password"
                       )}
-                    </motion.button>
+                    </button>
                   )}
 
 
                   {/* Back to Login button - Only show in reset mode */}
                   {isResetMode && (
-                    <motion.button
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.5, delay: 0.7 }}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
+                    <button
                       onClick={() => setIsResetMode(false)}
-                      className="w-full bg-transparent border border-gray-600 hover:border-gray-500 transition-all duration-300 py-3 rounded-xl text-gray-300 font-semibold"
+                      className="w-full bg-transparent border border-gray-600 hover:border-gray-500 transition-all duration-300 py-3 rounded-xl text-gray-300 font-semibold ui-enter transition-transform duration-150 enabled:hover:scale-[1.02] enabled:active:scale-[0.98]"
                     >
                       Back to Login
-                    </motion.button>
+                    </button>
                   )}
                 </form>
-              </motion.div>
+              </div>
             </>
           )}
           {modalAttemp && (
@@ -1023,7 +924,7 @@ const LoginComponent = () => {
               button="Accept"
             />
           )}
-        </motion.div>
+        </div>
       </div>
 
       {/* Right Panel - Dark Mode Branding */}
@@ -1031,42 +932,13 @@ const LoginComponent = () => {
         {/* Animated Background Elements */}
         <div className="absolute inset-0">
           {/* Floating geometric shapes */}
-          <motion.div
-            animate={{
-              x: [0, 50, 0],
-              y: [0, -30, 0],
-              rotate: [0, 360],
-            }}
-            transition={{
-              duration: 30,
-              repeat: Infinity,
-              ease: "linear",
-            }}
+          <div
             className="absolute top-20 right-20 w-20 h-20 border-2 border-blue-400/20 rounded-2xl"
           />
-          <motion.div
-            animate={{
-              x: [0, -40, 0],
-              y: [0, 25, 0],
-              scale: [1, 1.2, 1],
-            }}
-            transition={{
-              duration: 25,
-              repeat: Infinity,
-              ease: "easeInOut",
-            }}
+          <div
             className="absolute bottom-40 left-20 w-16 h-16 bg-gradient-to-br from-blue-400/20 to-purple-400/20 rounded-full blur-sm"
           />
-          <motion.div
-            animate={{
-              rotate: [0, 180, 360],
-              scale: [1, 1.1, 1],
-            }}
-            transition={{
-              duration: 20,
-              repeat: Infinity,
-              ease: "linear",
-            }}
+          <div
             className="absolute top-1/3 right-1/4 w-12 h-12 border border-indigo-400/30 rounded-lg"
           />
         </div>
@@ -1079,18 +951,12 @@ const LoginComponent = () => {
           }}
         />
 
-        <motion.div
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.8, delay: 0.3 }}
-          className="m-auto text-white max-w-lg p-8 space-y-8 relative"
+        <div
+          className="m-auto text-white max-w-lg p-8 space-y-8 relative ui-slide-in-right"
         >
           <div className="space-y-6">
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.6, delay: 0.4 }}
-              className="inline-flex items-center space-x-3"
+            <div
+              className="inline-flex items-center space-x-3 ui-scale-in"
             >
               <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
                 <span className="text-white font-bold text-xl">L</span>
@@ -1100,7 +966,7 @@ const LoginComponent = () => {
                   Lightem
                 </span>
               </h2>
-            </motion.div>
+            </div>
 
             <div className="space-y-4">
               <h3 className="text-3xl font-bold text-white leading-tight">
@@ -1116,11 +982,8 @@ const LoginComponent = () => {
               </p>
             </div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.6 }}
-              className="flex items-center space-x-4"
+            <div
+              className="flex items-center space-x-4 ui-enter"
             >
               <a
                 href="/"
@@ -1141,15 +1004,12 @@ const LoginComponent = () => {
                   />
                 </svg>
               </a>
-            </motion.div>
+            </div>
           </div>
 
           {/* Enhanced Feature Highlights */}
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.8 }}
-            className="grid grid-cols-2 gap-6 pt-8 border-t border-gray-700"
+          <div
+            className="grid grid-cols-2 gap-6 pt-8 border-t border-gray-700 ui-enter"
           >
             <div className="space-y-3">
               <div className="w-10 h-10 bg-gradient-to-br from-indigo-500/20 to-indigo-600/20 rounded-xl flex items-center justify-center border border-indigo-500/30">
@@ -1160,15 +1020,12 @@ const LoginComponent = () => {
                 Grows seamlessly with your business
               </p>
             </div>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
 
         {/* Enhanced Decorative Element */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, delay: 1 }}
-          className="absolute bottom-8 right-8"
+        <div
+          className="absolute bottom-8 right-8 ui-scale-in"
         >
           <div className="w-12 h-12 bg-gradient-to-br from-blue-500/20 to-indigo-500/20 backdrop-blur-sm border border-blue-400/30 rounded-xl flex items-center justify-center hover:from-blue-500/30 hover:to-indigo-500/30 transition-all duration-300 cursor-pointer group">
             <svg
@@ -1185,7 +1042,7 @@ const LoginComponent = () => {
               />
             </svg>
           </div>
-        </motion.div>
+        </div>
       </div>
     </div>
   );

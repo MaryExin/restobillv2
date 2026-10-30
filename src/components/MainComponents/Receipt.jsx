@@ -1,4 +1,5 @@
 import React, { forwardRef } from "react";
+import { getOrderItemDisplayName } from "../../utils/orderItemDisplayName";
 
 const rowStyle = { display: "flex", justifyContent: "space-between", margin: "1px 0" };
 const labelStyle = { fontWeight: 600 };
@@ -127,7 +128,7 @@ const Receipt = forwardRef(({ transaction, detailedproduct, businessInfo = {} },
         <tbody>
           {receiptData.items.map((item, index) => (
             <tr key={index}>
-              <td style={{ textAlign: "left" }}>{item.name}</td>
+              <td style={{ textAlign: "left" }}>{getOrderItemDisplayName(item.name)}</td>
               <td style={{ textAlign: "center" }}>{item.qty}</td>
               <td style={{ textAlign: "right" }}>{Number(item.amt).toFixed(2)}</td>
             </tr>

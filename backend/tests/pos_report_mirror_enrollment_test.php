@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . "/../api/pos_report_mirror.php";
+require_once __DIR__ . "/../src/PosSplitBillReport.php";
 
 $cases = [
     "legacy unmapped mutation is ignored" => [[], false, false],
@@ -200,8 +201,53 @@ function posReportMirrorTestSplitArguments(string $arguments): array
     return $parts;
 }
 
+// Splitting creates a new POS transaction, while the original transaction is
+// only refreshed. The source refresh must remove moved detail IDs before the
+// new bill is enrolled because report child rows retain those physical IDs.
+$splitApi = file_get_contents(__DIR__ . '/../api/split_bill.php');
+$splitHelper = file_get_contents(__DIR__ . '/../src/PosSplitBillReport.php');
+if ($splitApi === false || $splitHelper === false) {
+    throw new RuntimeException('Unable to inspect split bill report integration.');
+}
+preg_match_all('/mirrorPosTransactionToReport\s*\((.*?)\);/s', $splitApi, $splitRefreshCalls);
+if (count($splitRefreshCalls[1] ?? []) !== 1) {
+    throw new RuntimeException('Failed: split API must refresh exactly the original transaction directly.');
+}
+$originalArguments = posReportMirrorTestSplitArguments($splitRefreshCalls[1][0]);
+if (count($originalArguments) !== 5 || !str_contains($originalArguments[2], '$source[\'transaction_id\']')) {
+    throw new RuntimeException('Failed: the original split bill must use the default non-enrolling mirror path.');
+}
+$refreshPosition = strpos($splitApi, 'mirrorPosTransactionToReport(');
+$enrollPosition = strpos($splitApi, 'posSplitBillEnrollReport(');
+if ($refreshPosition === false || $enrollPosition === false || $refreshPosition >= $enrollPosition) {
+    throw new RuntimeException('Failed: split API must refresh the original bill before enrolling the new one.');
+}
+preg_match('/posSplitBillEnrollReport\s*\((.*?)\);/s', $splitApi, $newBillCall);
+$newArguments = posReportMirrorTestSplitArguments($newBillCall[1] ?? '');
+if (count($newArguments) !== 7
+    || !str_contains($newArguments[2], '$new[\'ID\']')
+    || !str_contains($newArguments[3], '$new[\'transaction_id\']')
+    || !str_contains($newArguments[4], '$new[\'transaction_date\']')) {
+    throw new RuntimeException('Failed: split enrollment must use the newly created header identity and business date.');
+}
+$claimPosition = strpos($splitHelper, 'posReportMirrorActivationClaimAndNextSequence(');
+$mirrorPosition = strpos($splitHelper, 'mirrorPosTransactionToReport(');
+if ($claimPosition === false || $mirrorPosition === false || $claimPosition >= $mirrorPosition) {
+    throw new RuntimeException('Failed: new split bills must claim activation membership before mirroring.');
+}
+$inactivePdo = new PDO('sqlite::memory:');
+try {
+    posSplitBillEnrollReport($inactivePdo, [], '2', '1002', '2026-10-27', 'CAT', 'UNIT');
+    throw new RuntimeException('Failed: split enrollment accepted a call outside its owning transaction.');
+} catch (LogicException $expected) {
+    // Enrollment must never commit separately from the product transfer.
+}
+
 $enrollingCallers = [];
-$apiFiles = glob(__DIR__ . "/../api/*.php") ?: [];
+$apiFiles = array_merge(
+    glob(__DIR__ . "/../api/*.php") ?: [],
+    glob(__DIR__ . "/../src/*.php") ?: []
+);
 
 foreach ($apiFiles as $apiFile) {
     if (basename($apiFile) === "pos_report_mirror.php") {
@@ -231,9 +277,10 @@ foreach ($apiFiles as $apiFile) {
 }
 
 sort($enrollingCallers);
-if ($enrollingCallers !== ["save_order.php"]) {
+if ($enrollingCallers !== ["PosSplitBillReport.php", "save_order.php"]) {
     throw new RuntimeException(
-        "Failed: only save_order.php may enroll report rows"
+        "Failed: only save_order.php and PosSplitBillReport.php may enroll report rows; found "
+        . implode(', ', $enrollingCallers)
     );
 }
 

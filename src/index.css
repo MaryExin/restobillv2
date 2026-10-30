@@ -1,5 +1,3 @@
-@import url("https://fonts.googleapis.com/css2?family=Poppins:...&display=swap");
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -51,6 +49,19 @@ footer {
 * {
   scrollbar-width: thin;
   scrollbar-color: #2563eb transparent;
+}
+
+/* Shared by POS menus and Settings, including when Orderlist is not mounted.
+   Hide only the track; mouse-wheel, touch, and keyboard scrolling still work. */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .text_shadow {
@@ -291,4 +302,62 @@ body {
 [data-theme="light"] .pos-terminal-fixed,
 [data-theme="light"] .pos-terminal-fixed * {
   color: lightgray !important;
+}
+
+/* Native UI feedback. Short entrances finish without a retained transform so
+   nested fixed dialogs and ordinary hover/drag transforms keep working. */
+.ui-enter { animation: ui-enter 160ms ease-out; }
+.ui-fade-in { animation: ui-fade-in 120ms ease-out; }
+.ui-scale-in { animation: ui-scale-in 140ms ease-out; }
+.ui-slide-in-left { animation: ui-slide-in-left 160ms ease-out; }
+.ui-slide-in-right { animation: ui-slide-in-right 160ms ease-out; }
+.ui-slide-in-bottom { animation: ui-slide-in-bottom 160ms ease-out; }
+.ui-progress-enter { animation: ui-progress-enter 160ms ease-out; }
+.ui-spin { animation: ui-spin 1s linear infinite; }
+.ui-toast-progress {
+  transform-origin: left;
+  animation: ui-toast-countdown var(--ui-toast-duration, 4000ms) linear forwards;
+}
+
+@keyframes ui-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes ui-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes ui-scale-in {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes ui-slide-in-left {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes ui-slide-in-right {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes ui-slide-in-bottom {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes ui-progress-enter {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+@keyframes ui-spin { to { transform: rotate(360deg); } }
+@keyframes ui-toast-countdown {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-enter, .ui-fade-in, .ui-scale-in,
+  .ui-slide-in-left, .ui-slide-in-right, .ui-slide-in-bottom,
+  .ui-progress-enter, .ui-spin, .ui-toast-progress {
+    animation: none;
+  }
+  .transition-transform { transition-duration: 0s !important; }
 }

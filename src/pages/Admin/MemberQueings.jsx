@@ -5,7 +5,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Avatar } from "@mui/material";
-import { motion, AnimatePresence } from "framer-motion";
+
 import { CiSearch } from "react-icons/ci";
 import {
   FiRefreshCw,
@@ -460,26 +460,6 @@ const MemberQueings = () => {
         ? "border-emerald-200/80 bg-emerald-600/10 text-emerald-700"
         : "border-rose-200/80 bg-rose-600/10 text-rose-700";
 
-    const cardVariants = {
-      hidden: { opacity: 0, y: 16, scale: 0.985 },
-      show: {
-        opacity: 1,
-        y: 0,
-        scale: 1,
-        transition: { type: "spring", stiffness: 420, damping: 30 },
-      },
-    };
-
-    const panelVariants = {
-      closed: { x: "110%", opacity: 0 },
-      open: {
-        x: 0,
-        opacity: 1,
-        transition: { type: "spring", stiffness: 380, damping: 30 },
-      },
-      exit: { x: "110%", opacity: 0, transition: { duration: 0.15 } },
-    };
-
     const ActionBtn = ({ icon, label, onClick, tone = "default" }) => {
       const toneClass =
         tone === "good"
@@ -489,14 +469,12 @@ const MemberQueings = () => {
             : "hover:bg-slate-50";
 
       return (
-        <motion.button
-          whileHover={{ y: -1 }}
-          whileTap={{ scale: 0.98 }}
-          className={[
+        <button
+          className={"hover:-translate-y-0.5 active:scale-[0.98] transition-transform duration-150 motion-reduce:transform-none " + ([
             "w-full flex items-center gap-2 px-3 py-2 rounded-2xl",
             "border border-slate-200/80 bg-white/70 transition",
             toneClass,
-          ].join(" ")}
+          ].join(" "))}
           onClick={onClick}
           type="button"
         >
@@ -504,7 +482,7 @@ const MemberQueings = () => {
             {icon}
           </span>
           <span className="text-sm font-semibold text-slate-800">{label}</span>
-        </motion.button>
+        </button>
       );
     };
 
@@ -519,16 +497,13 @@ const MemberQueings = () => {
       "hover:bg-white transition active:scale-[0.99] relative overflow-hidden";
 
     return (
-      <motion.div
+      <div
         ref={cardRef}
-        variants={cardVariants}
-        initial="hidden"
-        animate="show"
-        className={[
+        className={"ui-enter " + ([
           "relative overflow-hidden rounded-3xl",
           "border border-slate-200/80 bg-white/65 backdrop-blur-xl",
           "shadow-[0_18px_50px_rgba(15,23,42,0.10)]",
-        ].join(" ")}
+        ].join(" "))}
       >
         <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-slate-900/10 to-transparent" />
         <div className="pointer-events-none absolute -top-20 -right-20 h-56 w-56 rounded-full bg-[radial-gradient(circle_at_30%_30%,rgba(215,85,41,0.16),transparent_60%)] blur-3xl" />
@@ -545,19 +520,15 @@ const MemberQueings = () => {
           </button>
         </div>
 
-        <AnimatePresence>
+        <>
           {menuOpen && (
-            <motion.div
+            <div
               ref={panelRef}
-              variants={panelVariants}
-              initial="closed"
-              animate="open"
-              exit="exit"
-              className={[
+              className={"ui-slide-in-right " + ([
                 "absolute z-20 top-0 right-0 h-full w-[220px]",
                 "p-3 bg-white/80 backdrop-blur-xl border-l border-slate-200/80",
                 "shadow-[0_20px_60px_rgba(0,0,0,0.20)]",
-              ].join(" ")}
+              ].join(" "))}
             >
               <div className="text-[11px] font-black tracking-wide text-slate-500 px-1">
                 ACTIONS
@@ -598,9 +569,9 @@ const MemberQueings = () => {
               <div className="mt-3 text-[11px] text-slate-500 px-1">
                 Tip: Use approve/reject here.
               </div>
-            </motion.div>
+            </div>
           )}
-        </AnimatePresence>
+        </>
 
         <div className="p-5">
           <div className="flex items-center gap-4">
@@ -639,11 +610,9 @@ const MemberQueings = () => {
               </div>
 
               <div className="mt-3 flex items-center gap-2">
-                <motion.button
-                  whileTap={{ scale: 0.98 }}
-                  whileHover={{ y: -1 }}
+                <button
                   type="button"
-                  className={BTN_APPROVE}
+                  className={"hover:-translate-y-0.5 active:scale-[0.98] transition-transform duration-150 motion-reduce:transform-none " + (BTN_APPROVE)}
                   onClick={openApproveConfirm}
                 >
                   <span className="pointer-events-none absolute inset-0 opacity-80 bg-[radial-gradient(circle_at_20%_20%,rgba(215,85,41,0.20),transparent_55%),radial-gradient(circle_at_80%_80%,rgba(255,122,0,0.16),transparent_60%)]" />
@@ -654,13 +623,11 @@ const MemberQueings = () => {
                     </span>
                     Approve
                   </span>
-                </motion.button>
+                </button>
 
-                <motion.button
-                  whileTap={{ scale: 0.98 }}
-                  whileHover={{ y: -1 }}
+                <button
                   type="button"
-                  className={BTN_REJECT}
+                  className={"hover:-translate-y-0.5 active:scale-[0.98] transition-transform duration-150 motion-reduce:transform-none " + (BTN_REJECT)}
                   onClick={openRejectConfirm}
                 >
                   <span className="pointer-events-none absolute inset-0 opacity-80 bg-[radial-gradient(circle_at_20%_20%,rgba(236,72,153,0.14),transparent_55%),radial-gradient(circle_at_80%_80%,rgba(215,85,41,0.14),transparent_60%)]" />
@@ -671,7 +638,7 @@ const MemberQueings = () => {
                     </span>
                     Reject
                   </span>
-                </motion.button>
+                </button>
               </div>
             </div>
           </div>
@@ -708,7 +675,7 @@ const MemberQueings = () => {
             100% { transform: translateX(260px) rotate(12deg); opacity: .15; }
           }
         `}</style>
-      </motion.div>
+      </div>
     );
   };
 
@@ -751,10 +718,8 @@ const MemberQueings = () => {
             setIsModalOpen={setShowSuccess}
             resetForm={() => {
               handleUsersReset();
-
               if ((lastActionRef.current || "").toLowerCase() === "approved") {
                 const approvedId = lastUserIdRef.current;
-
                 openAfterApproveModal({
                   message:
                     "✅ Approved successfully.\n\nCredentials (username & password) were already sent to the user’s email, including the company code.\n\nWould you like to go to User Roles now and assign Function / Routes / Business Unit access?",
@@ -954,10 +919,8 @@ const MemberQueings = () => {
                 </div>
 
                 <div className="mt-4 flex justify-end">
-                  <motion.button
-                    whileHover={{ y: -2 }}
-                    whileTap={{ scale: 0.98 }}
-                    className={BTN_GHOST}
+                  <button
+                    className={"hover:-translate-y-0.5 active:scale-[0.98] transition-transform duration-150 motion-reduce:transform-none " + (BTN_GHOST)}
                     onClick={handleUsersReset}
                     disabled={isFetching}
                   >
@@ -965,7 +928,7 @@ const MemberQueings = () => {
                       {isFetching ? <ModernLoader size={18} /> : null}
                       <span>{isFetching ? "Refreshing…" : "Reset"}</span>
                     </span>
-                  </motion.button>
+                  </button>
                 </div>
               </div>
             </div>

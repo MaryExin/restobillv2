@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/cors.php";
+require_once __DIR__ . "/../src/PosProductSearch.php";
 
 /**
  * PRICING SELECTION API
@@ -47,6 +48,7 @@ $sales_type_desc = trim($input["sales_type"] ?? "");
 $item_category   = trim($input["item_category"] ?? "");
 $search          = trim($input["search"] ?? "");
 $limit           = (int)($input["limit"] ?? 50);
+$offset          = max(0, (int)($input["offset"] ?? 0));
 
 // Optional: look up pricing for a specific set of product codes (e.g. to
 // re-price items already sitting in the cart when the sales type changes),
@@ -137,6 +139,7 @@ try {
     ------------------------------ */
     $where = [];
     $params = [];
+    $orderBy = "T2.item_name ASC";
 
     $where[] = "T2.category_code = :category_code";
     $params[":category_code"] = $category_code;
@@ -158,20 +161,19 @@ try {
         }
         $where[] = "T1.inv_code IN (" . implode(", ", $codePlaceholders) . ")";
         $limit = count($codes);
+        $offset = 0;
     } elseif ($item_category !== "" && $search === "") {
         $where[] = "T2.item_category = :item_category";
         $params[":item_category"] = $item_category;
     }
 
     if (empty($codes) && $search !== "") {
-        $where[] = "(
-            T2.item_name LIKE :search
-            OR T2.item_description LIKE :search
-            OR T2.sku LIKE :search
-            OR T2.bar_code LIKE :search
-            OR T1.inv_code LIKE :search
-        )";
-        $params[":search"] = "%" . $search . "%";
+        $productSearch = posProductSearchPredicate($search);
+        if ($productSearch["sql"] !== "") {
+            $where[] = $productSearch["sql"];
+            $params = array_merge($params, $productSearch["params"]);
+            $orderBy = $productSearch["order_by"];
+        }
     }
 
     $sqlProducts = "SELECT
@@ -206,8 +208,8 @@ try {
                     LEFT JOIN tbl_inventory_products_masterlist AS T2
                         ON T1.inv_code = T2.product_id
                     WHERE " . implode(" AND ", $where) . "
-                    ORDER BY T2.item_name ASC
-                    LIMIT " . (int)$limit;
+                    ORDER BY " . $orderBy . ", T1.inv_code ASC, T1.seq ASC
+                    LIMIT " . (int)$limit . " OFFSET " . (int)$offset;
 
     $stmtProducts = $pdo->prepare($sqlProducts);
     $stmtProducts->execute($params);
@@ -226,7 +228,8 @@ try {
             "unit_code" => $unit_code,
             "item_category" => $item_category,
             "search" => $search,
-            "limit" => $limit
+            "limit" => $limit,
+            "offset" => $offset
         ],
         "count" => count($products),
         "products" => $products

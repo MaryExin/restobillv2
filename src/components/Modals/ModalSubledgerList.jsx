@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { LinearProgress } from "@mui/material";
 import { useSecuredMutation } from "../../hooks/useSecuredMutation";
 import ModalSLRunningBal from "./ModalSLRunningBal";
@@ -271,13 +270,9 @@ const ModalSubledgerList = ({
 
   return (
     <>
-      <AnimatePresence>
-        <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-3 sm:p-5"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.18 }}
+      <>
+        <div
+          className="ui-fade-in fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-3 sm:p-5"
           onClick={(e) => {
             if (e.target === e.currentTarget) closeModal();
           }}
@@ -285,12 +280,8 @@ const ModalSubledgerList = ({
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/55 via-black/20 to-black/60" />
           <div className="pointer-events-none absolute inset-0 opacity-[0.07] [background:radial-gradient(circle_at_20%_15%,white,transparent_35%),radial-gradient(circle_at_80%_25%,white,transparent_38%),radial-gradient(circle_at_40%_80%,white,transparent_42%)]" />
 
-          <motion.div
-            className="relative w-[95vw] sm:w-[90vw] md:w-[84vw] lg:w-[80vw] max-w-4xl"
-            initial={{ scale: 0.92, opacity: 0, y: 12 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 0.92, opacity: 0, y: 12 }}
-            transition={{ type: "spring", stiffness: 380, damping: 28 }}
+          <div
+            className="ui-scale-in relative w-[95vw] sm:w-[90vw] md:w-[84vw] lg:w-[80vw] max-w-4xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="rounded-3xl p-[1px] bg-gradient-to-br from-colorBrandLight via-white/30 to-colorBrandLight shadow-[0_30px_90px_-55px_rgba(0,0,0,0.7)]">
@@ -385,14 +376,10 @@ const ModalSubledgerList = ({
                       </div>
                     </div>
 
-                    <AnimatePresence initial={false}>
+                    <>
                       {showFilters && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: "auto", opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.18 }}
-                          className="overflow-hidden"
+                        <div
+                          className="ui-fade-in overflow-hidden"
                         >
                           <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
                             <div className="lg:col-span-1">
@@ -526,9 +513,9 @@ const ModalSubledgerList = ({
                               </div>
                             </div>
                           </div>
-                        </motion.div>
+                        </div>
                       )}
-                    </AnimatePresence>
+                    </>
                   </div>
 
                   {/* List */}
@@ -647,9 +634,9 @@ const ModalSubledgerList = ({
                 </div>
               </div>
             </div>
-          </motion.div>
-        </motion.div>
-      </AnimatePresence>
+          </div>
+        </div>
+      </>
 
       {isModalSlRunningBal && (
         <ModalSLRunningBal

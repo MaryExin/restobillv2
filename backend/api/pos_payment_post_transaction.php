@@ -14,6 +14,7 @@ date_default_timezone_set("Asia/Manila");
 
 require __DIR__ . "/pdo.php";
 require_once __DIR__ . "/pos_report_mirror.php";
+require_once __DIR__ . "/../src/PosCurrentBillItems.php";
 
 function normalizeDiscountType($value)
 {
@@ -347,7 +348,8 @@ try {
             billing_no,
             invoice_no,
             remarks,
-            status
+            status,
+            order_status
         FROM tbl_pos_transactions
         WHERE {$readWhere}
         LIMIT 1
@@ -374,6 +376,12 @@ try {
     if ($Category_Code === "" || $Unit_Code === "") {
         throw new Exception("Category_Code and Unit_Code are required on the transaction row.");
     }
+
+    $currentCart = $body['cart_items'] ?? null;
+    if ($currentCart !== null && !is_array($currentCart)) {
+        throw new InvalidArgumentException('cart_items must be an array.');
+    }
+    posAssertCurrentBillItems($pdo, $existing, $TotalSales, $currentCart);
 
     $postedCheckStmt = $pdo->prepare("
         SELECT COUNT(*)

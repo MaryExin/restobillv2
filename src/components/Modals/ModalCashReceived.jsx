@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import { FaCashRegister, FaTimes } from "react-icons/fa";
 import { FiArrowLeft } from "react-icons/fi";
 import { set } from "lodash";
@@ -87,20 +86,12 @@ const ModalCashReceived = ({
   };
 
   return (
-    <AnimatePresence>
-      <motion.div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.3 }}
+    <>
+      <div
+        className="ui-fade-in fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm"
       >
-        <motion.div
-          className="bg-gradient-to-br from-colorBrand to-colorBrandSecondary p-1 rounded-2xl shadow-2xl w-[90vw] max-w-2xl"
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.8, opacity: 0 }}
-          transition={{ type: "spring", stiffness: 300, damping: 25 }}
+        <div
+          className="ui-scale-in bg-gradient-to-br from-colorBrand to-colorBrandSecondary p-1 rounded-2xl shadow-2xl w-[90vw] max-w-2xl"
         >
           <div className="bg-white rounded-2xl overflow-hidden">
             {/* Header */}
@@ -108,14 +99,11 @@ const ModalCashReceived = ({
               <div className="absolute -top-8 -left-8 w-24 h-24 bg-colorBrandLighter rounded-full opacity-50 mix-blend-multiply animate-pulse" />
               <div className="absolute -bottom-8 -right-8 w-28 h-28 bg-colorBrandLighter rounded-full opacity-40 mix-blend-multiply" />
               <div className="absolute inset-0 flex items-center justify-between px-4">
-                <motion.div
-                  className="bg-white rounded-full p-4 shadow-lg"
-                  initial={{ rotate: -180, scale: 0, opacity: 0 }}
-                  animate={{ rotate: 0, scale: 1, opacity: 1 }}
-                  transition={{ duration: 0.7, ease: "easeOut" }}
+                <div
+                  className="ui-scale-in bg-white rounded-full p-4 shadow-lg"
                 >
                   <FaCashRegister className="w-16 h-16 text-colorBrand" />
-                </motion.div>
+                </div>
                 <button onClick={() => handleClose()} className="text-white">
                   <FaTimes className="w-8 h-8" />
                 </button>
@@ -309,9 +297,9 @@ const ModalCashReceived = ({
               )}
             </div>
           </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+        </div>
+      </div>
+    </>
   );
 };
 

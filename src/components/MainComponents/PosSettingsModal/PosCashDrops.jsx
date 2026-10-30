@@ -5,7 +5,7 @@ import {
   FiDollarSign, FiUser, FiClock, FiPlus, 
   FiCheckCircle, FiLoader, FiActivity, FiArrowDownCircle 
 } from "react-icons/fi";
-import { motion, AnimatePresence } from "framer-motion";
+
 
 const PosCashDrops = ({ isDark, accent }) => {
   const [amount, setAmount] = useState("");
@@ -84,26 +84,25 @@ const PosCashDrops = ({ isDark, accent }) => {
           </div>
         </div>
 
-        <motion.div 
-          initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-          className={`px-10 py-6 rounded-[35px] border-2 flex flex-col items-end ${isDark ? 'bg-white/5 border-white/5' : 'bg-white border-slate-100 shadow-sm'}`}
+        <div
+          className={`ui-scale-in px-10 py-6 rounded-[35px] border-2 flex flex-col items-end ${isDark ? 'bg-white/5 border-white/5' : 'bg-white border-slate-100 shadow-sm'}`}
         >
           <span className="text-[10px] font-black opacity-40 uppercase tracking-widest">Total Drops (Today)</span>
           <span className="text-4xl font-black tracking-tighter" style={{ color: accent }}>
             ₱{totalDrops.toLocaleString('en-US', { minimumFractionDigits: 2 })}
           </span>
-        </motion.div>
+        </div>
       </header>
 
       <div className="grid grid-cols-1 gap-10 lg:grid-cols-12">
-        
+
         {/* ENTRY FORM */}
-        <motion.div className="lg:col-span-4" initial={{ x: -20, opacity: 0 }} animate={{ x: 0, opacity: 1 }}>
+        <div className="ui-slide-in-left lg:col-span-4"  >
           <form onSubmit={handleSubmit} className={`p-8 rounded-[45px] border-2 border-dashed ${isDark ? 'border-white/10 bg-white/[0.02]' : 'border-slate-200 bg-white shadow-sm'}`}>
             <h3 className="text-[11px] font-black uppercase tracking-widest opacity-30 mb-8 italic flex items-center gap-2">
               <FiArrowDownCircle /> New Authorized Drop
             </h3>
-            
+
             <div className="space-y-6">
               <div className="space-y-2">
                 <label className="text-[9px] font-black uppercase tracking-widest opacity-40 ml-2">Amount (PHP)</label>
@@ -141,16 +140,16 @@ const PosCashDrops = ({ isDark, accent }) => {
               </button>
             </div>
           </form>
-        </motion.div>
+        </div>
 
         {/* AUDIT LOG TABLE */}
-        <motion.div className="lg:col-span-8" initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }}>
+        <div className="ui-slide-in-right lg:col-span-8"  >
           <div className={`rounded-[50px] border h-full overflow-hidden flex flex-col ${isDark ? 'bg-white/[0.01] border-white/5' : 'bg-slate-50/50 border-slate-100'}`}>
             <div className="flex items-center justify-between p-10 border-b border-inherit bg-black/5">
               <span className="text-[11px] font-black uppercase tracking-widest opacity-40 italic">Transaction Audit</span>
               <span className="px-4 py-1 rounded-full text-[9px] font-black bg-white/5 opacity-40 uppercase tracking-tighter">CNC-STA.MARIA</span>
             </div>
-            
+
             <div className="flex-1 overflow-y-auto custom-scrollbar min-h-[400px]">
               <table className="w-full text-left">
                 <tbody className="divide-y divide-inherit">
@@ -180,7 +179,7 @@ const PosCashDrops = ({ isDark, accent }) => {
               </table>
             </div>
           </div>
-        </motion.div>
+        </div>
 
       </div>
     </div>

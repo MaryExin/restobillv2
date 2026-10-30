@@ -10,7 +10,7 @@ import {
   FiLoader,
   FiCamera,
 } from "react-icons/fi";
-import { motion, AnimatePresence } from "framer-motion";
+
 import Cropper from "react-easy-crop";
 import useApiHost from "../../../hooks/useApiHost";
 import { usePosRoleOptions } from "../../../hooks/usePosRoleAccessConfig";
@@ -384,13 +384,11 @@ const PosUserAccounts = ({ isDark, accent, getContrastText }) => {
       </div>
 
       {/* REGISTRATION MODAL */}
-      <AnimatePresence>
+      <>
         {isModalOpen && (
           <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6 bg-black/90 backdrop-blur-2xl">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className={`w-full max-w-6xl rounded-[60px] p-16 overflow-y-auto max-h-[95vh] ${isDark ? "bg-[#0b1222]" : "bg-white"}`}
+            <div
+              className={`ui-scale-in w-full max-w-6xl rounded-[60px] p-16 overflow-y-auto max-h-[95vh] ${isDark ? "bg-[#0b1222]" : "bg-white"}`}
             >
               <div className="flex items-center justify-between mb-10">
                 <h3
@@ -526,10 +524,10 @@ const PosUserAccounts = ({ isDark, accent, getContrastText }) => {
                     ? "Save Changes"
                     : "Confirm & Save Registry"}
               </button>
-            </motion.div>
+            </div>
           </div>
         )}
-      </AnimatePresence>
+      </>
 
       {/* IMAGE CROPPER MODAL */}
       {isCropperOpen && (

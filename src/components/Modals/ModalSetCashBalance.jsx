@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AnimatePresence, motion } from "framer-motion";
 import useZustandSideMenu from "../../context/useZustandSideMenu";
 import ModalYesNoReusable from "./ModalYesNoReusable";
 import { FaCashRegister } from "react-icons/fa";
@@ -64,21 +63,13 @@ const ModalSetCashBalance = ({
 
   return (
     <>
-      <AnimatePresence>
-        <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.3 }}
+      <>
+        <div
+          className="ui-fade-in fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm"
         >
           {/* Lightem Modal wrapper with red motif */}
-          <motion.div
-            className="bg-gradient-to-br from-colorBrand to-colorBrandSecondary p-1 rounded-2xl shadow-2xl"
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.8, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+          <div
+            className="ui-scale-in bg-gradient-to-br from-colorBrand to-colorBrandSecondary p-1 rounded-2xl shadow-2xl"
           >
             <div className="bg-white rounded-2xl overflow-hidden w-[90vw] max-w-md">
               {/* Header with geometric shapes and cash icon */}
@@ -86,15 +77,12 @@ const ModalSetCashBalance = ({
                 <div className="absolute -top-8 -left-8 w-24 h-24 bg-colorBrandLighter rounded-full opacity-50 mix-blend-multiply animate-pulse" />
                 <div className="absolute -bottom-8 -right-8 w-28 h-28 bg-colorBrandLighter rounded-full opacity-40 mix-blend-multiply" />
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <motion.div
-                    initial={{ rotate: -180, scale: 0, opacity: 0 }}
-                    animate={{ rotate: 0, scale: 1, opacity: 1 }}
-                    transition={{ duration: 0.7, ease: "easeOut" }}
-                    className="bg-white rounded-full p-4 shadow-lg cursor-pointer"
+                  <div
+                    className="ui-scale-in bg-white rounded-full p-4 shadow-lg cursor-pointer"
                     onClick={handleClose}
                   >
                     <FaCashRegister className="w-16 h-16 text-colorBrand" />
-                  </motion.div>
+                  </div>
                 </div>
               </div>
 
@@ -124,14 +112,12 @@ const ModalSetCashBalance = ({
                       required
                     />
                   </div>
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
+                  <button
                     type="submit"
-                    className="w-full inline-flex justify-center items-center px-6 py-3 bg-colorBrand hover:bg-colorBrandSecondary text-white font-medium rounded-full shadow-lg transition"
+                    className="hover:opacity-90 active:opacity-80 transition-opacity duration-150 w-full inline-flex justify-center items-center px-6 py-3 bg-colorBrand hover:bg-colorBrandSecondary text-white font-medium rounded-full shadow-lg transition"
                   >
                     Submit
-                  </motion.button>
+                  </button>
                 </form>
 
                 {/* Yes/No Modal */}
@@ -146,9 +132,9 @@ const ModalSetCashBalance = ({
                 )}
               </div>
             </div>
-          </motion.div>
-        </motion.div>
-      </AnimatePresence>
+          </div>
+        </div>
+      </>
       {showhidesuccess && (
         <>
           <ModalSuccessNavToSelf

@@ -7,7 +7,6 @@ import React, {
   useState,
   useCallback,
 } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { FixedSizeList as List } from "react-window";
 import {
   FaArrowLeft,
@@ -274,15 +273,12 @@ const ShiftCard = ({ row, checked, onToggle, isDark, disabledAll = false }) => {
   const badgeCls = badgeForShift(row, isDark);
 
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 14 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={`rounded-[2rem] overflow-hidden border ${
+    <div
+      className={(`rounded-[2rem] overflow-hidden border ${
         isDark
           ? "bg-slate-900/30 border-white/5"
           : "bg-white border-slate-200 shadow-sm"
-      }`}
+      }`) + " ui-enter"}
       style={{ marginBottom: "18px" }}
     >
       <div className="p-5 md:p-6">
@@ -460,7 +456,7 @@ const ShiftCard = ({ row, checked, onToggle, isDark, disabledAll = false }) => {
           </div>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 };
 
@@ -1838,7 +1834,7 @@ Both WEB shifting tables will be updated to Status = Synced atomically. Both LOC
             </div>
           ) : viewMode === "card" ? (
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-              <AnimatePresence mode="popLayout">
+              <>
                 {filteredRows.map((row) => (
                   <ShiftCard
                     key={row.row_key}
@@ -1849,7 +1845,7 @@ Both WEB shifting tables will be updated to Status = Synced atomically. Both LOC
                     disabledAll={isSyncing}
                   />
                 ))}
-              </AnimatePresence>
+              </>
             </div>
           ) : (
             <div

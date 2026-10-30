@@ -8,7 +8,6 @@ import {
   createAndDownloadEmptyCSV,
 } from "../Modals/utils/downloadHelper";
 import { FiFilter, FiDownload } from "react-icons/fi";
-import { motion } from "framer-motion";
 import useZustandAPIEndpoint from "../../context/useZustandAPIEndpoint";
 
 function ModalFilterExcel({ isOpen, onClose }) {
@@ -939,23 +938,16 @@ function ModalFilterExcel({ isOpen, onClose }) {
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-800 bg-opacity-50 p-10">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6">
-            <motion.h2
-              className="flex items-center space-x-2 bg-colorBrand text-white p-3 rounded-2xl shadow-lg mb-4"
-              initial={{ x: -30, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              transition={{ type: "spring", stiffness: 250, damping: 20 }}
-              whileHover={{ scale: 1.02 }}
+            <h2
+              className="ui-slide-in-left hover:opacity-90 transition-opacity duration-150 flex items-center space-x-2 bg-colorBrand text-white p-3 rounded-2xl shadow-lg mb-4"
             >
-              <motion.span
-                className="p-1 bg-white/20 rounded-full"
-                initial={{ rotate: 0 }}
-                animate={{ rotate: 360 }}
-                transition={{ repeat: Infinity, duration: 5, ease: "linear" }}
+              <span
+                className="ui-fade-in p-1 bg-white/20 rounded-full"
               >
                 <FiFilter className="w-6 h-6 text-white" />
-              </motion.span>
+              </span>
               <span className="text-xl font-semibold">Filter Options</span>
-            </motion.h2>
+            </h2>
 
             {/* <div className="mb-4">
               <label className="block text-gray-700">Excel Token</label>
@@ -1020,35 +1012,24 @@ function ModalFilterExcel({ isOpen, onClose }) {
               >
                 Cancel
               </button>
-              <motion.button
+              <button
                 onClick={handleSequentialDownloads}
-                className="flex items-center space-x-2 px-5 py-3 bg-gradient-to-br from-green-700 to-green-600 text-white rounded-full shadow-lg"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ type: "spring", stiffness: 260, damping: 20 }}
+                className="ui-enter hover:opacity-90 active:opacity-80 transition-opacity duration-150 flex items-center space-x-2 px-5 py-3 bg-gradient-to-br from-green-700 to-green-600 text-white rounded-full shadow-lg"
               >
                 {isLoadingCSV ? (
-                  <motion.span
+                  <span
                     className="flex items-center space-x-2"
-                    animate={{ rotate: 360 }}
-                    transition={{
-                      repeat: Infinity,
-                      duration: 1,
-                      ease: "linear",
-                    }}
                   >
-                    <FiDownload className="w-5 h-5" />
+                    <FiDownload className="ui-spin w-5 h-5" />
                     <span>Loading...</span>
-                  </motion.span>
+                  </span>
                 ) : (
                   <span className="flex items-center space-x-2">
                     <FiDownload className="w-5 h-5" />
                     <span>CSVs</span>
                   </span>
                 )}
-              </motion.button>
+              </button>
             </div>
           </div>
         </div>

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { posAuthenticatedFetch } from "../../utils/posAuthenticatedFetch";
+import { getOrderItemDisplayName } from "../../utils/orderItemDisplayName";
 
 const peso = (value) =>
   Number(value || 0).toLocaleString("en-PH", {
@@ -547,7 +548,7 @@ const PosPaymentReceipt = React.forwardRef(
                 <tr key={item.ID || index}>
                   <td style={{ padding: "2px 0", verticalAlign: "top" }}>
                     •{" "}
-                    {String(
+                    {getOrderItemDisplayName(
                       item.item_name || item.product_id || "-",
                     ).toUpperCase()}
                   </td>

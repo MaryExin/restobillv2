@@ -1,7 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import useZustandSideMenu from "../../context/useZustandSideMenu";
-import { motion } from "framer-motion";
 import { FaCheckCircle, FaArrowRight } from "react-icons/fa";
 import useZustandAPIEndpoint from "../../context/useZustandAPIEndpoint";
 
@@ -17,12 +16,8 @@ const ModalSuccess = ({ header, message, button, route }) => {
         backgroundColor: "rgba(0, 0, 0, 0.55)",
       }}
     >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.8 }}
-        transition={{ type: "spring", stiffness: 300, damping: 25 }}
-        className="overflow-hidden rounded-2xl p-[1px] shadow-2xl"
+      <div
+        className="ui-scale-in overflow-hidden rounded-2xl p-[1px] shadow-2xl"
         style={{
           background:
             "linear-gradient(135deg, var(--app-accent), var(--app-accent-secondary))",
@@ -59,11 +54,8 @@ const ModalSuccess = ({ header, message, button, route }) => {
             />
 
             <div className="absolute inset-0 flex items-center justify-center">
-              <motion.div
-                initial={{ rotate: -180, scale: 0, opacity: 0 }}
-                animate={{ rotate: 0, scale: 1, opacity: 1 }}
-                transition={{ duration: 0.7, ease: "easeOut" }}
-                className="rounded-full p-4 shadow-lg"
+              <div
+                className="ui-scale-in rounded-full p-4 shadow-lg"
                 style={{
                   backgroundColor: "var(--app-surface)",
                   border: "1px solid var(--app-border)",
@@ -73,7 +65,7 @@ const ModalSuccess = ({ header, message, button, route }) => {
                   className="h-16 w-16"
                   style={{ color: "var(--app-accent)" }}
                 />
-              </motion.div>
+              </div>
             </div>
           </div>
 
@@ -87,11 +79,9 @@ const ModalSuccess = ({ header, message, button, route }) => {
 
             <p style={{ color: "var(--app-muted-text)" }}>{message}</p>
 
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+            <button
               onClick={() => navigate(route)}
-              className="mt-4 inline-flex items-center space-x-2 rounded-full px-6 py-3 font-medium text-white shadow-lg transition"
+              className="hover:opacity-90 active:opacity-80 transition-opacity duration-150 mt-4 inline-flex items-center space-x-2 rounded-full px-6 py-3 font-medium text-white shadow-lg transition"
               style={{
                 background:
                   "linear-gradient(180deg, var(--app-accent) 0%, var(--app-accent-secondary) 100%)",
@@ -100,10 +90,10 @@ const ModalSuccess = ({ header, message, button, route }) => {
             >
               <span>{button}</span>
               <FaArrowRight className="h-5 w-5" />
-            </motion.button>
+            </button>
           </div>
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 };

@@ -32,26 +32,64 @@ import {
   usePosRoleAccessVersion,
 } from "../../hooks/usePosRoleAccessConfig";
 
-// Modals
-import DashboardModal from "../MainComponents/ReportsModal/DashboardModal";
-import DailySalesModal from "../MainComponents/ReportsModal/DailySalesModal";
-import HourlySalesModal from "../MainComponents/ReportsModal/HourlySalesModal";
-import SalesPerProductModal from "../MainComponents/ReportsModal/SalesPerProductModal";
-import TransactionsModal from "../MainComponents/ReportsModal/TransactionsModal";
-import BirESalesModal from "../MainComponents/ReportsModal/BIRESalesModal";
-import RefundsModal from "../MainComponents/ReportsModal/RefundsModal";
-import VoidsModal from "../MainComponents/ReportsModal/VoidsModal";
-import CustomersModal from "../MainComponents/ReportsModal/CustomersModal";
-import LogsModal from "../MainComponents/ReportsModal/LogsModal";
-import ModalXml from "../Modals/ModalXml";
-import ZReadingView from "../MainComponents/ReportsModal/ZReadingView";
-import ZReadingMonthlyView from "../MainComponents/ReportsModal/ZReadingMonthlyView";
-import PricingDashboard from "../MainComponents/ReportsModal/PricingDashboard";
-import MonthlySalesModal from "../MainComponents/ReportsModal/MonthlySalesModal";
-import SalesPerItemPerDateModal from "../MainComponents/ReportsModal/SalesPerItemPerDateModal";
-import EJournalReportModal from "../MainComponents/ReportsModal/EJournalReportModal";
-import CustomerHeadCountModal from "../MainComponents/ReportsModal/CustomerHeadCountModal";
+import lazyDialog from "../common/lazyDialog";
 import TutorialTip from "../common/TutorialTip";
+
+// Each report loads and mounts only when it is first opened.
+const DashboardModal = lazyDialog(
+  () => import("../MainComponents/ReportsModal/DashboardModal"),
+);
+const DailySalesModal = lazyDialog(
+  () => import("../MainComponents/ReportsModal/DailySalesModal"),
+);
+const HourlySalesModal = lazyDialog(
+  () => import("../MainComponents/ReportsModal/HourlySalesModal"),
+);
+const SalesPerProductModal = lazyDialog(
+  () => import("../MainComponents/ReportsModal/SalesPerProductModal"),
+);
+const TransactionsModal = lazyDialog(
+  () => import("../MainComponents/ReportsModal/TransactionsModal"),
+);
+const BirESalesModal = lazyDialog(
+  () => import("../MainComponents/ReportsModal/BIRESalesModal"),
+);
+const RefundsModal = lazyDialog(
+  () => import("../MainComponents/ReportsModal/RefundsModal"),
+);
+const VoidsModal = lazyDialog(
+  () => import("../MainComponents/ReportsModal/VoidsModal"),
+);
+const CustomersModal = lazyDialog(
+  () => import("../MainComponents/ReportsModal/CustomersModal"),
+);
+const LogsModal = lazyDialog(
+  () => import("../MainComponents/ReportsModal/LogsModal"),
+);
+const ModalXml = lazyDialog(
+  () => import("../Modals/ModalXml"),
+);
+const ZReadingView = lazyDialog(
+  () => import("../MainComponents/ReportsModal/ZReadingView"),
+);
+const ZReadingMonthlyView = lazyDialog(
+  () => import("../MainComponents/ReportsModal/ZReadingMonthlyView"),
+);
+const PricingDashboard = lazyDialog(
+  () => import("../MainComponents/ReportsModal/PricingDashboard"),
+);
+const MonthlySalesModal = lazyDialog(
+  () => import("../MainComponents/ReportsModal/MonthlySalesModal"),
+);
+const SalesPerItemPerDateModal = lazyDialog(
+  () => import("../MainComponents/ReportsModal/SalesPerItemPerDateModal"),
+);
+const EJournalReportModal = lazyDialog(
+  () => import("../MainComponents/ReportsModal/EJournalReportModal"),
+);
+const CustomerHeadCountModal = lazyDialog(
+  () => import("../MainComponents/ReportsModal/CustomerHeadCountModal"),
+);
 
 const MenuCard = ({
   icon: Icon,

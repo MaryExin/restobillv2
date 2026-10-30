@@ -7,7 +7,6 @@ import {
   HiDocumentText,
   HiCash,
 } from "react-icons/hi";
-import { motion } from "framer-motion";
 import ModalYesNoReusable from "./ModalYesNoReusable";
 import { LinearProgress } from "@mui/material";
 import Dropdown from "../Dropdown/Dropdown";
@@ -89,11 +88,8 @@ const ModalPettyCash = ({
   return (
     <>
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10 px-3">
-        <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.3 }}
-          className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden"
+        <div
+          className="ui-scale-in bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden"
         >
           {/* Header */}
           <div className="flex items-center justify-between bg-gradient-to-br from-colorBrand to-colorBrandSecondary p-4">
@@ -297,7 +293,7 @@ const ModalPettyCash = ({
               </table>
             </div>
           </div>
-        </motion.div>
+        </div>
       </div>
 
       {/* Confirm Add */}

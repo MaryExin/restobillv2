@@ -14,6 +14,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 $config = require __DIR__ . "/config.php";
 require_once __DIR__ . "/pos_report_mirror.php";
+require_once __DIR__ . "/../src/PosOrderItemInstructions.php";
+require_once __DIR__ . "/../src/PosCurrentBillItems.php";
 
 $conn = new mysqli(
     $config["host"],
@@ -85,6 +87,9 @@ $stmtTransactionLog = null;
 $lockTransaction = null;
 
 try {
+    $hasItemInstruction = posOrderHasItemInstructionColumn($conn);
+    posOrderValidateItemInstructions($cart_items, $hasItemInstruction);
+
     if (!$conn->begin_transaction()) {
         throw new Exception("Failed to start transaction: " . $conn->error);
     }
@@ -94,7 +99,8 @@ try {
             transaction_id,
             order_slip_no,
             remarks,
-            status
+            status,
+            order_status
         FROM tbl_pos_transactions
         WHERE transaction_id = ?
         LIMIT 1
@@ -117,6 +123,8 @@ try {
     if (!$existing) {
         throw new Exception("Transaction not found.");
     }
+
+    posAssertBillNotCancelled($existing);
 
     if (
         strcasecmp((string)($existing['remarks'] ?? ''), 'Paid') === 0 ||
@@ -194,21 +202,7 @@ try {
     $stmtDelete->close();
     $stmtDelete = null;
 
-    $sqlDetails = "INSERT INTO tbl_pos_transactions_detailed (
-        transaction_id,
-        Category_Code,
-        Unit_Code,
-        transaction_date,
-        product_id,
-        sku,
-        sales_quantity,
-        landing_cost,
-        unit_cost,
-        selling_price,
-        vatable,
-        isDiscountable,
-        order_status
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)";
+    $sqlDetails = posOrderDetailInsertSql($hasItemInstruction);
 
     $stmtDetails = $conn->prepare($sqlDetails);
     if (!$stmtDetails) {
@@ -229,8 +223,7 @@ try {
         $isDiscountable = isset($item["isDiscountable"]) ? (string) $item["isDiscountable"] : '';
         $detail_status = $item["order_status"] ?? '';
 
-        $stmtDetails->bind_param(
-            "isssssddddsss",
+        $detailValues = [
             $transaction_id,
             $Category_Code,
             $Unit_Code,
@@ -244,6 +237,13 @@ try {
             $vatable,
             $isDiscountable,
             $detail_status
+        ];
+        if ($hasItemInstruction) {
+            $detailValues[] = posOrderItemInstruction($item);
+        }
+        $stmtDetails->bind_param(
+            'isssssddddsss' . ($hasItemInstruction ? 's' : ''),
+            ...$detailValues
         );
 
         if (!$stmtDetails->execute()) {

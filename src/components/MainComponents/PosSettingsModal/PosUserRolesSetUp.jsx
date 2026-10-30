@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+
 import { 
   FiUsers, FiCheck, FiSearch, FiChevronDown, 
   FiShoppingCart, FiPackage, FiBarChart2, 
@@ -60,7 +60,7 @@ const PosUserRolesSetUp = ({ isDark, accent, textColor }) => {
 
   return (
     <div className="space-y-12 text-left selection:bg-slate-200">
-      
+
       {/* 1. TOP BAR WITH PREMIUM CUSTOM DROPDOWN */}
       <div className={`p-10 rounded-[45px] border-2 flex flex-col lg:flex-row items-center gap-10 transition-all ${theme.panel}`}>
         <div className="relative z-50 flex items-center flex-1 w-full gap-6">
@@ -68,31 +68,26 @@ const PosUserRolesSetUp = ({ isDark, accent, textColor }) => {
                  style={{ backgroundColor: accent, color: textColor }}>
                 <FiUsers />
             </div>
-            
+
             <div className="relative flex-1">
                 <p className={`text-[11px] font-black uppercase tracking-[0.4em] mb-1.5 ${theme.textMuted}`}>Configuration Target</p>
-                
+
                 <button 
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                   className={`w-full flex items-center justify-between font-black uppercase text-2xl tracking-tighter focus:outline-none cursor-pointer ${theme.textPrimary}`}
                 >
                     <span>{selectedEmployeeObj.name}</span>
-                    <motion.div
-                      animate={{ rotate: isDropdownOpen ? 180 : 0 }}
-                      className={`text-2xl transition-colors ${theme.textMuted}`}
+                    <div
+                      className={`text-2xl transition-transform duration-150 ${theme.textMuted} ${isDropdownOpen ? "rotate-180" : "rotate-0"}`}
                     >
                       <FiChevronDown />
-                    </motion.div>
+                    </div>
                 </button>
 
-                <AnimatePresence>
+                <>
                   {isDropdownOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -20 }}
-                      transition={{ duration: 0.3, ease: "easeOut" }}
-                      className={`absolute top-full left-0 mt-4 w-[400px] p-5 rounded-[30px] border z-[60] overflow-hidden ${theme.dropdownBg}`}
+                    <div
+                      className={`ui-fade-in absolute top-full left-0 mt-4 w-[400px] p-5 rounded-[30px] border z-[60] overflow-hidden ${theme.dropdownBg}`}
                     >
                       <div className="space-y-3">
                         {employees.map((emp) => (
@@ -112,7 +107,7 @@ const PosUserRolesSetUp = ({ isDark, accent, textColor }) => {
                                 </span>
                                 <p className={`text-[10px] font-black uppercase tracking-[0.3em] mt-1 ${isDark ? "text-white/30" : "text-slate-400"}`}>{emp.role}</p>
                             </div>
-                            
+
                             {selectedEmployeeObj.name === emp.name && (
                                 <div className="flex items-center justify-center w-6 h-6 text-xl transition-colors duration-500 rounded-full" style={{ color: accent }}>
                                   <FiCheck />
@@ -121,9 +116,9 @@ const PosUserRolesSetUp = ({ isDark, accent, textColor }) => {
                           </button>
                         ))}
                       </div>
-                    </motion.div>
+                    </div>
                   )}
-                </AnimatePresence>
+                </>
             </div>
         </div>
 
@@ -150,10 +145,10 @@ const PosUserRolesSetUp = ({ isDark, accent, textColor }) => {
                 <button onClick={() => toggleCategory(group.items)} className="flex items-center gap-4 px-5 py-2 transition-all rounded-full hover:bg-slate-100 group">
                     <span className={`text-[10px] font-black uppercase tracking-widest ${theme.textMuted} group-hover:text-slate-900`}>Select All</span>
                     <div className="flex items-center w-12 p-1 transition-all border rounded-full shadow-inner h-7 border-slate-300/20" style={{ backgroundColor: isCategoryAllEnabled(group.items) ? accent : (isCategoryPartiallyEnabled(group.items) ? accent + '90' : (isDark ? '#1e293b' : '#e2e8f0')) }}>
-                        <motion.div animate={{ x: isCategoryAllEnabled(group.items) ? 20 : 0 }} className="flex items-center justify-center w-5 h-5 rounded-full shadow-lg" style={{ backgroundColor: isCategoryAllEnabled(group.items) || isCategoryPartiallyEnabled(group.items) ? textColor : '#fff' }}>
+                        <div className="flex items-center justify-center w-5 h-5 rounded-full shadow-lg transition-transform duration-150" style={{ transform: `translateX(${isCategoryAllEnabled(group.items) ? 20 : 0}px)`, backgroundColor: isCategoryAllEnabled(group.items) || isCategoryPartiallyEnabled(group.items) ? textColor : '#fff' }}>
                             {isCategoryAllEnabled(group.items) && <FiCheck size={12} style={{ color: accent }} />}
                             {isCategoryPartiallyEnabled(group.items) && <FiMinus size={12} style={{ color: accent }} />}
-                        </motion.div>
+                        </div>
                     </div>
                 </button>
             </div>
@@ -162,9 +157,9 @@ const PosUserRolesSetUp = ({ isDark, accent, textColor }) => {
                 <div key={item} className="flex items-center justify-between py-1 group">
                   <span className={`text-[14px] font-black uppercase tracking-wide transition-colors ${permissions[item] ? theme.textPrimary : "text-slate-400"}`}>{item}</span>
                   <button onClick={() => togglePermission(item)} className="relative w-16 transition-all duration-300 rounded-full shadow-inner h-9" style={{ backgroundColor: permissions[item] ? accent : (isDark ? '#1e293b' : '#cbd5e1') }}>
-                    <motion.div animate={{ x: permissions[item] ? 28 : 4 }} className="absolute flex items-center justify-center transition-colors rounded-full shadow-xl top-1 h-7 w-7" style={{ backgroundColor: permissions[item] ? textColor : '#fff' }}>
+                    <div className="absolute flex items-center justify-center transition-transform duration-150 rounded-full shadow-xl top-1 h-7 w-7" style={{ transform: `translateX(${permissions[item] ? 28 : 4}px)`, backgroundColor: permissions[item] ? textColor : '#fff' }}>
                         {permissions[item] && <FiCheck size={14} style={{ color: accent }} />}
-                    </motion.div>
+                    </div>
                   </button>
                 </div>
               ))}

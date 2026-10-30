@@ -7,6 +7,7 @@ date_default_timezone_set("Asia/Manila");
 
 require __DIR__ . "/pdo.php";
 require_once __DIR__ . "/pos_report_mirror.php";
+require_once __DIR__ . "/../src/PosCurrentBillItems.php";
 
 function respond(bool $success, string $message, int $status = 200, array $extra = []): void {
     http_response_code($status);
@@ -92,7 +93,7 @@ try {
     $pdo->beginTransaction();
 
     $transactionStmt = $pdo->prepare("
-        SELECT invoice_no, remarks, status, void_id, refund_id
+        SELECT invoice_no, remarks, status, order_status, void_id, refund_id
         FROM tbl_pos_transactions
         WHERE transaction_id = :transaction_id
           AND Category_Code = :category_code
@@ -120,6 +121,13 @@ try {
     if ((int)($transaction["refund_id"] ?? 0) > 0) {
         $pdo->rollBack();
         respond(false, "Transaction is refunded and cannot be marked as paid.", 409);
+    }
+
+    try {
+        posAssertBillNotCancelled($transaction);
+    } catch (InvalidArgumentException $error) {
+        $pdo->rollBack();
+        respond(false, $error->getMessage(), 409);
     }
 
     $currentRemarks = trim((string)($transaction["remarks"] ?? ""));

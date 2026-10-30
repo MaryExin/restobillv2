@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
 import { array } from "zod";
 import { useCustomSecuredMutation } from "../../hooks/useCustomSecuredMutation";
 import ModalYesNoReusable from "./ModalYesNoReusable";
@@ -308,17 +307,14 @@ const ModalCreditClearing = ({
           >
             <div className="scale-90 lg:scale-100  flex flex-col lg:mt-20 h-auto pb-5 shadow-2xl  overflow-y-auto scrollbar rounded-xl bg-slate-50 z-20">
               <div className="bg-gradient-to-br from-colorBrand to-colorBrandSecondary flex items-center justify-between px-6 py-4 rounded-t-2xl">
-                <motion.div
-                  className="flex items-center space-x-3"
-                  initial={{ opacity: 0, x: -50 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.5 }}
+                <div
+                  className="ui-slide-in-left flex items-center space-x-3"
                 >
                   <HiCreditCard className="w-8 h-8 text-white" />
                   {/* <h2 className="text-white text-xl font-semibold">
                     Credit Clearing
                   </h2> */}
-                </motion.div>
+                </div>
 
                 <button
                   onClick={() => setIsModalCreditClearing(false)}

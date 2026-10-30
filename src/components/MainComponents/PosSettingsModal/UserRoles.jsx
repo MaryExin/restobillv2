@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+
 import { FiEye, FiX, FiGlobe, FiUploadCloud } from "react-icons/fi";
 import { FaUserShield, FaArrowLeft } from "react-icons/fa6";
 import { useNavigate } from "react-router-dom";
@@ -60,18 +60,16 @@ const ModernLoader = ({ size = 18, className = "" }) => {
 
 const FloatingReadButton = ({ onOpen, disabled = false }) => {
   return (
-    <motion.button
+    <button
       type="button"
       onClick={onOpen}
       disabled={disabled}
-      whileHover={disabled ? {} : { y: -2, scale: 1.02 }}
-      whileTap={disabled ? {} : { scale: 0.98 }}
-      className={[
+      className={"enabled:hover:-translate-y-0.5 enabled:hover:scale-[1.02] transition-transform duration-150 enabled:active:scale-[0.98] " + ([
         "fixed z-[9998] bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-5",
         "group flex items-center gap-3 rounded-3xl border border-slate-200/80 bg-white/80 backdrop-blur-xl",
         "px-4 py-3 shadow-[0_18px_50px_rgba(15,23,42,0.16)] transition",
         disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-white",
-      ].join(" ")}
+      ].join(" "))}
     >
       <span className="relative">
         <span className="pointer-events-none absolute -inset-3 rounded-2xl bg-gradient-to-br from-orange-500/20 via-red-400/15 to-purple-500/10 blur-xl opacity-80" />
@@ -92,24 +90,22 @@ const FloatingReadButton = ({ onOpen, disabled = false }) => {
       <span className="ml-1 text-[11px] font-semibold text-slate-500">
         Open →
       </span>
-    </motion.button>
+    </button>
   );
 };
 
 const FloatingReadWebButton = ({ onOpen, disabled = false }) => {
   return (
-    <motion.button
+    <button
       type="button"
       onClick={onOpen}
       disabled={disabled}
-      whileHover={disabled ? {} : { y: -2, scale: 1.02 }}
-      whileTap={disabled ? {} : { scale: 0.98 }}
-      className={[
+      className={"enabled:hover:-translate-y-0.5 enabled:hover:scale-[1.02] transition-transform duration-150 enabled:active:scale-[0.98] " + ([
         "fixed z-[9998] bottom-[max(5.75rem,env(safe-area-inset-bottom))] right-5",
         "group flex items-center gap-3 rounded-3xl border border-slate-200/80 bg-white/80 backdrop-blur-xl",
         "px-4 py-3 shadow-[0_18px_50px_rgba(15,23,42,0.16)] transition",
         disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-white",
-      ].join(" ")}
+      ].join(" "))}
     >
       <span className="relative">
         <span className="pointer-events-none absolute -inset-3 rounded-2xl bg-gradient-to-br from-sky-500/20 via-cyan-400/15 to-blue-500/10 blur-xl opacity-80" />
@@ -130,7 +126,7 @@ const FloatingReadWebButton = ({ onOpen, disabled = false }) => {
       <span className="ml-1 text-[11px] font-semibold text-slate-500">
         Open →
       </span>
-    </motion.button>
+    </button>
   );
 };
 
@@ -185,10 +181,8 @@ const UserRoles = () => {
         />
 
         <div className="mx-auto w-full max-w-7xl px-4 lg:px-10">
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-8 rounded-[2rem] border border-slate-200 bg-white/80 backdrop-blur-xl shadow-sm overflow-hidden"
+          <div
+            className="ui-enter mt-8 rounded-[2rem] border border-slate-200 bg-white/80 backdrop-blur-xl shadow-sm overflow-hidden"
           >
             <div className="relative p-6 sm:p-8">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -217,7 +211,7 @@ const UserRoles = () => {
                 </div>
               </div>
             </div>
-          </motion.div>
+          </div>
 
           <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-5">
             <div className="relative lg:col-span-2 rounded-[2rem] border border-slate-200 bg-white/80 backdrop-blur-xl shadow-sm">
@@ -506,7 +500,7 @@ const ReadUserRolesModal = ({ isOpen, onClose }) => {
   };
 
   return (
-    <AnimatePresence>
+    <>
       {isOpen && (
         <>
           {isDeleteYesNoModalOpen && (
@@ -519,47 +513,31 @@ const ReadUserRolesModal = ({ isOpen, onClose }) => {
             />
           )}
 
-          <motion.button
+          <button
             type="button"
             onClick={onClose}
-            className="fixed inset-0 z-[9999] bg-black/55 backdrop-blur-sm"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            className="ui-fade-in fixed inset-0 z-[9999] bg-black/55 backdrop-blur-sm"
             aria-label="Close"
           />
 
-          <motion.div
-            className="fixed inset-0 z-[10000] grid place-items-center px-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+          <div
+            className="ui-fade-in fixed inset-0 z-[10000] grid place-items-center px-4"
           >
-            <motion.div
-              initial={{ opacity: 0, y: 18, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 18, scale: 0.98 }}
-              transition={{ duration: 0.22, ease: "easeOut" }}
-              className="relative w-full max-w-5xl h-[85svh] sm:h-[90vh] overflow-hidden rounded-[2rem] border border-slate-200 bg-white/90 backdrop-blur-xl shadow-[0_28px_90px_rgba(0,0,0,0.30)]"
+            <div
+              className="ui-scale-in relative w-full max-w-5xl h-[85svh] sm:h-[90vh] overflow-hidden rounded-[2rem] border border-slate-200 bg-white/90 backdrop-blur-xl shadow-[0_28px_90px_rgba(0,0,0,0.30)]"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-orange-600 via-red-500 to-purple-600" />
 
               <div className="flex h-full flex-col">
                 <div className="mt-3 ms-3">
-                  <motion.div
-                    initial={false}
-                    animate={{
-                      opacity: isFetching || isFetchingNextPage ? 1 : 0,
-                      y: isFetching || isFetchingNextPage ? 0 : -4,
-                    }}
-                    transition={{ duration: 0.18 }}
-                    className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-600"
+                  <div
+                    className={`inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-600 transition-[opacity,transform] duration-150 ${isFetching || isFetchingNextPage ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-1"}`}
                     style={{ pointerEvents: "none" }}
                   >
-                    <ModernLoader size={18} />
+                    {(isFetching || isFetchingNextPage) && <ModernLoader size={18} />}
                     Syncing list…
-                  </motion.div>
+                  </div>
 
                   <div className="text-xs ms-2 lg:hidden text-zinc-500 mt-1">
                     Swipe right records to Edit or Delete
@@ -732,11 +710,11 @@ const ReadUserRolesModal = ({ isOpen, onClose }) => {
                   </div>
                 </div>
               </div>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         </>
       )}
-    </AnimatePresence>
+    </>
   );
 };
 
@@ -941,7 +919,7 @@ const ReadUserRolesWebModal = ({ isOpen, onClose }) => {
         />
       )}
 
-      <AnimatePresence>
+      <>
         {isOpen && (
           <>
             {isSyncYesNoOpen && (
@@ -954,47 +932,31 @@ const ReadUserRolesWebModal = ({ isOpen, onClose }) => {
               />
             )}
 
-            <motion.button
+            <button
               type="button"
               onClick={onClose}
-              className="fixed inset-0 z-[9999] bg-black/55 backdrop-blur-sm"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              className="ui-fade-in fixed inset-0 z-[9999] bg-black/55 backdrop-blur-sm"
               aria-label="Close"
             />
 
-            <motion.div
-              className="fixed inset-0 z-[10000] grid place-items-center px-4"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+            <div
+              className="ui-fade-in fixed inset-0 z-[10000] grid place-items-center px-4"
             >
-              <motion.div
-                initial={{ opacity: 0, y: 18, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 18, scale: 0.98 }}
-                transition={{ duration: 0.22, ease: "easeOut" }}
-                className="relative w-full max-w-6xl h-[85svh] sm:h-[90vh] overflow-hidden rounded-[2rem] border border-slate-200 bg-white/90 backdrop-blur-xl shadow-[0_28px_90px_rgba(0,0,0,0.30)]"
+              <div
+                className="ui-scale-in relative w-full max-w-6xl h-[85svh] sm:h-[90vh] overflow-hidden rounded-[2rem] border border-slate-200 bg-white/90 backdrop-blur-xl shadow-[0_28px_90px_rgba(0,0,0,0.30)]"
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-sky-500 via-cyan-500 to-blue-500" />
 
                 <div className="flex h-full flex-col">
                   <div className="mt-3 ms-3">
-                    <motion.div
-                      initial={false}
-                      animate={{
-                        opacity: isFetching || isFetchingNextPage ? 1 : 0,
-                        y: isFetching || isFetchingNextPage ? 0 : -4,
-                      }}
-                      transition={{ duration: 0.18 }}
-                      className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[11px] font-semibold text-sky-700"
+                    <div
+                      className={`inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[11px] font-semibold text-sky-700 transition-[opacity,transform] duration-150 ${isFetching || isFetchingNextPage ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-1"}`}
                       style={{ pointerEvents: "none" }}
                     >
-                      <ModernLoader size={18} />
+                      {(isFetching || isFetchingNextPage) && <ModernLoader size={18} />}
                       Loading WEB list…
-                    </motion.div>
+                    </div>
                   </div>
 
                   <div className="shrink-0 p-5 sm:p-6">
@@ -1156,11 +1118,11 @@ const ReadUserRolesWebModal = ({ isOpen, onClose }) => {
                     </div>
                   </div>
                 </div>
-              </motion.div>
-            </motion.div>
+              </div>
+            </div>
           </>
         )}
-      </AnimatePresence>
+      </>
     </>
   );
 };

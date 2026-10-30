@@ -1,3 +1,9 @@
+import { getOrderItemDisplayName } from "./orderItemDisplayName.js";
+
+const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => ({
+  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+})[character]);
+
 const peso = (value) =>
   Number(value || 0).toLocaleString("en-PH", {
     minimumFractionDigits: 2,
@@ -69,7 +75,7 @@ export const buildVoidRefundHtml = ({
   const itemRows = safeItems
     .map((item) => {
       const isDiscountable = yesNoToBool(item?.isDiscountable);
-      const name = `${String(item?.item_name || item?.product_id || "-").toUpperCase()}${
+      const name = `${getOrderItemDisplayName(item?.item_name || item?.product_id || "-").toUpperCase()}${
         isDiscountable ? " (D)" : ""
       }`;
       const qty = Number(item?.sales_quantity || 0);
@@ -80,7 +86,7 @@ export const buildVoidRefundHtml = ({
 
       return `
         <tr>
-          <td class="name">${name}</td>
+          <td class="name">${escapeHtml(name)}</td>
           <td class="qty">${qty}</td>
           <td class="amt">${subtotal}</td>
         </tr>

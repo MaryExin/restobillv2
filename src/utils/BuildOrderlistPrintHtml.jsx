@@ -2,6 +2,7 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import Receipt from "../components/MainComponents/Receipt";
+import { getOrderItemDisplayName } from "./orderItemDisplayName";
 
 const peso = (value) =>
   Number(value || 0).toLocaleString("en-PH", {
@@ -354,7 +355,7 @@ export function BuildOrderReceiptHtml({
                 cartItems.map((item, index) => (
                   <tr key={item.code || index} className="item-row">
                     <td className="py-2 leading-tight item-col">
-                      <div className="bold uppercase">{item.name}</div>
+                      <div className="bold uppercase">{getOrderItemDisplayName(item.name)}</div>
 
                       {item.itemInstruction ? (
                         <div className="text-9 italic mt-1">

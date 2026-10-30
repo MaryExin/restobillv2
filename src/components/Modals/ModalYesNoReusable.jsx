@@ -1,5 +1,4 @@
 import React from "react";
-import { AnimatePresence, motion } from "framer-motion";
 
 const ModalYesNoReusable = ({
   header = "Are you sure?",
@@ -24,24 +23,17 @@ const ModalYesNoReusable = ({
   };
 
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[100000] flex items-center justify-center p-4"
+    <>
+      <div
+        className="ui-fade-in fixed inset-0 z-[100000] flex items-center justify-center p-4"
         style={{
           backgroundColor: "rgba(0,0,0,0.6)",
           backdropFilter: "blur(4px)",
         }}
       >
-        <motion.div
+        <div
           data-tour={dataTour}
-          initial={{ scale: 0.95, y: 10 }}
-          animate={{ scale: 1, y: 0 }}
-          exit={{ scale: 0.95, y: 10 }}
-          transition={{ type: "spring", stiffness: 260, damping: 22 }}
-          className="w-full max-w-sm rounded-3xl border p-8 text-center shadow-2xl"
+          className="ui-scale-in w-full max-w-sm rounded-3xl border p-8 text-center shadow-2xl"
           style={{
             background: "var(--app-surface)",
             color: "var(--app-text)",
@@ -66,12 +58,10 @@ const ModalYesNoReusable = ({
           </p>
 
           <div className="flex gap-3">
-            <motion.button
+            <button
               onClick={handleYes}
               data-tour={dataTourBtn}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="flex-1 rounded-2xl py-3 font-bold text-white"
+              className="hover:opacity-90 active:opacity-80 transition-opacity duration-150 flex-1 rounded-2xl py-3 font-bold text-white"
               style={{
                 background:
                   "linear-gradient(180deg, var(--app-accent), var(--app-accent-secondary))",
@@ -79,13 +69,11 @@ const ModalYesNoReusable = ({
               }}
             >
               {yesLabel}
-            </motion.button>
+            </button>
 
-            <motion.button
+            <button
               onClick={handleNo}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="flex-1 rounded-2xl py-3 font-bold"
+              className="hover:opacity-90 active:opacity-80 transition-opacity duration-150 flex-1 rounded-2xl py-3 font-bold"
               style={{
                 backgroundColor: "var(--app-surface-soft)",
                 color: "var(--app-text)",
@@ -93,11 +81,11 @@ const ModalYesNoReusable = ({
               }}
             >
               {noLabel}
-            </motion.button>
+            </button>
           </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+        </div>
+      </div>
+    </>
   );
 };
 

@@ -15,7 +15,7 @@ import {
   FaList,
 } from "react-icons/fa";
 import { FiEdit2, FiPlus, FiRotateCcw, FiTrash2, FiX } from "react-icons/fi";
-import { motion, AnimatePresence } from "framer-motion";
+
 import useApiHost from "../../hooks/useApiHost";
 import { useTheme } from "../../context/ThemeContext";
 
@@ -757,22 +757,32 @@ const ViewOrdering = () => {
   ]);
 
   useEffect(() => {
-    if (!apiHost || isDateLoading || isTableLayoutSettingLoading) return;
+    // The table picker is covered while an order is being edited. Resume with
+    // an immediate refresh when it becomes visible again.
+    if (!apiHost || isDateLoading || isTableLayoutSettingLoading || showorderlist) return;
 
     let isMounted = true;
+    let requestController;
+    let requestInProgress = false;
 
     const loadTables = () => {
+      if (!isMounted || requestInProgress) return;
       if (!selectedDate && !isTableLayoutEnabled) {
         setOriginalTableList([]);
         setIsLoading(false);
         return;
       }
 
+      requestInProgress = true;
+      requestController = new AbortController();
+      const { signal } = requestController;
+
       if (!isTableLayoutEnabled) {
         fetch(
           `${apiHost}/api/table_list.php?date=${encodeURIComponent(
             selectedDate,
           )}&onlyPending=true`,
+          { signal },
         )
           .then(async (res) => {
             if (!res.ok) {
@@ -789,10 +799,13 @@ const ViewOrdering = () => {
             setIsLoading(false);
           })
           .catch((error) => {
+            if (!isMounted || signal.aborted) return;
             console.error("Failed to load pending tables:", error);
-            if (!isMounted) return;
             setOriginalTableList([]);
             setIsLoading(false);
+          })
+          .finally(() => {
+            requestInProgress = false;
           });
         return;
       }
@@ -802,6 +815,7 @@ const ViewOrdering = () => {
             `${apiHost}/api/table_list.php?date=${encodeURIComponent(
               selectedDate,
             )}&onlyPending=true`,
+            { signal },
           ).then(async (res) => {
             if (!res.ok) {
               throw new Error(`Pending table HTTP ${res.status}`);
@@ -811,7 +825,7 @@ const ViewOrdering = () => {
         : Promise.resolve([]);
 
       Promise.all([
-        fetch(`${apiHost}/api/master_table_list.php?includeAll=true`).then(
+        fetch(`${apiHost}/api/master_table_list.php?includeAll=true`, { signal }).then(
           async (res) => {
             if (!res.ok) {
               throw new Error(`Master table HTTP ${res.status}`);
@@ -833,10 +847,15 @@ const ViewOrdering = () => {
           setIsLoading(false);
         })
         .catch((error) => {
+          if (!isMounted || signal.aborted) return;
+          // If either request fails, stop its sibling before the next poll.
+          requestController.abort();
           console.error("Failed to load floor tables:", error);
-          if (!isMounted) return;
           setOriginalTableList([]);
           setIsLoading(false);
+        })
+        .finally(() => {
+          requestInProgress = false;
         });
     };
 
@@ -847,6 +866,7 @@ const ViewOrdering = () => {
     return () => {
       isMounted = false;
       if (interval) clearInterval(interval);
+      requestController?.abort();
     };
   }, [
     apiHost,
@@ -855,6 +875,7 @@ const ViewOrdering = () => {
     isDateLoading,
     isTableLayoutEnabled,
     isTableLayoutSettingLoading,
+    showorderlist,
   ]);
 
   const activeRoom = useMemo(
@@ -2223,7 +2244,7 @@ const ViewOrdering = () => {
         />
       </div>
 
-      <AnimatePresence>
+      <>
         {showorderlist && (
           <Orderlist
             tableselected={tableselected}
@@ -2234,22 +2255,16 @@ const ViewOrdering = () => {
             initialHeadCount={pendingHeadCount}
           />
         )}
-      </AnimatePresence>
+      </>
 
-      <AnimatePresence>
+      <>
         {showHeadCountModal && (
-          <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm px-4"
+          <div
+            className="ui-fade-in fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm px-4"
             style={{ backgroundColor: "rgba(0,0,0,0.55)" }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
           >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="w-full max-w-sm rounded-[2rem] p-6 shadow-2xl border"
+            <div
+              className="ui-scale-in w-full max-w-sm rounded-[2rem] p-6 shadow-2xl border"
               style={{
                 backgroundColor: surface,
                 borderColor: border,
@@ -2313,25 +2328,19 @@ const ViewOrdering = () => {
                   Open Order
                 </button>
               </div>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
+      </>
 
-      <AnimatePresence>
+      <>
         {showPendingConfirmModal && (
-          <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm px-4"
+          <div
+            className="ui-fade-in fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm px-4"
             style={{ backgroundColor: "rgba(0,0,0,0.55)" }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
           >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="w-full max-w-md rounded-[2rem] p-6 shadow-2xl border"
+            <div
+              className="ui-scale-in w-full max-w-md rounded-[2rem] p-6 shadow-2xl border"
               style={{
                 backgroundColor: surface,
                 borderColor: border,
@@ -2371,25 +2380,19 @@ const ViewOrdering = () => {
                   Proceed
                 </button>
               </div>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
+      </>
 
-      <AnimatePresence>
+      <>
         {showOrderModal && (
-          <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm px-3 sm:px-4 py-3"
+          <div
+            className="ui-fade-in fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm px-3 sm:px-4 py-3"
             style={{ backgroundColor: "rgba(0,0,0,0.55)" }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
           >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.96, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 8 }}
-              className="w-full max-w-[730px] rounded-[1.5rem] p-4 sm:p-5 shadow-2xl border"
+            <div
+              className="ui-scale-in w-full max-w-[730px] rounded-[1.5rem] p-4 sm:p-5 shadow-2xl border"
               style={{
                 backgroundColor: surface,
                 borderColor: border,
@@ -2866,28 +2869,22 @@ const ViewOrdering = () => {
                   Open Order
                 </button>
               </div>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
+      </>
 
-      <AnimatePresence>
+      <>
         {showAddRoomModal && (
-          <motion.div
-            className="fixed inset-0 z-[75] flex items-center justify-center bg-black/60 px-4 py-5 backdrop-blur-sm"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+          <div
+            className="ui-fade-in fixed inset-0 z-[75] flex items-center justify-center bg-black/60 px-4 py-5 backdrop-blur-sm"
           >
-            <motion.form
+            <form
               onSubmit={(event) => {
                 event.preventDefault();
                 handleSaveNewRoom();
               }}
-              initial={{ opacity: 0, scale: 0.96, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 10 }}
-              className="w-full max-w-md overflow-hidden rounded-[1.5rem] bg-white shadow-2xl ring-1 ring-white/30"
+              className="ui-scale-in w-full max-w-md overflow-hidden rounded-[1.5rem] bg-white shadow-2xl ring-1 ring-white/30"
             >
               <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-6 py-5">
                 <div>
@@ -2939,24 +2936,18 @@ const ViewOrdering = () => {
                   {isRoomsSaving ? "Saving..." : "Create Room"}
                 </button>
               </div>
-            </motion.form>
-          </motion.div>
+            </form>
+          </div>
         )}
-      </AnimatePresence>
+      </>
 
-      <AnimatePresence>
+      <>
         {showRoomSetupModal && (
-          <motion.div
-            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 px-4 py-5 backdrop-blur-sm"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+          <div
+            className="ui-fade-in fixed inset-0 z-[70] flex items-center justify-center bg-black/60 px-4 py-5 backdrop-blur-sm"
           >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.96, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 10 }}
-              className="flex max-h-[88vh] w-full max-w-6xl flex-col overflow-hidden rounded-[1.75rem] bg-slate-50 shadow-2xl ring-1 ring-white/30"
+            <div
+              className="ui-scale-in flex max-h-[88vh] w-full max-w-6xl flex-col overflow-hidden rounded-[1.75rem] bg-slate-50 shadow-2xl ring-1 ring-white/30"
             >
               <div className="flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-6 py-5">
                 <div>
@@ -3208,10 +3199,10 @@ const ViewOrdering = () => {
                   </div>
                 </section>
               </div>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
+      </>
 
       <nav
         className="sticky top-0 z-40 backdrop-blur-xl px-4 py-4 mb-8 border-b"
@@ -3291,9 +3282,7 @@ const ViewOrdering = () => {
 
       <div className="relative z-10 px-6 mx-auto max-w-7xl">
         <header className="flex flex-col justify-between gap-8 mb-10 lg:flex-row lg:items-end">
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
+          <div className="ui-enter"
           >
             {isTableLayoutEnabled ? (
               <>
@@ -3354,7 +3343,7 @@ const ViewOrdering = () => {
                 </p>
               </>
             )}
-          </motion.div>
+          </div>
 
           <div className="flex flex-col w-full gap-3 lg:flex-row lg:w-auto lg:items-center">
             <div
@@ -3438,7 +3427,7 @@ const ViewOrdering = () => {
               No tables found.
             </div>
           ) : (
-            <AnimatePresence mode="wait">
+            <>
               {viewMode === "card" ? (
                 isTableLayoutEnabled ? (
                   <div
@@ -3593,12 +3582,9 @@ const ViewOrdering = () => {
                       </div>
                     </aside>
 
-                    <motion.div
+                    <div
                       key="card-view"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="overflow-y-auto overflow-x-hidden p-5"
+                      className="ui-fade-in overflow-y-auto overflow-x-hidden p-5"
                       style={{
                         backgroundColor: pageSurfaceSoft,
                       }}
@@ -3731,15 +3717,10 @@ const ViewOrdering = () => {
                             groupBounds.height > groupBounds.width;
 
                           return (
-                            <motion.div
+                            <div
                               key={item.id}
                               role="button"
                               tabIndex={0}
-                              initial={{ opacity: 0, scale: 0.95 }}
-                              animate={{
-                                opacity: 1,
-                                scale: isDragging ? 1.02 : 1,
-                              }}
                               onKeyDown={(event) => {
                                 if (
                                   event.key === "Enter" ||
@@ -3759,7 +3740,7 @@ const ViewOrdering = () => {
                                 handleFloorPointerUp(event, item)
                               }
                               onPointerCancel={handleFloorPointerCancel}
-                              className="group absolute flex select-none flex-col items-center justify-center overflow-visible rounded-[1.25rem] border p-4 text-center outline-none transition-shadow"
+                              className="ui-fade-in group absolute flex select-none flex-col items-center justify-center overflow-visible rounded-[1.25rem] border p-4 text-center outline-none transition-shadow"
                               style={{
                                 left: Number(item.position?.x || 0),
                                 top: Number(item.position?.y || 0),
@@ -3767,6 +3748,8 @@ const ViewOrdering = () => {
                                 height: item.size.height,
                                 cursor: isDragging ? "grabbing" : "grab",
                                 touchAction: "none",
+                                transform: isDragging ? "scale(1.02)" : undefined,
+                                transition: "transform 120ms ease-out, box-shadow 120ms ease-out",
                                 background: isDropTarget
                                   ? toRgba(tableTone, 0.12)
                                   : "transparent",
@@ -4042,32 +4025,23 @@ const ViewOrdering = () => {
                                   </p>
                                 )}
                               </div>
-                            </motion.div>
+                            </div>
                           );
                         })}
                       </div>
-                    </motion.div>
+                    </div>
                   </div>
                 ) : (
-                  <motion.div
+                  <div
                     key="default-card-view"
-                    layout
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="grid grid-cols-3 gap-4 sm:grid-cols-4 lg:grid-cols-5 md:gap-6"
+                    className="ui-fade-in grid grid-cols-3 gap-4 sm:grid-cols-4 lg:grid-cols-5 md:gap-6"
                   >
                     {currentTables.map((table) => (
-                      <motion.button
+                      <button
                         key={table.table_number}
-                        layout
                         type="button"
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        whileHover={{ y: -5 }}
-                        whileTap={{ scale: 0.95 }}
                         onClick={() => handleTableSelect(table)}
-                        className="relative aspect-[4/5] rounded-[2rem] flex flex-col items-center justify-center transition-all group overflow-hidden border"
+                        className="ui-scale-in hover:-translate-y-1 active:scale-[0.95] transition-transform duration-150 motion-reduce:transform-none relative aspect-[4/5] rounded-[2rem] flex flex-col items-center justify-center transition-all group overflow-hidden border"
                         style={{
                           backgroundColor: surfaceSoft,
                           borderColor: border,
@@ -4094,17 +4068,14 @@ const ViewOrdering = () => {
                           className="absolute bottom-6 w-1 h-1 rounded-full group-hover:w-8 transition-all"
                           style={{ backgroundColor: accent }}
                         />
-                      </motion.button>
+                      </button>
                     ))}
-                  </motion.div>
+                  </div>
                 )
               ) : (
-                <motion.div
+                <div
                   key="table-view"
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -15 }}
-                  className="rounded-[2.5rem] overflow-hidden border"
+                  className="ui-enter rounded-[2.5rem] overflow-hidden border"
                   style={{
                     backgroundColor: toRgba(surface, 0.8),
                     borderColor: border,
@@ -4228,9 +4199,9 @@ const ViewOrdering = () => {
                       })}
                     </tbody>
                   </table>
-                </motion.div>
+                </div>
               )}
-            </AnimatePresence>
+            </>
           )}
         </main>
 

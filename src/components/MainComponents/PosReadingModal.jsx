@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import { FaCashRegister, FaPrint } from "react-icons/fa";
 import { FiX } from "react-icons/fi";
 import useApiHost from "../../hooks/useApiHost";
@@ -542,19 +541,12 @@ export default function PosReadingModal({
   if (!open) return null;
 
   return (
-    <AnimatePresence>
-      <motion.div
-        className="fixed inset-0 z-[200] flex items-center justify-center bg-black/55 px-4 py-6 backdrop-blur-sm"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+    <>
+      <div
+        className="fixed inset-0 z-[200] flex items-center justify-center bg-black/55 px-4 py-6 backdrop-blur-sm ui-fade-in"
       >
-        <motion.div
-          initial={{ opacity: 0, scale: 0.96, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.96, y: 20 }}
-          transition={{ duration: 0.2 }}
-          className="relative w-full max-w-4xl overflow-hidden rounded-[28px] border border-zinc-200 bg-[#eef2f8] p-8 shadow-[0_24px_70px_rgba(0,0,0,0.22)]"
+        <div
+          className="relative w-full max-w-4xl overflow-hidden rounded-[28px] border border-zinc-200 bg-[#eef2f8] p-8 shadow-[0_24px_70px_rgba(0,0,0,0.22)] ui-scale-in"
         >
           <div className="absolute right-4 top-4 flex items-center gap-2">
             <TutorialTip
@@ -625,19 +617,13 @@ export default function PosReadingModal({
             </div>
           </div>
 
-          <AnimatePresence>
+          <>
             {activeType && (
-              <motion.div
-                className="fixed inset-0 z-[210] flex items-center justify-center bg-black/40 px-4 py-6 backdrop-blur-[2px]"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
+              <div
+                className="fixed inset-0 z-[210] flex items-center justify-center bg-black/40 px-4 py-6 backdrop-blur-[2px] ui-fade-in"
               >
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                  className="w-full max-w-4xl max-h-[95vh] overflow-y-auto rounded-[28px] bg-white p-6 shadow-[0_24px_70px_rgba(15,23,42,0.30)]"
+                <div
+                  className="w-full max-w-4xl max-h-[95vh] overflow-y-auto rounded-[28px] bg-white p-6 shadow-[0_24px_70px_rgba(15,23,42,0.30)] ui-scale-in"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div>
@@ -829,25 +815,18 @@ export default function PosReadingModal({
                       Print Now
                     </ButtonComponent>
                   </div>
-                </motion.div>
-              </motion.div>
+                </div>
+              </div>
             )}
-          </AnimatePresence>
+          </>
 
-          <AnimatePresence>
+          <>
             {blockerModal.open && (
-              <motion.div
-                className="absolute inset-0 z-[30] flex items-center justify-center bg-black/45 px-4 backdrop-blur-[2px]"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
+              <div
+                className="absolute inset-0 z-[30] flex items-center justify-center bg-black/45 px-4 backdrop-blur-[2px] ui-fade-in"
               >
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.96, y: 16 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.96, y: 16 }}
-                  transition={{ duration: 0.2 }}
-                  className="w-full max-w-2xl rounded-[30px] border border-white/70 bg-[#f7f8fb] p-8 shadow-[0_25px_60px_rgba(15,23,42,0.28)]"
+                <div
+                  className="w-full max-w-2xl rounded-[30px] border border-white/70 bg-[#f7f8fb] p-8 shadow-[0_25px_60px_rgba(15,23,42,0.28)] ui-scale-in"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div>
@@ -882,13 +861,13 @@ export default function PosReadingModal({
                       OK
                     </button>
                   </div>
-                </motion.div>
-              </motion.div>
+                </div>
+              </div>
             )}
-          </AnimatePresence>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+          </>
+        </div>
+      </div>
+    </>
   );
 }
 

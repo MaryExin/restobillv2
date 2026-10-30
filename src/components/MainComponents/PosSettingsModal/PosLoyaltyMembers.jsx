@@ -2,7 +2,7 @@
 /* eslint-disable react/prop-types */
 
 import { useEffect, useMemo, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+
 import {
   FiX,
   FiSearch,
@@ -197,14 +197,11 @@ const PosLoyaltyMembers = ({ isOpen, onClose, isDark, accent = "#3b82f6" }) => {
   };
 
   return (
-    <AnimatePresence>
+    <>
       {isOpen ? (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-xl">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.96 }}
-            className={`w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-[32px] border p-6 sm:p-8 ${theme.modal}`}
+          <div
+            className={`ui-scale-in w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-[32px] border p-6 sm:p-8 ${theme.modal}`}
           >
             {view === "list" ? (
               <>
@@ -426,17 +423,14 @@ const PosLoyaltyMembers = ({ isOpen, onClose, isDark, accent = "#3b82f6" }) => {
                 </button>
               </>
             )}
-          </motion.div>
+          </div>
         </div>
       ) : null}
 
       {pendingDelete ? (
         <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xl">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.96 }}
-            className={`w-full max-w-sm rounded-[28px] border p-6 ${theme.modal}`}
+          <div
+            className={`ui-scale-in w-full max-w-sm rounded-[28px] border p-6 ${theme.modal}`}
           >
             <div
               className={`flex h-12 w-12 items-center justify-center rounded-2xl ${
@@ -482,10 +476,10 @@ const PosLoyaltyMembers = ({ isOpen, onClose, isDark, accent = "#3b82f6" }) => {
                 Delete
               </button>
             </div>
-          </motion.div>
+          </div>
         </div>
       ) : null}
-    </AnimatePresence>
+    </>
   );
 };
 

@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import {
   FiXCircle,
   FiShoppingBag as FiStore,
@@ -62,60 +61,26 @@ const formatToMonthDay = (inputDate) => {
 const ModalSalesDashboard = ({ setIsModalSalesDashboard, filter, data }) => {
   const { endpoint, setEndPoint } = useZustandAPIEndpoint();
   // Animation variants
-  const backdropVariant = {
-    hidden: { opacity: 0 },
-    visible: { opacity: 1, transition: { duration: 0.3 } },
-  };
-  const panelVariant = {
-    hidden: { y: "-10%", opacity: 0 },
-    visible: {
-      y: "0%",
-      opacity: 1,
-      transition: { type: "spring", stiffness: 300, damping: 25 },
-    },
-    exit: { y: "10%", opacity: 0, transition: { duration: 0.2 } },
-  };
-  const listVariants = {
-    hidden: {},
-    visible: { transition: { staggerChildren: 0.1 } },
-  };
-  const itemVariant = {
-    hidden: { opacity: 0, x: -20 },
-    visible: { opacity: 1, x: 0, transition: { duration: 0.3 } },
-  };
 
   return (
-    <AnimatePresence>
-      <motion.div
-        className="fixed inset-0 z-30 flex items-center justify-center"
-        initial="hidden"
-        animate="visible"
-        exit="hidden"
-        variants={backdropVariant}
+    <>
+      <div
+        className="ui-enter fixed inset-0 z-30 flex items-center justify-center"
         style={{ backgroundColor: "rgba(0,0,0,0.6)" }}
       >
-        <motion.div
-          className="bg-white rounded-2xl overflow-hidden shadow-2xl w-full max-w-2xl mx-4"
-          variants={panelVariant}
-          initial="hidden"
-          animate="visible"
-          exit="exit"
+        <div
+          className="ui-scale-in bg-white rounded-2xl overflow-hidden shadow-2xl w-full max-w-2xl mx-4"
         >
           {/* Header */}
           <div className="relative bg-gradient-to-br from-colorBrand to-colorBrandSecondary p-6">
-            <motion.div
+            <div
               onClick={() => setIsModalSalesDashboard(false)}
-              className="absolute top-4 right-4 text-white cursor-pointer"
-              whileHover={{ scale: 1.2 }}
-              whileTap={{ scale: 0.9 }}
+              className="hover:opacity-90 active:opacity-80 transition-opacity duration-150 absolute top-4 right-4 text-white cursor-pointer"
             >
               <FiXCircle className="w-8 h-8" />
-            </motion.div>
-            <motion.div
-              className="flex items-center justify-center space-x-3"
-              initial={{ scale: 0, rotate: -180, opacity: 0 }}
-              animate={{ scale: 1, rotate: 0, opacity: 1 }}
-              transition={{ duration: 0.6, type: "spring", stiffness: 200 }}
+            </div>
+            <div
+              className="ui-scale-in flex items-center justify-center space-x-3"
             >
               {filter === "countofstoresopen" ? (
                 <FiCheckCircle className="text-white w-10 h-10" />
@@ -127,20 +92,16 @@ const ModalSalesDashboard = ({ setIsModalSalesDashboard, filter, data }) => {
                   ? "Open Cashiers"
                   : "Closed Busunits"}
               </h2>
-            </motion.div>
+            </div>
           </div>
 
           {/* Content */}
-          <motion.div
-            className="p-6 space-y-4 max-h-[60vh] overflow-auto scrollbar"
-            initial="hidden"
-            animate="visible"
-            variants={listVariants}
+          <div
+            className="ui-enter p-6 space-y-4 max-h-[60vh] overflow-auto scrollbar"
           >
             {/* Column Headings */}
-            <motion.div
-              className="grid grid-cols-4 gap-4 text-gray-600 font-medium"
-              variants={itemVariant}
+            <div
+              className="ui-enter grid grid-cols-4 gap-4 text-gray-600 font-medium"
             >
               {filter === "countofstoresopen" ? (
                 <>
@@ -159,7 +120,7 @@ const ModalSalesDashboard = ({ setIsModalSalesDashboard, filter, data }) => {
                   <span></span>{" "}
                 </>
               )}
-            </motion.div>
+            </div>
 
             {/* Rows */}
             {data
@@ -169,10 +130,9 @@ const ModalSalesDashboard = ({ setIsModalSalesDashboard, filter, data }) => {
                   : item.storestatus === "CLOSED"
               )
               .map((row, idx) => (
-                <motion.div
+                <div
                   key={idx}
-                  className="grid grid-cols-4 gap-4 items-center bg-white p-4 rounded-lg shadow hover:shadow-lg transition"
-                  variants={itemVariant}
+                  className="ui-enter grid grid-cols-4 gap-4 items-center bg-white p-4 rounded-lg shadow hover:shadow-lg transition"
                 >
                   <div className="flex items-center space-x-2">
                     <FiStore className="text-colorBrand w-5 h-5" />
@@ -199,12 +159,12 @@ const ModalSalesDashboard = ({ setIsModalSalesDashboard, filter, data }) => {
                   ) : (
                     <span></span>
                   )}
-                </motion.div>
+                </div>
               ))}
-          </motion.div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+          </div>
+        </div>
+      </div>
+    </>
   );
 };
 

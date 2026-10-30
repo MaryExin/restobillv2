@@ -1,6 +1,5 @@
 import React, { useEffect, useCallback } from "react";
 import ReactDOM from "react-dom";
-import { motion } from "framer-motion";
 import { FaCheckCircle } from "react-icons/fa";
 import useZustandAPIEndpoint from "../../context/useZustandAPIEndpoint";
 
@@ -36,27 +35,20 @@ const ModalSuccessNavToSelf = ({
   }, [handleClose]);
 
   const modalContent = (
-    <motion.div
-      className="fixed inset-0 z-[340] flex items-center justify-center p-4"
+    <div
+      className="ui-fade-in fixed inset-0 z-[340] flex items-center justify-center p-4"
       style={{
         backgroundColor: "rgba(0, 0, 0, 0.55)",
       }}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
     >
-      <motion.div
+      <div
         data-tour={dataTour}
-        className="w-full max-w-sm rounded-3xl border p-8 text-center shadow-2xl transition-colors"
+        className="ui-scale-in w-full max-w-sm rounded-3xl border p-8 text-center shadow-2xl transition-colors"
         style={{
           borderColor: "var(--app-border)",
           backgroundColor: "var(--app-surface)",
           color: "var(--app-text)",
         }}
-        initial={{ scale: 0.95, y: 10 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.95, y: 10 }}
-        transition={{ type: "spring", stiffness: 260, damping: 22 }}
       >
         <div
           className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full"
@@ -81,11 +73,9 @@ const ModalSuccessNavToSelf = ({
         </p>
 
         <div data-tour={dataTourBtn}>
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+          <button
             onClick={handleClose}
-            className="w-full rounded-2xl py-3 font-bold text-white transition"
+            className="hover:opacity-90 active:opacity-80 transition-opacity duration-150 w-full rounded-2xl py-3 font-bold text-white transition"
             style={{
               background:
                 "linear-gradient(180deg, var(--app-accent) 0%, var(--app-accent-secondary) 100%)",
@@ -94,10 +84,10 @@ const ModalSuccessNavToSelf = ({
             autoFocus
           >
             {button}
-          </motion.button>
+          </button>
         </div>
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   );
 
   return ReactDOM.createPortal(modalContent, document.body);

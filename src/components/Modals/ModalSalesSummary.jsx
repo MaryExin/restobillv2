@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import { HiX, HiTrash, HiViewList, HiTag, HiCreditCard } from "react-icons/hi";
 import { TiArrowBack } from "react-icons/ti";
 import { useSecuredMutation } from "../../hooks/useSecuredMutation";
@@ -73,11 +72,8 @@ const ModalSalesSummary = ({
           triggerYesNoEvent={handleVoid}
         />
       )}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.9 }}
-        className="bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden flex flex-col"
+      <div
+        className="ui-scale-in bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden flex flex-col"
       >
         {/* Header */}
         <div className="flex items-center justify-between bg-gradient-to-br from-colorBrand to-colorBrandSecondary p-4">
@@ -394,7 +390,7 @@ const ModalSalesSummary = ({
             </div>
           )}
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 };

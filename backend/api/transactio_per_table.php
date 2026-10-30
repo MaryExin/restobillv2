@@ -16,6 +16,7 @@ $config = require __DIR__ . "/config.php";
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
 try {
+    require_once __DIR__ . '/../src/PosUnsplitBill.php';
     $conn = new mysqli(
         $config["host"],
         $config["user"],
@@ -73,7 +74,7 @@ try {
     $sql = "
         SELECT *
         FROM tbl_pos_transactions
-        WHERE status != 'Voided'
+        WHERE status NOT IN ('Voided', 'Unsplit')
           AND transaction_date = ?
           AND table_number = ?
     ";
@@ -87,6 +88,27 @@ try {
 
     while ($row = $result->fetch_assoc()) {
         $data[] = $row;
+    }
+
+    // The split audit is the existing persistent parent link. Read each branch
+    // once and expose only a verified link matching this transaction's slip.
+    $linksByBranch = [];
+    if ($data !== []) {
+        foreach ($data as &$row) {
+            $category = (string)$row['Category_Code'];
+            $unit = (string)$row['Unit_Code'];
+            $branch = json_encode([$category, $unit]);
+            if (!array_key_exists($branch, $linksByBranch)) {
+                // Some installations store audit Unit_Code as a number. The
+                // shared reader checks JSON scope and unambiguous legacy links.
+                $linksByBranch[$branch] = posUnsplitBillLinks(posBillAuditReadRows($conn, $category, $unit));
+            }
+            $link = $linksByBranch[$branch][(string)$row['transaction_id']] ?? null;
+            if ($link !== null && (string)$link['order_slip_no'] === (string)$row['order_slip_no']) {
+                $row['split_source_transaction_id'] = $link['source_transaction_id'];
+            }
+        }
+        unset($row);
     }
 
     echo json_encode([

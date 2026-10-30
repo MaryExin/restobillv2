@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import useZustandSideMenu from "../../context/useZustandSideMenu";
 import useZustandLoginCred from "../../context/useZustandLoginCred";
-import { motion } from "framer-motion";
 
 // icons
 import {
@@ -131,28 +130,20 @@ const SidePanel = () => {
           triggerYesNoEvent={() => alert("Hey")}
         />
       )}
-      <motion.div
+      <div
         ref={panelRef}
-        initial={{ x: "-100%" }}
-        animate={{ x: 0 }}
-        transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        className="fixed left-0 top-0 h-screen w-64 sm:w-72 bg-gradient-to-b from-darkerPrimary via-darkPrimary to-medPrimary backdrop-blur-xl border-r border-slate-700/50 flex flex-col z-50 lg:block shadow-2xl shadow-slate-900/20"
+        className="fixed left-0 top-0 h-screen w-64 sm:w-72 bg-gradient-to-b from-darkerPrimary via-darkPrimary to-medPrimary backdrop-blur-xl border-r border-slate-700/50 flex flex-col z-50 lg:block shadow-2xl shadow-slate-900/20 ui-slide-in-left"
       >
         {/* Loading Indicator */}
         {isLoading && (
-          <motion.div
-            initial={{ scaleX: 0 }}
-            animate={{ scaleX: 1 }}
-            className="w-full h-0.5 bg-gradient-to-r from-colorBrand via-colorBrandSecondary to-colorBrandTertiary origin-left"
+          <div
+            className="w-full h-0.5 bg-gradient-to-r from-colorBrand via-colorBrandSecondary to-colorBrandTertiary origin-left ui-progress-enter"
           />
         )}
 
         {/* Redesigned Header with Conditional Icons */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="relative"
+        <div
+          className="relative ui-enter"
         >
           {/* Main Header */}
           <div className="px-3 py-3 bg-gradient-to-r from-softPrimary to-darkPrimary backdrop-blur-sm border-b border-darkerPrimary/50">
@@ -160,49 +151,32 @@ const SidePanel = () => {
               {/* Profile Section */}
               <div className="flex items-center space-x-2 flex-1 min-w-0">
                 <div className="relative flex-shrink-0">
-                  <motion.img
-                    whileHover={{ scale: 1.05 }}
+                  <img
                     src={handleFilterImageURL(profilePic) || "/placeholder.svg"}
                     alt="Avatar"
                     onError={(e) =>
                       (e.currentTarget.src = "/default-avatar.png")
                     }
-                    className="w-8 h-8 rounded-full object-cover border border-slate-500/50 shadow-md ring-1 ring-blue-500/20 transition-all duration-300"
+                    className="w-8 h-8 rounded-full object-cover border border-slate-500/50 shadow-md ring-1 ring-blue-500/20 transition-all duration-300 transition-transform duration-150 hover:scale-[1.02]"
                   />
-                  <motion.div
-                    animate={{ scale: [1, 1.2, 1] }}
-                    transition={{
-                      repeat: Number.POSITIVE_INFINITY,
-                      duration: 2,
-                    }}
+                  <div
                     className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border border-slate-800 shadow-sm"
                   />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.2 }}
-                    className="text-white font-medium text-sm truncate"
+                  <div
+                    className="text-white font-medium text-sm truncate ui-enter"
                   >
                     {firstName}
-                  </motion.div>
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.3 }}
-                    className="text-xs text-green-400 flex items-center gap-1"
+                  </div>
+                  <div
+                    className="text-xs text-green-400 flex items-center gap-1 ui-enter"
                   >
-                    <motion.div
-                      animate={{ opacity: [1, 0.3, 1] }}
-                      transition={{
-                        repeat: Number.POSITIVE_INFINITY,
-                        duration: 1.5,
-                      }}
+                    <div
                       className="w-1.5 h-1.5 bg-green-400 rounded-full"
                     />
                     <span className="font-medium">Online</span>
-                  </motion.div>
+                  </div>
                 </div>
               </div>
 
@@ -211,75 +185,52 @@ const SidePanel = () => {
                   <>
                     {/* Settings Button - Only show when dropdown is closed */}
                     {roles[0]?.some((r) => r.rolename === "/settings") && (
-                      <motion.button
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.8 }}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
+                      <button
                         onClick={() => handleSettingsClick()}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all duration-200 group"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all duration-200 group ui-scale-in transition-transform duration-150 enabled:hover:scale-[1.02] enabled:active:scale-[0.98]"
                         title="Settings"
                       >
                         <IoSettingsOutline size={16} />
-                      </motion.button>
+                      </button>
                     )}
 
                     {isAuthenticated && (
-                      <motion.button
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.8 }}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
+                      <button
                         onClick={handleLogout}
                         disabled={isLoading}
-                        className="p-1.5 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all duration-200 group disabled:opacity-50"
+                        className="p-1.5 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all duration-200 group disabled:opacity-50 ui-scale-in transition-transform duration-150 enabled:hover:scale-[1.02] enabled:active:scale-[0.98]"
                         title="Logout"
                       >
                         {isLoading ? (
-                          <motion.div
-                            animate={{ rotate: 360 }}
-                            transition={{
-                              duration: 1,
-                              repeat: Number.POSITIVE_INFINITY,
-                              ease: "linear",
-                            }}
+                          <div className="ui-spin"
                           >
                             <IoLogOutOutline size={16} />
-                          </motion.div>
+                          </div>
                         ) : (
                           <IoLogOutOutline size={16} />
                         )}
-                      </motion.button>
+                      </button>
                     )}
                   </>
                 )}
 
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
+                <button
                   onClick={() => setShowProfileDropdown(!showProfileDropdown)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all duration-200 group"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all duration-200 group transition-transform duration-150 enabled:hover:scale-[1.02] enabled:active:scale-[0.98]"
                   title="Profile Menu"
                 >
-                  <motion.div
-                    animate={{ rotate: showProfileDropdown ? 180 : 0 }}
-                    transition={{ duration: 0.2 }}
+                  <div className={`transition-transform duration-150 ${showProfileDropdown ? "rotate-180" : ""}`}
                   >
                     <IoChevronDown size={14} />
-                  </motion.div>
-                </motion.button>
+                  </div>
+                </button>
               </div>
             </div>
           </div>
 
           {showProfileDropdown && (
-            <motion.div
-              initial={{ opacity: 0, y: -10, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -10, scale: 0.95 }}
-              className="absolute top-full left-0 right-0 bg-gradient-to-b from-darkPrimary to-medPrimary border-b border-slate-700/50 shadow-lg z-10"
+            <div
+              className="absolute top-full left-0 right-0 bg-gradient-to-b from-darkPrimary to-medPrimary border-b border-slate-700/50 shadow-lg z-10 ui-scale-in"
             >
               <div className="px-3 py-3 space-y-3">
                 {/* Account Info Section */}
@@ -308,61 +259,48 @@ const SidePanel = () => {
 
                   {/* Settings Button in Dropdown */}
                   {roles[0]?.some((r) => r.rolename === "/settings") && (
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
+                    <button
                       onClick={() => {
                         setShowProfileDropdown(false);
                         handleSettingsClick();
                       }}
-                      className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-slate-300 hover:text-white hover:bg-slate-700/50 rounded-md transition-all duration-200"
+                      className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-slate-300 hover:text-white hover:bg-slate-700/50 rounded-md transition-all duration-200 transition-transform duration-150 enabled:hover:scale-[1.02] enabled:active:scale-[0.98]"
                     >
                       <IoSettingsOutline size={14} />
                       Settings
-                    </motion.button>
+                    </button>
                   )}
 
                   {isAuthenticated && (
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
+                    <button
                       onClick={() => {
                         setShowProfileDropdown(false);
                         handleLogout();
                       }}
                       disabled={isLoading}
-                      className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-md transition-all duration-200 disabled:opacity-50"
+                      className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-md transition-all duration-200 disabled:opacity-50 transition-transform duration-150 enabled:hover:scale-[1.02] enabled:active:scale-[0.98]"
                     >
                       {isLoading ? (
-                        <motion.div
-                          animate={{ rotate: 360 }}
-                          transition={{
-                            duration: 1,
-                            repeat: Number.POSITIVE_INFINITY,
-                            ease: "linear",
-                          }}
+                        <div className="ui-spin"
                         >
                           <IoLogOutOutline size={14} />
-                        </motion.div>
+                        </div>
                       ) : (
                         <IoLogOutOutline size={14} />
                       )}
                       {isLoading ? "Logging out..." : "Log Out"}
-                    </motion.button>
+                    </button>
                   )}
                 </div>
               </div>
-            </motion.div>
+            </div>
           )}
-        </motion.div>
+        </div>
 
         <div className="flex-1 flex flex-col min-h-0">
           <nav className="flex-1 sm:overflow-y-auto overflow-y-hidden py-1 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-transparent scroll-smooth">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="space-y-0.5 px-2 mb-1"
+            <div
+              className="space-y-0.5 px-2 mb-1 ui-enter"
             >
               <SectionLabel>Main</SectionLabel>
               <MenuItem
@@ -389,7 +327,7 @@ const SidePanel = () => {
                 onHover={setHovered}
                 hovered={hovered}
               />
-            </motion.div>
+            </div>
 
             <Divider />
 
@@ -397,11 +335,8 @@ const SidePanel = () => {
             {(roles[0]?.some((r) => r.rolename === "/ims") ||
               roles[0]?.some((r) => r.rolename === "/salestracker") ||
               roles[0]?.some((r) => r.rolename === "/accounting")) && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="space-y-0.5 px-2 mb-1"
+              <div
+                className="space-y-0.5 px-2 mb-1 ui-enter"
               >
                 <SectionLabel>Business</SectionLabel>
                 {roles[0]?.some((r) => r.rolename === "/ims") && (
@@ -435,7 +370,7 @@ const SidePanel = () => {
                     hovered={hovered}
                   />
                 )}
-              </motion.div>
+              </div>
             )}
 
             {(roles[0]?.some((r) => r.rolename === "/ims") ||
@@ -447,11 +382,8 @@ const SidePanel = () => {
             {/* User Management */}
             {(roles[0]?.some((r) => r.rolename === "/hris") ||
               roles[0]?.some((r) => r.rolename === "/usersqueu")) && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-                className="space-y-0.5 px-2 mb-1"
+              <div
+                className="space-y-0.5 px-2 mb-1 ui-enter"
               >
                 <SectionLabel>User Management</SectionLabel>
                 {roles[0]?.some((r) => r.rolename === "/hris") && (
@@ -474,7 +406,7 @@ const SidePanel = () => {
                     hovered={hovered}
                   />
                 )}
-              </motion.div>
+              </div>
             )}
 
             {(roles[0]?.some((r) => r.rolename === "/hris") ||
@@ -483,11 +415,8 @@ const SidePanel = () => {
             )}
 
             {/* System */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
-              className="space-y-0.5 px-2 mb-2"
+            <div
+              className="space-y-0.5 px-2 mb-2 ui-enter"
             >
               <SectionLabel>System</SectionLabel>
               <MenuItem
@@ -498,10 +427,10 @@ const SidePanel = () => {
                 onHover={setHovered}
                 hovered={hovered}
               />
-            </motion.div>
+            </div>
           </nav>
         </div>
-      </motion.div>
+      </div>
     </>
   );
 };
@@ -518,10 +447,8 @@ const MenuItem = ({
   hovered,
   isLogout = false,
 }) => (
-  <motion.div
-    whileHover={{ scale: 1.01, x: 1 }}
-    whileTap={{ scale: 0.99 }}
-    className="list-none"
+  <div
+    className="list-none transition-transform duration-150 hover:scale-[1.02] active:scale-[0.98]"
   >
     <button
       onMouseEnter={() => onHover(label)}
@@ -539,10 +466,8 @@ const MenuItem = ({
       `}
     >
       {active && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-purple-600/10 blur-lg -z-10"
+        <div
+          className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-purple-600/10 blur-lg -z-10 ui-fade-in"
         />
       )}
 
@@ -574,46 +499,37 @@ const MenuItem = ({
 
       {/* Hover indicator */}
       {hovered === label && !active && (
-        <motion.div
-          initial={{ opacity: 0, x: -5, scale: 0.9 }}
-          animate={{ opacity: 1, x: 0, scale: 1 }}
-          exit={{ opacity: 0, x: -5, scale: 0.9 }}
-          className="text-xs text-slate-400 bg-slate-700/50 px-1.5 py-0.5 rounded border border-slate-600/30 shadow-sm backdrop-blur-sm"
+        <div
+          className="text-xs text-slate-400 bg-slate-700/50 px-1.5 py-0.5 rounded border border-slate-600/30 shadow-sm backdrop-blur-sm ui-scale-in"
         >
           •
-        </motion.div>
+        </div>
       )}
 
       {/* Active indicator */}
       {active && (
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          className="w-1.5 h-1.5 bg-white rounded-full shadow-sm flex-shrink-0"
+        <div
+          className="w-1.5 h-1.5 bg-white rounded-full shadow-sm flex-shrink-0 ui-scale-in"
         />
       )}
     </button>
-  </motion.div>
+  </div>
 );
 
 const Divider = () => (
-  <motion.div
-    initial={{ opacity: 0, scaleX: 0 }}
-    animate={{ opacity: 1, scaleX: 1 }}
-    className="my-1.5 mx-3 relative"
+  <div
+    className="my-1.5 mx-3 relative ui-enter"
   >
     <div className="border-t border-slate-600/20 relative">
       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-slate-500/10 to-transparent blur-sm" />
     </div>
-  </motion.div>
+  </div>
 );
 
 const SectionLabel = ({ children }) => (
-  <motion.div
-    initial={{ opacity: 0, x: -5 }}
-    animate={{ opacity: 1, x: 0 }}
-    className="text-xs font-medium text-slate-500 uppercase tracking-wide px-1 py-1 mb-0.5"
+  <div
+    className="text-xs font-medium text-slate-500 uppercase tracking-wide px-1 py-1 mb-0.5 ui-slide-in-left"
   >
     {children}
-  </motion.div>
+  </div>
 );

@@ -1,4 +1,3 @@
-import { motion, AnimatePresence } from "framer-motion";
 import { IoMdClose } from "react-icons/io";
 
 const FormModal = ({ isOpen, onClose, title, children, size = "lg" }) => {
@@ -10,25 +9,18 @@ const FormModal = ({ isOpen, onClose, title, children, size = "lg" }) => {
   };
 
   return (
-    <AnimatePresence>
+    <>
       {isOpen && (
         <>
           {/* Backdrop with blur effect */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+          <div
             onClick={onClose}
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
+            className="ui-fade-in fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
           />
 
           {/* Modal Container */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.92, y: 30 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.92, y: 30 }}
-            transition={{ duration: 0.3, ease: "easeOut" }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          <div
+            className="ui-scale-in fixed inset-0 z-50 flex items-center justify-center p-4"
           >
             <div
               className={`${sizeClasses[size]} w-full bg-white rounded-2xl shadow-2xl border border-border/50 overflow-hidden`}
@@ -41,16 +33,13 @@ const FormModal = ({ isOpen, onClose, title, children, size = "lg" }) => {
                       {title}
                     </h2>
                   </div>
-                  <motion.button
+                  <button
                     onClick={onClose}
-                    whileHover={{ scale: 1.1, rotate: 90 }}
-                    whileTap={{ scale: 0.95 }}
-                    transition={{ duration: 0.2 }}
-                    className="p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground"
+                    className="hover:opacity-90 active:opacity-80 transition-opacity duration-150 p-2 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground"
                     aria-label="Close modal"
                   >
                     <IoMdClose className="w-5 h-5" />
-                  </motion.button>
+                  </button>
                 </div>
               )}
 
@@ -59,10 +48,10 @@ const FormModal = ({ isOpen, onClose, title, children, size = "lg" }) => {
                 {children}
               </div>
             </div>
-          </motion.div>
+          </div>
         </>
       )}
-    </AnimatePresence>
+    </>
   );
 };
 

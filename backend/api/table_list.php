@@ -32,7 +32,7 @@ $onlyPending = isset($_GET["onlyPending"]) &&
 $data = [];
 
 if ($isDefaultTable) {
-    // Return all pending transactions joined with tables, excluding Voided
+    // Discarded split bills retain their audit header but are no longer payable.
     $sql = "
         SELECT
             tpt.id,
@@ -46,7 +46,7 @@ if ($isDefaultTable) {
         LEFT JOIN tbl_pos_tables tt
             ON tpt.table_number = tt.table_name
         WHERE tpt.remarks != 'Paid'
-          AND tpt.status != 'Voided'
+          AND tpt.status NOT IN ('Voided', 'Unsplit')
     ";
 
     $params = [];
@@ -88,7 +88,7 @@ if ($isDefaultTable) {
             transaction_id,
             MAX(
                 CASE
-                    WHEN remarks != 'Paid' AND status != 'Voided' THEN 'Pending'
+                    WHEN remarks != 'Paid' AND status NOT IN ('Voided', 'Unsplit') THEN 'Pending'
                     ELSE 'Paid'
                 END
             ) AS status_label
@@ -99,8 +99,9 @@ if ($isDefaultTable) {
     $types = "";
     $conditions = [];
 
-    // CRITICAL: Exclude Voided transactions from the grouping logic entirely
+    // Exclude cancelled headers from the grouping logic entirely.
     $conditions[] = "status NOT LIKE '%Voided%'";
+    $conditions[] = "status <> 'Unsplit'";
 
     if (!empty($date)) {
         $conditions[] = "transaction_date = ?";

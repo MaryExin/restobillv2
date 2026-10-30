@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . "/cors.php";
 require_once __DIR__ . "/pos_report_mirror.php";
+require_once __DIR__ . "/../src/PosOrderItemInstructions.php";
+require_once __DIR__ . "/../src/PosCurrentBillItems.php";
 
 
 header("Access-Control-Allow-Origin: *");
@@ -118,6 +120,10 @@ $insertActivityLog = null;
 $insertTransactionLog = null;
 
 try {
+    $hasItemInstruction = posOrderHasItemInstructionColumn($conn);
+    posOrderValidateItemInstructions($source_items, $hasItemInstruction);
+    posOrderValidateItemInstructions($destination_items, $hasItemInstruction);
+
     if (!$conn->begin_transaction()) {
         throw new Exception("Failed to start transaction: " . $conn->error);
     }
@@ -197,6 +203,9 @@ try {
     if (!$destinationExisting) {
         throw new Exception("Destination transaction not found.");
     }
+
+    posAssertBillNotCancelled($sourceExisting);
+    posAssertBillNotCancelled($destinationExisting);
 
     if (
         strcasecmp((string)($sourceExisting["remarks"] ?? ""), "Paid") === 0 ||
@@ -342,23 +351,7 @@ try {
     $deleteDestinationDetails->close();
     $deleteDestinationDetails = null;
 
-    $detailSql = "
-        INSERT INTO tbl_pos_transactions_detailed (
-            transaction_id,
-            Category_Code,
-            Unit_Code,
-            transaction_date,
-            product_id,
-            sku,
-            sales_quantity,
-            landing_cost,
-            unit_cost,
-            selling_price,
-            vatable,
-            isDiscountable,
-            order_status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ";
+    $detailSql = posOrderDetailInsertSql($hasItemInstruction);
 
     $insertDetail = $conn->prepare($detailSql);
     if (!$insertDetail) {
@@ -383,8 +376,7 @@ try {
             continue;
         }
 
-        $insertDetail->bind_param(
-            "isssssidddsss",
+        $detailValues = [
             $source_transaction_id,
             $Category_Code,
             $Unit_Code,
@@ -398,6 +390,13 @@ try {
             $vatable,
             $isDiscountable,
             $detailOrderStatus
+        ];
+        if ($hasItemInstruction) {
+            $detailValues[] = posOrderItemInstruction($item);
+        }
+        $insertDetail->bind_param(
+            'isssssidddsss' . ($hasItemInstruction ? 's' : ''),
+            ...$detailValues
         );
 
         if (!$insertDetail->execute()) {
@@ -434,8 +433,7 @@ try {
             continue;
         }
 
-        $insertDetail->bind_param(
-            "isssssidddsss",
+        $detailValues = [
             $destination_transaction_id,
             $Category_Code,
             $Unit_Code,
@@ -449,6 +447,13 @@ try {
             $vatable,
             $isDiscountable,
             $detailOrderStatus
+        ];
+        if ($hasItemInstruction) {
+            $detailValues[] = posOrderItemInstruction($item);
+        }
+        $insertDetail->bind_param(
+            'isssssidddsss' . ($hasItemInstruction ? 's' : ''),
+            ...$detailValues
         );
 
         if (!$insertDetail->execute()) {

@@ -34,16 +34,19 @@ const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
 
   // Charge list (tbl_pos_list_of_other_charges)
   const [charges, setCharges]   = useState([]);
+  const [salesTypes, setSalesTypes] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
 
   // Add new charge form
   const [newName, setNewName]         = useState("");
   const [newAmount, setNewAmount]     = useState("");
   const [newRateType, setNewRateType] = useState("Percentage");
+  const [newAutoSalesTypeIds, setNewAutoSalesTypeIds] = useState([]);
   const [isAdding, setIsAdding]       = useState(false);
 
   const [savingId, setSavingId]   = useState(null); // ID being saved
   const [deletingId, setDeletingId] = useState(null);
+  const chargeMutationPending = savingId !== null || deletingId !== null || isAdding;
 
   const [message, setMessage] = useState("");
   const [error, setError]     = useState("");
@@ -77,6 +80,9 @@ const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
       if (!scRes.ok || !sc?.success) {
         throw new Error(sc?.message || "Failed to load service charge settings.");
       }
+      if (!listRes.ok || !list?.success || !Array.isArray(list.charges)) {
+        throw new Error(list?.message || "Failed to load charge types.");
+      }
       if (sc?.success) {
         const v = Boolean(sc?.data?.service_charge_enabled || false);
         const basis = normalizeServiceChargeBasis(sc?.data?.service_charge_basis);
@@ -87,7 +93,8 @@ const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
         setSettingsLoaded(true);
       }
       if (list?.success) {
-        setCharges(Array.isArray(list.charges) ? list.charges : []);
+        setCharges(list.charges);
+        setSalesTypes(Array.isArray(list.sales_types) ? list.sales_types : []);
       }
     } catch (err) {
       setError(err.message || "Failed to load settings.");
@@ -135,7 +142,7 @@ const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
 
   // ── Toggle individual charge ──────────────────────────────────────────────
   const toggleCharge = async (id, currentEnabled) => {
-    if (!apiHost || savingId !== null) return;
+    if (!apiHost || chargeMutationPending) return;
     setSavingId(id);
     try {
       const res    = await fetch(`${apiHost}/api/pos_manage_other_charges.php`, {
@@ -144,8 +151,9 @@ const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
         body: JSON.stringify({ id, is_enabled: currentEnabled ? 0 : 1 }),
       });
       const result = await res.json();
-      if (!result?.success) throw new Error(result?.message || "Failed to update.");
+      if (!res.ok || !result?.success) throw new Error(result?.message || "Failed to update.");
       setCharges(Array.isArray(result.charges) ? result.charges : []);
+      if (Array.isArray(result.sales_types)) setSalesTypes(result.sales_types);
     } catch (err) {
       flash(err.message || "Failed to update.", true);
     } finally {
@@ -153,20 +161,25 @@ const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
     }
   };
 
-  // ── Save amount/rate_type for a charge ────────────────────────────────────
-  const saveCharge = async (id, amount, rateType) => {
-    if (!apiHost || savingId !== null) return;
+  // ── Save amount, rate and automatic service types for a charge ────────────
+  const saveCharge = async (id, amount, rateType, autoSalesTypeIds) => {
+    if (!apiHost || chargeMutationPending) return;
     setSavingId(id);
     setError(""); setMessage("");
     try {
       const res    = await fetch(`${apiHost}/api/pos_manage_other_charges.php`, {
         method: "PUT",
         headers: mutationHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ id, amount: Number(amount || 0), rate_type: rateType }),
+        body: JSON.stringify({
+          id, amount: Number(amount || 0), rate_type: rateType,
+          auto_sales_type_ids: autoSalesTypeIds,
+        }),
       });
       const result = await res.json();
-      if (!result?.success) throw new Error(result?.message || "Failed to save.");
+      if (!res.ok || !result?.success) throw new Error(result?.message || "Failed to save.");
       setCharges(Array.isArray(result.charges) ? result.charges : []);
+      if (Array.isArray(result.sales_types)) setSalesTypes(result.sales_types);
+      clearLocal(id);
       flash("Saved.");
     } catch (err) {
       flash(err.message || "Failed to save.", true);
@@ -177,7 +190,7 @@ const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
 
   // ── Delete charge ─────────────────────────────────────────────────────────
   const deleteCharge = async (id) => {
-    if (!apiHost || deletingId !== null) return;
+    if (!apiHost || chargeMutationPending) return;
     setDeletingId(id);
     setError(""); setMessage("");
     try {
@@ -187,8 +200,10 @@ const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
         body: JSON.stringify({ id }),
       });
       const result = await res.json();
-      if (!result?.success) throw new Error(result?.message || "Failed to delete.");
+      if (!res.ok || !result?.success) throw new Error(result?.message || "Failed to delete.");
       setCharges(Array.isArray(result.charges) ? result.charges : []);
+      if (Array.isArray(result.sales_types)) setSalesTypes(result.sales_types);
+      clearLocal(id);
       flash("Charge removed.");
     } catch (err) {
       flash(err.message || "Failed to delete.", true);
@@ -200,19 +215,24 @@ const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
   // ── Add new charge ────────────────────────────────────────────────────────
   const addCharge = async () => {
     const name = newName.trim();
-    if (!name || !apiHost || isAdding) return;
+    if (!name || !apiHost || !settingsLoaded || chargeMutationPending) return;
     setIsAdding(true);
     setError(""); setMessage("");
     try {
       const res    = await fetch(`${apiHost}/api/pos_manage_other_charges.php`, {
         method: "POST",
         headers: mutationHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ particulars: name, amount: Number(newAmount || 0), rate_type: newRateType }),
+        body: JSON.stringify({
+          particulars: name, amount: Number(newAmount || 0), rate_type: newRateType,
+          auto_sales_type_ids: newAutoSalesTypeIds,
+        }),
       });
       const result = await res.json();
-      if (!result?.success) throw new Error(result?.message || "Failed to add.");
+      if (!res.ok || !result?.success) throw new Error(result?.message || "Failed to add.");
       setCharges(Array.isArray(result.charges) ? result.charges : []);
+      if (Array.isArray(result.sales_types)) setSalesTypes(result.sales_types);
       setNewName(""); setNewAmount(""); setNewRateType("Percentage");
+      setNewAutoSalesTypeIds([]);
       flash(`"${name}" added.`);
     } catch (err) {
       flash(err.message || "Failed to add charge.", true);
@@ -221,12 +241,67 @@ const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
     }
   };
 
-  // Local edit state — track per-row amount/rate edits before saving
+  // Local edit state — track per-row edits before saving
   const [localEdits, setLocalEdits] = useState({});
   const getLocal = (id, field, fallback) =>
     localEdits[id]?.[field] !== undefined ? localEdits[id][field] : fallback;
   const setLocal = (id, field, value) =>
     setLocalEdits((prev) => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
+  const clearLocal = (id) => setLocalEdits((prev) => {
+    const next = { ...prev };
+    delete next[id];
+    return next;
+  });
+
+  const renderAutoSalesTypes = (label, selectedIds, onChange) => {
+    const availableIds = new Set(salesTypes.map((type) => type.sales_type_id));
+    const unavailableIds = selectedIds.filter((id) => !availableIds.has(id));
+    const choices = [
+      ...salesTypes,
+      ...unavailableIds.map((id) => ({ sales_type_id: id, description: `Unavailable service type (${id})` })),
+    ];
+    return (
+      <fieldset
+        aria-label={`Automatically enable for ${label}`}
+        disabled={chargeMutationPending || isLoading || !settingsLoaded}
+        className="mt-4 border-t border-current/10 pt-3 font-[Poppins-Regular]"
+      >
+        <legend className={`px-1 text-xs font-[Poppins-SemiBold] ${t.primary}`}>
+          Automatically enable for
+        </legend>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {choices.map((type) => (
+            <label
+              key={type.sales_type_id}
+              className={`inline-flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-xs ${t.input}`}
+              style={selectedIds.includes(type.sales_type_id) ? { borderColor: "var(--color-brandPrimary)" } : undefined}
+            >
+              <input
+                type="checkbox"
+                checked={selectedIds.includes(type.sales_type_id)}
+                onChange={(event) => onChange(event.target.checked
+                  ? [...selectedIds, type.sales_type_id]
+                  : selectedIds.filter((id) => id !== type.sales_type_id))}
+                style={{ accentColor: "var(--color-brandPrimary)" }}
+              />
+              {type.description}
+            </label>
+          ))}
+        </div>
+        <p className={`mt-2 text-xs ${t.muted}`}>
+          {choices.length === 0 ? "No active service types available. " : ""}
+          {selectedIds.length === 0
+            ? "None selected: enable this charge manually when billing."
+            : "Starts ON for new bills with these service types. Cashiers can turn it off."}
+        </p>
+        {unavailableIds.length > 0 && (
+          <p className="mt-2 text-xs" style={{ color: "var(--color-redaccent)" }}>
+            Remove unavailable service types before saving.
+          </p>
+        )}
+      </fieldset>
+    );
+  };
 
   const globalChanged =
     globalEnabled !== initialGlobalEnabled || calculationBasis !== initialCalculationBasis;
@@ -342,7 +417,7 @@ const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
       <div className={`rounded-[28px] border p-5 sm:p-6 ${t.panel}`}>
         <p className={`text-base font-black uppercase tracking-wide mb-1 ${t.primary}`}>Charge Types</p>
         <p className={`text-xs mb-5 ${t.muted}`}>
-          Each enabled charge is automatically applied to billing and payment. Changes to amount/rate take effect after clicking Save on that row.
+          Choose which service types automatically enable each charge on new bills. Turn ON both the Master Switch and the charge, then save the row. Saved bills keep their selections through payment.
         </p>
 
         {isLoading ? (
@@ -355,25 +430,30 @@ const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
           <div className="space-y-3">
             {charges.map((charge) => {
               const id        = Number(charge.ID);
-              const enabled   = Boolean(charge.is_enabled);
+              const enabled   = Number(charge.is_enabled) === 1;
               const amt       = getLocal(id, "amount",   String(charge.amount));
               const rateType  = getLocal(id, "rate_type", charge.rate_type || "Percentage");
+              const savedAutoSalesTypeIds = Array.isArray(charge.auto_sales_type_ids) ? charge.auto_sales_type_ids : [];
+              const autoSalesTypeIds = getLocal(id, "auto_sales_type_ids", savedAutoSalesTypeIds);
               const isDirty   =
                 amt !== String(charge.amount) ||
-                rateType !== (charge.rate_type || "Percentage");
+                rateType !== (charge.rate_type || "Percentage") ||
+                JSON.stringify([...autoSalesTypeIds].sort()) !== JSON.stringify([...savedAutoSalesTypeIds].sort());
 
               return (
                 <div
                   key={id}
-                  className={`flex flex-col gap-3 rounded-2xl border p-4 sm:flex-row sm:items-center ${t.panelSoft} ${
+                  className={`rounded-2xl border p-4 ${t.panelSoft} ${
                     enabled ? "border-emerald-500/30" : ""
                   }`}
                 >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                   {/* Enable toggle */}
                   <button
                     type="button"
                     onClick={() => toggleCharge(id, enabled)}
-                    disabled={savingId !== null}
+                    aria-label={`${enabled ? "Disable" : "Enable"} ${charge.particulars}`}
+                    disabled={chargeMutationPending}
                     className={`flex-shrink-0 inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold transition ${
                       enabled
                         ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/30"
@@ -401,8 +481,10 @@ const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
                       type="number"
                       min="0"
                       step="0.01"
+                      aria-label={`Amount for ${charge.particulars}`}
                       value={amt}
                       onChange={(e) => setLocal(id, "amount", e.target.value)}
+                      disabled={chargeMutationPending}
                       onWheel={(e) => e.currentTarget.blur()}
                       className={`h-10 w-full rounded-xl border pl-3 pr-8 text-sm outline-none ${t.input}`}
                       placeholder="0.00"
@@ -414,8 +496,10 @@ const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
 
                   {/* Rate type */}
                   <select
+                    aria-label={`Rate type for ${charge.particulars}`}
                     value={rateType}
                     onChange={(e) => setLocal(id, "rate_type", e.target.value)}
+                    disabled={chargeMutationPending}
                     className={`h-10 rounded-xl border px-3 text-sm outline-none ${t.input}`}
                   >
                     {RATE_TYPES.map((r) => <option key={r} value={r}>{r}</option>)}
@@ -424,8 +508,9 @@ const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
                   {/* Save row */}
                   <button
                     type="button"
-                    onClick={() => saveCharge(id, amt, rateType)}
-                    disabled={!isDirty || savingId !== null}
+                    aria-label={`Save ${charge.particulars}`}
+                    onClick={() => saveCharge(id, amt, rateType, autoSalesTypeIds)}
+                    disabled={!isDirty || chargeMutationPending}
                     className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-black text-white transition disabled:opacity-40"
                     style={{ backgroundColor: accent }}
                   >
@@ -437,12 +522,16 @@ const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
                   <button
                     type="button"
                     onClick={() => deleteCharge(id)}
-                    disabled={deletingId !== null}
+                    aria-label={`Remove ${charge.particulars}`}
+                    disabled={chargeMutationPending}
                     className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold text-red-500 hover:bg-red-500/10 transition disabled:opacity-40"
                   >
                     {deletingId === id ? <FiLoader size={12} className="animate-spin" /> : <FiTrash2 size={12} />}
                     Remove
                   </button>
+                  </div>
+                  {renderAutoSalesTypes(charge.particulars, autoSalesTypeIds,
+                    (ids) => setLocal(id, "auto_sales_type_ids", ids))}
                 </div>
               );
             })}
@@ -457,12 +546,13 @@ const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
               <label className={t.label}>Charge Name</label>
               <input
                 type="text"
+                aria-label="Charge Name"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") addCharge(); }}
                 placeholder="e.g. Service Charge"
                 className={`h-11 w-full rounded-2xl border px-4 text-sm outline-none ${t.input}`}
-                disabled={isAdding}
+                disabled={chargeMutationPending || !settingsLoaded}
               />
             </div>
             <div className="w-32">
@@ -470,6 +560,7 @@ const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
               <div className="relative">
                 <input
                   type="number"
+                  aria-label="New charge amount"
                   min="0"
                   step="0.01"
                   value={newAmount}
@@ -477,7 +568,7 @@ const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
                   onWheel={(e) => e.currentTarget.blur()}
                   placeholder="0.00"
                   className={`h-11 w-full rounded-2xl border pl-3 pr-7 text-sm outline-none ${t.input}`}
-                  disabled={isAdding}
+                  disabled={chargeMutationPending || !settingsLoaded}
                 />
                 <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-xs ${t.soft}`}>
                   {newRateType === "Percentage" ? "%" : "₱"}
@@ -487,10 +578,11 @@ const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
             <div className="w-36">
               <label className={t.label}>Rate Type</label>
               <select
+                aria-label="New charge rate type"
                 value={newRateType}
                 onChange={(e) => setNewRateType(e.target.value)}
                 className={`h-11 w-full rounded-2xl border px-3 text-sm outline-none ${t.input}`}
-                disabled={isAdding}
+                disabled={chargeMutationPending || !settingsLoaded}
               >
                 {RATE_TYPES.map((r) => <option key={r} value={r}>{r}</option>)}
               </select>
@@ -498,7 +590,7 @@ const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
             <button
               type="button"
               onClick={addCharge}
-              disabled={isAdding || !newName.trim()}
+              disabled={chargeMutationPending || !settingsLoaded || !newName.trim()}
               className="inline-flex items-center gap-2 rounded-2xl px-5 h-11 text-sm font-black text-white transition disabled:opacity-50 flex-shrink-0"
               style={{ backgroundColor: accent }}
             >
@@ -506,6 +598,10 @@ const PosServiceCharge = ({ isDark, accent = "#3b82f6" }) => {
               Add
             </button>
           </div>
+          {renderAutoSalesTypes("new charge", newAutoSalesTypeIds, setNewAutoSalesTypeIds)}
+          <p className={`mt-2 text-xs font-[Poppins-Regular] ${t.muted}`}>
+            New charges start OFF. Turn the charge ON after adding it to use these automatic selections.
+          </p>
         </div>
       </div>
     </div>

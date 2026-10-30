@@ -143,6 +143,22 @@ try {
     $categoryCode = trim((string)($transactionSummary["Category_Code"] ?? ""));
     $unitCode = trim((string)($transactionSummary["Unit_Code"] ?? ""));
 
+    $stmtOtherCharges = $pdo->prepare("
+        SELECT ID, transaction_id, Category_Code, Unit_Code, Project_Code,
+               transaction_date, particulars, amount, reference
+        FROM tbl_pos_transactions_other_charges
+        WHERE transaction_id = :transaction_id
+          AND Category_Code = :Category_Code
+          AND Unit_Code = :Unit_Code
+        ORDER BY ID ASC
+    ");
+    $stmtOtherCharges->execute([
+        ":transaction_id" => $transactionSummary["transaction_id"],
+        ":Category_Code" => $categoryCode,
+        ":Unit_Code" => $unitCode,
+    ]);
+    $otherChargeRows = $stmtOtherCharges->fetchAll(PDO::FETCH_ASSOC);
+
     $sql = "
         SELECT
             d.ID,
@@ -250,6 +266,7 @@ try {
         "discount_counts" => $discountCounts,
         "discount_counts_by_label" => $discountCountsByLabel,
         "discount_rows" => $discountRows,
+        "other_charge_rows" => $otherChargeRows,
         "items" => $rows,
     ]);
 } catch (Throwable $e) {
@@ -267,6 +284,7 @@ try {
         ],
         "discount_counts_by_label" => [],
         "discount_rows" => [],
+        "other_charge_rows" => [],
         "items" => [],
     ]);
 }

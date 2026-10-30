@@ -17,6 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require __DIR__ . "/bootstrap.php";
 require_once __DIR__ . "/pos_report_mirror.php";
 require_once __DIR__ . "/pos_report_mirror_activation.php";
+require_once __DIR__ . "/../src/PosOrderItemInstructions.php";
 
 date_default_timezone_set('Asia/Manila');
 
@@ -185,6 +186,9 @@ try {
         exit;
     }
 
+    $hasItemInstruction = posOrderHasItemInstructionColumn($pdo);
+    posOrderValidateItemInstructions($cart_items, $hasItemInstruction);
+
     $pdo->beginTransaction();
     $manualTransactionStarted = true;
 
@@ -294,35 +298,7 @@ try {
         throw new RuntimeException("Unable to identify the saved POS transaction row.");
     }
 
-    $sqlDetails = "INSERT INTO tbl_pos_transactions_detailed (
-        transaction_id,
-        Category_Code,
-        Unit_Code,
-        transaction_date,
-        product_id,
-        sku,
-        sales_quantity,
-        landing_cost,
-        unit_cost,
-        selling_price,
-        vatable,
-        isDiscountable,
-        order_status
-    ) VALUES (
-        :transaction_id,
-        :Category_Code,
-        :Unit_Code,
-        :transaction_date,
-        :product_id,
-        :sku,
-        :sales_quantity,
-        :landing_cost,
-        :unit_cost,
-        :selling_price,
-        :vatable,
-        :isDiscountable,
-        :order_status
-    )";
+    $sqlDetails = posOrderDetailInsertSql($hasItemInstruction, true);
 
     $stmtDetails = $pdo->prepare($sqlDetails);
 
@@ -340,7 +316,7 @@ try {
         $isDiscountable = (string)($item["isDiscountable"] ?? '');
         $detail_status = (string)($item["order_status"] ?? '');
 
-        $stmtDetails->execute([
+        $detailParams = [
             ":transaction_id" => $transaction_id,
             ":Category_Code" => $Category_Code,
             ":Unit_Code" => $Unit_Code,
@@ -354,7 +330,11 @@ try {
             ":vatable" => $vatable,
             ":isDiscountable" => $isDiscountable,
             ":order_status" => $detail_status
-        ]);
+        ];
+        if ($hasItemInstruction) {
+            $detailParams[':item_instruction'] = posOrderItemInstruction($item);
+        }
+        $stmtDetails->execute($detailParams);
 
         $lineTotal = round($sales_quantity * $selling_price, 2);
         $totalAmount += $lineTotal;

@@ -6,7 +6,6 @@ import {
   HiCalendar,
   HiIdentification,
 } from "react-icons/hi";
-import { motion } from "framer-motion";
 import ModalYesNoReusable from "./ModalYesNoReusable";
 import useCustomQuery from "../../hooks/useCustomQuery";
 import useZustandAPIEndpoint from "../../context/useZustandAPIEndpoint";
@@ -178,11 +177,8 @@ const ModalSalesCreditPayment = ({
   return (
     <>
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-3 ">
-        <motion.div
-          initial={{ opacity: 0, y: -50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          className="bg-white hadow-xl w-full max-w-lg lg:mt-[10vh]"
+        <div
+          className="ui-enter bg-white hadow-xl w-full max-w-lg lg:mt-[10vh]"
         >
           {/* Header */}
           <div className="flex items-center justify-between bg-gradient-to-br  from-colorBrand to-colorBrandSecondary p-4 ">
@@ -455,7 +451,7 @@ const ModalSalesCreditPayment = ({
               </button>
             </div>
           </div>
-        </motion.div>
+        </div>
       </div>
 
       {isYesNoModalOpen && (

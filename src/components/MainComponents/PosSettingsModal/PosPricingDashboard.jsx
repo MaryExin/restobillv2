@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
-import { motion, AnimatePresence } from "framer-motion";
+
 import {
   FiSearch, FiEdit2, FiCamera, FiPlus, FiRefreshCw,
   FiLoader, FiSave, FiToggleLeft, FiToggleRight,
@@ -407,8 +407,7 @@ const PosPricingDashboard = ({ isDark, accent = "#3b82f6" }) => {
           }`}
         >
           {filteredProducts.map((item, idx) => (
-            <motion.div
-              layout
+            <div
               key={idx}
               className={`relative flex flex-col overflow-hidden rounded-[2rem] border group hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 ${th.card}`}
             >
@@ -488,34 +487,29 @@ const PosPricingDashboard = ({ isDark, accent = "#3b82f6" }) => {
                   </div>
                 </div>
               </div>
-            </motion.div>
+            </div>
           ))}
         </div>
       )}
 
       {/* ── Success toast ─────────────────────────────────────────────────────── */}
-      <AnimatePresence>
+      <>
         {showToast && (
-          <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="fixed bottom-10 z-[10000000] flex items-center gap-4 px-8 py-5 bg-white border border-blue-100 rounded-3xl shadow-2xl left-1/2 -translate-x-1/2"
+          <div
+            className="ui-fade-in fixed bottom-10 z-[10000000] flex items-center gap-4 px-8 py-5 bg-white border border-blue-100 rounded-3xl shadow-2xl left-1/2 -translate-x-1/2"
           >
             <FiCheckCircle className="text-blue-600" size={22} />
             <p className="text-[13px] font-bold text-slate-700">{toastMsg}</p>
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
+      </>
 
       {/* ── Add Product Modal ─────────────────────────────────────────────────── */}
-      <AnimatePresence>
+      <>
         {isAddModalOpen && (
           <div className="fixed inset-0 z-[9999999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="w-full max-w-[450px] bg-white rounded-[2.5rem] p-10 shadow-2xl border border-white max-h-[90vh] overflow-y-auto no-scrollbar"
+            <div
+              className="ui-scale-in w-full max-w-[450px] bg-white rounded-[2.5rem] p-10 shadow-2xl border border-white max-h-[90vh] overflow-y-auto no-scrollbar"
             >
               <h2 className="mb-8 text-xs font-black uppercase text-slate-700 tracking-[0.2em] flex items-center gap-2">
                 <FiPlus size={14} className="text-blue-600" /> New Inventory Entry
@@ -638,19 +632,17 @@ const PosPricingDashboard = ({ isDark, accent = "#3b82f6" }) => {
                   Save Entry
                 </button>
               </div>
-            </motion.div>
+            </div>
           </div>
         )}
-      </AnimatePresence>
+      </>
 
       {/* ── Edit Price Modal ──────────────────────────────────────────────────── */}
-      <AnimatePresence>
+      <>
         {isModalOpen && (
           <div className="fixed inset-0 z-[9999999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="w-full max-w-[300px] bg-white rounded-[2.5rem] p-10 shadow-2xl text-center border border-white"
+            <div
+              className="ui-scale-in w-full max-w-[300px] bg-white rounded-[2.5rem] p-10 shadow-2xl text-center border border-white"
             >
               {!showConfirm ? (
                 <>
@@ -723,10 +715,10 @@ const PosPricingDashboard = ({ isDark, accent = "#3b82f6" }) => {
                   </div>
                 </div>
               )}
-            </motion.div>
+            </div>
           </div>
         )}
-      </AnimatePresence>
+      </>
     </div>
   );
 };

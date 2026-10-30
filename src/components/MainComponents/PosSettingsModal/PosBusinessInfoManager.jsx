@@ -14,7 +14,7 @@ import {
   FiShield,
   FiLock,
 } from "react-icons/fi";
-import { motion, AnimatePresence } from "framer-motion";
+
 import useBusinessInfo from "../../../hooks/useBusinessInfo";
 import { usePosDeveloperSession } from "../../../hooks/usePosRoleAccessConfig";
 
@@ -436,14 +436,11 @@ const PosBusinessInfoManager = ({ isDark, accent, getContrastText }) => {
         </div>
       </div>
 
-      <AnimatePresence>
+      <>
         {isModalOpen && (
           <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/90 p-6 backdrop-blur-2xl">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className={`max-h-[95vh] w-full max-w-7xl overflow-y-auto rounded-[60px] p-16 ${
+            <div
+              className={`ui-scale-in max-h-[95vh] w-full max-w-7xl overflow-y-auto rounded-[60px] p-16 ${
                 isDark ? "bg-[#0b1222]" : "bg-white"
               }`}
             >
@@ -637,10 +634,10 @@ const PosBusinessInfoManager = ({ isDark, accent, getContrastText }) => {
                   </button>
                 </div>
               </div>
-            </motion.div>
+            </div>
           </div>
         )}
-      </AnimatePresence>
+      </>
     </div>
   );
 };

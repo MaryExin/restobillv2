@@ -1,6 +1,5 @@
 import React, { useEffect } from "react";
 import useCustomAgingInfiniteQuery from "../../hooks/useCustomAgingInfiniteQuery";
-import { motion } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
 import useZustandAPIEndpoint from "../../context/useZustandAPIEndpoint";
 
@@ -38,14 +37,11 @@ const ModalFixedAssetsData = ({
       <div className="w-full max-w-3xl p-4">
         <div className="bg-white rounded-lg shadow-2xl overflow-hidden">
           <div className="bg-gradient-to-br from-darkerPrimary via-darkPrimary to-medPrimary p-6 text-center text-white rounded-t-lg">
-            <motion.h1
-              className="text-2xl font-semibold"
-              initial={{ opacity: 0, scale: 0, rotate: -180 }}
-              animate={{ opacity: 1, scale: 1, rotate: 0 }}
-              transition={{ duration: 0.5 }}
+            <h1
+              className="ui-scale-in text-2xl font-semibold"
             >
               Fixed Assets Data
-            </motion.h1>
+            </h1>
           </div>
 
           <div className="p-6 space-y-4">

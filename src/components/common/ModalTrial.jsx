@@ -1,6 +1,5 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
 import { FiClock, FiArrowRight } from "react-icons/fi";
 import { FaGift, FaRocket, FaCrown } from "react-icons/fa6";
 
@@ -84,21 +83,14 @@ const ModalTrialExpiration = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+      <div
+        className="ui-fade-in absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={() => setIsModalOpen?.(false)}
       />
 
       {/* Modal Container */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        transition={{ duration: 0.3, ease: "easeOut" }}
-        className="relative z-10 w-full max-w-5xl bg-gradient-to-br from-slate-900 via-gray-900 to-black border border-gray-700/50 rounded-2xl shadow-2xl overflow-hidden"
+      <div
+        className="ui-scale-in relative z-10 w-full max-w-5xl bg-gradient-to-br from-slate-900 via-gray-900 to-black border border-gray-700/50 rounded-2xl shadow-2xl overflow-hidden"
       >
         <div className="absolute inset-0 opacity-30">
           <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-full blur-3xl" />
@@ -106,16 +98,13 @@ const ModalTrialExpiration = ({
         </div>
 
         <div className="relative z-10  md:p-12">
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1, duration: 0.4 }}
-            className="text-center "
+          <div
+            className="ui-enter text-center "
           >
             <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-2xl mb-6 border border-blue-500/30">
               <FiClock className="w-8 h-8 text-blue-500" />
             </div>
-          </motion.div>
+          </div>
 
           <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-xl p-6 mb-8 text-center">
             <h3 className="text-lg font-semibold text-white mb-2">
@@ -127,20 +116,13 @@ const ModalTrialExpiration = ({
           </div>
 
           {/* Pricing Plans */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 0.4 }}
-            className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10"
+          <div
+            className="ui-enter grid grid-cols-1 md:grid-cols-2 gap-6 mb-10"
           >
             {plans.map((plan, index) => (
-              <motion.div
+              <div
                 key={plan.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 + index * 0.1, duration: 0.4 }}
-                whileHover={{ y: -6 }}
-                className={`relative p-6 rounded-2xl shadow-lg border border-white/10 bg-gradient-to-br ${plan.gradient}`}
+                className={"ui-enter hover:opacity-90 transition-opacity duration-150 " + (`relative p-6 rounded-2xl shadow-lg border border-white/10 bg-gradient-to-br ${plan.gradient}`)}
               >
                 <div className="flex items-center justify-between mb-4">
                   <div className="p-3 bg-white/10 rounded-lg">{plan.icon}</div>
@@ -186,9 +168,9 @@ const ModalTrialExpiration = ({
                 >
                   {plan.button}
                 </button>
-              </motion.div>
+              </div>
             ))}
-          </motion.div>
+          </div>
 
           {/* Footer Buttons */}
           <div className="flex flex-col sm:flex-row gap-4">
@@ -218,7 +200,7 @@ const ModalTrialExpiration = ({
             </a>
           </p>
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 };

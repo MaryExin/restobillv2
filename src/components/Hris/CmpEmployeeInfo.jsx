@@ -6,7 +6,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import "../../fonts/font-style.css";
 import "../../components/Hris/Hris.css";
-import { AnimatePresence, motion } from "framer-motion";
+
 import { Avatar, LinearProgress } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 
@@ -225,48 +225,23 @@ function ReadEmployeesModal({
     });
   }, [data, localSearch]);
 
-  const overlay = {
-    hidden: { opacity: 0 },
-    show: { opacity: 1, transition: { duration: 0.15 } },
-    exit: { opacity: 0, transition: { duration: 0.12 } },
-  };
-
-  const panel = {
-    hidden: { opacity: 0, y: 10, scale: 0.985 },
-    show: {
-      opacity: 1,
-      y: 0,
-      scale: 1,
-      transition: { type: "spring", stiffness: 380, damping: 28 },
-    },
-    exit: { opacity: 0, y: 10, scale: 0.985, transition: { duration: 0.12 } },
-  };
-
   return (
-    <AnimatePresence>
+    <>
       {open ? (
-        <motion.div
-          className="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center px-2 sm:px-4 lg:px-6"
-          variants={overlay}
-          initial="hidden"
-          animate="show"
-          exit="exit"
+        <div
+          className="ui-fade-in fixed inset-0 z-[99999] flex items-end sm:items-center justify-center px-2 sm:px-4 lg:px-6"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) close();
           }}
         >
           <div className="absolute inset-0 bg-black/55 backdrop-blur-sm" />
 
-          <motion.div
-            variants={panel}
-            initial="hidden"
-            animate="show"
-            exit="exit"
+          <div
             role="dialog"
             aria-modal="true"
             aria-label="Read Employees"
             onMouseDown={(e) => e.stopPropagation()}
-            className="relative w-full max-w-6xl"
+            className="ui-scale-in relative w-full max-w-6xl"
             style={{ height: "min(92vh, 980px)" }}
           >
             <div className="h-full rounded-3xl p-[1px] bg-gradient-to-br from-colorBrand/70 via-redAccent/30 to-colorBrandSecondary/60 shadow-[0_24px_80px_rgba(0,0,0,0.35)]">
@@ -609,10 +584,10 @@ function ReadEmployeesModal({
                 </div>
               </div>
             </div>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
       ) : null}
-    </AnimatePresence>
+    </>
   );
 }
 
@@ -1850,17 +1825,15 @@ const CmpEmployeeInfo = () => {
                           type="button"
                           onClick={() => {
                             const nextAction = isEditMode ? "Edit" : "Create";
-
                             if (
                               nextAction === "Create" &&
-                              activeUserCount >= planInfo.max
+                              activeUserCount>= planInfo.max
                             ) {
                               setaddedit("UPGRADE_GATE");
                               setsuccessmassage("UPGRADE_GATE");
                               setYesNoModalOpen(true);
                               return;
                             }
-
                             setaddedit(nextAction);
                             setsuccessmassage(nextAction);
                             setYesNoModalOpen(true);
@@ -1983,18 +1956,16 @@ const CmpEmployeeInfo = () => {
       </div>
 
       <div className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))] z-[9998]">
-        <motion.button
+        <button
           type="button"
           onClick={() => setIsReadOpen(true)}
-          whileHover={{ y: -2 }}
-          whileTap={{ scale: 0.98 }}
-          className={[
+          className={"hover:-translate-y-0.5 active:scale-[0.98] transition-transform duration-150 motion-reduce:transform-none " + ([
             "group relative overflow-hidden",
             "rounded-full px-4 py-3",
             "border border-slate-200/80 bg-white/75 backdrop-blur-xl",
             "shadow-[0_18px_50px_rgba(15,23,42,0.12)]",
             "transition active:scale-[0.99]",
-          ].join(" ")}
+          ].join(" "))}
           aria-label="Open Read Employees"
         >
           <span className="pointer-events-none absolute inset-0 opacity-0 transition group-hover:opacity-100 bg-[radial-gradient(circle_at_30%_20%,rgba(215,85,41,0.16),transparent_55%),radial-gradient(circle_at_80%_80%,rgba(236,72,153,0.12),transparent_55%)]" />
@@ -2005,7 +1976,7 @@ const CmpEmployeeInfo = () => {
             <span className="text-sm font-semibold text-slate-900">Read</span>
             <span className="text-xs font-semibold text-slate-500">Open →</span>
           </span>
-        </motion.button>
+        </button>
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 /* eslint-disable react/prop-types */
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { motion, AnimatePresence } from 'framer-motion';
+
 import {
   Search, Edit3, X, Loader2, Camera,
   AlertCircle, Tag, ShoppingBag, Plus, RefreshCw, CheckCircle2,
@@ -225,10 +225,8 @@ const PricingDashboard = ({ isOpen, onClose }) => {
     <>
       {/* ── MAIN MODAL ──────────────────────────────────────────────────────── */}
       <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/60 backdrop-blur-md p-6 font-sans overflow-hidden text-slate-700">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="flex flex-col w-full h-full max-w-[1200px] max-h-[90vh] bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden"
+        <div
+          className="ui-scale-in flex flex-col w-full h-full max-w-[1200px] max-h-[90vh] bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden"
         >
           {/* ── HEADER ──────────────────────────────────────────────────────── */}
           <div className="p-6 border-b border-slate-50">
@@ -330,8 +328,7 @@ const PricingDashboard = ({ isOpen, onClose }) => {
                 }`}
               >
                 {filteredProducts.map((item, idx) => (
-                  <motion.div
-                    layout
+                  <div
                     key={idx}
                     className="relative flex flex-col overflow-hidden rounded-[2.2rem] border border-slate-100 bg-white shadow-sm group hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
                   >
@@ -407,37 +404,32 @@ const PricingDashboard = ({ isOpen, onClose }) => {
                         </div>
                       </div>
                     </div>
-                  </motion.div>
+                  </div>
                 ))}
               </div>
             )}
           </div>
-        </motion.div>
+        </div>
       </div>
 
       {/* ── SUCCESS TOAST ────────────────────────────────────────────────────── */}
-      <AnimatePresence>
+      <>
         {showSuccess && (
-          <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="fixed bottom-10 z-[10000000] flex items-center gap-4 px-8 py-5 bg-white border border-blue-100 rounded-3xl shadow-2xl left-1/2 -translate-x-1/2"
+          <div
+            className="ui-fade-in fixed bottom-10 z-[10000000] flex items-center gap-4 px-8 py-5 bg-white border border-blue-100 rounded-3xl shadow-2xl left-1/2 -translate-x-1/2"
           >
             <CheckCircle2 className="text-blue-600" size={24} />
             <p className="text-[13px] font-bold text-slate-700">{successMsg}</p>
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
+      </>
 
       {/* ── ADD PRODUCT MODAL ────────────────────────────────────────────────── */}
-      <AnimatePresence>
+      <>
         {isAddModalOpen && (
           <div className="fixed inset-0 z-[9999999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="w-full max-w-[450px] bg-white rounded-[2.5rem] p-10 shadow-2xl border border-white max-h-[90vh] overflow-y-auto no-scrollbar"
+            <div
+              className="ui-scale-in w-full max-w-[450px] bg-white rounded-[2.5rem] p-10 shadow-2xl border border-white max-h-[90vh] overflow-y-auto no-scrollbar"
             >
               <h2 className="mb-8 text-xs font-black uppercase text-slate-700 tracking-[0.2em] flex items-center gap-2">
                 <Plus size={16} className="text-blue-600" /> New Inventory Entry
@@ -558,19 +550,17 @@ const PricingDashboard = ({ isOpen, onClose }) => {
                   Save Entry
                 </button>
               </div>
-            </motion.div>
+            </div>
           </div>
         )}
-      </AnimatePresence>
+      </>
 
       {/* ── EDIT PRICE MODAL ─────────────────────────────────────────────────── */}
-      <AnimatePresence>
+      <>
         {isModalOpen && (
           <div className="fixed inset-0 z-[9999999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="w-full max-w-[300px] bg-white rounded-[2.5rem] p-10 shadow-2xl text-center border border-white"
+            <div
+              className="ui-scale-in w-full max-w-[300px] bg-white rounded-[2.5rem] p-10 shadow-2xl text-center border border-white"
             >
               {!showConfirm ? (
                 <>
@@ -629,10 +619,10 @@ const PricingDashboard = ({ isOpen, onClose }) => {
                   </div>
                 </div>
               )}
-            </motion.div>
+            </div>
           </div>
         )}
-      </AnimatePresence>
+      </>
     </>
   );
 };

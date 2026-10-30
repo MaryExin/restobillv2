@@ -1,5 +1,4 @@
-import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   IoClose,
   IoCheckmarkCircle,
@@ -10,21 +9,22 @@ import {
 
 const Toast = ({ message, type = "info", duration = 4000, onClose }) => {
   const [showToast, setShowToast] = useState(true);
+  const closedRef = useRef(false);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const handleClose = useCallback(() => {
+    if (closedRef.current) return;
+    closedRef.current = true;
+    setShowToast(false);
+    onCloseRef.current?.();
+  }, []);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      handleClose();
-    }, duration);
+    if (!showToast) return;
+    const timer = setTimeout(handleClose, duration);
 
     return () => clearTimeout(timer);
-  }, [duration]);
-
-  const handleClose = () => {
-    setShowToast(false);
-    setTimeout(() => {
-      if (onClose) onClose();
-    }, 300); // Wait for exit animation
-  };
+  }, [duration, showToast, handleClose]);
 
   const getToastStyles = () => {
     const baseStyles = "backdrop-blur-md border shadow-lg";
@@ -59,26 +59,17 @@ const Toast = ({ message, type = "info", duration = 4000, onClose }) => {
   };
 
   return (
-    <AnimatePresence>
+    <>
       {showToast && (
-        <motion.div
-          initial={{ x: 400, opacity: 0, scale: 0.9 }}
-          animate={{ x: 0, opacity: 1, scale: 1 }}
-          exit={{ x: 400, opacity: 0, scale: 0.9 }}
-          transition={{
-            type: "spring",
-            damping: 25,
-            stiffness: 300,
-            duration: 0.3,
-          }}
-          className={`
+        <div
+          className={"ui-slide-in-right " + (`
             fixed bottom-4 right-4 z-50 max-w-sm w-full
             ${getToastStyles()}
             rounded-xl p-4
             shadow-xl shadow-black/5
             hover:shadow-2xl hover:shadow-black/10
             transition-shadow duration-200
-          `}
+          `)}
           role="alert"
           aria-live="polite"
         >
@@ -103,15 +94,13 @@ const Toast = ({ message, type = "info", duration = 4000, onClose }) => {
             </button>
           </div>
 
-          <motion.div
-            className="absolute bottom-0 left-0 h-1 bg-current opacity-20 rounded-b-xl"
-            initial={{ width: "100%" }}
-            animate={{ width: "0%" }}
-            transition={{ duration: duration / 1000, ease: "linear" }}
+          <div
+            className="ui-toast-progress absolute bottom-0 left-0 h-1 w-full bg-current opacity-20 rounded-b-xl"
+            style={{ "--ui-toast-duration": `${duration}ms` }}
           />
-        </motion.div>
+        </div>
       )}
-    </AnimatePresence>
+    </>
   );
 };
 

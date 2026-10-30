@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
 import { useSecuredMutation } from "../../hooks/useSecuredMutation";
 import useZustandAPIEndpoint from "../../context/useZustandAPIEndpoint";
 
@@ -80,12 +79,9 @@ const ModalCustomerDetailEdit = ({
                     />
                   </svg>
                 </div>
-                <motion.div
-                  className="flex flex-row justify-center"
-                  initial={{ opacity: 0, scale: 0, rotate: -180 }}
-                  animate={{ opacity: 1, scale: 1, rotate: 0 }}
-                  transition={{ duration: 0.5 }}
-                ></motion.div>
+                <div
+                  className="ui-scale-in flex flex-row justify-center"
+                ></div>
               </div>
 
               {/* Main Form */}

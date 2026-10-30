@@ -1,50 +1,63 @@
-import { Routes, Route, HashRouter } from "react-router-dom";
-import { useEffect } from "react";
-import ViewOrdering from "./components/MainComponents/ViewOrdering";
-import PrintBilling from "./components/MainComponents/PrintBilling";
-import SalesDashboard from "./components/Dashboards/SalesDashboard";
-import TransactionRecords from "./components/Dashboards/TransactionRecords";
+import { Routes, Route, HashRouter, useLocation } from "react-router-dom";
+import { lazy, Suspense, useEffect } from "react";
 import GlobalThemeToggle from "./components/common/GlobalThemeToggle";
 import GlobalSync from "./components/common/GlobalSync";
 import RoleAccessHydrator from "./components/common/RoleAccessHydrator";
-import PosReadingModal from "./components/MainComponents/PosReadingModal";
 import PosLogin from "./pages/PosCore/PosLogin";
-import PosSelectBusunit from "./pages/PosCore/PosSelectBusunit";
-import PosHomeScreen from "./pages/PosCore/PosHomeScreen";
-import PosPayment from "./components/MainComponents/PosPayment";
-import ProductList from "./components/MainComponents/Productlist";
-import SyncProductsAndPricing from "./components/MainComponents/SyncProductsAndPricing";
 import PrivateRoute from "./routes/PrivateRoute";
-import SyncOfflineSalesToWeb from "./components/MainComponents/SyncOfflineSalesToWeb";
-import CmpEmployeeInfo from "./components/Hris/CmpEmployeeInfo";
-import MemberQueings from "../src/pages/Admin/MemberQueings";
-import MemberProfile from "./components/Hris/MemberProfile";
 import KioskFullscreenGuard from "./components/KioskSecondScreen/KioskFullscreenGuard";
-import SecondScreenCart from "./components/KioskSecondScreen/SecondScreenCart";
+import ScreenLoader from "./components/common/ScreenLoader";
 import { useKioskSecondScreen } from "./hooks/useKioskSecondScreen";
 import useApiHost from "./hooks/useApiHost";
 import useZustandLayoutMode from "./context/useZustandLayoutMode";
 
-const App = () => {
+// Keep login immediately available; load the rest only when its route is opened.
+const ViewOrdering = lazy(() => import("./components/MainComponents/ViewOrdering"));
+const PrintBilling = lazy(() => import("./components/MainComponents/PrintBilling"));
+const SalesDashboard = lazy(() => import("./components/Dashboards/SalesDashboard"));
+const TransactionRecords = lazy(() => import("./components/Dashboards/TransactionRecords"));
+const PosReadingModal = lazy(() => import("./components/MainComponents/PosReadingModal"));
+const PosSelectBusunit = lazy(() => import("./pages/PosCore/PosSelectBusunit"));
+const PosHomeScreen = lazy(() => import("./pages/PosCore/PosHomeScreen"));
+const PosPayment = lazy(() => import("./components/MainComponents/PosPayment"));
+const ProductList = lazy(() => import("./components/MainComponents/Productlist"));
+const SyncProductsAndPricing = lazy(() => import("./components/MainComponents/SyncProductsAndPricing"));
+const SyncOfflineSalesToWeb = lazy(() => import("./components/MainComponents/SyncOfflineSalesToWeb"));
+const CmpEmployeeInfo = lazy(() => import("./components/Hris/CmpEmployeeInfo"));
+const MemberQueings = lazy(() => import("./pages/Admin/MemberQueings"));
+const MemberProfile = lazy(() => import("./components/Hris/MemberProfile"));
+const SecondScreenCart = lazy(() => import("./components/KioskSecondScreen/SecondScreenCart"));
+
+const PrimaryWindowServices = () => {
   // Auto-launch second screen the moment the app opens, if Kiosk Mode is active.
   useKioskSecondScreen();
 
   // Seed layoutMode from DB on first load; enables persistence across devices/reboots.
   const apiHost = useApiHost();
-  const { initLayoutMode } = useZustandLayoutMode();
+  const initLayoutMode = useZustandLayoutMode((state) => state.initLayoutMode);
   useEffect(() => {
     if (apiHost) initLayoutMode(apiHost);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiHost]);
+  }, [apiHost, initLayoutMode]);
 
   return (
-    <HashRouter>
-      {}
-      {/* Kiosk fullscreen enforcement — transparent, renders no UI unless gesture fallback needed */}
+    <>
       <KioskFullscreenGuard />
       <RoleAccessHydrator />
       <GlobalSync />
+      <GlobalThemeToggle />
+    </>
+  );
+};
 
+const AppRoutes = () => {
+  const isCustomerDisplay = useLocation().pathname === "/kiosk-display";
+
+  return (
+    <>
+      {/* A customer display must not start a second backup scheduler or control the main window. */}
+      {!isCustomerDisplay && <PrimaryWindowServices />}
+
+      <Suspense fallback={<ScreenLoader />}>
       <Routes>
         <Route exact path="/" element={<PosLogin />} />
         <Route
@@ -134,10 +147,15 @@ const App = () => {
         {/* Kiosk second-screen display — loaded in the secondary BrowserWindow */}
         <Route path="/kiosk-display" element={<SecondScreenCart />} />
       </Routes>
-
-      <GlobalThemeToggle />
-    </HashRouter>
+      </Suspense>
+    </>
   );
 };
+
+const App = () => (
+  <HashRouter>
+    <AppRoutes />
+  </HashRouter>
+);
 
 export default App;

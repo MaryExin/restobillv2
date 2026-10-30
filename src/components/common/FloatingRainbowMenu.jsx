@@ -1,6 +1,5 @@
 // HiTechFloatingMenu.jsx
 import React, { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import {
   HiMenu,
   HiX,
@@ -53,7 +52,7 @@ export default function HiTechFloatingMenu({
 
   return (
     <div>
-      <AnimatePresence>
+      <>
         {open &&
           menuItems.map((item, i) => {
             let x = 0,
@@ -74,23 +73,14 @@ export default function HiTechFloatingMenu({
             }
 
             return (
-              <motion.button
+              <button
                 key={item.label}
-                initial={{ x: 0, y: 0, opacity: 0 }}
-                animate={{ x, y, opacity: 1 }}
-                exit={{ x: 0, y: 0, opacity: 0 }}
-                transition={{
-                  type: "spring",
-                  stiffness: 450,
-                  damping: 25,
-                  delay: i * 0.05,
-                }}
                 onClick={() => {
                   item.action();
                   setOpen(false);
                 }}
                 aria-label={item.label}
-                className="
+                className="ui-fade-in
                   fixed right-[81vw] lg:right-24 bottom-6 z-40
                   bg-white hover:bg-colorBrand hover:text-white
                   p-3 rounded-full
@@ -99,17 +89,17 @@ export default function HiTechFloatingMenu({
                   text-darkPrimary
                   focus:outline-none 
                 "
-                style={{ transform: "translate(-50%, -50%)" }}
+                style={{ transform: `translate(-50%, -50%) translate(${x}px, ${y}px)` }}
               >
                 <span className="text-xl">{item.icon}</span>
-              </motion.button>
+              </button>
             );
           })}
-      </AnimatePresence>
+      </>
 
       {/* main toggle */}
-      <motion.button
-        className="
+      <button
+        className="active:opacity-80 transition-opacity duration-150
           fixed right-[80vw] lg:right-24 bottom-6 z-50
           bg-gradient-to-br from-colorBrand via-colorBrandSecondary to-colorBrandTertiary
           p-4 rounded-full
@@ -118,11 +108,10 @@ export default function HiTechFloatingMenu({
           focus:outline-none
         "
         onClick={() => setOpen((o) => !o)}
-        whileTap={{ scale: 0.9 }}
         aria-label="Toggle menu"
       >
         {open ? <HiX className="w-6 h-6" /> : <HiMenu className="w-6 h-6" />}
-      </motion.button>
+      </button>
     </div>
   );
 }

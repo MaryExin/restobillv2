@@ -15,7 +15,7 @@ import {
   FaCreditCard,
 } from "react-icons/fa";
 import { FaGear } from "react-icons/fa6";
-import { motion } from "framer-motion";
+
 import { Avatar } from "@mui/material";
 
 import { useSecuredMutation } from "../../hooks/useSecuredMutation";
@@ -651,23 +651,16 @@ const CmpMemberProfile = () => {
     softBtn +
     " bg-white/70 text-slate-700 border border-white/60 hover:bg-white/90";
 
-  const shell = {
-    hidden: { opacity: 0, y: 14 },
-    show: { opacity: 1, y: 0, transition: { duration: 0.35 } },
-  };
-
   const SideNavButton = ({ active, icon, label, onClick }) => (
-    <motion.button
+    <button
       type="button"
-      whileHover={{ y: -1 }}
-      whileTap={{ scale: 0.99 }}
       onClick={onClick}
-      className={[
+      className={"hover:-translate-y-0.5 active:scale-[0.99] transition-transform duration-150 motion-reduce:transform-none " + ([
         "group flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition",
         active
           ? "bg-gradient-to-r from-colorBrand/15 via-colorBrand/10 to-transparent ring-1 ring-colorBrand/25"
           : "hover:bg-white/70",
-      ].join(" ")}
+      ].join(" "))}
     >
       <span
         className={[
@@ -690,7 +683,7 @@ const CmpMemberProfile = () => {
       {active ? (
         <span className="h-2 w-2 rounded-full bg-colorBrand shadow-[0_0_0_4px_rgba(215,85,41,0.15)]" />
       ) : null}
-    </motion.button>
+    </button>
   );
 
   return (
@@ -764,11 +757,8 @@ const CmpMemberProfile = () => {
               </div>
             )}
 
-            <motion.div
-              variants={shell}
-              initial="hidden"
-              animate="show"
-              className={[glassStrong, "mb-5 overflow-hidden"].join(" ")}
+            <div
+              className={"ui-enter " + ([glassStrong, "mb-5 overflow-hidden"].join(" "))}
             >
               <div className="relative p-5 sm:p-6">
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-colorBrand/12 via-transparent to-purple-500/8" />
@@ -815,14 +805,11 @@ const CmpMemberProfile = () => {
                   </div>
                 </div>
               </div>
-            </motion.div>
+            </div>
 
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-[290px_1fr]">
-              <motion.aside
-                variants={shell}
-                initial="hidden"
-                animate="show"
-                className={[glass, "sticky top-4 h-fit p-3"].join(" ")}
+              <aside
+                className={"ui-enter " + ([glass, "sticky top-4 h-fit p-3"].join(" "))}
               >
                 <div className="px-2 pb-3 pt-2">
                   <div className="text-sm font-bold text-slate-900">
@@ -898,13 +885,10 @@ const CmpMemberProfile = () => {
                     </div>
                   </div>
                 )}
-              </motion.aside>
+              </aside>
 
-              <motion.main
-                variants={shell}
-                initial="hidden"
-                animate="show"
-                className={[glass, "overflow-hidden"].join(" ")}
+              <main
+                className={"ui-enter " + ([glass, "overflow-hidden"].join(" "))}
               >
                 <div className="relative border-b border-white/50 p-5 sm:p-6">
                   <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-colorBrand/10 via-transparent to-blue-500/8" />
@@ -952,12 +936,9 @@ const CmpMemberProfile = () => {
 
                 <div className="p-4 sm:p-6">
                   {tabSelected === "Employee Info" && emp && (
-                    <motion.div
+                    <div
                       key="employee-info"
-                      initial={{ opacity: 0, y: 14 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.28 }}
-                      className="space-y-5"
+                      className="ui-enter space-y-5"
                     >
                       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <div className="rounded-3xl border border-white/60 bg-white/70 p-5 backdrop-blur-xl shadow-sm">
@@ -1130,16 +1111,13 @@ const CmpMemberProfile = () => {
                           </div>
                         </div>
                       </div>
-                    </motion.div>
+                    </div>
                   )}
 
                   {tabSelected === "Account" && (
-                    <motion.div
+                    <div
                       key="account"
-                      initial={{ opacity: 0, y: 14 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.28 }}
-                      className="space-y-4"
+                      className="ui-enter space-y-4"
                     >
                       <div className="rounded-3xl border border-white/60 bg-white/70 p-5 backdrop-blur-xl shadow-sm">
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -1215,12 +1193,9 @@ const CmpMemberProfile = () => {
                                         Number(selectedYear),
                                   )
                                   .map((sub, idx) => (
-                                    <motion.tr
+                                    <tr
                                       key={idx}
-                                      initial={{ opacity: 0, y: 10 }}
-                                      animate={{ opacity: 1, y: 0 }}
-                                      transition={{ delay: idx * 0.04 }}
-                                      className="text-center transition hover:bg-colorBrand/5"
+                                      className="ui-enter text-center transition hover:bg-colorBrand/5"
                                     >
                                       <td className="whitespace-nowrap px-6 py-4 text-sm font-semibold text-slate-800">
                                         {sub.plan}
@@ -1254,16 +1229,16 @@ const CmpMemberProfile = () => {
                                           </a>
                                         </div>
                                       </td>
-                                    </motion.tr>
+                                    </tr>
                                   ))}
                             </tbody>
                           </table>
                         </div>
                       </div>
-                    </motion.div>
+                    </div>
                   )}
                 </div>
-              </motion.main>
+              </main>
             </div>
 
             <div className="mt-6 text-center text-xs text-slate-500">

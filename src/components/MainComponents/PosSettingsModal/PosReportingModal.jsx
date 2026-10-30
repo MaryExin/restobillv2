@@ -13,7 +13,7 @@ import {
   FiInbox,
 } from "react-icons/fi";
 import { TbCurrencyPeso } from "react-icons/tb";
-import { motion, AnimatePresence } from "framer-motion";
+
 import useApiHost from "../../../hooks/useApiHost";
 
 const POS_DISPATCH_SENDER_PATH =
@@ -61,10 +61,9 @@ const Toggle = ({ isOn, onToggle, accent, isDark }) => (
     }`}
     style={{ backgroundColor: isOn ? accent : undefined }}
   >
-    <motion.div
-      animate={{ x: isOn ? 24 : 3 }}
-      transition={{ type: "spring", stiffness: 500, damping: 30 }}
-      className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm"
+    <div
+      className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-150"
+      style={{ transform: `translateX(${isOn ? 24 : 3}px)` }}
     />
   </button>
 );
@@ -396,16 +395,13 @@ const PosReportingModal = ({ isDark, accent = "#2563eb" }) => {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <AnimatePresence mode="popLayout">
+                  <>
                     {Object.keys(selectedReports)
                       .filter((id) => selectedReports[id])
                       .map((id) => (
-                        <motion.div
+                        <div
                           key={id}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0.96 }}
-                          className={`flex items-center gap-3 rounded-[20px] border p-4 ${
+                          className={`ui-enter flex items-center gap-3 rounded-[20px] border p-4 ${
                             isDark
                               ? "bg-slate-900/50 border-slate-800"
                               : "bg-white border-slate-200"
@@ -420,9 +416,9 @@ const PosReportingModal = ({ isDark, accent = "#2563eb" }) => {
                           >
                             {REPORT_OPTIONS.find((o) => o.id === id)?.title}
                           </span>
-                        </motion.div>
+                        </div>
                       ))}
-                  </AnimatePresence>
+                  </>
                 </div>
               )}
             </div>
@@ -475,16 +471,9 @@ const PosReportingModal = ({ isDark, accent = "#2563eb" }) => {
               <div className="flex items-center justify-center gap-3">
                 {status === "sending" ? (
                   <>
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{
-                        repeat: Infinity,
-                        duration: 1,
-                        ease: "linear",
-                      }}
-                    >
+                    <div className="ui-spin">
                       <FiLoader size={20} />
-                    </motion.div>
+                    </div>
                     Transmitting...
                   </>
                 ) : status === "success" ? (

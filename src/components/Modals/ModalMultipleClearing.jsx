@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
-import { motion } from "framer-motion";
 import { FiXCircle, FiCreditCard, FiCheck, FiList } from "react-icons/fi";
 import ModalYesNoReusable from "./ModalYesNoReusable";
 import { yearMonthday } from "../../constants/DateConstants";
@@ -291,20 +290,16 @@ const ModalMultipleClearing = ({
             <div className="flex flex-col bg-slate-50 rounded-xl shadow-2xl h-[80vh] overflow-y-auto scrollbar">
               {/* Header */}
               <div className="relative flex justify-center items-center bg-gradient-to-br from-colorBrand to-colorBrandSecondary rounded-t-xl p-5 text-white">
-                <motion.div
+                <div
                   onClick={() => setIsModalClearing(false)}
-                  className="absolute right-4 top-4 cursor-pointer hover:scale-110 transition"
-                  whileHover={{ rotate: 90 }}
+                  className="hover:opacity-90 transition-opacity duration-150 absolute right-4 top-4 cursor-pointer hover:scale-110 transition"
                 >
                   <FiXCircle size={28} />
-                </motion.div>
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.5, rotate: -180 }}
-                  animate={{ opacity: 1, scale: 1, rotate: 0 }}
-                  transition={{ duration: 0.5 }}
+                </div>
+                <div className="ui-scale-in"
                 >
                   <FiCreditCard size={48} />
-                </motion.div>
+                </div>
               </div>
 
               {/* Main Form */}
@@ -326,15 +321,14 @@ const ModalMultipleClearing = ({
                         <FiList size={20} />
                         Clearing References
                       </h2>
-                      <motion.button
+                      <button
                         onClick={toggleAllReferences}
-                        className="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition"
-                        whileHover={{ scale: 1.02 }}
+                        className="hover:opacity-90 transition-opacity duration-150 px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition"
                       >
                         {selectedReferences.every((ref) => ref.selected)
                           ? "Deselect All"
                           : "Select All"}
-                      </motion.button>
+                      </button>
                     </div>
 
                     <div className="max-h-48 overflow-y-auto border rounded-lg">
@@ -351,28 +345,25 @@ const ModalMultipleClearing = ({
                         </thead>
                         <tbody>
                           {selectedReferences.map((ref, index) => (
-                            <motion.tr
+                            <tr
                               key={ref.uniqueId}
-                              className={`border-t hover:bg-gray-50 ${
+                              className={"hover:opacity-90 transition-opacity duration-150 " + (`border-t hover:bg-gray-50 ${
                                 ref.selected ? "bg-blue-50" : ""
-                              }`}
-                              whileHover={{ backgroundColor: "#f9fafb" }}
+                              }`)}
                             >
                               <td className="p-3">
-                                <motion.div
-                                  className={`w-5 h-5 rounded border-2 cursor-pointer flex items-center justify-center ${
+                                <div
+                                  className={"hover:opacity-90 active:opacity-80 transition-opacity duration-150 " + (`w-5 h-5 rounded border-2 cursor-pointer flex items-center justify-center ${
                                     ref.selected
                                       ? "bg-colorBrand border-colorBrand text-white"
                                       : "border-gray-300"
-                                  }`}
+                                  }`)}
                                   onClick={() =>
                                     toggleReferenceSelection(ref.uniqueId)
                                   }
-                                  whileHover={{ scale: 1.1 }}
-                                  whileTap={{ scale: 0.95 }}
                                 >
                                   {ref.selected && <FiCheck size={12} />}
-                                </motion.div>
+                                </div>
                               </td>
                               <td className="p-3 font-medium">
                                 {ref.reference}
@@ -395,7 +386,7 @@ const ModalMultipleClearing = ({
                                   maximumFractionDigits: 2,
                                 })}
                               </td>
-                            </motion.tr>
+                            </tr>
                           ))}
                         </tbody>
                       </table>
@@ -669,10 +660,9 @@ const ModalMultipleClearing = ({
 
                   {/* Auto-fill button for total amount */}
                   <div className="flex justify-center">
-                    <motion.button
+                    <button
                       onClick={() => setAmount(totalAmountToClear)}
-                      className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition"
-                      whileHover={{ scale: 1.02 }}
+                      className="hover:opacity-90 transition-opacity duration-150 px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition"
                     >
                       Pay Full Amount (₱
                       {totalAmountToClear.toLocaleString(undefined, {
@@ -680,29 +670,25 @@ const ModalMultipleClearing = ({
                         maximumFractionDigits: 2,
                       })}
                       )
-                    </motion.button>
+                    </button>
                   </div>
 
                   {/* Submit Button */}
                   <div className="flex justify-end">
-                    <motion.button
+                    <button
                       onClick={() => setYesNoModalOpen(true)}
-                      className="px-5 py-2 bg-gradient-to-br from-colorBrand via-colorBrandSecondary to-colorBrandTertiary text-white rounded hover:scale-95 transition"
-                      whileHover={{ scale: 1.02 }}
+                      className="hover:opacity-90 transition-opacity duration-150 px-5 py-2 bg-gradient-to-br from-colorBrand via-colorBrandSecondary to-colorBrandTertiary text-white rounded hover:scale-95 transition"
                       disabled={selectedCount === 0}
                     >
                       Pay {selectedCount} Reference
                       {selectedCount !== 1 ? "s" : ""}
-                    </motion.button>
+                    </button>
                   </div>
 
                   <h1>Balance due:</h1>
                   {/* Balance Highlight */}
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.6, duration: 0.4 }}
-                    className="flex items-center mt-4 bg-white border-2 border-colorBrand shadow-lg text-white px-4 py-2 rounded-lg w-auto mx-auto space-x-3"
+                  <div
+                    className="ui-scale-in flex items-center mt-4 bg-white border-2 border-colorBrand shadow-lg text-white px-4 py-2 rounded-lg w-auto mx-auto space-x-3"
                   >
                     <FiCreditCard
                       className="text-softPrimary animate-pulse"
@@ -735,7 +721,7 @@ const ModalMultipleClearing = ({
                         maximumFractionDigits: 2,
                       })}
                     </span>
-                  </motion.div>
+                  </div>
 
                   {/* Detailed Breakdown */}
                   <div className="bg-gray-50 p-4 rounded-lg">

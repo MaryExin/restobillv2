@@ -6,7 +6,6 @@ import React, {
   useCallback,
 } from "react";
 import { FixedSizeList as List } from "react-window";
-import { AnimatePresence, motion } from "framer-motion";
 import {
   FiX,
   FiSearch,
@@ -245,47 +244,35 @@ const InlineFailureModal = ({
   if (!isOpen) return null;
 
   return (
-    <AnimatePresence>
-      <motion.div
-        className="fixed inset-0 z-[120000] flex items-center justify-center bg-black/50 px-4"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+    <>
+      <div
+        className="fixed inset-0 z-[120000] flex items-center justify-center bg-black/50 px-4 ui-fade-in"
       >
-        <motion.div
-          className="w-11/12 max-w-md overflow-hidden rounded-md border-t-8 border-red-500 bg-white shadow-lg"
-          initial={{ opacity: 0, y: -30 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -30 }}
-          transition={{ type: "spring", stiffness: 260, damping: 20 }}
+        <div
+          className="w-11/12 max-w-md overflow-hidden rounded-md border-t-8 border-red-500 bg-white shadow-lg ui-enter"
         >
           <div className="flex flex-col items-center p-6">
-            <motion.div
-              className="mb-4 flex h-16 w-16 items-center justify-center rounded-md bg-[#fee2e2]"
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: "spring", stiffness: 300, damping: 15 }}
+            <div
+              className="mb-4 flex h-16 w-16 items-center justify-center rounded-md bg-[#fee2e2] ui-scale-in"
             >
               <MdWarning className="h-8 w-8 text-red-500" />
-            </motion.div>
+            </div>
 
             <h2 className="mb-2 text-2xl font-semibold text-gray-800">
               {header}
             </h2>
             <p className="mb-6 text-center text-gray-600">{message}</p>
 
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+            <button
               onClick={() => setIsModalOpen(false)}
-              className="rounded-md bg-red-500 px-6 py-2 text-white shadow-md transition hover:bg-red-600"
+              className="rounded-md bg-red-500 px-6 py-2 text-white shadow-md transition hover:bg-red-600 transition-transform duration-150 enabled:hover:scale-[1.02] enabled:active:scale-[0.98]"
             >
               {button}
-            </motion.button>
+            </button>
           </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+        </div>
+      </div>
+    </>
   );
 };
 
@@ -329,25 +316,18 @@ const ModalShell = ({
 }) => {
   if (!isOpen) return null;
   return (
-    <AnimatePresence>
-      <motion.div
-        className={`fixed inset-0 ${zIndex} flex items-center justify-center p-3 md:p-5 backdrop-blur-md ${
+    <>
+      <div
+        className={(`fixed inset-0 ${zIndex} flex items-center justify-center p-3 md:p-5 backdrop-blur-md ${
           isDark ? "bg-slate-950/80" : "bg-slate-900/20"
-        }`}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+        }`) + " ui-fade-in"}
       >
-        <motion.div
-          initial={{ scale: 0.97, opacity: 0, y: 14 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-          exit={{ scale: 0.97, opacity: 0, y: 14 }}
-          transition={{ duration: 0.18 }}
-          className={`relative flex w-full ${maxWidth} max-h-[calc(100vh-1.5rem)] flex-col overflow-hidden rounded-[30px] border shadow-[0_30px_100px_rgba(15,23,42,0.35)] ${
+        <div
+          className={(`relative flex w-full ${maxWidth} max-h-[calc(100vh-1.5rem)] flex-col overflow-hidden rounded-[30px] border shadow-[0_30px_100px_rgba(15,23,42,0.35)] ${
             isDark
               ? "border-white/10 bg-[#0f172a] text-white"
               : "border-slate-200 bg-white text-slate-900"
-          }`}
+          }`) + " ui-scale-in"}
         >
           {onClose ? (
             <button
@@ -362,9 +342,9 @@ const ModalShell = ({
             </button>
           ) : null}
           {children}
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+        </div>
+      </div>
+    </>
   );
 };
 

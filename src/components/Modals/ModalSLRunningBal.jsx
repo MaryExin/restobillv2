@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { FixedSizeList as List } from "react-window";
-import { motion, AnimatePresence } from "framer-motion";
 import { useWindowSize } from "react-use";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
@@ -363,13 +362,9 @@ const ModalSLRunningBal = ({
   };
 
   return (
-    <AnimatePresence>
-      <motion.div
-        className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/85 backdrop-blur-md p-3 sm:p-5"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.18 }}
+    <>
+      <div
+        className="ui-fade-in fixed inset-0 z-[9999] flex items-center justify-center bg-black/85 backdrop-blur-md p-3 sm:p-5"
         onClick={(e) => {
           if (e.target === e.currentTarget) close();
         }}
@@ -379,12 +374,8 @@ const ModalSLRunningBal = ({
         {/* subtle sheen/noise */}
         <div className="pointer-events-none absolute inset-0 opacity-[0.07] [background:radial-gradient(circle_at_20%_15%,white,transparent_35%),radial-gradient(circle_at_80%_25%,white,transparent_38%),radial-gradient(circle_at_40%_80%,white,transparent_42%)]" />
 
-        <motion.div
-          initial={{ opacity: 0, scale: 0.92, y: 12 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.92, y: 12 }}
-          transition={{ type: "spring", stiffness: 380, damping: 28 }}
-          className="relative w-[95vw] sm:w-[90vw] md:w-[84vw] lg:w-[78vw] max-w-6xl"
+        <div
+          className="ui-scale-in relative w-[95vw] sm:w-[90vw] md:w-[84vw] lg:w-[78vw] max-w-6xl"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="rounded-3xl p-[1px] bg-gradient-to-br from-colorBrandLight via-white/30 to-colorBrandLight shadow-[0_30px_90px_-55px_rgba(0,0,0,0.7)]">
@@ -521,14 +512,10 @@ const ModalSLRunningBal = ({
                   </div>
 
                   {/* Collapsible filter panel */}
-                  <AnimatePresence initial={false}>
+                  <>
                     {showFilters && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.18 }}
-                        className="overflow-hidden"
+                      <div
+                        className="ui-fade-in overflow-hidden"
                       >
                         <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
                           {/* Search */}
@@ -648,9 +635,9 @@ const ModalSLRunningBal = ({
                             </div>
                           </div>
                         </div>
-                      </motion.div>
+                      </div>
                     )}
-                  </AnimatePresence>
+                  </>
                 </div>
 
                 {/* Body: dedicated scroll area (mobile/tablet/desktop) */}
@@ -723,9 +710,9 @@ const ModalSLRunningBal = ({
               </div>
             </div>
           </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+        </div>
+      </div>
+    </>
   );
 };
 

@@ -1,8 +1,7 @@
-import { motion } from "framer-motion";
 import { FaArrowRight } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 
-const AnimatedCard = ({ item, index, IconComponent, onClick }) => {
+const AnimatedCard = ({ item, IconComponent, onClick }) => {
   const navigate = useNavigate();
 
   const handleCardClick = (route) => {
@@ -12,32 +11,11 @@ const AnimatedCard = ({ item, index, IconComponent, onClick }) => {
       navigate(route);
     }
   };
-  const cardVariants = {
-    hidden: { opacity: 0, y: 30, scale: 0.95 },
-    visible: (i) => ({
-      opacity: 1,
-      y: 0,
-      scale: 1,
-      transition: {
-        delay: i * 0.08,
-        duration: 0.7,
-        ease: [0.25, 0.46, 0.45, 0.94],
-      },
-    }),
-  };
   return (
-    <motion.div
+    <div
       key={item.route}
-      custom={index}
-      variants={cardVariants}
-      whileHover={{
-        y: -8,
-        scale: 1.02,
-        transition: { duration: 0.3, ease: "easeOut" },
-      }}
-      whileTap={{ scale: 0.98 }}
       onClick={() => handleCardClick(item.route)}
-      className="group relative cursor-pointer overflow-hidden rounded-3xl bg-white/80 backdrop-blur-sm p-8 shadow-sm ring-1 ring-gray-200/50 transition-all duration-500 hover:shadow-2xl hover:shadow-blue-500/10 hover:ring-blue-300/30"
+      className="ui-enter hover:opacity-90 active:opacity-80 transition-opacity duration-150 group relative cursor-pointer overflow-hidden rounded-3xl bg-white/80 backdrop-blur-sm p-8 shadow-sm ring-1 ring-gray-200/50 transition-all duration-500 hover:shadow-2xl hover:shadow-blue-500/10 hover:ring-blue-300/30"
     >
       <div
         className={`absolute inset-0 bg-gradient-to-br ${item.gradient} opacity-0 transition-all duration-500 group-hover:opacity-[0.03]`}
@@ -86,7 +64,7 @@ const AnimatedCard = ({ item, index, IconComponent, onClick }) => {
             "linear-gradient(135deg, transparent, rgba(59, 130, 246, 0.1), transparent)",
         }}
       />
-    </motion.div>
+    </div>
   );
 };
 

@@ -1,6 +1,5 @@
 "use client";
 import { FiX, FiCheck } from "react-icons/fi";
-import { motion, AnimatePresence } from "framer-motion";
 
 export default function ReusableAddModal({
   open,
@@ -22,20 +21,13 @@ export default function ReusableAddModal({
 }) {
   const storedFirstTime = localStorage.getItem("isFirstTimeLogin");
   return (
-    <AnimatePresence>
+    <>
       {open && (
-        <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+        <div
+          className="ui-fade-in fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60"
         >
-          <motion.div
-            className="relative w-full max-w-sm p-6 bg-white rounded-2xl shadow-2xl"
-            initial={{ y: -30, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 30, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+          <div
+            className="ui-enter relative w-full max-w-sm p-6 bg-white rounded-2xl shadow-2xl"
             data-tour={dataTour}
           >
             {/* Header */}
@@ -45,13 +37,12 @@ export default function ReusableAddModal({
                 <h2 className="text-lg font-bold">{title}</h2>
               </div>
               {storedFirstTime !== "True" && (
-                <motion.button
+                <button
                   onClick={onClose}
-                  whileHover={{ rotate: 90 }}
-                  className="text-gray-500 hover:text-gray-800"
+                  className="hover:opacity-90 transition-opacity duration-150 text-gray-500 hover:text-gray-800"
                 >
                   <FiX className="w-6 h-6" />
-                </motion.button>
+                </button>
               )}
             </div>
 
@@ -63,7 +54,7 @@ export default function ReusableAddModal({
               }}
               className="space-y-4"
             >
-              <motion.div
+              <div
                 className="relative"
                 whileFocusWithin={{ scale: 1.02 }}
               >
@@ -77,34 +68,29 @@ export default function ReusableAddModal({
                   />
                 </div>
                 <IconComponent className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-              </motion.div>
+              </div>
 
               {showCheckbox && setCheckboxValue && (
-                <motion.div
-                  className="relative flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200 hover:border-blue-300 transition-all cursor-pointer group"
-                  whileHover={{ backgroundColor: "#e8f0ff" }}
+                <div
+                  className="hover:opacity-90 transition-opacity duration-150 relative flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200 hover:border-blue-300 transition-all cursor-pointer group"
                   onClick={() => setCheckboxValue(!checkboxValue)}
                 >
                   <div className="flex items-center gap-3 flex-1">
                     {/* Custom checkbox */}
-                    <motion.div
-                      className={`relative w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
+                    <div
+                      className={"active:opacity-80 transition-opacity duration-150 " + (`relative w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
                         checkboxValue
                           ? "bg-gradient-to-br from-blue-500 to-indigo-600 border-blue-600 shadow-md"
                           : "bg-white border-blue-300 group-hover:border-blue-400"
-                      }`}
-                      whileTap={{ scale: 0.9 }}
+                      }`)}
                     >
                       {checkboxValue && (
-                        <motion.div
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          transition={{ type: "spring", stiffness: 200 }}
+                        <div className="ui-scale-in"
                         >
                           <FiCheck className="w-3 h-3 text-white font-bold" />
-                        </motion.div>
+                        </div>
                       )}
-                    </motion.div>
+                    </div>
 
                     {/* Label */}
                     <label
@@ -135,23 +121,21 @@ export default function ReusableAddModal({
                     className="sr-only"
                     aria-label={checkboxLabel}
                   />
-                </motion.div>
+                </div>
               )}
 
-              <motion.button
+              <button
                 type="submit"
-                className="flex w-full justify-center items-center gap-2 px-4 py-2 bg-gradient-to-br from-darkerPrimary via-darkPrimary to-medPrimary text-white rounded-lg shadow-lg"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+                className="hover:opacity-90 active:opacity-80 transition-opacity duration-150 flex w-full justify-center items-center gap-2 px-4 py-2 bg-gradient-to-br from-darkerPrimary via-darkPrimary to-medPrimary text-white rounded-lg shadow-lg"
                 data-tour={dataTourBtn}
               >
                 <FiCheck className="w-5 h-5" />
                 {buttonText}
-              </motion.button>
+              </button>
             </form>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
       )}
-    </AnimatePresence>
+    </>
   );
 }

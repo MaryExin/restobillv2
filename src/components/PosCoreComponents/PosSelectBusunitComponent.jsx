@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { useWindowSize } from "react-use";
+
 import useZustandLoginCred from "../../context/useZustandLoginCred";
 import "../../fonts/font-style.css";
 
@@ -86,52 +85,27 @@ function ReadBusunitManageModal({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open]);
 
-  const overlay = {
-    hidden: { opacity: 0 },
-    show: { opacity: 1, transition: { duration: 0.15 } },
-    exit: { opacity: 0, transition: { duration: 0.12 } },
-  };
-
-  const panel = {
-    hidden: { opacity: 0, y: 10, scale: 0.985 },
-    show: {
-      opacity: 1,
-      y: 0,
-      scale: 1,
-      transition: { type: "spring", stiffness: 360, damping: 28 },
-    },
-    exit: { opacity: 0, y: 10, scale: 0.985, transition: { duration: 0.12 } },
-  };
-
   const LABEL = "text-[11px] font-semibold tracking-wide theme-muted";
   const INPUT =
     "theme-input h-11 w-full rounded-2xl px-4 text-sm outline-none transition";
 
   return (
-    <AnimatePresence>
+    <>
       {open ? (
-        <motion.div
-          className="fixed inset-0 z-[99999] flex items-end justify-center px-3 sm:items-center sm:px-6"
-          variants={overlay}
-          initial="hidden"
-          animate="show"
-          exit="exit"
+        <div
+          className="ui-fade-in fixed inset-0 z-[99999] flex items-end justify-center px-3 sm:items-center sm:px-6"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) close();
           }}
         >
           <div className="absolute inset-0 bg-black/45 backdrop-blur-sm" />
 
-          <motion.div
-            variants={panel}
-            initial="hidden"
-            animate="show"
-            exit="exit"
+          <div
             role="dialog"
             aria-modal="true"
             aria-label="Manage Categories and Business Units"
             onMouseDown={(e) => e.stopPropagation()}
-            className="relative max-h-[100vh] w-full overflow-y-auto rounded-3xl sm:max-w-6xl"
+            className="ui-scale-in relative max-h-[100vh] w-full overflow-y-auto rounded-3xl sm:max-w-6xl"
           >
             <div
               className="rounded-3xl p-[1px] shadow-[0_24px_80px_rgba(0,0,0,0.28)]"
@@ -409,10 +383,10 @@ function ReadBusunitManageModal({
                 </div>
               </div>
             </div>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
       ) : null}
-    </AnimatePresence>
+    </>
   );
 }
 
@@ -423,12 +397,7 @@ const PosSelectBusunitComponent = () => {
   const navigate = useNavigate();
   const apiHost = useApiHost();
   const { userId, firstName } = useZustandLoginCred();
-  const { width } = useWindowSize();
   const { isDark, themeSettings } = useTheme();
-
-  const reduceMotion = useReducedMotion();
-  const isMobile = width < 768;
-  const reduceMobileMotion = reduceMotion || isMobile;
 
   const activePalette = useMemo(() => {
     if (isDark) {
@@ -749,20 +718,6 @@ const PosSelectBusunitComponent = () => {
     }
   };
 
-  const containerVariants = reduceMobileMotion
-    ? {
-        hidden: { opacity: 0 },
-        visible: { opacity: 1, transition: { duration: 0.18 } },
-      }
-    : {
-        hidden: { opacity: 0, y: 10 },
-        visible: {
-          opacity: 1,
-          y: 0,
-          transition: { duration: 0.35, ease: "easeOut" },
-        },
-      };
-
   return (
     <div
       className="theme-page relative min-h-screen w-full overflow-x-hidden overflow-y-auto"
@@ -839,11 +794,8 @@ const PosSelectBusunitComponent = () => {
       />
 
       <div className="relative mx-auto w-full max-w-7xl p-3 sm:p-4 lg:p-6">
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          className="theme-surface overflow-hidden rounded-[28px]"
+        <div
+          className="ui-enter theme-surface overflow-hidden rounded-[28px]"
         >
           <div
             className="px-5 py-4 sm:px-6 sm:py-5"
@@ -1088,7 +1040,7 @@ const PosSelectBusunitComponent = () => {
               </div>
             </div>
           </div>
-        </motion.div>
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
 import { FaUtensils, FaReceipt, FaChartPie, FaCoins } from "react-icons/fa";
 import { IoMdClose } from "react-icons/io";
 import Background from "../../assets/background.png";
@@ -127,25 +126,19 @@ const Home = () => {
         }`}
       />
 
-      <AnimatePresence>
+      <>
         {showPasswordModal && (
-          <motion.div
-            className={`fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm px-4 ${
+          <div
+            className={(`fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm px-4 ${
               isDark ? "bg-black/60" : "bg-slate-900/30"
-            }`}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            }`) + " ui-fade-in"}
           >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className={`w-full max-w-md rounded-[2rem] border p-6 shadow-2xl transition-colors ${
+            <div
+              className={(`w-full max-w-md rounded-[2rem] border p-6 shadow-2xl transition-colors ${
                 isDark
                   ? "bg-slate-950 border-white/10"
                   : "bg-white border-slate-200"
-              }`}
+              }`) + " ui-scale-in"}
             >
               <div className="flex items-center justify-between mb-5">
                 <div>
@@ -224,16 +217,14 @@ const Home = () => {
                   </button>
                 </div>
               </div>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         )}
-      </AnimatePresence>
+      </>
 
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-6">
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-16"
+        <div
+          className="text-center mb-16 ui-enter"
         >
           <h1
             className={`text-5xl md:text-7xl font-black tracking-tighter mb-4 ${
@@ -243,23 +234,16 @@ const Home = () => {
             DASH<span className="text-blue-500">BOARD</span>
           </h1>
           <div className="h-1.5 w-24 bg-blue-600 mx-auto rounded-full shadow-[0_0_20px_rgba(37,99,235,0.5)]" />
-        </motion.div>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-5xl">
           {menuOptions.map((item, index) => (
-            <motion.div
+            <div
               key={item.id}
-              initial={{ opacity: 0, scale: 0.9, x: index === 0 ? -30 : 30 }}
-              animate={{ opacity: 1, scale: 1, x: 0 }}
-              transition={{
-                delay: 0.1 * index,
-                type: "spring",
-                stiffness: 100,
-              }}
               onClick={() => handleCardClick(item)}
-              className={`group relative aspect-[4/3] md:aspect-square rounded-[2.5rem] overflow-hidden cursor-pointer shadow-2xl transition-colors ${
+              className={(`group relative aspect-[4/3] md:aspect-square rounded-[2.5rem] overflow-hidden cursor-pointer shadow-2xl transition-colors ${
                 isDark ? "border border-white/10" : "border border-slate-200"
-              }`}
+              }`) + " ui-scale-in"}
             >
               <div
                 className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110"
@@ -284,16 +268,15 @@ const Home = () => {
                   isDark ? "text-white" : "text-slate-900"
                 }`}
               >
-                <motion.div
-                  className={`backdrop-blur-md w-fit p-3 rounded-2xl mb-4 border ${
+                <div
+                  className={(`backdrop-blur-md w-fit p-3 rounded-2xl mb-4 border ${
                     isDark
                       ? "bg-white/10 border-white/20"
                       : "bg-white/70 border-white/60"
-                  }`}
-                  whileHover={{ rotate: 10 }}
+                  }`) + " transition-transform duration-150 hover:rotate-6"}
                 >
                   {item.icon}
-                </motion.div>
+                </div>
 
                 <h2 className="text-3xl md:text-5xl font-black tracking-tight mb-2">
                   {item.title}
@@ -323,20 +306,17 @@ const Home = () => {
                   />
                 </div>
               </div>
-            </motion.div>
+            </div>
           ))}
         </div>
 
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-          className={`mt-16 text-[10px] font-black uppercase tracking-[0.5em] ${
+        <p
+          className={(`mt-16 text-[10px] font-black uppercase tracking-[0.5em] ${
             isDark ? "text-slate-500" : "text-slate-600"
-          }`}
+          }`) + " ui-enter"}
         >
           POS System v2.0 • Management Console
-        </motion.p>
+        </p>
       </div>
     </div>
   );

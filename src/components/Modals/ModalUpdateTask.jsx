@@ -1,7 +1,6 @@
 import React from "react";
 import useZustandSideMenu from "../../context/useZustandSideMenu";
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import useZustandAPIEndpoint from "../../context/useZustandAPIEndpoint";
 
@@ -27,11 +26,8 @@ const ModalUpdateTask = ({
           <div className="flex flex-col justify-start w-full md:w-1/2">
             <div className="flex flex-col mt-20 h-auto pb-5 shadow-2xl rounded-xl bg-white z-20">
               <div className="flex flex-row justify-center text-white w-full   bg-gradient-to-br from-darkerPrimary via-darkPrimary to-medPrimary rounded-t-xl p-10">
-                <motion.div
-                  className="flex flex-row justify-center"
-                  initial={{ opacity: 0, scale: 0, rotate: -180 }}
-                  animate={{ opacity: 1, scale: 1, rotate: 0 }}
-                  transition={{ duration: 0.5 }}
+                <div
+                  className="ui-scale-in flex flex-row justify-center"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -45,7 +41,7 @@ const ModalUpdateTask = ({
                       clipRule="evenodd"
                     />
                   </svg>
-                </motion.div>
+                </div>
               </div>
               <div className="flex flex-col space-y-5 py-5">
                 <h1 className="text-2xl font-serif text-center">{header}</h1>

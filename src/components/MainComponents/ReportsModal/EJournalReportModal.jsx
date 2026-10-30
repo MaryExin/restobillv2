@@ -7,6 +7,7 @@ import {
 } from "react-icons/fa";
 import useBusinessInfo from "../../../hooks/useBusinessInfo";
 import useReportDateAccess from "../../../hooks/useReportDateAccess";
+import { getOrderItemDisplayName } from "../../../utils/orderItemDisplayName";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 
@@ -86,7 +87,7 @@ const buildInvoiceText = (invoice, businessInfo) => {
     items.forEach((item) => {
       const qty = Number(item.sales_quantity || 0);
       const price = Number(item.selling_price || 0);
-      const label = `${String(item.item_name || item.product_id || "-").toUpperCase()}${
+      const label = `${getOrderItemDisplayName(item.item_name || item.product_id || "-").toUpperCase()}${
         yesNoToBool(item.isDiscountable) ? " (D)" : ""
       }`;
       lines.push(`- ${label}`);
@@ -310,7 +311,7 @@ const InvoiceReceipt = ({ invoice, businessInfo }) => {
             return (
               <tr key={idx}>
                 <td className="align-top py-0.5 pr-1">
-                  • {String(item.item_name || item.product_id || "-").toUpperCase()}
+                  • {getOrderItemDisplayName(item.item_name || item.product_id || "-").toUpperCase()}
                   {yesNoToBool(item.isDiscountable) ? " (D)" : ""}
                 </td>
                 <td className="align-top py-0.5 text-center whitespace-nowrap">

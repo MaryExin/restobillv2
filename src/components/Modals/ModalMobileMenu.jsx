@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import useZustandSideMenu from "../../context/useZustandSideMenu";
 import useZustandLoginCred from "../../context/useZustandLoginCred";
-import { motion } from "framer-motion";
 
 // icons…
 import {
@@ -101,12 +100,9 @@ const SidePanel = () => {
   };
 
   return (
-    <motion.div
+    <div
       ref={panelRef} // ← attach ref here
-      initial={{ x: "-100%", y: 50 }}
-      animate={{ x: 0 }}
-      transition={{ type: "spring", stiffness: 300, damping: 30 }}
-      className="fixed left-0 top-0 h-screen w-64 bg-white border-r flex flex-col z-50 lg:block"
+      className="ui-slide-in-left fixed left-0 top-0 h-screen w-64 bg-white border-r flex flex-col z-50 lg:block"
     >
       {/* Profile Header */}
       <div className="px-4 py-2 bg-gray-100 flex items-center space-x-3">
@@ -281,7 +277,7 @@ const SidePanel = () => {
           />
         )}
       </nav>
-    </motion.div>
+    </div>
   );
 };
 

@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
 import useZustandLoginCred from "../../context/useZustandLoginCred";
 import ModalYesNoReusable from "./ModalYesNoReusable";
 import { LinearProgress, setRef } from "@mui/material";
@@ -213,11 +212,8 @@ useEffect(() => {
                     />
                   </svg>
                 </div>
-                <motion.div
-                  className="flex flex-row justify-center"
-                  initial={{ opacity: 0, scale: 0, rotate: -180 }}
-                  animate={{ opacity: 1, scale: 1, rotate: 0 }}
-                  transition={{ duration: 0.5 }}
+                <div
+                  className="ui-scale-in flex flex-row justify-center"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -232,7 +228,7 @@ useEffect(() => {
                       clipRule="evenodd"
                     />
                   </svg>
-                </motion.div>
+                </div>
               </div>
 
               <div className="w-full h-3">

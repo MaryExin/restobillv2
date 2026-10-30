@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { getOrderItemDisplayName } from "../../utils/orderItemDisplayName";
+import { isGroupedOrderItem } from "../../utils/orderCombinationCart";
 import {
   FaTrash,
   FaShoppingCart,
@@ -40,12 +42,17 @@ const KioskCartItem = ({
           className="block text-xs font-medium leading-tight"
           style={{ color: "var(--app-text)" }}
         >
-          {item.name}
+          {getOrderItemDisplayName(item)}
         </span>
+        {isGroupedOrderItem(item) && (
+          <span className="mt-1 block text-[10px] font-[Poppins-Medium]" style={{ color: "var(--app-accent)" }}>
+            {item.combinationLabel}
+          </span>
+        )}
 
-        {item.itemInstruction && (
+        {(isGroupedOrderItem(item) ? item.displayInstruction : item.itemInstruction) && (
           <p className="mt-1 break-words text-[10px] text-amber-500">
-            Note: {item.itemInstruction}
+            Note: {isGroupedOrderItem(item) ? item.displayInstruction : item.itemInstruction}
           </p>
         )}
       </div>
@@ -113,9 +120,9 @@ const KioskCartItem = ({
 
           <input
             type="number"
-            min="0.01"
-            step="0.01"
-            inputMode="decimal"
+            min={isGroupedOrderItem(item) ? "1" : "0.01"}
+            step={isGroupedOrderItem(item) ? "1" : "0.01"}
+            inputMode={isGroupedOrderItem(item) ? "numeric" : "decimal"}
             value={item.quantity}
             onFocus={(e) => e.target.select()}
             onChange={(e) =>

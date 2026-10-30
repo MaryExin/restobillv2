@@ -16,7 +16,7 @@ import {
   FaCheckCircle,
   FaClock,
 } from "react-icons/fa";
-import { motion, AnimatePresence } from "framer-motion";
+
 import useApiHost from "../../hooks/useApiHost";
 import { useTheme } from "../../context/ThemeContext";
 import { useNavigate } from "react-router-dom";
@@ -77,24 +77,18 @@ function FilterModal({
   };
 
   return (
-    <AnimatePresence>
-      <motion.div
-        className={`fixed inset-0 z-[100] flex items-center justify-center p-4 backdrop-blur-md ${
+    <>
+      <div
+        className={"ui-fade-in " + (`fixed inset-0 z-[100] flex items-center justify-center p-4 backdrop-blur-md ${
           isDark ? "bg-slate-950/75" : "bg-slate-900/20"
-        }`}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+        }`)}
       >
-        <motion.div
-          initial={{ opacity: 0, scale: 0.97, y: 12 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.97, y: 12 }}
-          className={`w-full max-w-2xl overflow-hidden rounded-[28px] border shadow-2xl ${
+        <div
+          className={"ui-scale-in " + (`w-full max-w-2xl overflow-hidden rounded-[28px] border shadow-2xl ${
             isDark
               ? "border-white/10 bg-slate-900"
               : "border-slate-200 bg-white"
-          }`}
+          }`)}
         >
           <div
             className={`flex items-center justify-between px-6 py-5 ${
@@ -208,9 +202,9 @@ function FilterModal({
               Apply Filter
             </button>
           </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+        </div>
+      </div>
+    </>
   );
 }
 

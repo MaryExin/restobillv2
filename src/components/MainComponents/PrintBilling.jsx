@@ -14,7 +14,6 @@ import {
   FaThLarge,
   FaList,
 } from "react-icons/fa";
-import { motion, AnimatePresence } from "framer-motion";
 import useApiHost from "../../hooks/useApiHost";
 import useBillingEnabled from "../../hooks/useBillingEnabled";
 import { useTheme } from "../../context/ThemeContext";
@@ -32,6 +31,7 @@ const PrintBilling = () => {
 
   const [dateFrom, setDateFrom] = useState("");
   const [originalTableList, setOriginalTableList] = useState([]);
+  const [tableRefresh, setTableRefresh] = useState(0);
   const [tablelist, setTablelist] = useState([]);
   const [searchtable, setsearchtable] = useState("");
   const [statusFilter, setStatusFilter] = useState("pending");
@@ -113,7 +113,7 @@ const PrintBilling = () => {
         console.error("Fetch error:", error);
         setIsLoading(false);
       });
-  }, [apiHost, dateFrom]);
+  }, [apiHost, dateFrom, tableRefresh]);
 
   useEffect(() => {
     let filtered = originalTableList.filter((table) =>
@@ -213,16 +213,17 @@ const PrintBilling = () => {
         />
       </div>
 
-      <AnimatePresence>
+      <>
         {showtranslistpertable && (
           <ModalTrans_List
             tableselected={tableselected}
             data={transpertable}
             setshowtranslistpertable={setshowtranslistpertable}
             dateFrom={dateFrom}
+            onTransactionsChanged={() => setTableRefresh((value) => value + 1)}
           />
         )}
-      </AnimatePresence>
+      </>
 
       <div className="relative z-10 mx-auto flex min-h-[90vh] max-w-7xl flex-col">
         <nav className="mb-8 flex items-center justify-between">
@@ -366,19 +367,17 @@ const PrintBilling = () => {
               ))}
             </div>
           ) : viewMode === "grid" ? (
-            <motion.div
-              layout
+            <div
               className="grid grid-cols-3 gap-4 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6"
             >
               {currentItems.map((table, index) => {
                 const isPending =
                   table.status_label?.toLowerCase() === "pending";
                 return (
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
+                  <button
                     key={index}
                     onClick={() => table_trasaction(table.table_number)}
-                    className="relative flex aspect-square flex-col items-center justify-center overflow-hidden rounded-[2rem] border shadow-xl transition-all"
+                    className="relative flex aspect-square flex-col items-center justify-center overflow-hidden rounded-[2rem] border shadow-xl transition-all transition-transform duration-150 enabled:hover:scale-[1.02]"
                     style={{
                       backgroundColor: "var(--app-surface)",
                       borderColor: "var(--app-border)",
@@ -407,18 +406,17 @@ const PrintBilling = () => {
                     >
                       {table.status_label}
                     </span>
-                  </motion.button>
+                  </button>
                 );
               })}
-            </motion.div>
+            </div>
           ) : (
-            <motion.div layout className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3">
               {currentItems.map((table, index) => {
                 const isPending =
                   table.status_label?.toLowerCase() === "pending";
                 return (
-                  <motion.button
-                    layout
+                  <button
                     key={index}
                     onClick={() => table_trasaction(table.table_number)}
                     className="flex items-center justify-between rounded-3xl border p-4 transition-all"
@@ -467,10 +465,10 @@ const PrintBilling = () => {
                         {table.status_label}
                       </span>
                     </div>
-                  </motion.button>
+                  </button>
                 );
               })}
-            </motion.div>
+            </div>
           )}
 
           {!isLoading && !isDateLoading && currentItems.length === 0 && (

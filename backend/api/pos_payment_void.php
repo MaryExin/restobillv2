@@ -14,6 +14,7 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
 
 require __DIR__ . "/pdo.php";
 require_once __DIR__ . "/pos_report_mirror.php";
+require_once __DIR__ . "/../src/PosCurrentBillItems.php";
 
 function respond(bool $success, string $message, int $status = 200, array $extra = []): void {
     http_response_code($status);
@@ -94,7 +95,7 @@ try {
     $pdo->beginTransaction();
 
     $transactionStmt = $pdo->prepare("
-        SELECT status, order_status, void_id, refund_id
+        SELECT status, remarks, order_status, void_id, refund_id
         FROM tbl_pos_transactions
         WHERE transaction_id = :transaction_id
           AND Category_Code = :category_code
@@ -122,6 +123,13 @@ try {
     if ((int)($transaction["refund_id"] ?? 0) > 0) {
         $pdo->rollBack();
         respond(false, "A refunded transaction cannot be voided.", 409);
+    }
+
+    try {
+        posAssertBillNotCancelled($transaction);
+    } catch (InvalidArgumentException $error) {
+        $pdo->rollBack();
+        respond(false, $error->getMessage(), 409);
     }
 
     $counterStmt = $pdo->prepare("

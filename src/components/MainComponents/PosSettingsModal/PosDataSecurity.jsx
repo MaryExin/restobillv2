@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { FiBriefcase, FiDatabase, FiShield } from "react-icons/fi";
-import { motion, AnimatePresence } from "framer-motion";
+
 
 import PosBusinessInfoManager from "./PosBusinessInfoManager";
 import PosBackupModal from "./PosBackupModal";
@@ -121,13 +121,9 @@ const PosDataSecurity = ({ isDark, accent, getContrastText }) => {
       </div>
 
       {/* Sub-tab content */}
-      <AnimatePresence mode="wait">
-        <motion.div
+      <>
+        <div className="ui-enter"
           key={activeSubTab}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -6 }}
-          transition={{ duration: 0.18 }}
         >
           {activeSubTab === "business-profile" && (
             <PosBusinessInfoManager
@@ -141,8 +137,8 @@ const PosDataSecurity = ({ isDark, accent, getContrastText }) => {
             <PosBackupModal isDark={isDark} accent={accent} />
           )}
 
-        </motion.div>
-      </AnimatePresence>
+        </div>
+      </>
     </div>
   );
 };

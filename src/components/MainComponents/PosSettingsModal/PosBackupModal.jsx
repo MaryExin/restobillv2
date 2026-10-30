@@ -24,7 +24,7 @@ import {
   FiBox,
   FiDatabase,
 } from "react-icons/fi";
-import { motion, AnimatePresence } from "framer-motion";
+
 import useApiHost from "../../../hooks/useApiHost";
 import { usePosDeveloperSession } from "../../../hooks/usePosRoleAccessConfig";
 
@@ -383,19 +383,16 @@ const PosBackupModal = ({ isDark, accent = "#3b82f6" }) => {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      <AnimatePresence>
+      <>
         {showSavedToast && (
-          <motion.div
-            initial={{ opacity: 0, y: -24 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -24 }}
-            className="fixed top-8 left-1/2 -translate-x-1/2 z-[300] rounded-full px-6 py-4 bg-emerald-500 text-white shadow-2xl flex items-center gap-3 font-black uppercase tracking-[0.18em] text-[11px]"
+          <div
+            className="ui-fade-in fixed top-8 left-1/2 -translate-x-1/2 z-[300] rounded-full px-6 py-4 bg-emerald-500 text-white shadow-2xl flex items-center gap-3 font-black uppercase tracking-[0.18em] text-[11px]"
           >
             <FiCheckCircle size={18} />
             System update saved
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
+      </>
 
       <div
         className={`relative overflow-hidden rounded-[32px] border p-6 sm:p-8 lg:p-10 ${theme.panel}`}
@@ -673,14 +670,11 @@ const PosBackupModal = ({ isDark, accent = "#3b82f6" }) => {
         </div>
       </div>
 
-      <AnimatePresence>
+      <>
         {showMachineModal && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/70 backdrop-blur-md">
-            <motion.div
-              initial={{ y: 28, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 28, opacity: 0 }}
-              className={`w-full max-w-5xl max-h-[92vh] overflow-y-auto rounded-[32px] border p-6 sm:p-8 ${theme.panel}`}
+            <div
+              className={`ui-enter w-full max-w-5xl max-h-[92vh] overflow-y-auto rounded-[32px] border p-6 sm:p-8 ${theme.panel}`}
             >
               <div className="flex items-center justify-between gap-4 mb-8">
                 <div className="flex items-center gap-4">
@@ -773,19 +767,16 @@ const PosBackupModal = ({ isDark, accent = "#3b82f6" }) => {
                   </button>
                 </div>
               </form>
-            </motion.div>
+            </div>
           </div>
         )}
-      </AnimatePresence>
+      </>
 
-      <AnimatePresence>
+      <>
         {showResetModal && (
           <div className="fixed inset-0 z-[300] flex items-center justify-center p-6 bg-black/70 backdrop-blur-md">
-            <motion.div
-              initial={{ scale: 0.94, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.94, opacity: 0 }}
-              className={`w-full max-w-lg rounded-[32px] border p-6 sm:p-8 ${theme.panel}`}
+            <div
+              className={`ui-scale-in w-full max-w-lg rounded-[32px] border p-6 sm:p-8 ${theme.panel}`}
             >
               <div className="text-center">
                 <div
@@ -830,10 +821,10 @@ const PosBackupModal = ({ isDark, accent = "#3b82f6" }) => {
                   </button>
                 </div>
               </div>
-            </motion.div>
+            </div>
           </div>
         )}
-      </AnimatePresence>
+      </>
     </div>
   );
 };
