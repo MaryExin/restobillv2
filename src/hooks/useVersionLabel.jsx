@@ -7,7 +7,7 @@ const DEFAULT_VERSIONS = {
   retail_version: "2.0.1-1",
 };
 
-// Builds the "Restaurant (Version: x.x.x-x)" / "Retail (Version: x.x.x-x)"
+// Builds the "Hotel and Restaurant (Version: x.x.x-x)" / "Retail (Version: x.x.x-x)"
 // label shown on login and the POS header. The mode comes from the existing
 // layout-mode store; the version numbers come from tbl_pos_settings
 // (category "General", description "Restaurant Version" / "Retail Version")
@@ -44,7 +44,7 @@ export default function useVersionLabel() {
   }, [apiHost]);
 
   const isRetail = layoutMode === "Restaurant Version 2";
-  const modeLabel = isRetail ? "Retail" : "Restaurant";
+  const modeLabel = isRetail ? "Retail" : "Hotel and Restaurant";
   const version = isRetail ? versions.retail_version : versions.restaurant_version;
 
   return `${modeLabel} (Version: ${version})`;

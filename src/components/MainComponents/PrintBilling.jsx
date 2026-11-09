@@ -198,7 +198,7 @@ const PrintBilling = () => {
               ? themeSettings.Dashboard_Background_Url.startsWith("/")
                 ? `${apiHost}${themeSettings.Dashboard_Background_Url}`
                 : `${apiHost}/${themeSettings.Dashboard_Background_Url}`
-              : "./pos-home-bg.png"
+              : "./richwell-home-bg.png"
           })`,
           backgroundPosition: "center",
           backgroundRepeat: "no-repeat",

@@ -16,7 +16,6 @@ import {
   FiChevronRight,
   FiPrinter,
   FiImage,
-  FiTag,
   FiMonitor,
   FiLock,
   FiSlash,
@@ -53,7 +52,6 @@ const PosPrintSettings = lazy(() => import("./PosSettingsModal/PosPrintSettings"
 const PosModeOfPayment = lazy(() => import("./PosSettingsModal/PosModeOfPayment"));
 const PosPictureSettings = lazy(() => import("./PosSettingsModal/PosPictureSettings"));
 const PosProductSubcategories = lazy(() => import("./PosSettingsModal/PosProductSubcategories"));
-const PosPricingDashboard = lazy(() => import("./PosSettingsModal/PosPricingDashboard"));
 const PosLayoutMode = lazy(() => import("./PosSettingsModal/PosLayoutMode"));
 const PosSecondScreen = lazy(() => import("./PosSettingsModal/PosSecondScreen"));
 const PosTableLayout = lazy(() => import("./PosSettingsModal/PosTableLayout"));
@@ -89,7 +87,6 @@ const ALL_NAV_ITEMS = [
   { id: "Print Options", icon: FiPrinter },
   { id: "Picture Settings", icon: FiImage },
   { id: "Product Subcategories", icon: FiLayers },
-  { id: "Pricing Engine", icon: FiTag },
   { id: "Layout Mode", icon: FiMonitor },
   { id: "Second Screen", icon: FiMonitor },
   { id: "Tutorial Guide", icon: FiFileText },
@@ -405,10 +402,6 @@ const PosSettings = ({ isOpen, onClose, branchInfo, initialTab = null }) => {
 
     if (activeTab === "Product Subcategories") {
       return <PosProductSubcategories isDark={isDark} accent={accentColor} />;
-    }
-
-    if (activeTab === "Pricing Engine") {
-      return <PosPricingDashboard isDark={isDark} accent={accentColor} />;
     }
 
     if (activeTab === "Layout Mode") {

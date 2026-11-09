@@ -19,7 +19,7 @@ import { FiEdit2, FiPlus, FiRotateCcw, FiTrash2, FiX } from "react-icons/fi";
 import useApiHost from "../../hooks/useApiHost";
 import { useTheme } from "../../context/ThemeContext";
 
-const FALLBACK_BG = "./pos-home-bg.png";
+const FALLBACK_BG = "./richwell-home-bg.png";
 const FLOOR_TABLE_BASE_WIDTH = 280;
 const FLOOR_TABLE_BASE_HEIGHT = 245;
 const FLOOR_TABLE_VISUAL_WIDTH = 176;
@@ -3906,90 +3906,139 @@ const ViewOrdering = () => {
                                       }`}
                                       style={groupTableStyle}
                                     >
+                                    {/* Room (top-down): walls, bed, nightstand, door */}
                                     <div
-                                      className="absolute left-1/2 top-0 h-7 w-20 -translate-x-1/2 rounded-full border"
+                                      className="absolute inset-0 overflow-hidden rounded-[1.1rem] border-[3px] shadow-lg"
                                       style={{
-                                        backgroundColor: toRgba(
+                                        background: `linear-gradient(160deg, ${toRgba(
                                           tableTone,
-                                          item.isOccupied ? 0.12 : 0.2,
-                                        ),
+                                          item.isOccupied ? 0.06 : 0.1,
+                                        )} 0%, ${toRgba(
+                                          tableTone,
+                                          item.isOccupied ? 0.1 : 0.2,
+                                        )} 100%)`,
+                                        backgroundColor: pageSurfaceStrong,
                                         borderColor: toRgba(
                                           tableTone,
-                                          item.isOccupied ? 0.28 : 0.48,
-                                        ),
-                                      }}
-                                    />
-                                    <div
-                                      className="absolute bottom-0 left-1/2 h-7 w-20 -translate-x-1/2 rounded-full border"
-                                      style={{
-                                        backgroundColor: toRgba(
-                                          tableTone,
-                                          item.isOccupied ? 0.12 : 0.2,
-                                        ),
-                                        borderColor: toRgba(
-                                          tableTone,
-                                          item.isOccupied ? 0.28 : 0.48,
-                                        ),
-                                      }}
-                                    />
-                                    <div
-                                      className="absolute left-0 top-1/2 h-20 w-7 -translate-y-1/2 rounded-full border"
-                                      style={{
-                                        backgroundColor: toRgba(
-                                          tableTone,
-                                          item.isOccupied ? 0.12 : 0.2,
-                                        ),
-                                        borderColor: toRgba(
-                                          tableTone,
-                                          item.isOccupied ? 0.28 : 0.48,
-                                        ),
-                                      }}
-                                    />
-                                    <div
-                                      className="absolute right-0 top-1/2 h-20 w-7 -translate-y-1/2 rounded-full border"
-                                      style={{
-                                        backgroundColor: toRgba(
-                                          tableTone,
-                                          item.isOccupied ? 0.12 : 0.2,
-                                        ),
-                                        borderColor: toRgba(
-                                          tableTone,
-                                          item.isOccupied ? 0.28 : 0.48,
-                                        ),
-                                      }}
-                                    />
-                                    <div
-                                      className="absolute left-1/2 top-1/2 flex h-24 w-36 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[1.35rem] border shadow-lg"
-                                      style={{
-                                        background: `linear-gradient(180deg, ${toRgba(
-                                          tableTone,
-                                          item.isOccupied ? 0.52 : 0.95,
-                                        )} 0%, ${
-                                          item.isOccupied
-                                            ? toRgba(tableTone, 0.72)
-                                            : tableTone
-                                        } 100%)`,
-                                        borderColor: toRgba(
-                                          tableTone,
-                                          item.isOccupied ? 0.38 : 0.72,
+                                          item.isOccupied ? 0.45 : 0.9,
                                         ),
                                         boxShadow: `0 12px 28px ${toRgba(
                                           tableTone,
-                                          item.isOccupied ? 0.12 : 0.28,
+                                          item.isOccupied ? 0.1 : 0.24,
                                         )}`,
                                       }}
                                     >
-                                      <span
-                                        className="max-w-[6.5rem] break-words text-center text-4xl font-black leading-none"
+                                      {/* Bed */}
+                                      <div
+                                        className="absolute left-2.5 top-2.5 bottom-6 w-[68px] overflow-hidden rounded-lg border"
                                         style={{
-                                          color: getContrastText(
+                                          backgroundColor: "#ffffff",
+                                          borderColor: toRgba(
                                             tableTone,
-                                            "#ffffff",
+                                            item.isOccupied ? 0.3 : 0.5,
                                           ),
                                         }}
                                       >
-                                        {getCompactTableLabel(tableName)}
-                                      </span>
+                                        {/* headboard */}
+                                        <div
+                                          className="h-2 w-full"
+                                          style={{
+                                            backgroundColor: toRgba(
+                                              tableTone,
+                                              item.isOccupied ? 0.55 : 1,
+                                            ),
+                                          }}
+                                        />
+                                        {/* pillows */}
+                                        <div className="mt-1 flex justify-center gap-1 px-1.5">
+                                          {[0, 1].map((pillow) => (
+                                            <div
+                                              key={pillow}
+                                              className="h-3.5 flex-1 rounded-md border"
+                                              style={{
+                                                backgroundColor: toRgba(tableTone, 0.08),
+                                                borderColor: toRgba(tableTone, 0.3),
+                                              }}
+                                            />
+                                          ))}
+                                        </div>
+                                        {/* blanket */}
+                                        <div
+                                          className="absolute inset-x-0 bottom-0 top-[30px] rounded-t-md"
+                                          style={{
+                                            background: `linear-gradient(180deg, ${toRgba(
+                                              tableTone,
+                                              item.isOccupied ? 0.4 : 0.75,
+                                            )} 0%, ${toRgba(
+                                              tableTone,
+                                              item.isOccupied ? 0.55 : 1,
+                                            )} 100%)`,
+                                          }}
+                                        >
+                                          <div
+                                            className="mt-1.5 h-[2px] w-full"
+                                            style={{ backgroundColor: "rgba(255,255,255,0.45)" }}
+                                          />
+                                        </div>
+                                      </div>
+
+                                      {/* Nightstand */}
+                                      <div
+                                        className="absolute left-[86px] top-2.5 h-4 w-4 rounded-[4px] border"
+                                        style={{
+                                          backgroundColor: toRgba(
+                                            tableTone,
+                                            item.isOccupied ? 0.18 : 0.3,
+                                          ),
+                                          borderColor: toRgba(tableTone, 0.45),
+                                        }}
+                                      />
+
+                                      {/* Room label */}
+                                      <div className="absolute bottom-6 right-2.5 top-2.5 flex w-[78px] flex-col items-center justify-center">
+                                        <span
+                                          className="text-[8px] font-black uppercase tracking-[0.3em]"
+                                          style={{
+                                            color: toRgba(
+                                              tableTone,
+                                              item.isOccupied ? 0.6 : 0.85,
+                                            ),
+                                          }}
+                                        >
+                                          Room
+                                        </span>
+                                        <span
+                                          className="max-w-full break-words text-center text-[1.6rem] font-black leading-none"
+                                          style={{
+                                            color: toRgba(
+                                              tableTone,
+                                              item.isOccupied ? 0.7 : 1,
+                                            ),
+                                          }}
+                                        >
+                                          {getCompactTableLabel(tableName)}
+                                        </span>
+                                      </div>
+
+                                      {/* Door: swing arc + door leaf on the bottom wall */}
+                                      <div
+                                        className="absolute bottom-0 right-5 h-9 w-9 rounded-tl-full border-l-2 border-t-2 border-dashed"
+                                        style={{
+                                          borderColor: toRgba(
+                                            tableTone,
+                                            item.isOccupied ? 0.35 : 0.6,
+                                          ),
+                                        }}
+                                      />
+                                      <div
+                                        className="absolute bottom-0 right-[56px] h-9 w-[3px] rounded-full"
+                                        style={{
+                                          backgroundColor: toRgba(
+                                            tableTone,
+                                            item.isOccupied ? 0.55 : 0.9,
+                                          ),
+                                        }}
+                                      />
                                     </div>
                                   </div>
                                   );
@@ -4003,7 +4052,10 @@ const ViewOrdering = () => {
                                     : "relative z-10 mt-5 min-h-[44px] max-w-full"
                                 }
                               >
-                                <p className="break-words text-sm font-extrabold leading-tight">
+                                <p
+                                  className="break-words text-sm font-extrabold leading-tight"
+                                  style={{ color: pageText }}
+                                >
                                   {item.table_number}
                                 </p>
                                 <p

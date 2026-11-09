@@ -54,7 +54,7 @@ const PosReports = lazyDialog(
 );
 const PosSettings = lazyDialog(() => import("../MainComponents/PosSettings"));
 
-const POS_HOME_BG = "./pos-home-bg.png";
+const POS_HOME_BG = "./richwell-home-bg.png";
 const HEADER_HEIGHT = 96;
 const FOOTER_HEIGHT = 118;
 

@@ -15,7 +15,7 @@ import useLoginAttempts from "../../context/useLoginAttempts ";
 import { useTheme } from "../../context/ThemeContext";
 import useVersionLabel from "../../hooks/useVersionLabel";
 
-const FALLBACK_RIGHT_IMAGE = ".//login-visual.png";
+const FALLBACK_RIGHT_IMAGE = "./richwell-login-visual.png";
 
 const hexToRgb = (hex) => {
   if (!hex || typeof hex !== "string") return null;

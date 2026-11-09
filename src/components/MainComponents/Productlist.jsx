@@ -1,4 +1,12 @@
-import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import React, {
+  lazy,
+  Suspense,
+  useEffect,
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaSearch,
@@ -13,19 +21,44 @@ import {
   FaThLarge,
   FaPercent,
   FaLayerGroup,
+  FaPlus,
 } from "react-icons/fa";
 import { useTheme } from "../../context/ThemeContext";
 import useApiHost from "../../hooks/useApiHost";
 import ProductImage from "../common/ProductImage";
 import TutorialTip from "../common/TutorialTip";
+import AddProductModal from "./ProductListModal/AddProductModal";
+import useZustandLoginCred from "../../context/useZustandLoginCred";
+import { hasPosSettingsAccess } from "../../utils/posRoleAccess";
+import {
+  usePosDeveloperSession,
+  usePosRoleAccessVersion,
+} from "../../hooks/usePosRoleAccessConfig";
+
+const PosPricingDashboard = lazy(() =>
+  import("./PosSettingsModal/PosPricingDashboard"),
+);
 
 const PRODUCTS_PER_PAGE = 60;
+const PRICING_ACCENT = "var(--branch-primary)";
 
 const ProductList = () => {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const navigate = useNavigate();
   const apiHost = useApiHost();
+
+  // "products" = product masterlist, "pricing" = Pricing Engine (moved here from Settings)
+  const [activeView, setActiveView] = useState("products");
+  const roles = useZustandLoginCred((state) => state.roles);
+  const roleAccessVersion = usePosRoleAccessVersion();
+  const developerMode = usePosDeveloperSession();
+  const canUsePricing = useMemo(
+    () => hasPosSettingsAccess(roles, "Pricing Engine", developerMode),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [roles, roleAccessVersion, developerMode],
+  );
+  const showPricing = activeView === "pricing" && canUsePricing;
 
   const imageBaseUrl = useMemo(() => {
     if (!apiHost) return "";
@@ -44,6 +77,8 @@ const ProductList = () => {
 
   // MODAL STATES
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showAddProduct, setShowAddProduct] = useState(false);
+  const [addedNotice, setAddedNotice] = useState("");
   const [pendingStatus, setPendingStatus] = useState(null);
 
   const fetchProducts = useCallback(async () => {
@@ -224,6 +259,19 @@ const ProductList = () => {
     return ["ALL", ...uniqueCats];
   }, [categoryStats]);
 
+  const productCategoryOptions = useMemo(
+    () => categories.filter((cat) => cat !== "ALL"),
+    [categories],
+  );
+
+  const productUnitOptions = useMemo(
+    () =>
+      [...new Set(products.map((p) => String(p.unit_of_measure || "").trim().toUpperCase()))]
+        .filter(Boolean)
+        .sort(),
+    [products],
+  );
+
   const subcategoriesByCategory = useMemo(() => {
     const map = {};
     products.forEach((p) => {
@@ -313,6 +361,29 @@ const ProductList = () => {
         isDark ? "bg-[#0f172a]" : "bg-[#f8fafc]"
       }`}
     >
+      <AddProductModal
+        isOpen={showAddProduct}
+        onClose={() => setShowAddProduct(false)}
+        onAdded={({ item_name, prices_added }) => {
+          setAddedNotice(
+            `${item_name} added with ${prices_added} price${prices_added === 1 ? "" : "s"}.`,
+          );
+          setTimeout(() => setAddedNotice(""), 3500);
+          fetchProducts();
+        }}
+        isDark={isDark}
+        apiHost={apiHost}
+        categories={productCategoryOptions}
+        units={productUnitOptions}
+      />
+
+      {addedNotice && (
+        <div className="fixed bottom-8 left-1/2 z-[110] flex -translate-x-1/2 items-center gap-3 rounded-2xl bg-emerald-500 px-6 py-4 text-xs font-black uppercase tracking-widest text-white shadow-2xl shadow-emerald-500/30">
+          <FaCheckCircle size={14} />
+          {addedNotice}
+        </div>
+      )}
+
       {showConfirm && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 backdrop-blur-sm bg-black/40 animate-in fade-in duration-300">
           <div
@@ -383,7 +454,7 @@ const ProductList = () => {
       )}
 
       <div
-        className={`sticky top-0 z-30 border-b-2 ${
+        className={`${showPricing ? "" : "sticky top-0"} z-30 border-b-2 ${
           isDark
             ? "bg-slate-900/95 border-white/10"
             : "bg-white/95 border-slate-200"
@@ -421,7 +492,57 @@ const ProductList = () => {
               />
             </div>
 
+            {canUsePricing && (
+              <div
+                className={`flex w-full md:w-auto p-1 rounded-2xl border-2 ${
+                  isDark
+                    ? "bg-white/5 border-white/10"
+                    : "bg-slate-100 border-slate-200"
+                }`}
+              >
+                {[
+                  { id: "products", label: "Products", icon: FaThLarge },
+                  { id: "pricing", label: "Pricing Engine", icon: FaTag },
+                ].map(({ id, label, icon: Icon }) => {
+                  const isSelected = activeView === id;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => {
+                        if (id === activeView) return;
+                        setActiveView(id);
+                        // prices may have changed in the Pricing Engine
+                        if (id === "products") fetchProducts();
+                      }}
+                      className={`flex flex-1 md:flex-none items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                        isSelected
+                          ? "bg-blue-600 text-white shadow-lg shadow-blue-500/30"
+                          : isDark
+                            ? "text-slate-400 hover:text-white"
+                            : "text-slate-500 hover:text-slate-800"
+                      }`}
+                    >
+                      <Icon size={12} />
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {!showPricing && (
             <div className="flex items-center w-full gap-3 md:w-auto">
+              {canUsePricing && (
+                <button
+                  type="button"
+                  onClick={() => setShowAddProduct(true)}
+                  className="flex items-center gap-2 px-4 py-3 text-[10px] font-black tracking-widest text-white uppercase transition-all bg-blue-600 shadow-lg rounded-2xl shadow-blue-500/30 hover:bg-blue-700 active:scale-95 whitespace-nowrap"
+                >
+                  <FaPlus size={11} />
+                  Add Product
+                </button>
+              )}
               <div
                 className={`flex items-center gap-2 pr-3 mr-2 border-r-2 ${
                   isDark ? "border-white/10" : "border-slate-200"
@@ -489,8 +610,10 @@ const ProductList = () => {
                 <FaLock size={16} />
               </button>
             </div>
+            )}
           </div>
 
+          {!showPricing && (
           <div className="flex items-center gap-3 pb-2 mt-6 overflow-x-auto no-scrollbar scroll-smooth">
             {categories.map((cat) => {
               const isActive = selectedCategory === cat;
@@ -541,9 +664,29 @@ const ProductList = () => {
               );
             })}
           </div>
+          )}
         </div>
       </div>
 
+      {showPricing ? (
+        <div className="flex-grow p-6">
+          <div className="max-w-[1600px] mx-auto">
+            <Suspense
+              fallback={
+                <div className="flex flex-col items-center justify-center gap-4 py-40">
+                  <div className="w-12 h-12 border-[5px] border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
+                  <p className="text-[10px] font-black tracking-[0.2em] uppercase text-slate-500 animate-pulse">
+                    Loading Pricing Engine...
+                  </p>
+                </div>
+              }
+            >
+              <PosPricingDashboard isDark={isDark} accent={PRICING_ACCENT} />
+            </Suspense>
+          </div>
+        </div>
+      ) : (
+      <>
       <div className="flex-grow p-6 overflow-auto">
         <div ref={productGridRef} className="max-w-[1600px] mx-auto scroll-mt-60">
           {paginationControls}
@@ -555,194 +698,167 @@ const ProductList = () => {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
               {visibleProducts.map((item) => {
                 const isActive = item.status === "1";
 
                 return (
                   <div
                     key={item.product_id}
-                    className={`group relative rounded-[35px] p-6 border-2 transition-all duration-500 ${
-                      !isActive
-                        ? "bg-slate-100/80 grayscale opacity-60 border-slate-300"
-                        : isDark
-                          ? "bg-slate-900/60 border-white/20 hover:border-white hover:-translate-y-2 hover:shadow-[0_20px_60px_rgba(255,255,255,0.08)]"
-                          : "bg-white border-blue-500/40 hover:border-blue-600 hover:-translate-y-2 hover:shadow-2xl hover:shadow-blue-500/20"
+                    className={`relative flex gap-4 overflow-hidden rounded-[1.75rem] border p-4 group transition-all duration-200 ${
+                      isDark
+                        ? "bg-slate-900/50 border-slate-800"
+                        : "bg-white border-slate-100"
+                    } ${
+                      isActive
+                        ? "hover:shadow-md hover:-translate-y-0.5"
+                        : "grayscale opacity-60"
                     }`}
                   >
-                    <div
-                      className={`absolute top-6 right-6 px-3 py-1 rounded-full text-[9px] font-black uppercase flex items-center gap-1.5 z-10 border ${
-                        isActive
-                          ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500"
-                          : "bg-rose-500/10 border-rose-500/20 text-rose-500"
-                      }`}
-                    >
-                      <div
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          isActive
-                            ? "bg-emerald-500 animate-pulse"
-                            : "bg-rose-500"
-                        }`}
-                      ></div>
-                      {isActive ? "Active" : "Inactive"}
-                    </div>
-
                     {enablePictures && (
                       <div
-                        className={`w-full aspect-square rounded-[28px] flex items-center justify-center mb-6 overflow-hidden border-2 transition-all duration-500 group-hover:scale-[1.03] ${
-                          isActive
-                            ? isDark
-                              ? "bg-slate-800 border-white/10"
-                              : "bg-slate-50 border-blue-500/10"
-                            : "bg-slate-200 border-slate-300"
+                        className={`relative flex-shrink-0 w-20 h-20 overflow-hidden rounded-2xl border bg-white ${
+                          isDark ? "border-white/10" : "border-slate-200"
                         }`}
                       >
                         <ProductImage
                           src={`${apiHost}/item_pictures/${item.item_name}.jpg`}
                           alt={item.item_name}
-                          className="object-cover w-full h-full"
-                          wrapperClassName="w-full h-full overflow-hidden rounded-[26px]"
+                          className="object-contain w-full h-full p-1.5 transition-transform group-hover:scale-105"
+                          wrapperClassName="w-full h-full overflow-hidden"
                           fallbackSrc={`${apiHost}/item_pictures/default.jpg`}
                         />
                       </div>
                     )}
 
-                    <div className="px-1">
-                      <h3
-                        className={`font-black text-sm uppercase mb-1.5 truncate tracking-tight ${
-                          isDark && isActive ? "text-white" : "text-slate-800"
-                        }`}
-                      >
-                        {item.item_name}
-                      </h3>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em] flex items-center gap-2 mb-2">
-                        <FaTag className="text-blue-500" size={10} />
-                        {item.unit_of_measure}
-                      </p>
-
-                      {/* Subcategory row */}
-                      <div className="mb-4">
-                        {editingSubcategoryId === item.product_id ? (
-                          <>
-                            <input
-                              autoFocus
-                              type="text"
-                              list={`subcat-options-${item.product_id}`}
-                              value={subcategoryDraft}
-                              onChange={(e) => setSubcategoryDraft(e.target.value)}
-                              onBlur={() => {
-                                saveSubcategory(item.product_id, subcategoryDraft);
-                                setEditingSubcategoryId(null);
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.currentTarget.blur();
-                                } else if (e.key === "Escape") {
-                                  setEditingSubcategoryId(null);
-                                }
-                              }}
-                              placeholder="Set subcategory..."
-                              className={`w-full rounded-lg border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.1em] outline-none ${
-                                isDark
-                                  ? "bg-slate-800 border-blue-500/40 text-white"
-                                  : "bg-white border-blue-400 text-slate-700"
+                    <div className="flex flex-col justify-between flex-1 min-w-0">
+                      <div className="min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <p
+                            className="flex items-center gap-1 text-[8px] font-black uppercase tracking-tight truncate"
+                            style={{ color: PRICING_ACCENT }}
+                          >
+                            <FaTag size={7} />
+                            {item.unit_of_measure}
+                          </p>
+                          <span
+                            className={`flex items-center gap-1 flex-shrink-0 px-2 py-0.5 rounded-full text-[8px] font-black uppercase border ${
+                              isActive
+                                ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500"
+                                : "bg-rose-500/10 border-rose-500/20 text-rose-500"
+                            }`}
+                          >
+                            <span
+                              className={`w-1 h-1 rounded-full ${
+                                isActive ? "bg-emerald-500 animate-pulse" : "bg-rose-500"
                               }`}
                             />
-                            <datalist id={`subcat-options-${item.product_id}`}>
-                              {(subcategoriesByCategory[item.item_category] || []).map(
-                                (sub) => (
-                                  <option key={sub} value={sub} />
-                                ),
-                              )}
-                            </datalist>
-                          </>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingSubcategoryId(item.product_id);
-                              setSubcategoryDraft(
-                                item.subcategory_item_category || "",
-                              );
-                            }}
-                            className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.1em] border-b border-dashed pb-0.5 transition-colors ${
-                              item.subcategory_item_category
-                                ? isDark
-                                  ? "text-slate-300 border-slate-600 hover:text-white"
-                                  : "text-slate-500 border-slate-300 hover:text-slate-800"
-                                : "text-blue-500/70 border-blue-500/30 hover:text-blue-500"
-                            }`}
-                          >
-                            <FaLayerGroup size={10} />
-                            {item.subcategory_item_category || "Add Subcategory"}
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Discountable toggle row */}
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-1.5">
-                          <FaPercent
-                            size={9}
-                            className={
-                              item.isDiscountable === "Yes"
-                                ? "text-amber-500"
-                                : "text-slate-400"
-                            }
-                          />
-                          <span
-                            className={`text-[9px] font-black uppercase tracking-widest ${
-                              item.isDiscountable === "Yes"
-                                ? isDark ? "text-amber-400" : "text-amber-600"
-                                : "text-slate-400"
-                            }`}
-                          >
-                            {item.isDiscountable === "Yes" ? "Discountable" : "No Discount"}
+                            {isActive ? "Active" : "Inactive"}
                           </span>
                         </div>
-                        <button
-                          onClick={() => toggleDiscountable(item.product_id)}
-                          className={`relative w-12 h-6 rounded-full transition-all duration-300 flex items-center p-1 border-2 ${
-                            item.isDiscountable === "Yes"
-                              ? "bg-amber-500 border-amber-400 shadow-lg shadow-amber-500/30"
-                              : isDark
-                                ? "bg-slate-700 border-slate-600 shadow-inner"
-                                : "bg-slate-300 border-slate-400 shadow-inner"
+                        <h3
+                          className={`text-[11px] font-black leading-tight uppercase line-clamp-2 mt-0.5 ${
+                            isDark ? "text-white" : "text-slate-900"
                           }`}
                         >
-                          <div
-                            className={`w-3 h-3 bg-white rounded-full shadow-md transform transition-transform duration-300 ${
-                              item.isDiscountable === "Yes"
-                                ? "translate-x-6"
-                                : "translate-x-0"
-                            }`}
-                          />
-                        </button>
+                          {item.item_name}
+                        </h3>
+
+                        {/* Subcategory */}
+                        <div className="mt-1.5">
+                          {editingSubcategoryId === item.product_id ? (
+                            <>
+                              <input
+                                autoFocus
+                                type="text"
+                                list={`subcat-options-${item.product_id}`}
+                                value={subcategoryDraft}
+                                onChange={(e) => setSubcategoryDraft(e.target.value)}
+                                onBlur={() => {
+                                  saveSubcategory(item.product_id, subcategoryDraft);
+                                  setEditingSubcategoryId(null);
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.currentTarget.blur();
+                                  } else if (e.key === "Escape") {
+                                    setEditingSubcategoryId(null);
+                                  }
+                                }}
+                                placeholder="Set subcategory..."
+                                className={`w-full rounded-lg border px-2 py-1 text-[9px] font-bold uppercase tracking-[0.1em] outline-none ${
+                                  isDark
+                                    ? "bg-slate-800 border-blue-500/40 text-white"
+                                    : "bg-white border-blue-400 text-slate-700"
+                                }`}
+                              />
+                              <datalist id={`subcat-options-${item.product_id}`}>
+                                {(subcategoriesByCategory[item.item_category] || []).map(
+                                  (sub) => (
+                                    <option key={sub} value={sub} />
+                                  ),
+                                )}
+                              </datalist>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingSubcategoryId(item.product_id);
+                                setSubcategoryDraft(
+                                  item.subcategory_item_category || "",
+                                );
+                              }}
+                              className={`inline-flex max-w-full items-center gap-1.5 px-2 py-0.5 text-[8px] font-black uppercase rounded-lg tracking-wide border border-dashed transition-colors ${
+                                item.subcategory_item_category
+                                  ? isDark
+                                    ? "bg-white/5 border-white/10 text-slate-400 hover:text-white"
+                                    : "bg-blue-50 border-blue-100 text-blue-500 hover:text-blue-700"
+                                  : "border-blue-500/30 text-blue-500/70 hover:text-blue-500"
+                              }`}
+                            >
+                              <FaLayerGroup size={8} className="flex-shrink-0" />
+                              <span className="truncate">
+                                {item.subcategory_item_category || "Add Subcategory"}
+                              </span>
+                            </button>
+                          )}
+                        </div>
                       </div>
 
-                      <div className="flex items-center justify-between pt-4 border-t-2 border-slate-100/10">
-                        <p
-                          className={`text-xl font-black tracking-tighter ${
-                            isActive ? "text-blue-600" : "text-slate-400"
+                      <div className="flex items-end justify-between gap-2 mt-3">
+                        {/* Discountable toggle */}
+                        <button
+                          type="button"
+                          onClick={() => toggleDiscountable(item.product_id)}
+                          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[8px] font-black uppercase tracking-widest transition-colors ${
+                            item.isDiscountable === "Yes"
+                              ? isDark
+                                ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
+                                : "bg-amber-50 border-amber-200 text-amber-600"
+                              : isDark
+                                ? "bg-slate-800 border-slate-700 text-slate-500"
+                                : "bg-slate-50 border-slate-200 text-slate-400"
                           }`}
                         >
-                          ₱
-                          {parseFloat(item.selling_price || 0).toLocaleString(
-                            "en-US",
-                            { minimumFractionDigits: 2 },
-                          )}
-                        </p>
+                          <FaPercent size={8} />
+                          {item.isDiscountable === "Yes" ? "Discountable" : "No Discount"}
+                        </button>
+
+                        {/* Active / inactive toggle */}
                         <button
+                          type="button"
                           onClick={() => toggleStatus(item.product_id)}
-                          className={`relative w-14 h-7 rounded-full transition-all duration-300 flex items-center p-1.5 border-2 ${
+                          title={isActive ? "Deactivate" : "Activate"}
+                          className={`relative w-11 h-6 flex-shrink-0 rounded-full transition-all duration-300 flex items-center p-1 border-2 ${
                             isActive
                               ? "bg-emerald-500 border-emerald-400 shadow-lg shadow-emerald-500/30"
                               : "bg-slate-400 border-slate-500 shadow-inner"
                           }`}
                         >
                           <div
-                            className={`w-3.5 h-3.5 bg-white rounded-full shadow-md transform transition-transform duration-300 ${
-                              isActive ? "translate-x-7" : "translate-x-0"
+                            className={`w-3 h-3 bg-white rounded-full shadow-md transform transition-transform duration-300 ${
+                              isActive ? "translate-x-5" : "translate-x-0"
                             }`}
                           ></div>
                         </button>
@@ -801,6 +917,8 @@ const ProductList = () => {
           </div>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 };

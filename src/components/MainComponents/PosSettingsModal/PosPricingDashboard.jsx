@@ -6,9 +6,9 @@ import axios from "axios";
 
 import {
   FiSearch, FiEdit2, FiCamera, FiPlus, FiRefreshCw,
-  FiLoader, FiSave, FiToggleLeft, FiToggleRight,
+  FiLoader,
   FiAlertCircle, FiCheckCircle, FiShoppingBag,
-  FiTag, FiFileText, FiLayers,
+  FiTag,
 } from "react-icons/fi";
 import useApiHost from "../../../hooks/useApiHost";
 
@@ -57,14 +57,9 @@ const PosPricingDashboard = ({ isDark, accent = "#3b82f6" }) => {
   const [selectedService, setSelectedService] = useState("");
   const [enablePictures, setEnablePictures] = useState(true);
 
-  // ── Config state (read/write) ─────────────────────────────────────────────────
-  const [noPriceOnOS, setNoPriceOnOS]               = useState(false);
-  const [groupByCategory, setGroupByCategory]       = useState(false);
-  const [initNoPriceOnOS, setInitNoPriceOnOS]       = useState(false);
-  const [initGroupByCategory, setInitGroupByCategory] = useState(false);
-  const [isSavingConfig, setIsSavingConfig]         = useState(false);
-  const [configMsg, setConfigMsg]                   = useState("");
-  const [configErr, setConfigErr]                   = useState("");
+  // ── Order-slip config (read-only; affects how the grid is displayed) ───────────
+  const [noPriceOnOS, setNoPriceOnOS]         = useState(false);
+  const [groupByCategory, setGroupByCategory] = useState(false);
 
   // ── Toast ─────────────────────────────────────────────────────────────────────
   const [showToast, setShowToast] = useState(false);
@@ -117,8 +112,8 @@ const PosPricingDashboard = ({ isDark, accent = "#3b82f6" }) => {
         if (!cancelled && d.success) {
           const hp = Boolean(d.data?.hide_price_on_os);
           const gc = Boolean(d.data?.group_by_category);
-          setNoPriceOnOS(hp);     setInitNoPriceOnOS(hp);
-          setGroupByCategory(gc); setInitGroupByCategory(gc);
+          setNoPriceOnOS(hp);
+          setGroupByCategory(gc);
         }
       })
       .catch(() => {});
@@ -140,34 +135,6 @@ const PosPricingDashboard = ({ isDark, accent = "#3b82f6" }) => {
   const triggerToast = (msg) => {
     setToastMsg(msg); setShowToast(true);
     setTimeout(() => setShowToast(false), 3000);
-  };
-
-  const hasConfigChanges =
-    noPriceOnOS !== initNoPriceOnOS || groupByCategory !== initGroupByCategory;
-
-  const saveConfig = async () => {
-    if (!apiHost || isSavingConfig) return;
-    try {
-      setIsSavingConfig(true); setConfigErr(""); setConfigMsg("");
-      const res = await fetch(`${apiHost}${ORDER_SLIP_SETTINGS_PATH}`, {
-        method: "POST",
-        headers: pricingAuthorizationHeaders({
-          "Content-Type": "application/json",
-        }),
-        body: JSON.stringify({ hide_price_on_os: noPriceOnOS, group_by_category: groupByCategory }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json?.success) throw new Error(json?.message || "Failed to save.");
-      const hp = Boolean(json.data?.hide_price_on_os);
-      const gc = Boolean(json.data?.group_by_category);
-      setNoPriceOnOS(hp);     setInitNoPriceOnOS(hp);
-      setGroupByCategory(gc); setInitGroupByCategory(gc);
-      setConfigMsg("Slip configuration saved.");
-    } catch (e) {
-      setConfigErr(e.message || "Save failed.");
-    } finally {
-      setIsSavingConfig(false);
-    }
   };
 
   // ── Image upload ──────────────────────────────────────────────────────────────
@@ -270,67 +237,10 @@ const PosPricingDashboard = ({ isDark, accent = "#3b82f6" }) => {
               Product <span style={{ color: accent }}>Pricing</span>
             </h2>
             <p className={`mt-3 max-w-xl text-sm ${th.muted}`}>
-              Manage product prices, upload images, add inventory items, and
-              configure how prices appear on printed order slips.
+              Manage product prices, upload images, and add inventory items.
             </p>
           </div>
 
-          {/* Right: Config toggles + save button */}
-          <div className="flex flex-col gap-3 lg:items-end flex-shrink-0">
-            <div className="flex gap-3 flex-wrap lg:justify-end">
-              <button
-                type="button"
-                onClick={() => { setConfigMsg(""); setConfigErr(""); setNoPriceOnOS((v) => !v); }}
-                disabled={isSavingConfig}
-                className={`flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-xs font-black uppercase tracking-wide transition-all ${
-                  noPriceOnOS
-                    ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-500"
-                    : isDark
-                      ? "border-slate-700 bg-slate-800 text-slate-400 hover:text-slate-300"
-                      : "border-slate-200 bg-slate-100 text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                <FiFileText size={13} />
-                <span>No Price on OS</span>
-                {noPriceOnOS ? <FiToggleRight size={16} /> : <FiToggleLeft size={16} />}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => { setConfigMsg(""); setConfigErr(""); setGroupByCategory((v) => !v); }}
-                disabled={isSavingConfig}
-                className={`flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-xs font-black uppercase tracking-wide transition-all ${
-                  groupByCategory
-                    ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-500"
-                    : isDark
-                      ? "border-slate-700 bg-slate-800 text-slate-400 hover:text-slate-300"
-                      : "border-slate-200 bg-slate-100 text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                <FiLayers size={13} />
-                <span>Per Category</span>
-                {groupByCategory ? <FiToggleRight size={16} /> : <FiToggleLeft size={16} />}
-              </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={saveConfig}
-              disabled={isSavingConfig || !hasConfigChanges}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-[11px] font-black uppercase tracking-[0.18em] shadow-lg transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-              style={{ backgroundColor: accent, color: isDark ? "#0f172a" : "#ffffff" }}
-            >
-              {isSavingConfig ? <FiLoader className="animate-spin" size={14} /> : <FiSave size={14} />}
-              Save Slip Config
-            </button>
-
-            {configMsg && (
-              <p className="text-xs font-bold text-emerald-500 lg:text-right">{configMsg}</p>
-            )}
-            {configErr && (
-              <p className="text-xs font-bold text-red-500 lg:text-right">{configErr}</p>
-            )}
-          </div>
         </div>
       </div>
 
@@ -399,24 +309,23 @@ const PosPricingDashboard = ({ isDark, accent = "#3b82f6" }) => {
           </p>
         </div>
       ) : (
-        <div
-          className={`grid gap-4 ${
-            enablePictures
-              ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4"
-              : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
-          }`}
-        >
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           {filteredProducts.map((item, idx) => (
             <div
               key={idx}
-              className={`relative flex flex-col overflow-hidden rounded-[2rem] border group hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 ${th.card}`}
+              className={`relative flex gap-4 overflow-hidden rounded-[1.75rem] border p-4 group hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 ${th.card}`}
             >
               {enablePictures && (
-                <div className={`relative w-full overflow-hidden aspect-square ${isDark ? "bg-slate-800" : "bg-slate-100"}`}>
+                <div
+                  className={`relative flex-shrink-0 w-20 h-20 overflow-hidden rounded-2xl border bg-white p-1.5 ${
+                    isDark ? "border-white/10" : "border-slate-200"
+                  }`}
+                >
                   <img
                     src={`${apiHost}/item_pictures/${item.item_description}.jpg?t=${cacheKey}`}
-                    className="object-cover w-full h-full transition-transform group-hover:scale-105"
+                    className="object-contain w-full h-full transition-transform group-hover:scale-105"
                     onError={(e) => {
+                      e.target.onerror = null;
                       e.target.src = `${apiHost}/item_pictures/default.jpg?t=${cacheKey}`;
                     }}
                     alt={item.item_description}
@@ -424,8 +333,8 @@ const PosPricingDashboard = ({ isDark, accent = "#3b82f6" }) => {
                 </div>
               )}
 
-              <div className="flex flex-col justify-between flex-1 p-4">
-                <div>
+              <div className="flex flex-col justify-between flex-1 min-w-0">
+                <div className="min-w-0">
                   <p
                     className="text-[8px] font-black uppercase tracking-tight"
                     style={{ color: accent }}
@@ -450,7 +359,7 @@ const PosPricingDashboard = ({ isDark, accent = "#3b82f6" }) => {
 
                 <div className="flex items-end justify-between mt-3">
                   <div>
-                    <p className="text-[18px] font-black" style={{ color: accent }}>
+                    <p className="text-[18px] font-black leading-none" style={{ color: accent }}>
                       ₱{Number(item.srp).toLocaleString()}
                     </p>
                     {noPriceOnOS && (
