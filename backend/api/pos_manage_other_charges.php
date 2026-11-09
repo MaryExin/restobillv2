@@ -23,6 +23,13 @@ if ($requiresMutationAuthorization) {
 const AUTO_SERVICE_TYPE_CATEGORY = "Service";
 const AUTO_SERVICE_TYPE_PREFIX = "Service Charge Auto Types: ";
 
+// array_is_list() only exists in PHP 8.1+; XAMPP ships PHP 8.0.
+if (!function_exists("array_is_list")) {
+    function array_is_list(array $array): bool {
+        return $array === [] || array_keys($array) === range(0, count($array) - 1);
+    }
+}
+
 function fetchSalesTypes(PDO $pdo): array {
     return $pdo->query("
         SELECT TRIM(sales_type_id) AS sales_type_id, TRIM(description) AS description

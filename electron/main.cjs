@@ -148,15 +148,33 @@ function getIpFilePath() {
     : path.join(__dirname, "..", "public", "ip.txt");
 }
 
+// Packaged installs under C:\Program Files make resources/ read-only for
+// non-admin users (EPERM on save). Settings the app writes live in userData
+// instead, seeded once from the bundled copy so existing values carry over.
+function getWritableConfigPath(fileName) {
+  const configDir = path.join(app.getPath("userData"), "config");
+  const filePath = path.join(configDir, fileName);
+  try {
+    if (!fs.existsSync(filePath)) {
+      fs.mkdirSync(configDir, { recursive: true });
+      const bundledPath = path.join(process.resourcesPath, fileName);
+      if (fs.existsSync(bundledPath)) fs.copyFileSync(bundledPath, filePath);
+    }
+  } catch (error) {
+    console.error(`Failed to prepare writable config: ${filePath}`, error);
+  }
+  return filePath;
+}
+
 function getPrinterFilePath() {
   return app.isPackaged
-    ? path.join(process.resourcesPath, "printer.txt")
+    ? getWritableConfigPath("printer.txt")
     : path.join(__dirname, "..", "public", "printer.txt");
 }
 
 function getPrinterCategoriesFilePath() {
   return app.isPackaged
-    ? path.join(process.resourcesPath, "printer_categories.json")
+    ? getWritableConfigPath("printer_categories.json")
     : path.join(__dirname, "..", "public", "printer_categories.json");
 }
 
@@ -171,13 +189,13 @@ function readPrinterCategories() {
 
 function getBusinessInfoFilePath() {
   return app.isPackaged
-    ? path.join(process.resourcesPath, "businessInfo.json")
+    ? getWritableConfigPath("businessInfo.json")
     : path.join(__dirname, "..", "public", "businessInfo.json");
 }
 
 function getBusinessInfoBackupDir() {
   const dir = app.isPackaged
-    ? path.join(process.resourcesPath, "business-info-backups")
+    ? path.join(app.getPath("userData"), "config", "business-info-backups")
     : path.join(__dirname, "..", "public", "business-info-backups");
 
   if (!fs.existsSync(dir)) {
@@ -482,7 +500,7 @@ function getPrinterHost() {
     // Dev fallback:
     // <project root>\printer.txt
     const printerFilePath = app.isPackaged
-      ? path.join(process.resourcesPath, "printer.txt")
+      ? getPrinterFilePath()
       : path.join(app.getAppPath(), "printer.txt");
 
     if (!fs.existsSync(printerFilePath)) {
@@ -2573,7 +2591,7 @@ app.whenReady().then(() => {
   ipcMain.handle("read-business-info", async () => {
     try {
       const filePath = app.isPackaged
-        ? path.join(process.resourcesPath, "businessInfo.json")
+        ? getBusinessInfoFilePath()
         : path.join(__dirname, "businessInfo.json");
 
       if (!fs.existsSync(filePath)) {

@@ -40,7 +40,6 @@ class ProductSyncLocalMutateGateway
         $affected = 0;
         $insertedProducts = 0;
         $updatedPrices = 0;
-        $inactivatedProducts = 0;
         $syncedSalesTypes = 0;
         $syncedSalesTypeMappings = 0;
 
@@ -90,11 +89,8 @@ class ProductSyncLocalMutateGateway
                 }
 
                 if ($action === 'inactive_product') {
-                    $productAffected = $this->setOfflineProductInactive($productId);
-                    $pricingAffected = $this->setAllOfflinePricingInactive($productId, $userId);
-
-                    $affected += $productAffected + $pricingAffected;
-                    $inactivatedProducts++;
+                    // Backward compatibility for stale clients: product sync no
+                    // longer inactivates local products or pricing rows.
                     continue;
                 }
             }
@@ -106,7 +102,7 @@ class ProductSyncLocalMutateGateway
             return [
                 'message' => 'Success',
                 'affected_rows' => $totalOps,
-                'summary_message' => "Synced {$totalOps} operation(s). Sales types: {$syncedSalesTypes}, BU pricing mappings: {$syncedSalesTypeMappings}, new products: {$insertedProducts}, price changes: {$updatedPrices}, inactivated: {$inactivatedProducts}.",
+                'summary_message' => "Synced {$totalOps} operation(s). Sales types: {$syncedSalesTypes}, BU pricing mappings: {$syncedSalesTypeMappings}, new products: {$insertedProducts}, pricing updates: {$updatedPrices}.",
             ];
         } catch (Throwable $e) {
             if ($this->conn->inTransaction()) {
@@ -422,37 +418,6 @@ class ProductSyncLocalMutateGateway
 
         $stmt = $this->conn->prepare($sql);
         $stmt->execute($params);
-
-        return $stmt->rowCount();
-    }
-
-    private function setOfflineProductInactive(string $productId): int
-    {
-        $stmt = $this->conn->prepare("
-            UPDATE tbl_inventory_products_masterlist
-            SET status = 'Inactive'
-            WHERE product_id = :product_id
-        ");
-        $stmt->execute([
-            'product_id' => $productId,
-        ]);
-
-        return $stmt->rowCount();
-    }
-
-    private function setAllOfflinePricingInactive(string $productId, int|string $userId): int
-    {
-        $stmt = $this->conn->prepare("
-            UPDATE tbl_pricing_details
-            SET
-                deletestatus = 'Inactive',
-                usertracker = :usertracker
-            WHERE inv_code = :inv_code
-        ");
-        $stmt->execute([
-            'inv_code' => $productId,
-            'usertracker' => (string) $userId,
-        ]);
 
         return $stmt->rowCount();
     }

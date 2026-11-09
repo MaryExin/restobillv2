@@ -332,7 +332,13 @@ const PosSettings = ({ isOpen, onClose, branchInfo, initialTab = null }) => {
     }
 
     if (activeTab === "Table Layout") {
-      return <PosTableLayout isDark={isDark} accent={accentColor} />;
+      return (
+        <PosTableLayout
+          isDark={isDark}
+          accent={accentColor}
+          branchInfo={branchInfo}
+        />
+      );
     }
 
     if (activeTab === "Sales Type Order") {

@@ -160,7 +160,7 @@ class ProductSyncLocalReadGateway
                 isDiscountable,
                 status
             FROM tbl_inventory_products_masterlist
-            WHERE category_code = :busunitcode
+            WHERE unit_code = :busunitcode
             ORDER BY item_name ASC, product_id ASC
         ");
         $stmt->execute([

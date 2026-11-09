@@ -77,7 +77,7 @@ const sameNumber = (a, b, epsilon = 0.0001) => {
 
 const badgeMap = {
   price_change: {
-    label: "Price Change",
+    label: "Pricing Update",
     darkCls: "bg-amber-500/10 text-amber-300 border border-amber-500/30",
     lightCls: "bg-amber-50 text-amber-700 border border-amber-200",
   },
@@ -86,8 +86,8 @@ const badgeMap = {
     darkCls: "bg-emerald-500/10 text-emerald-300 border border-emerald-500/30",
     lightCls: "bg-emerald-50 text-emerald-700 border border-emerald-200",
   },
-  inactive_product: {
-    label: "Set Inactive",
+  offline_only: {
+    label: "Offline Only",
     darkCls: "bg-rose-500/10 text-rose-300 border border-rose-500/30",
     lightCls: "bg-rose-50 text-rose-700 border border-rose-200",
   },
@@ -97,6 +97,9 @@ const badgeMap = {
     lightCls: "bg-slate-100 text-slate-700 border border-slate-200",
   },
 };
+
+const isSyncableAction = (action) =>
+  action === "price_change" || action === "new_product";
 
 const TABLE_TEMPLATE =
   "260px 170px 150px 130px 130px 130px 130px 160px 160px 120px";
@@ -285,7 +288,7 @@ const ProductCard = ({
   disabled = false,
 }) => {
   const badge = badgeMap[row.action] || badgeMap.no_price_change;
-  const hasAction = row.action !== "no_price_change";
+  const hasAction = isSyncableAction(row.action);
   const priceChanged = row.diff?.price_changed || row.diff?.cost_changed;
   const badgeCls = isDark ? badge.darkCls : badge.lightCls;
 
@@ -460,7 +463,7 @@ const ProductCard = ({
               />
             </div>
 
-            {row.action === "inactive_product" ? (
+            {row.action === "offline_only" ? (
               <div
                 className={`mt-4 rounded-2xl px-4 py-3 text-sm font-semibold ${
                   isDark
@@ -468,9 +471,9 @@ const ProductCard = ({
                     : "bg-rose-50 border border-rose-200 text-rose-700"
                 }`}
               >
-                This product is no longer available ONLINE for this selected
-                pricing scope. Sync will set the OFFLINE product status to
-                Inactive and deactivate its pricing row.
+                This product is not available ONLINE for this selected pricing
+                scope. Its existing OFFLINE product and pricing statuses will
+                remain unchanged.
               </div>
             ) : null}
           </div>
@@ -663,7 +666,7 @@ const VirtualRow = ({ index, style, data }) => {
         <div className="p-4">
           <span
             className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
-              row.action === "inactive_product"
+              row.action === "offline_only"
                 ? isDark
                   ? "bg-rose-500/10 text-rose-300 border border-rose-500/20"
                   : "bg-rose-50 text-rose-700 border border-rose-200"
@@ -687,12 +690,12 @@ const VirtualRow = ({ index, style, data }) => {
 
         <div className="p-4">
           <button
-            disabled={row.action === "no_price_change" || disabled}
+            disabled={!isSyncableAction(row.action) || disabled}
             onClick={() => toggleSelect(row.row_key)}
             className={`rounded-2xl px-4 py-2 font-bold transition-all ${
               checked
                 ? "bg-blue-600 text-white"
-                : row.action === "no_price_change"
+                : !isSyncableAction(row.action)
                   ? isDark
                     ? "bg-slate-700/30 text-slate-500 cursor-not-allowed"
                     : "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
@@ -707,7 +710,7 @@ const VirtualRow = ({ index, style, data }) => {
           >
             {checked
               ? "Selected"
-              : row.action === "no_price_change"
+              : !isSyncableAction(row.action)
                 ? "None"
                 : "Select"}
           </button>
@@ -958,12 +961,24 @@ const SyncProductsAndPricing = () => {
             webRow.unit_of_measure,
             localProduct?.unit_of_measure,
           ),
+          status_changed:
+            String(localPricing?.deletestatus || "")
+              .trim()
+              .toLowerCase() !== "active" ||
+            (!!localProduct &&
+              String(localProduct.status || "")
+                .trim()
+                .toLowerCase() !== "active"),
         };
 
         let action = "no_price_change";
         if (!localPricing) {
           action = "new_product";
-        } else if (diff.price_changed || diff.cost_changed) {
+        } else if (
+          diff.price_changed ||
+          diff.cost_changed ||
+          diff.status_changed
+        ) {
           action = "price_change";
         }
 
@@ -1039,7 +1054,7 @@ const SyncProductsAndPricing = () => {
           product_id: productId,
           pricing_code: pricingCode,
           pricing_label: pricingLabels[pricingCode] || pricingCode,
-          action: "inactive_product",
+          action: "offline_only",
           online_presence: false,
           offline_presence: !!localProduct,
           offline_status: String(localProduct?.status || "Active"),
@@ -1066,6 +1081,7 @@ const SyncProductsAndPricing = () => {
             name_changed: false,
             category_changed: false,
             uom_changed: false,
+            status_changed: false,
           },
         });
 
@@ -1081,16 +1097,14 @@ const SyncProductsAndPricing = () => {
       total: rows.length,
       priceChange: rows.filter((r) => r.action === "price_change").length,
       newProduct: rows.filter((r) => r.action === "new_product").length,
-      inactive: rows.filter((r) => r.action === "inactive_product").length,
+      offlineOnly: rows.filter((r) => r.action === "offline_only").length,
       noPriceChange: rows.filter((r) => r.action === "no_price_change").length,
     };
   }, [rows]);
 
   useEffect(() => {
     const auto = rows
-      .filter((r) =>
-        ["price_change", "new_product", "inactive_product"].includes(r.action),
-      )
+      .filter((r) => isSyncableAction(r.action))
       .map((r) => r.row_key);
 
     setSelectedRowKeys(auto);
@@ -1155,7 +1169,7 @@ const SyncProductsAndPricing = () => {
   const selectedRows = useMemo(() => {
     const map = new Set(selectedRowKeys);
     return rows.filter(
-      (r) => map.has(r.row_key) && r.action !== "no_price_change",
+      (r) => map.has(r.row_key) && isSyncableAction(r.action),
     );
   }, [rows, selectedRowKeys]);
 
@@ -1174,7 +1188,7 @@ const SyncProductsAndPricing = () => {
   const selectAllVisibleChanges = () => {
     if (isSyncing) return;
     const visibleChangeIds = filteredRows
-      .filter((r) => r.action !== "no_price_change")
+      .filter((r) => isSyncableAction(r.action))
       .map((r) => r.row_key);
 
     setSelectedRowKeys((prev) => {
@@ -1325,15 +1339,10 @@ const SyncProductsAndPricing = () => {
     const newProductCount = selectedRows.filter(
       (r) => r.action === "new_product",
     ).length;
-    const inactiveCount = selectedRows.filter(
-      (r) => r.action === "inactive_product",
-    ).length;
-
     return `Do you want to sync ${selectedRows.length} selected row(s)?
 
-Price changes: ${priceChangeCount}
+Pricing updates: ${priceChangeCount}
 New products: ${newProductCount}
-Set inactive: ${inactiveCount}
 
 This will also replace OFFLINE lkp_sales_type and tbl_pricing_by_sales_type using WEB mappings for the selected business unit.`;
   }, [selectedRows]);
@@ -1501,7 +1510,7 @@ This will also replace OFFLINE lkp_sales_type and tbl_pricing_by_sales_type usin
             <div className="flex flex-wrap gap-2">
               <FilterChip
                 active={filter === "price_change"}
-                label="Price Change"
+                label="Pricing Update"
                 tone="amber"
                 onClick={() => setFilter("price_change")}
                 isDark={isDark}
@@ -1516,10 +1525,10 @@ This will also replace OFFLINE lkp_sales_type and tbl_pricing_by_sales_type usin
                 disabled={isSyncing}
               />
               <FilterChip
-                active={filter === "inactive_product"}
-                label="Not Available"
+                active={filter === "offline_only"}
+                label="Offline Only"
                 tone="rose"
-                onClick={() => setFilter("inactive_product")}
+                onClick={() => setFilter("offline_only")}
                 isDark={isDark}
                 disabled={isSyncing}
               />
@@ -1557,9 +1566,9 @@ This will also replace OFFLINE lkp_sales_type and tbl_pricing_by_sales_type usin
             isDark={isDark}
           />
           <StatCard
-            title="Price Changes"
+            title="Pricing Updates"
             value={summary.priceChange}
-            subtitle="Cost and/or SRP changed"
+            subtitle="Cost, SRP, or active status changed"
             icon={<FaSyncAlt size={18} />}
             accent="amber"
             isDark={isDark}
@@ -1573,9 +1582,9 @@ This will also replace OFFLINE lkp_sales_type and tbl_pricing_by_sales_type usin
             isDark={isDark}
           />
           <StatCard
-            title="Not Available"
-            value={summary.inactive}
-            subtitle="OFFLINE rows missing ONLINE"
+            title="Offline Only"
+            value={summary.offlineOnly}
+            subtitle="Kept unchanged during sync"
             icon={<FiSlash size={18} />}
             accent="rose"
             isDark={isDark}

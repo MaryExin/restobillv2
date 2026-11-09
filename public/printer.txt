@@ -1,8 +1,8 @@
-printReceipt: COM5
-printEscposXzReading: usb:auto
-printEscposSalesPerProduct: usb:auto
-printEscpos: usb:auto
-printEscposBilling: usb:auto
-printEscposDiscount: usb:auto
-printEscpospospaymentreceipt: usb:auto
-printEscposDuplicate: usb:auto
+printReceipt: windows:XP-80C
+printEscposXzReading: windows:XP-80C
+printEscposSalesPerProduct: windows:XP-80C
+printEscpos: windows:XP-80C
+printEscposBilling: windows:XP-80C
+printEscposDiscount: windows:XP-80C
+printEscpospospaymentreceipt: windows:XP-80C
+printEscposDuplicate: windows:XP-80C
