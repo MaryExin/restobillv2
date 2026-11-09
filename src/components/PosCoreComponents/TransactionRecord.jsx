@@ -20,7 +20,7 @@ const sampleTransactions = [
     invoiceNo: "0",
     transactionDate: "February 26, 2026 11:21 AM",
     transactionType: "PRODUCT",
-    referenceTag: "Table 01",
+    referenceTag: "Room 01",
     totalAmount: 1250,
     discount: 0,
     vatExemption: 0,

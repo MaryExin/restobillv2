@@ -148,7 +148,7 @@ const PrintBilling = () => {
 
     fetch(`${apiHost}/api/transactio_per_table.php?${params.toString()}`)
       .then((res) => {
-        if (!res.ok) throw new Error("Failed to fetch transaction per table");
+        if (!res.ok) throw new Error("Failed to fetch transaction per room");
         return res.json();
       })
       .then((data) => {
@@ -258,7 +258,7 @@ const PrintBilling = () => {
               Print Billing
             </h1>
             <p style={{ color: "var(--app-muted-text)" }}>
-              Showing {tablelist.length} tables found for this date.
+              Showing {tablelist.length} rooms found for this date.
             </p>
           </div>
 
@@ -333,7 +333,7 @@ const PrintBilling = () => {
             />
             <input
               type="text"
-              placeholder="Search table number..."
+              placeholder="Search room number..."
               value={searchtable}
               onChange={(e) => setsearchtable(e.target.value)}
               className="w-full rounded-2xl border py-4 pl-12 pr-4"
@@ -387,7 +387,7 @@ const PrintBilling = () => {
                       className="text-[10px] font-black uppercase"
                       style={{ color: "var(--app-muted-text)" }}
                     >
-                      Table
+                      Room
                     </span>
                     <span className="text-4xl font-black">
                       {String(table.table_number || "")}
@@ -483,7 +483,7 @@ const PrintBilling = () => {
                 className="font-bold uppercase tracking-widest"
                 style={{ color: "var(--app-muted-text)" }}
               >
-                No Tables Found
+                No Rooms Found
               </p>
             </div>
           )}

@@ -127,7 +127,7 @@ try {
             // selected business-unit scope. Scope is only required for adds.
         }
 
-        respondTables(true, "Table list loaded.", [
+        respondTables(true, "Room list loaded.", [
             "scope" => $scope,
             "tables" => readTables($pdo),
         ]);
@@ -137,10 +137,10 @@ try {
 
     $tableName = trim((string)($body["table_name"] ?? ""));
     if ($tableName === "") {
-        respondTables(false, "Table name is required.", tableState($pdo, $scope), 400);
+        respondTables(false, "Room name is required.", tableState($pdo, $scope), 400);
     }
     if (mb_strlen($tableName) > 100) {
-        respondTables(false, "Table name must not exceed 100 characters.", tableState($pdo, $scope), 400);
+        respondTables(false, "Room name must not exceed 100 characters.", tableState($pdo, $scope), 400);
     }
 
     $duplicateStmt = $pdo->prepare("
@@ -154,7 +154,7 @@ try {
     ]);
 
     if ($duplicateStmt->fetchColumn() !== false) {
-        respondTables(false, "That table already exists in tbl_pos_tables.", tableState($pdo, $scope), 409);
+        respondTables(false, "That room already exists in tbl_pos_tables.", tableState($pdo, $scope), 409);
     }
 
     $insertStmt = $pdo->prepare("
@@ -180,12 +180,12 @@ try {
         ":status" => "Available",
     ]);
 
-    respondTables(true, "Table added successfully.", tableState($pdo, $scope), 201);
+    respondTables(true, "Room added successfully.", tableState($pdo, $scope), 201);
 } catch (InvalidArgumentException $e) {
     respondTables(false, $e->getMessage(), null, 400);
 } catch (TableScopeNotFoundException $e) {
     respondTables(false, $e->getMessage(), null, 404);
 } catch (Throwable $e) {
     error_log("POS table management error: " . $e->getMessage());
-    respondTables(false, "Unable to process the POS table list.", null, 500);
+    respondTables(false, "Unable to process the POS room list.", null, 500);
 }

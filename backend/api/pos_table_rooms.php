@@ -217,7 +217,7 @@ $ensureDefaultRoom = function ($categoryCode, $unitCode) use (
     }
 
     $tables = $readMasterTables($categoryCode, $unitCode);
-    $insertRoom($categoryCode, $unitCode, "main-room", "Main Room", $tables, 0);
+    $insertRoom($categoryCode, $unitCode, "main-room", "Main Floor", $tables, 0);
     return $readRooms($categoryCode, $unitCode);
 };
 
@@ -287,7 +287,7 @@ try {
     if (count($rooms) === 0) {
         $rooms[] = [
             "room_key" => "main-room",
-            "room_name" => "Main Room",
+            "room_name" => "Main Floor",
             "tables" => $readMasterTables($categoryCode, $unitCode),
             "sort_order" => 0,
         ];
@@ -326,7 +326,7 @@ try {
     $conn->commit();
     $transactionStarted = false;
 
-    $respond("success", "Table rooms saved", [
+    $respond("success", "Floors saved", [
         "rooms" => $readRooms($categoryCode, $unitCode),
     ]);
 } catch (Throwable $e) {

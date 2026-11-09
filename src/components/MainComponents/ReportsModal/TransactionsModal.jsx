@@ -354,7 +354,7 @@ const TransactionsModal = ({ isOpen, onClose }) => {
             <FaSearch className={`mr-4 transition-colors ${isDark ? "text-slate-700 group-focus-within:text-blue-500" : "text-slate-400 group-focus-within:text-blue-600"}`} size={14} />
             <input
               type="text"
-              placeholder="Search invoices, tables, or transaction IDs..."
+              placeholder="Search invoices, rooms, or transaction IDs..."
               className={`w-full text-sm font-bold bg-transparent border-none outline-none h-full ${isDark ? "text-white placeholder:text-slate-800" : "text-[#2e4a7d] placeholder:text-slate-300"}`}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -378,7 +378,7 @@ const TransactionsModal = ({ isOpen, onClose }) => {
                   <th className={`p-5 sticky left-0 z-[60] border-b ${isDark ? "bg-[#0a0f1e] border-white/5" : "bg-slate-50 border-slate-200"}`}>ID</th>
                   <th className="p-5 border-b">Invoice / Slip</th>
                   <th className="p-5 text-center border-b">Timestamp</th>
-                  <th className="p-5 border-b">Table</th>
+                  <th className="p-5 border-b">Room</th>
                   <th className="p-5 text-right border-b">Gross</th>
                   <th className="p-5 text-right border-b text-rose-500">Disc.</th>
                   <th className={`p-5 border-b text-right ${isDark ? "bg-white/[0.01]" : "bg-blue-50/30"}`}>Net Due</th>

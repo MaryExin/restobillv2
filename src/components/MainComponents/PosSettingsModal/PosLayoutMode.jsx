@@ -8,7 +8,7 @@ const MODES = [
     icon: FiMonitor,
     label: "Restaurant",
     description:
-      "Standard POS layout with cart summary panel. Best for dine-in and table-service restaurants.",
+      "Standard POS layout with cart summary panel. Best for dine-in and room-service setups.",
   },
   {
     id: "Restaurant Version 2",

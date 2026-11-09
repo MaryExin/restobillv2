@@ -95,14 +95,14 @@ const PosTableLayout = ({
         const result = await response.json();
 
         if (!response.ok || !result?.success) {
-          throw new Error(result?.message || "Failed to load the table list.");
+          throw new Error(result?.message || "Failed to load the room list.");
         }
 
         setTables(Array.isArray(result?.data?.tables) ? result.data.tables : []);
         setTableScope(result?.data?.scope || null);
       } catch (err) {
         console.error(err);
-        setTableError(err.message || "Failed to load the table list.");
+        setTableError(err.message || "Failed to load the room list.");
       } finally {
         if (!silent) setIsTableListLoading(false);
       }
@@ -127,7 +127,7 @@ const PosTableLayout = ({
         const result = await response.json();
 
         if (!response.ok || !result?.success) {
-          throw new Error(result?.message || "Failed to load table layout.");
+          throw new Error(result?.message || "Failed to load room layout.");
         }
 
         if (!cancelled) {
@@ -140,7 +140,7 @@ const PosTableLayout = ({
       } catch (err) {
         console.error(err);
         if (!cancelled) {
-          setError(err.message || "Failed to load table layout.");
+          setError(err.message || "Failed to load room layout.");
         }
       } finally {
         if (!cancelled) {
@@ -186,7 +186,7 @@ const PosTableLayout = ({
       const result = await response.json();
 
       if (!response.ok || !result?.success) {
-        throw new Error(result?.message || "Failed to save table layout.");
+        throw new Error(result?.message || "Failed to save room layout.");
       }
 
       const savedIsEnabled = Boolean(
@@ -194,10 +194,10 @@ const PosTableLayout = ({
       );
       setIsEnabled(savedIsEnabled);
       setInitialIsEnabled(savedIsEnabled);
-      setMessage("Table layout settings saved.");
+      setMessage("Room layout settings saved.");
     } catch (err) {
       console.error(err);
-      setError(err.message || "Failed to save table layout.");
+      setError(err.message || "Failed to save room layout.");
     } finally {
       setIsSaving(false);
     }
@@ -208,7 +208,7 @@ const PosTableLayout = ({
 
     const cleanTableName = tableName.trim();
     if (!tableApiUrl || isAddingTable || !cleanTableName) {
-      if (!cleanTableName) setTableError("Table name is required.");
+      if (!cleanTableName) setTableError("Room name is required.");
       return;
     }
 
@@ -240,7 +240,7 @@ const PosTableLayout = ({
       setTables(Array.isArray(result?.data?.tables) ? result.data.tables : []);
       setTableScope(result?.data?.scope || null);
       setTableName("");
-      setTableMessage(result?.message || "Table added successfully.");
+      setTableMessage(result?.message || "Room added successfully.");
     } catch (err) {
       console.error(err);
       setTableError(err.message || "Failed to add the table.");
@@ -275,12 +275,12 @@ const PosTableLayout = ({
             <h2
               className={`mt-4 text-3xl sm:text-4xl font-black tracking-tight uppercase ${theme.textPrimary}`}
             >
-              Table Layout
+              Room Layout
             </h2>
 
             <p className={`mt-3 max-w-2xl text-sm ${theme.textMuted}`}>
-              Turn on the physical dining-floor arrangement for Ordering, or
-              keep the original table display without drag and drop.
+              Turn on the physical floor arrangement for Ordering, or
+              keep the original room display without drag and drop.
             </p>
           </div>
 
@@ -308,7 +308,7 @@ const PosTableLayout = ({
         <label
           className={`mb-2 block text-[10px] font-black uppercase tracking-[0.18em] ${theme.textSoft}`}
         >
-          Table Layout Mode
+          Room Layout Mode
         </label>
 
         <button
@@ -372,10 +372,10 @@ const PosTableLayout = ({
               <h3
                 className={`font-[Poppins-Bold] text-xl ${theme.textPrimary}`}
               >
-                Add Table
+                Add Room
               </h3>
               <p className={`mt-1 font-[Poppins-Regular] text-sm ${theme.textMuted}`}>
-                Add a dining table to the current POS business unit.
+                Add a room to the current POS business unit.
               </p>
             </div>
           </div>
@@ -398,7 +398,7 @@ const PosTableLayout = ({
             htmlFor="pos-table-name"
             className={`mt-5 block font-[Poppins-SemiBold] text-[10px] uppercase tracking-[0.16em] ${theme.textSoft}`}
           >
-            Table Name
+            Room Name
           </label>
           <input
             id="pos-table-name"
@@ -410,7 +410,7 @@ const PosTableLayout = ({
               setTableError("");
               setTableMessage("");
             }}
-            placeholder="e.g. Table 31"
+            placeholder="e.g. Room 31"
             disabled={isAddingTable || isTableListLoading}
             className={`mt-2 w-full rounded-2xl border px-4 py-3.5 font-[Poppins-Regular] text-sm outline-none transition focus:ring-4 focus:ring-blue-500/10 ${
               isDark
@@ -433,7 +433,7 @@ const PosTableLayout = ({
             ) : (
               <FiPlus size={16} />
             )}
-            Add Table
+            Add Room
           </button>
 
           {tableMessage ? (
@@ -463,10 +463,10 @@ const PosTableLayout = ({
                 <h3
                   className={`font-[Poppins-Bold] text-xl ${theme.textPrimary}`}
                 >
-                  Table List
+                  Room List
                 </h3>
                 <p className={`mt-1 font-[Poppins-Regular] text-sm ${theme.textMuted}`}>
-                  {tables.length} table{tables.length === 1 ? "" : "s"} configured
+                  {tables.length} room{tables.length === 1 ? "" : "s"} configured
                   in tbl_pos_tables.
                 </p>
               </div>
@@ -499,7 +499,7 @@ const PosTableLayout = ({
               type="search"
               value={tableSearch}
               onChange={(event) => setTableSearch(event.target.value)}
-              placeholder="Search table name or status..."
+              placeholder="Search room name or status..."
               className={`w-full rounded-2xl border py-3 pl-11 pr-4 font-[Poppins-Regular] text-sm outline-none transition focus:ring-4 focus:ring-blue-500/10 ${
                 isDark
                   ? "border-slate-700 bg-slate-950/60 text-white placeholder:text-slate-600"
@@ -513,18 +513,18 @@ const PosTableLayout = ({
               <div className="flex min-h-48 flex-col items-center justify-center gap-3 p-8">
                 <FiLoader className="animate-spin" size={28} style={{ color: accent }} />
                 <p className={`font-[Poppins-SemiBold] text-sm ${theme.textMuted}`}>
-                  Loading table list...
+                  Loading room list...
                 </p>
               </div>
             ) : filteredTables.length === 0 ? (
               <div className="min-h-48 p-8 text-center">
                 <FiGrid className={`mx-auto ${theme.textSoft}`} size={32} />
                 <p className={`mt-3 font-[Poppins-SemiBold] text-sm ${theme.textPrimary}`}>
-                  {tables.length === 0 ? "No tables added yet." : "No matching tables."}
+                  {tables.length === 0 ? "No rooms added yet." : "No matching rooms."}
                 </p>
                 <p className={`mt-1 font-[Poppins-Regular] text-xs ${theme.textMuted}`}>
                   {tables.length === 0
-                    ? "Use the Add Table form to create the first table."
+                    ? "Use the Add Room form to create the first room."
                     : "Try another search keyword."}
                 </p>
               </div>
@@ -543,7 +543,7 @@ const PosTableLayout = ({
                         ID
                       </th>
                       <th className="px-4 py-3 font-[Poppins-Bold] text-[10px] uppercase tracking-[0.14em]">
-                        Table Name
+                        Room Name
                       </th>
                       <th className="px-4 py-3 font-[Poppins-Bold] text-[10px] uppercase tracking-[0.14em]">
                         Status

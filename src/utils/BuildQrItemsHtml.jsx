@@ -32,7 +32,7 @@ export function BuildQrItemsHtml({ items, table, transactionId }) {
       >
         <div className="qr-name">{name}</div>
         {code ? <div>{code}</div> : null}
-        {table ? <div>TABLE: {table}</div> : null}
+        {table ? <div>ROOM: {table}</div> : null}
         {transactionId ? <div>TX: {transactionId}</div> : null}
         <div>{copyLabel}</div>
         <div className="qr-price">P{peso(item?.price)}</div>

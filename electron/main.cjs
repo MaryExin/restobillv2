@@ -2142,7 +2142,7 @@ async function buildEscposOrderReceiptBuffer({
   chunks.push(normalSize);
   chunks.push(txt(`Transaction ID: ${transactionId || "-"}`));
   chunks.push(nl());
-  chunks.push(txt(`Table: ${table || "-"}`));
+  chunks.push(txt(`Room: ${table || "-"}`));
   chunks.push(nl());
   chunks.push(txt(new Date().toLocaleString()));
   chunks.push(nl());
@@ -2392,7 +2392,7 @@ async function buildEscposQrItemsBuffer(data = {}) {
     chunks.push(boldOff);
 
     if (code) { chunks.push(txt(centerText(code))); chunks.push(nl()); }
-    if (table) { chunks.push(txt(centerText(`TABLE: ${table}`))); chunks.push(nl()); }
+    if (table) { chunks.push(txt(centerText(`ROOM: ${table}`))); chunks.push(nl()); }
     if (transactionId) { chunks.push(txt(centerText(`TX: ${transactionId}`))); chunks.push(nl()); }
 
     if (item.qrCopyPerItem > 1) {

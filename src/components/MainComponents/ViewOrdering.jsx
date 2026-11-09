@@ -28,7 +28,7 @@ const FLOOR_GROUP_HEIGHT = 280;
 const FLOOR_GROUP_LABEL_HEIGHT = 64;
 const FLOOR_DROP_DISTANCE = 130;
 const DEFAULT_ROOM_KEY = "main-room";
-const DEFAULT_ROOM_NAME = "Main Room";
+const DEFAULT_ROOM_NAME = "Main Floor";
 
 const getDefaultFloorLayout = () => ({ positions: {}, groups: [] });
 
@@ -154,7 +154,7 @@ const getContrastText = (hex, fallback = "#ffffff") => {
   return brightness > 155 ? "#0f172a" : "#ffffff";
 };
 
-const KIOSK_DEFAULT_TABLE = "Table 01";
+const KIOSK_DEFAULT_TABLE = "Room 01";
 const RETAIL_DEFAULT_TABLE = "Register 1";
 
 const ViewOrdering = () => {
@@ -1215,7 +1215,7 @@ const ViewOrdering = () => {
       const result = await response.json();
 
       if (!response.ok || result?.status !== "success") {
-        throw new Error(result?.message || "Failed to save table rooms.");
+        throw new Error(result?.message || "Failed to save floors.");
       }
 
       const savedRooms = normalizeFloorRooms(
@@ -1230,7 +1230,7 @@ const ViewOrdering = () => {
       return savedRooms;
     } catch (error) {
       console.error("Failed to save table rooms:", error);
-      alert(error.message || "Failed to save table rooms.");
+      alert(error.message || "Failed to save floors.");
       return normalizedRooms;
     } finally {
       setIsRoomsSaving(false);
@@ -1252,7 +1252,7 @@ const ViewOrdering = () => {
   };
 
   const openAddRoomModal = () => {
-    setNewRoomName(`Room ${floorRooms.length + 1}`);
+    setNewRoomName(`Floor ${floorRooms.length + 1}`);
     setShowAddRoomModal(true);
   };
 
@@ -1363,7 +1363,7 @@ const ViewOrdering = () => {
     const room = floorRooms.find((item) => item.room_key === roomKey);
     if (!room) return;
 
-    const roomName = window.prompt("Rename room", room.room_name);
+    const roomName = window.prompt("Rename floor", room.room_name);
     const cleanName = String(roomName || "").trim();
     if (!cleanName || cleanName === room.room_name) return;
 
@@ -1376,7 +1376,7 @@ const ViewOrdering = () => {
 
   const handleDeleteRoom = (roomKey) => {
     if (floorRooms.length <= 1) {
-      alert("You need at least one room.");
+      alert("You need at least one floor.");
       return;
     }
 
@@ -1385,7 +1385,7 @@ const ViewOrdering = () => {
 
     if (
       !window.confirm(
-        `Delete ${room.room_name}? Tables will move to another room.`,
+        `Delete ${room.room_name}? Rooms will move to another floor.`,
       )
     ) {
       return;
@@ -1496,7 +1496,7 @@ const ViewOrdering = () => {
 
     if (table.hasMixedOrders) {
       alert(
-        "This combined table contains more than one active order. Please separate the tables before opening an order.",
+        "This combined room contains more than one active order. Please separate the rooms before opening an order.",
       );
       return;
     }
@@ -1597,7 +1597,7 @@ const ViewOrdering = () => {
 
     if (mergedTxIds.length > 1) {
       alert(
-        "Both tables already have active orders. Open one table first, then merge from the order screen.",
+        "Both rooms already have active orders. Open one room first, then merge from the order screen.",
       );
       return false;
     }
@@ -2094,7 +2094,7 @@ const ViewOrdering = () => {
     if (!isTableLayoutEnabled || !activeRoom) return;
 
     const shouldReset = window.confirm(
-      `Reset the layout for ${activeRoom.room_name}? Table assignments will stay in this room.`,
+      `Reset the layout for ${activeRoom.room_name}? Room assignments will stay on this floor.`,
     );
 
     if (!shouldReset) return;
@@ -2184,7 +2184,7 @@ const ViewOrdering = () => {
       value = customFixedTableName.trim() || selectedFixedTable;
 
       if (!value) {
-        alert("Please select a fixed table or type a custom table name.");
+        alert("Please select a fixed room or type a custom room name.");
         return;
       }
     } else if (tableMode === "custom") {
@@ -2195,7 +2195,7 @@ const ViewOrdering = () => {
 
       if (mergedTables.length === 0) {
         alert(
-          "Please select at least 1 table to merge or type a custom table name.",
+          "Please select at least 1 room to merge or type a custom room name.",
         );
         return;
       }
@@ -2280,7 +2280,7 @@ const ViewOrdering = () => {
               >
                 How many guests are seated at{" "}
                 <span style={{ color: text, fontWeight: 700 }}>
-                  {pendingOrderTable || "this table"}
+                  {pendingOrderTable || "this room"}
                 </span>
                 ?
               </p>
@@ -2351,7 +2351,7 @@ const ViewOrdering = () => {
                 Pending Billing
               </h2>
               <p className="leading-relaxed" style={{ color: mutedText }}>
-                This table has a pending bill. Do you want to proceed and edit
+                This room has a pending bill. Do you want to proceed and edit
                 the existing order?
               </p>
 
@@ -2411,8 +2411,8 @@ const ViewOrdering = () => {
                     className="text-xs sm:text-sm leading-snug mt-1"
                     style={{ color: mutedText }}
                   >
-                    Choose a fixed table or merge tables. You can also type a
-                    custom or special table name inside either option.
+                    Choose a fixed room or merge rooms. You can also type a
+                    custom or special room name inside either option.
                   </p>
                 </div>
 
@@ -2444,7 +2444,7 @@ const ViewOrdering = () => {
                         : mutedText,
                   }}
                 >
-                  Fixed Table
+                  Fixed Room
                 </button>
 
                 <button
@@ -2459,7 +2459,7 @@ const ViewOrdering = () => {
                         : mutedText,
                   }}
                 >
-                  Merge Table
+                  Merge Room
                 </button>
               </div>
 
@@ -2472,7 +2472,7 @@ const ViewOrdering = () => {
                     />
                     <input
                       type="text"
-                      placeholder="Search fixed table..."
+                      placeholder="Search fixed room..."
                       value={fixedSearch}
                       onChange={(e) => setFixedSearch(e.target.value)}
                       className="w-full rounded-xl py-3 pl-11 pr-4 text-sm focus:outline-none transition-all border"
@@ -2489,7 +2489,7 @@ const ViewOrdering = () => {
                       className="block text-[10px] font-black uppercase tracking-[0.28em] mb-2"
                       style={{ color: mutedText }}
                     >
-                      Select Fixed Table
+                      Select Fixed Room
                     </label>
 
                     <div
@@ -2553,7 +2553,7 @@ const ViewOrdering = () => {
                                         color: isSelected ? accent : mutedText,
                                       }}
                                     >
-                                      Table
+                                      Room
                                     </p>
                                     <p className="text-sm font-extrabold leading-tight break-words">
                                       {tableName}
@@ -2593,7 +2593,7 @@ const ViewOrdering = () => {
                             borderColor: border,
                           }}
                         >
-                          No fixed table found.
+                          No fixed room found.
                         </div>
                       )}
                     </div>
@@ -2604,12 +2604,12 @@ const ViewOrdering = () => {
                       className="block text-[10px] font-black uppercase tracking-[0.28em] mb-2"
                       style={{ color: mutedText }}
                     >
-                      Or Type Custom / Special Table
+                      Or Type Custom / Special Room
                     </label>
 
                     <input
                       type="text"
-                      placeholder="e.g. VIP Table, Function Hall"
+                      placeholder="e.g. VIP Room, Function Hall"
                       value={customFixedTableName}
                       onChange={(e) => setCustomFixedTableName(e.target.value)}
                       className="w-full rounded-xl py-3 px-4 text-sm focus:outline-none transition-all border"
@@ -2662,7 +2662,7 @@ const ViewOrdering = () => {
                     />
                     <input
                       type="text"
-                      placeholder="Search tables to merge..."
+                      placeholder="Search rooms to merge..."
                       value={mergeSearch}
                       onChange={(e) => setMergeSearch(e.target.value)}
                       className="w-full rounded-xl py-3 pl-11 pr-4 text-sm focus:outline-none transition-all border"
@@ -2679,7 +2679,7 @@ const ViewOrdering = () => {
                       className="block text-[10px] font-black uppercase tracking-[0.28em] mb-2"
                       style={{ color: mutedText }}
                     >
-                      Select Tables To Merge
+                      Select Rooms To Merge
                     </label>
 
                     <div
@@ -2744,7 +2744,7 @@ const ViewOrdering = () => {
                                         color: isSelected ? accent : mutedText,
                                       }}
                                     >
-                                      Table
+                                      Room
                                     </p>
                                     <p className="text-sm font-extrabold leading-tight break-words">
                                       {tableName}
@@ -2784,7 +2784,7 @@ const ViewOrdering = () => {
                             borderColor: border,
                           }}
                         >
-                          No tables found.
+                          No rooms found.
                         </div>
                       )}
                     </div>
@@ -2795,12 +2795,12 @@ const ViewOrdering = () => {
                       className="block text-[10px] font-black uppercase tracking-[0.28em] mb-2"
                       style={{ color: mutedText }}
                     >
-                      Add Custom / Special Table To Merge
+                      Add Custom / Special Room To Merge
                     </label>
 
                     <input
                       type="text"
-                      placeholder="e.g. VIP Table, Function Hall"
+                      placeholder="e.g. VIP Room, Function Hall"
                       value={customMergeTableName}
                       onChange={(e) => setCustomMergeTableName(e.target.value)}
                       className="w-full rounded-xl py-3 px-4 text-sm focus:outline-none transition-all border"
@@ -2889,10 +2889,10 @@ const ViewOrdering = () => {
               <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-6 py-5">
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.24em] text-emerald-600">
-                    Room Setup
+                    Floor Setup
                   </p>
                   <h2 className="mt-1 text-2xl font-black text-slate-900">
-                    Add Room
+                    Add Floor
                   </h2>
                 </div>
 
@@ -2907,7 +2907,7 @@ const ViewOrdering = () => {
 
               <div className="px-6 py-5">
                 <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-                  Room Name
+                  Floor Name
                 </label>
                 <input
                   type="text"
@@ -2933,7 +2933,7 @@ const ViewOrdering = () => {
                   disabled={!String(newRoomName || "").trim() || isRoomsSaving}
                   className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-600/20 transition-all hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {isRoomsSaving ? "Saving..." : "Create Room"}
+                  {isRoomsSaving ? "Saving..." : "Create Floor"}
                 </button>
               </div>
             </form>
@@ -2952,13 +2952,13 @@ const ViewOrdering = () => {
               <div className="flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-6 py-5">
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.24em] text-emerald-600">
-                    Room Setup
+                    Floor Setup
                   </p>
                   <h2 className="mt-1 text-2xl font-black text-slate-900">
-                    Assign Tables
+                    Assign Rooms
                   </h2>
                   <p className="mt-1 text-sm font-semibold text-slate-500">
-                    Choose a room, then mark every table that belongs there.
+                    Choose a floor, then mark every room that belongs there.
                   </p>
                 </div>
 
@@ -2974,7 +2974,7 @@ const ViewOrdering = () => {
               <div className="grid min-h-0 flex-1 lg:grid-cols-[260px_minmax(0,1fr)]">
                 <aside className="min-h-0 overflow-y-auto border-r border-slate-200 bg-slate-950 p-4">
                   <p className="mb-3 px-2 text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">
-                    Rooms
+                    Floors
                   </p>
 
                   <div className="flex flex-col gap-2">
@@ -3006,7 +3006,7 @@ const ViewOrdering = () => {
                             ) : null}
                           </span>
                           <span className="mt-2 inline-flex rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-200">
-                            {(room.tables || []).length} tables
+                            {(room.tables || []).length} rooms
                           </span>
                         </button>
                       );
@@ -3019,13 +3019,13 @@ const ViewOrdering = () => {
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                       <div>
                         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-                          Selected Room
+                          Selected Floor
                         </p>
                         <h3 className="text-xl font-black text-slate-900">
                           {setupActiveRoom?.room_name || DEFAULT_ROOM_NAME}
                         </h3>
                         <div className="mt-2 inline-flex rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700 ring-1 ring-emerald-100">
-                          {setupActiveRoomTableCount} assigned tables
+                          {setupActiveRoomTableCount} assigned rooms
                         </div>
                       </div>
 
@@ -3045,7 +3045,7 @@ const ViewOrdering = () => {
                           disabled={!setupActiveRoom}
                           className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs font-black uppercase tracking-[0.14em] text-slate-600 disabled:cursor-not-allowed disabled:opacity-45"
                         >
-                          Clear Room
+                          Clear Floor
                         </button>
                       </div>
                     </div>
@@ -3056,7 +3056,7 @@ const ViewOrdering = () => {
                         type="text"
                         value={setupSearch}
                         onChange={(event) => setSetupSearch(event.target.value)}
-                        placeholder="Search all tables..."
+                        placeholder="Search all rooms..."
                         className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-4 text-sm font-semibold text-slate-800 outline-none"
                       />
                     </div>
@@ -3065,7 +3065,7 @@ const ViewOrdering = () => {
                   <div className="min-h-0 flex-1 overflow-y-auto p-5">
                     {setupFilteredTables.length === 0 ? (
                       <div className="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center text-sm font-semibold text-slate-500">
-                        No tables found.
+                        No rooms found.
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -3081,7 +3081,7 @@ const ViewOrdering = () => {
                           const isAssignedToSetup =
                             assignedRoomKey === setupActiveRoom?.room_key;
                           const assignmentLabel = isAssignedToSetup
-                            ? "In this room"
+                            ? "On this floor"
                             : assignedRoom
                               ? `In ${assignedRoom.room_name}`
                               : "Unassigned";
@@ -3291,7 +3291,7 @@ const ViewOrdering = () => {
                     className="text-4xl md:text-6xl font-black tracking-tighter"
                     style={{ color: pageText }}
                   >
-                    Table <span style={{ color: accent }}>Floor</span>
+                    Room <span style={{ color: accent }}>Floor</span>
                   </h1>
                   <TutorialTip
                     section="Taking a New Order"
@@ -3331,7 +3331,7 @@ const ViewOrdering = () => {
                     className="text-4xl md:text-6xl font-black tracking-tighter"
                     style={{ color: pageText }}
                   >
-                    Pending <span style={{ color: accent }}>Tables</span>
+                    Pending <span style={{ color: accent }}>Rooms</span>
                   </h1>
                   <TutorialTip
                     section="Taking a New Order"
@@ -3339,7 +3339,7 @@ const ViewOrdering = () => {
                   />
                 </div>
                 <p style={{ color: pageMutedText }}>
-                  Click a table to manage guest orders.
+                  Click a room to manage guest orders.
                 </p>
               </>
             )}
@@ -3371,7 +3371,7 @@ const ViewOrdering = () => {
               />
               <input
                 type="text"
-                placeholder="Jump to table..."
+                placeholder="Jump to room..."
                 value={searchTable}
                 onChange={(e) => {
                   setSearchTable(e.target.value);
@@ -3424,7 +3424,7 @@ const ViewOrdering = () => {
                 color: mutedText,
               }}
             >
-              No tables found.
+              No rooms found.
             </div>
           ) : (
             <>
@@ -3451,7 +3451,7 @@ const ViewOrdering = () => {
                             className="text-[10px] font-black uppercase tracking-[0.24em]"
                             style={{ color: pageSoftText }}
                           >
-                            {isRoomsSaving ? "Saving" : "Rooms"}
+                            {isRoomsSaving ? "Saving" : "Floors"}
                           </p>
                           <h3 className="mt-1 text-lg font-black">Available</h3>
                         </div>
@@ -3482,7 +3482,7 @@ const ViewOrdering = () => {
                         }}
                       >
                         <FiEdit2 size={14} />
-                        <span>Assign Tables</span>
+                        <span>Assign Rooms</span>
                       </button>
 
                       <button
@@ -3544,7 +3544,7 @@ const ViewOrdering = () => {
                                       : pageSoftText,
                                   }}
                                 >
-                                  {roomCount} tables
+                                  {roomCount} rooms
                                 </span>
                               </button>
 
@@ -3660,14 +3660,14 @@ const ViewOrdering = () => {
                                 className="text-[10px] font-black uppercase tracking-[0.2em]"
                                 style={{ color: pageSoftText }}
                               >
-                                Empty Room
+                                Empty Floor
                               </p>
                               <p
                                 className="mt-2 max-w-sm text-sm font-semibold"
                                 style={{ color: pageMutedText }}
                               >
-                                Use the room selector on a table from another
-                                room to move it here. The room tabs stay
+                                Use the floor selector on a room from another
+                                floor to move it here. The floor tabs stay
                                 available on the left.
                               </p>
                             </div>
@@ -4058,7 +4058,7 @@ const ViewOrdering = () => {
                             className="text-[10px] font-black tracking-[0.3em] uppercase mb-1 transition-colors"
                             style={{ color: mutedText }}
                           >
-                            Table
+                            Room
                           </span>
                           <span className="text-3xl md:text-5xl font-black group-hover:scale-110 transition-transform duration-500">
                             {table.table_number}
@@ -4088,7 +4088,7 @@ const ViewOrdering = () => {
                           className="p-8 text-[10px] font-black uppercase tracking-[0.3em]"
                           style={{ color: mutedText }}
                         >
-                          Table info
+                          Room info
                         </th>
                         <th
                           className="p-8 text-[10px] font-black uppercase tracking-[0.3em]"

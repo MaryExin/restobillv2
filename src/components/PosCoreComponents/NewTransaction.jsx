@@ -181,7 +181,7 @@ export default function NewTransaction() {
   const [serviceType, setServiceType] = useState("WALK IN");
   const [activeCategory, setActiveCategory] = useState("APPETIZERS");
   const [search, setSearch] = useState("");
-  const [refTag, setRefTag] = useState("Table 01");
+  const [refTag, setRefTag] = useState("Room 01");
   const [showPrintModal, setShowPrintModal] = useState(false);
 
   const [cartItems, setCartItems] = useState([]);
@@ -436,9 +436,9 @@ const filteredProducts = useMemo(() => {
                     onChange={(e) => setRefTag(e.target.value)}
                     className="h-[40px] min-w-[150px] appearance-none rounded-[14px] border border-orange-300 bg-white px-4 pr-10 text-[14px] font-semibold text-slate-700 outline-none shadow-sm"
                   >
-                    <option>Table 01</option>
-                    <option>Table 02</option>
-                    <option>Table 03</option>
+                    <option>Room 01</option>
+                    <option>Room 02</option>
+                    <option>Room 03</option>
                     <option>Take Out</option>
                   </select>
                   <FiChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-500" />

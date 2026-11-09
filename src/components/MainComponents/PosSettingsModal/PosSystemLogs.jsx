@@ -116,7 +116,7 @@ const PosSystemLogs = ({ isDark, accent }) => {
           </div>
           <div className={`flex flex-wrap gap-3 rounded-[24px] border p-2 ${theme.panelSoft}`}>
             {["TABLE", "PAYMENT", "CASHIER"].map((id) => (
-               <button key={id} onClick={() => setViewType(id)} className={`flex items-center gap-2 rounded-2xl px-4 py-3 text-[11px] font-black uppercase tracking-[0.14em] transition-all ${viewType === id ? "shadow-lg text-white" : theme.textMuted}`} style={viewType === id ? { backgroundColor: accent } : {}}>{id}</button>
+               <button key={id} onClick={() => setViewType(id)} className={`flex items-center gap-2 rounded-2xl px-4 py-3 text-[11px] font-black uppercase tracking-[0.14em] transition-all ${viewType === id ? "shadow-lg text-white" : theme.textMuted}`} style={viewType === id ? { backgroundColor: accent } : {}}>{id === "TABLE" ? "ROOM" : id}</button>
             ))}
           </div>
          </div>
@@ -203,7 +203,7 @@ const PosSystemLogs = ({ isDark, accent }) => {
                       <tr className={`text-[10px] font-black uppercase tracking-widest ${theme.textSoft} border-b border-white/5`}>
                         <th className="pb-4 pl-2">Ref ID</th>
                         <th className="pb-4">Date/Time</th>
-                        <th className="pb-4">Staff / Table</th>
+                        <th className="pb-4">Staff / Room</th>
                         <th className="pb-4 text-right">Amount</th>
                         <th className="pb-4 text-right">Action</th>
                       </tr>
@@ -213,7 +213,7 @@ const PosSystemLogs = ({ isDark, accent }) => {
                         <tr key={idx} className="group hover:bg-white/[0.02] transition-colors">
                           <td className={`py-4 pl-2 font-mono text-xs ${theme.textPrimary}`}>#{tr.transaction_id}</td>
                           <td className={`py-4 text-xs ${theme.textMuted}`}>{tr.created_at}</td>
-                          <td className="py-4"><div className="text-xs"><p className={theme.textPrimary}>{tr.cashier}</p><p className={theme.textSoft}>Table {tr.table_number}</p></div></td>
+                          <td className="py-4"><div className="text-xs"><p className={theme.textPrimary}>{tr.cashier}</p><p className={theme.textSoft}>Room {tr.table_number}</p></div></td>
                           <td className={`py-4 text-right font-black ${theme.textPrimary}`}>₱{Number(tr.amount).toLocaleString()}</td>
                           <td className="py-4 text-right">
                              <button onClick={() => handleTransactionClick(tr)} className="px-4 py-2 text-[10px] font-black uppercase rounded-xl border border-white/10 hover:bg-white/5 active:scale-95 transition-all" style={{color: accent}}>Payments</button>

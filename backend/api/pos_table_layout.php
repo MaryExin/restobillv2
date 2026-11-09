@@ -178,7 +178,7 @@ $stmt->close();
 
 echo json_encode([
     "status" => "success",
-    "message" => "Table layout saved",
+    "message" => "Room layout saved",
 ]);
 
 $conn->close();

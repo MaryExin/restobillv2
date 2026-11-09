@@ -125,13 +125,13 @@ export default function SplitBillModal({ transaction, apiHost, onClose, onSucces
         <header className="flex items-start justify-between gap-3 border-b border-softPrimary p-5">
           <div>
             <h2 id="split-bill-title" className="flex items-center gap-2 text-lg font-[Poppins-SemiBold]"><FiGitBranch /> Split bill</h2>
-            <p className="mt-1 text-xs">Transaction {transactionId} · {transaction?.table_number || "Current table"}</p>
+            <p className="mt-1 text-xs">Transaction {transactionId} · {transaction?.table_number || "Current room"}</p>
           </div>
           <button ref={closeRef} type="button" onClick={close} disabled={isSaving} aria-label="Close split bill"
             className="rounded-lg p-2 hover:bg-softPrimary disabled:opacity-50"><FiX size={20} /></button>
         </header>
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
-          <p className="text-sm">Choose the products and quantities for your friend's bill. They will move to a new transaction at the same table, with separate billing, payment and receipt.</p>
+          <p className="text-sm">Choose the products and quantities for your friend's bill. They will move to a new transaction in the same room, with separate billing, payment and receipt.</p>
           <p className="rounded-lg border border-softPrimary bg-softPrimary/20 p-3 text-xs leading-relaxed">
             Saved extra charges stay on the original bill. Remove saved discounts before splitting, then apply discounts and review charges on each bill. Unsaved billing changes are not applied.
           </p>

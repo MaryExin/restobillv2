@@ -329,7 +329,7 @@ export function BuildOrderReceiptHtml({
             <div className="black bigger uppercase underline">
               Order Summary
             </div>
-            <div className="bold big mt-2">Table: {tableselected}</div>
+            <div className="bold big mt-2">Room: {tableselected}</div>
             <div className="text-10 mt-1">{new Date().toLocaleString()}</div>
           </div>
 

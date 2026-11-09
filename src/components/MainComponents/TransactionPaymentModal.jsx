@@ -4799,7 +4799,7 @@ export default function TransactionPaymentModal({
 
                 <div className="flex flex-wrap gap-2 mt-2">
                   <InfoPill isDark={isDark}>
-                    Table: {transaction?.table_number || "-"}
+                    Room: {transaction?.table_number || "-"}
                   </InfoPill>
                   <InfoPill isDark={isDark}>
                     Type: {transaction?.order_type || "-"}

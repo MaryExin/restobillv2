@@ -110,7 +110,7 @@ function permissionDefinitions(): array
         ["group" => "settings", "key" => "discountCeiling", "name" => "Discount Ceiling", "description" => "Discount ceiling settings.", "locked" => false, "developer_only" => false, "sort" => 600],
         ["group" => "settings", "key" => "discountMode", "name" => "Discount Mode", "description" => "Discount mode settings.", "locked" => false, "developer_only" => false, "sort" => 610],
         ["group" => "settings", "key" => "customerInfo", "name" => "Customer Info", "description" => "Customer info settings.", "locked" => false, "developer_only" => false, "sort" => 620],
-        ["group" => "settings", "key" => "tableLayout", "name" => "Table Layout", "description" => "Table layout settings.", "locked" => false, "developer_only" => false, "sort" => 630],
+        ["group" => "settings", "key" => "tableLayout", "name" => "Room Layout", "description" => "Room layout settings.", "locked" => false, "developer_only" => false, "sort" => 630],
         ["group" => "settings", "key" => "salesTypeOrder", "name" => "Sales Type Order", "description" => "Sales type order settings.", "locked" => false, "developer_only" => false, "sort" => 640],
         ["group" => "settings", "key" => "loyaltyConfiguration", "name" => "Loyalty Configuration", "description" => "Loyalty configuration settings.", "locked" => false, "developer_only" => false, "sort" => 650],
         ["group" => "settings", "key" => "emailReports", "name" => "Email Reports", "description" => "Email report settings.", "locked" => false, "developer_only" => false, "sort" => 660],

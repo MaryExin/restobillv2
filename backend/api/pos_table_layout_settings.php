@@ -75,7 +75,7 @@ try {
     $method = $_SERVER["REQUEST_METHOD"];
 
     if ($method === "GET") {
-        respond(true, "Table layout settings loaded.", readTableLayoutSettings($pdo));
+        respond(true, "Room layout settings loaded.", readTableLayoutSettings($pdo));
     }
 
     if ($method !== "POST") {
@@ -131,8 +131,8 @@ try {
         ]);
     }
 
-    respond(true, "Table layout settings saved.", readTableLayoutSettings($pdo));
+    respond(true, "Room layout settings saved.", readTableLayoutSettings($pdo));
 } catch (Throwable $e) {
     error_log("POS table layout settings error: " . $e->getMessage());
-    respond(false, "Unable to process table layout settings.", null, 500);
+    respond(false, "Unable to process room layout settings.", null, 500);
 }

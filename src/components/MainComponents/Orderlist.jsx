@@ -113,7 +113,7 @@ const Orderlist = ({
 
   // Kiosk Mode: editable table/session label, initialized from prop or "Table 01".
   const [kioskTableName, setKioskTableName] = useState(
-    tableselected || "Table 01",
+    tableselected || "Room 01",
   );
   const [isEditingTableName, setIsEditingTableName] = useState(false);
 
@@ -2054,7 +2054,7 @@ const Orderlist = ({
   const buildShortQrValue = () => {
     const refTx = transactionId || `NEW-${Date.now()}`;
     const tableRef = tableselected || "NA";
-    return `ORDER|TABLE:${tableRef}|TX:${refTx}`;
+    return `ORDER|ROOM:${tableRef}|TX:${refTx}`;
   };
 
   const handleGenerateQR = () => {
@@ -2351,7 +2351,7 @@ const Orderlist = ({
           originalName: item.name || item.code || "ITEM",
           code: item.code || "",
           price: Number(item.price || 0),
-          qrValue: `ITEM:${item.code}|TABLE:${tableRef}|TX:${txRef}|NO:${globalItemIndex}`,
+          qrValue: `ITEM:${item.code}|ROOM:${tableRef}|TX:${txRef}|NO:${globalItemIndex}`,
           qrCopyPerItem: qty,
           qrItemNumber: globalItemIndex,
           qrCopyNumber: copyIndex,
@@ -2794,7 +2794,7 @@ const Orderlist = ({
         );
 
         if (!response.ok) {
-          throw new Error("Failed to load destination table order.");
+          throw new Error("Failed to load destination room order.");
         }
 
         const data = await response.json();
@@ -2832,7 +2832,7 @@ const Orderlist = ({
 
     if (transferMode === "fixed") {
       if (!(customTransferTableName.trim() || selectedTransferTable)) {
-        alert("Please select a fixed table or type a custom table name.");
+        alert("Please select a fixed room or type a custom room name.");
         return;
       }
     }
@@ -2845,7 +2845,7 @@ const Orderlist = ({
 
       if (mergedTables.length === 0) {
         alert(
-          "Please select at least one table to merge or type a custom table name.",
+          "Please select at least one room to merge or type a custom room name.",
         );
         return;
       }
@@ -2853,13 +2853,13 @@ const Orderlist = ({
 
     if (transferMode === "transferItem") {
       if (!selectedTransferTable) {
-        alert("Please select a pending table.");
+        alert("Please select a pending room.");
         return;
       }
 
       if (!selectedTransferTableRow?.pending_transaction_id) {
         alert(
-          "The selected pending table does not have a valid transaction id.",
+          "The selected pending room does not have a valid transaction id.",
         );
         return;
       }
@@ -2870,7 +2870,7 @@ const Orderlist = ({
       }
 
       if (remainingTransferProductTotalQty <= 0) {
-        alert("At least one product must remain on the current table.");
+        alert("At least one product must remain on the current room.");
         return;
       }
     }
@@ -3080,7 +3080,7 @@ const Orderlist = ({
         );
 
         if (!destinationTxId || !destinationTableName) {
-          throw new Error("Please select a valid pending table.");
+          throw new Error("Please select a valid pending room.");
         }
 
         const sourceSelectedItems = [];
@@ -3133,7 +3133,7 @@ const Orderlist = ({
 
         if (sourceRemainingItems.length === 0) {
           throw new Error(
-            "At least one product must remain on the current table.",
+            "At least one product must remain on the current room.",
           );
         }
 
@@ -3142,7 +3142,7 @@ const Orderlist = ({
         );
 
         if (!destinationResponse.ok) {
-          throw new Error("Failed to load destination table order.");
+          throw new Error("Failed to load destination room order.");
         }
 
         const destinationData = await destinationResponse.json();
@@ -3192,19 +3192,19 @@ const Orderlist = ({
       if (transferMode === "fixed") {
         finalTableValue =
           customTransferTableName.trim() || selectedTransferTable;
-        finalRemarks = `Transferred from table ${tableselected} to ${finalTableValue}`;
-        finalTransactionType = "TRANSFER TABLE";
+        finalRemarks = `Transferred from room ${tableselected} to ${finalTableValue}`;
+        finalTransactionType = "TRANSFER ROOM";
       } else if (transferMode === "merge") {
         finalTableValue = buildUniqueTableNames([
           ...selectedMergeTables,
           customMergeTableName,
         ]).join(" & ");
-        finalRemarks = `Merged table ${tableselected} to ${finalTableValue}`;
-        finalTransactionType = "MERGE TABLE";
+        finalRemarks = `Merged room ${tableselected} to ${finalTableValue}`;
+        finalTransactionType = "MERGE ROOM";
       }
 
       if (!finalTableValue) {
-        throw new Error("Invalid transfer table.");
+        throw new Error("Invalid transfer room.");
       }
 
       const formData = new FormData();
@@ -3234,7 +3234,7 @@ const Orderlist = ({
       const result = await response.json();
 
       if (!response.ok || result?.status !== "success") {
-        throw new Error(result?.message || "Failed to process table action.");
+        throw new Error(result?.message || "Failed to process room action.");
       }
 
       setShowTransferConfirmModal(false);
@@ -3246,8 +3246,8 @@ const Orderlist = ({
 
       setSaveSuccessMessage(
         transferMode === "merge"
-          ? `Table merged successfully: ${finalTableValue}`
-          : `Table transferred from ${tableselected} to ${finalTableValue}.`,
+          ? `Room merged successfully: ${finalTableValue}`
+          : `Room transferred from ${tableselected} to ${finalTableValue}.`,
       );
 
       setShowSaveSuccessModal(true);
@@ -3257,7 +3257,7 @@ const Orderlist = ({
       }, 1200);
     } catch (error) {
       console.error("Table action error:", error);
-      alert(error.message || "Failed to process table action.");
+      alert(error.message || "Failed to process room action.");
     } finally {
       setIsTransferringTable(false);
     }
@@ -3460,13 +3460,13 @@ const Orderlist = ({
                           onChange={(e) => setKioskTableName(e.target.value)}
                           onBlur={() => {
                             if (!kioskTableName.trim())
-                              setKioskTableName("Table 01");
+                              setKioskTableName("Room 01");
                             setIsEditingTableName(false);
                           }}
                           onKeyDown={(e) => {
                             if (e.key === "Enter" || e.key === "Escape") {
                               if (!kioskTableName.trim())
-                                setKioskTableName("Table 01");
+                                setKioskTableName("Room 01");
                               setIsEditingTableName(false);
                             }
                           }}
@@ -3481,7 +3481,7 @@ const Orderlist = ({
                         <button
                           onClick={() => setIsEditingTableName(true)}
                           className="group flex items-center gap-1.5"
-                          title="Click to edit table name"
+                          title="Click to edit room name"
                         >
                           <h2
                             className="text-xl font-bold"
@@ -3505,7 +3505,7 @@ const Orderlist = ({
                       }`}
                     >
                       <span style={{ color: "var(--app-accent)" }}>
-                        {tableselected || "Select Table"}
+                        {tableselected || "Select Room"}
                       </span>
                     </h2>
                   )}
@@ -3530,7 +3530,7 @@ const Orderlist = ({
                           ? "bg-slate-800 text-slate-300 hover:bg-slate-700"
                           : "bg-slate-100 text-slate-600 hover:bg-teal-50 hover:text-teal-600"
                       }`}
-                      title="Manage Table"
+                      title="Manage Room"
                     >
                       <svg
                         width="20"
@@ -3547,7 +3547,7 @@ const Orderlist = ({
                         <path d="M21 8H9C6.23858 8 4 10.2386 4 13V19" />
                       </svg>
                       <span className="text-xs font-semibold tracking-wider uppercase">
-                        Manage Table
+                        Manage Room
                       </span>
                     </button>
                   )}
@@ -4363,14 +4363,14 @@ const Orderlist = ({
                         <div className="flex items-start justify-between gap-3 mb-4">
                           <div>
                             <h2 className="text-lg font-black sm:text-xl">
-                              Transfer Table
+                              Transfer Room
                             </h2>
                             <p
                               className="text-xs sm:text-sm"
                               style={{ color: "var(--app-muted-text)" }}
                             >
-                              Choose fixed table, merge tables, or type a
-                              special table name.
+                              Choose fixed room, merge rooms, or type a
+                              special room name.
                             </p>
                           </div>
 
@@ -4408,7 +4408,7 @@ const Orderlist = ({
                                   : "var(--app-muted-text)",
                             }}
                           >
-                            Fixed Table
+                            Fixed Room
                           </button>
 
                           <button
@@ -4428,7 +4428,7 @@ const Orderlist = ({
                                   : "var(--app-muted-text)",
                             }}
                           >
-                            Merge Table
+                            Merge Room
                           </button>
 
                           <button
@@ -4462,7 +4462,7 @@ const Orderlist = ({
                               />
                               <input
                                 type="text"
-                                placeholder="Search fixed table..."
+                                placeholder="Search fixed room..."
                                 value={transferSearch}
                                 onChange={(e) =>
                                   setTransferSearch(e.target.value)
@@ -4481,7 +4481,7 @@ const Orderlist = ({
                                 className="mb-2 block text-[10px] font-black uppercase tracking-[0.25em]"
                                 style={{ color: "var(--app-muted-text)" }}
                               >
-                                Select Fixed Table
+                                Select Fixed Room
                               </label>
 
                               <div
@@ -4541,7 +4541,7 @@ const Orderlist = ({
                                                       : "var(--app-muted-text)",
                                                   }}
                                                 >
-                                                  Table
+                                                  Room
                                                 </p>
                                                 <p className="text-sm font-extrabold leading-tight break-words">
                                                   {tableName}
@@ -4581,7 +4581,7 @@ const Orderlist = ({
                                       border: "1px dashed var(--app-border)",
                                     }}
                                   >
-                                    No fixed table found.
+                                    No fixed room found.
                                   </div>
                                 )}
                               </div>
@@ -4592,12 +4592,12 @@ const Orderlist = ({
                                 className="mb-2 block text-[10px] font-black uppercase tracking-[0.25em]"
                                 style={{ color: "var(--app-muted-text)" }}
                               >
-                                Or Type Custom / Special Table
+                                Or Type Custom / Special Room
                               </label>
 
                               <input
                                 type="text"
-                                placeholder="e.g. VIP Table, Function Hall"
+                                placeholder="e.g. VIP Room, Function Hall"
                                 value={customTransferTableName}
                                 onChange={(e) =>
                                   setCustomTransferTableName(e.target.value)
@@ -4649,7 +4649,7 @@ const Orderlist = ({
                               />
                               <input
                                 type="text"
-                                placeholder="Search tables to merge..."
+                                placeholder="Search rooms to merge..."
                                 value={transferSearch}
                                 onChange={(e) =>
                                   setTransferSearch(e.target.value)
@@ -4668,7 +4668,7 @@ const Orderlist = ({
                                 className="mb-2 block text-[10px] font-black uppercase tracking-[0.25em]"
                                 style={{ color: "var(--app-muted-text)" }}
                               >
-                                Select Tables To Merge
+                                Select Rooms To Merge
                               </label>
 
                               <div
@@ -4725,7 +4725,7 @@ const Orderlist = ({
                                               >
                                                 {isCurrentTable
                                                   ? "Current"
-                                                  : "Table"}
+                                                  : "Room"}
                                               </p>
                                               <p className="text-sm font-extrabold leading-tight break-words">
                                                 {tableName}
@@ -4765,7 +4765,7 @@ const Orderlist = ({
                                       border: "1px dashed var(--app-border)",
                                     }}
                                   >
-                                    No tables found.
+                                    No rooms found.
                                   </div>
                                 )}
                               </div>
@@ -4776,12 +4776,12 @@ const Orderlist = ({
                                 className="mb-2 block text-[10px] font-black uppercase tracking-[0.25em]"
                                 style={{ color: "var(--app-muted-text)" }}
                               >
-                                Add Custom / Special Table To Merge
+                                Add Custom / Special Room To Merge
                               </label>
 
                               <input
                                 type="text"
-                                placeholder="e.g. VIP Table, Function Hall"
+                                placeholder="e.g. VIP Room, Function Hall"
                                 value={customMergeTableName}
                                 onChange={(e) =>
                                   setCustomMergeTableName(e.target.value)
@@ -5150,7 +5150,7 @@ const Orderlist = ({
                                 />
                                 <input
                                   type="text"
-                                  placeholder="Search pending tables..."
+                                  placeholder="Search pending rooms..."
                                   value={transferSearch}
                                   onChange={(e) =>
                                     setTransferSearch(e.target.value)
@@ -5177,7 +5177,7 @@ const Orderlist = ({
                                       className="text-[10px] font-black uppercase tracking-[0.25em]"
                                       style={{ color: "var(--app-muted-text)" }}
                                     >
-                                      Pending Tables
+                                      Pending Rooms
                                     </p>
                                   </div>
                                   <span
@@ -5233,7 +5233,7 @@ const Orderlist = ({
                                                       : "var(--app-muted-text)",
                                                   }}
                                                 >
-                                                  Pending Table
+                                                  Pending Room
                                                 </p>
                                                 <p className="mt-1 text-sm font-extrabold">
                                                   {tableName}
@@ -5272,7 +5272,7 @@ const Orderlist = ({
                                         border: "1px dashed var(--app-border)",
                                       }}
                                     >
-                                      No pending tables found.
+                                      No pending rooms found.
                                     </div>
                                   )}
                                 </div>
@@ -5296,7 +5296,7 @@ const Orderlist = ({
                                   style={{ color: "var(--app-text)" }}
                                 >
                                   {selectedTransferTable ||
-                                    "No pending table selected"}
+                                    "No pending room selected"}
                                 </p>
                                 {destinationTransferLoading ? (
                                   <p
@@ -5351,16 +5351,16 @@ const Orderlist = ({
                     <ModalYesNoReusable
                       header={
                         transferMode === "merge"
-                          ? "Confirm Table Merge"
+                          ? "Confirm Room Merge"
                           : transferMode === "transferItem"
                             ? "Confirm Product Transfer"
-                            : "Confirm Table Transfer"
+                            : "Confirm Room Transfer"
                       }
                       message={
                         transferMode === "merge"
-                          ? `Are you sure you want to update this transaction table into ${mergePreview}?`
+                          ? `Are you sure you want to update this transaction room into ${mergePreview}?`
                           : transferMode === "transferItem"
-                            ? `Are you sure you want to transfer ${selectedTransferProductTotalQty} selected item${selectedTransferProductTotalQty !== 1 ? "s" : ""} from ${tableselected} to pending table ${selectedTransferTable}?`
+                            ? `Are you sure you want to transfer ${selectedTransferProductTotalQty} selected item${selectedTransferProductTotalQty !== 1 ? "s" : ""} from ${tableselected} to pending room ${selectedTransferTable}?`
                             : `Are you sure you want to transfer this order from ${tableselected} to ${customTransferTableName.trim() || selectedTransferTable}?`
                       }
                       setYesNoModalOpen={setShowTransferConfirmModal}
@@ -5589,7 +5589,7 @@ const Orderlist = ({
                 <div
                   className={`mt-4 py-2 border-y border-slate-100/10 font-mono text-base font-bold ${isDark ? "text-slate-300" : "text-slate-700"}`}
                 >
-                  TABLE: {tableselected}
+                  ROOM: {tableselected}
                 </div>
               </div>
 
@@ -5825,7 +5825,7 @@ const Orderlist = ({
                     isDark ? "text-slate-400" : "text-slate-500"
                   }`}
                 >
-                  Table {tableselected} • {additionalTotalItems} additional
+                  Room {tableselected} • {additionalTotalItems} additional
                   items
                 </p>
               </div>

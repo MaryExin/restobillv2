@@ -55,7 +55,7 @@ $cashier          = trim($_POST["cashier"] ?? '');
 $transaction_date = trim($_POST["transaction_date"] ?? date("Y-m-d"));
 $terminal_number  = trim($_POST["terminal_number"] ?? 'POS');
 $order_slip_no    = trim($_POST["order_slip_no"] ?? '');
-$transaction_type = trim($_POST["transaction_type"] ?? 'TRANSFER TABLE');
+$transaction_type = trim($_POST["transaction_type"] ?? 'TRANSFER ROOM');
 $user_id          = trim($_POST["user_id"] ?? '');
 $user_name        = trim($_POST["user_name"] ?? $cashier);
 
@@ -70,7 +70,7 @@ if ($transaction_id <= 0) {
 if ($new_table_number === '') {
     echo json_encode([
         "status" => "error",
-        "message" => "New table number is required"
+        "message" => "New room number is required"
     ]);
     exit;
 }
@@ -143,7 +143,7 @@ try {
      */
     $activity_date_time = date("Y-m-d H:i:s");
     $type_of_activity = "POS ORDER";
-    $activity_performed = "TRANSFER TABLE";
+    $activity_performed = "TRANSFER ROOM";
 
     $values_of_data = json_encode([
         "transaction_id" => $transaction_id,
@@ -198,10 +198,10 @@ try {
     $Register = $terminal_number !== '' ? $terminal_number : 'POS';
     $Trans_Date = $transaction_date !== '' ? $transaction_date : date("Y-m-d");
     $Reference_No = $order_slip_no !== '' ? $order_slip_no : (string)$transaction_id;
-    $Trans_Type = $transaction_type !== '' ? $transaction_type : 'TRANSFER TABLE';
+    $Trans_Type = $transaction_type !== '' ? $transaction_type : 'TRANSFER ROOM';
     $User_ID = is_numeric($user_id) ? (int)$user_id : 0;
     $Amount = 0.00;
-    $Description = "POS Transfer Table | Transaction ID: {$transaction_id} | From Table: {$old_table_number} | To Table: {$new_table_number} | Cashier: {$cashier}";
+    $Description = "POS Transfer Room | Transaction ID: {$transaction_id} | From Room: {$old_table_number} | To Room: {$new_table_number} | Cashier: {$cashier}";
     $Log_Date = date("Y-m-d");
     $Log_Time = date("H:i:s");
 
@@ -264,7 +264,7 @@ try {
 
     echo json_encode([
         "status" => "success",
-        "message" => "Table transferred successfully",
+        "message" => "Room transferred successfully",
         "transaction_id" => $transaction_id,
         "old_table_number" => $old_table_number,
         "new_table_number" => $new_table_number,

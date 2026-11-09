@@ -37,7 +37,7 @@ import useBusinessInfo from "../../hooks/useBusinessInfo";
 import { buildVoidRefundHtml } from "../../utils/BuildVoidRefundHtml";
 import { printWithPdfFallback } from "../../utils/printWithPdfFallback";
 
-const KIOSK_DEFAULT_TABLE = "Table 01";
+const KIOSK_DEFAULT_TABLE = "Room 01";
 
 const peso = (value) =>
   `₱ ${Number(value || 0).toLocaleString("en-PH", {
@@ -527,7 +527,7 @@ function HeaderRow({ isDark, mode, isKiosk }) {
   const headers = [
     "Actions",
     "Transaction ID",
-    "Table",
+    "Room",
     "Order Type",
     "Transaction Date",
     mode === "pending" ? "Total Sales" : "Amount",
@@ -638,7 +638,7 @@ function ActionRemarksModal({
 
             <div>
               <div className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
-                Table
+                Room
               </div>
               <div className="mt-1 font-bold">
                 {activeRow?.table_number || "-"}
@@ -1913,7 +1913,7 @@ export default function PosPayment() {
                       <input
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Search transaction, table, cashier..."
+                        placeholder="Search transaction, room, cashier..."
                         className={`w-full bg-transparent text-sm outline-none ${
                           isDark
                             ? "text-white placeholder:text-slate-500"

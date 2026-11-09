@@ -79,7 +79,7 @@ const ALL_NAV_ITEMS = [
   { id: "Discount Ceiling", icon: FiPercent },
   { id: "Discount Mode", icon: FiPercent },
   { id: "Customer Info", icon: FiUsers },
-  { id: "Table Layout", icon: FiGrid },
+  { id: "Room Layout", icon: FiGrid },
   { id: "Sales Type Order", icon: FiList },
   { id: "Loyalty Configuration", icon: FiAward },
   { id: "Email Reports", icon: FiMail },
@@ -331,7 +331,7 @@ const PosSettings = ({ isOpen, onClose, branchInfo, initialTab = null }) => {
       return <PosCustomerInfo isDark={isDark} accent={accentColor} />;
     }
 
-    if (activeTab === "Table Layout") {
+    if (activeTab === "Room Layout") {
       return (
         <PosTableLayout
           isDark={isDark}
