@@ -34,24 +34,24 @@ ReactDOM.createRoot(document.getElementById("root")).render(
             <ToastProvider>
               <AppAlertProvider>
                 <Helmet>
-                  <title>Lightem</title>
+                  <title>Richwell Colleges POS</title>
                   <meta
                     name="description"
-                    content="Lightem is a tech company specializing in financial housekeeping software including accounting, inventory, sales, payroll, and more—designed to automate and streamline business operations."
+                    content="Richwell Colleges POS — hotel and restaurant ordering, billing, and sales."
                   />
                   <meta
                     name="keywords"
-                    content="accounting software, inventory system, sales automation, payroll system, financial management, business automation, Lightem, financial housekeeping, ERP"
+                    content="Richwell Colleges, POS, hotel, restaurant, ordering, billing, sales"
                   />
-                  <meta name="author" content="Lightem" />
+                  <meta name="author" content="Richwell Colleges" />
 
                   <meta
                     property="og:title"
-                    content="Lightem - Financial Housekeeping Software"
+                    content="Richwell Colleges POS"
                   />
                   <meta
                     property="og:description"
-                    content="Discover Lightem's powerful tools for accounting, inventory, sales, and payroll automation. Helping businesses grow through smart financial systems."
+                    content="Richwell Colleges POS — hotel and restaurant ordering, billing, and sales."
                   />
                   <meta
                     property="og:image"
@@ -62,11 +62,11 @@ ReactDOM.createRoot(document.getElementById("root")).render(
                   <meta name="twitter:card" content="summary_large_image" />
                   <meta
                     name="twitter:title"
-                    content="Lightem - Financial Housekeeping Software"
+                    content="Richwell Colleges POS"
                   />
                   <meta
                     name="twitter:description"
-                    content="Lightem offers all-in-one software for accounting, inventory, sales, and payroll—helping businesses simplify operations and stay financially healthy."
+                    content="Richwell Colleges POS — hotel and restaurant ordering, billing, and sales."
                   />
                   <meta
                     name="twitter:image"

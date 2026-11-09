@@ -5,7 +5,7 @@ const ProductImage = React.memo(function ProductImage({
   alt = "",
   className = "",
   wrapperClassName = "",
-  fallbackSrc = "/logo.png",
+  fallbackSrc = "/richwell-icon.png",
   priority = false,
 }) {
   return (

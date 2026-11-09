@@ -876,13 +876,13 @@ const PosPaymentReceipt = React.forwardRef(
           style={{ marginTop: "10px", textAlign: "center", fontSize: "10px" }}
         >
           <div style={{ fontWeight: "700" }}>
-            SUPPLIER: LIGHTEM SOLUTIONS INCORPORATED
+            SUPPLIER: RICHWELL COLLEGES POS
           </div>
-          <div>1187, PARULAN, PLARIDEL</div>
-          <div>BULACAN, PHILIPPINES</div>
-          <div>TIN: 626717559-000</div>
-          <div>BIR ACC#: 25A6267175592023091853</div>
-          <div>DATE ISSUED: 12/04/2023</div>
+          <div>SAMPLE ADDRESS</div>
+          <div>PHILIPPINES</div>
+          <div>TIN: 000-000-000-00000</div>
+          <div>BIR ACC#: 00000000000000000000</div>
+          <div>DATE ISSUED: 01/01/2025</div>
           <div>PTU: {receiptInfo.ptuNumber || "-"}</div>
           <div>DATE ISSUED: {receiptInfo.ptuDateIssued || "-"}</div>
         </div>

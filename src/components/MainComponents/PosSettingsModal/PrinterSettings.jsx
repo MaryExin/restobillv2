@@ -164,7 +164,7 @@ const PrinterSettings = ({ isDark, accent = "#3b82f6" }) => {
           printerName,
           printerType,
           content:
-            "\x1b\x40\x1b\x61\x01\x0aHELLO FROM LIGHTEM POS\x0aTEST PRINT SUCCESSFUL\x0aPort: " +
+            "\x1b\x40\x1b\x61\x01\x0aHELLO FROM RICHWELL POS\x0aTEST PRINT SUCCESSFUL\x0aPort: " +
             printerName +
             "\x0a\x0a\x0a\x0a\x1d\x56\x42\x00",
         });

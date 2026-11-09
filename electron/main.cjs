@@ -84,13 +84,14 @@ const DEFAULT_BUSINESS_INFO = {
   tin: "",
   machineNumber: "",
   serialNumber: "",
-  posProviderName: "LIGHTEM SOLUTIONS INCORPORATED",
-  posProviderAddress: "1187, PARULAN, PLARIDEL|BULACAN, PHILIPPINES",
-  posProviderTin: "626717559-000",
-  posProviderBirAccreNo: "25A6267175592023091853",
-  posProviderAccreDateIssued: "12/04/2023",
-  posProviderPTUNo: "FP022026-25B0584602-00012",
-  posProviderPTUDateIssued: "2/13/2026",
+  // Dummy placeholders -- replace with the real accredited supplier details.
+  posProviderName: "RICHWELL COLLEGES POS",
+  posProviderAddress: "SAMPLE ADDRESS|PHILIPPINES",
+  posProviderTin: "000-000-000-00000",
+  posProviderBirAccreNo: "00000000000000000000",
+  posProviderAccreDateIssued: "01/01/2025",
+  posProviderPTUNo: "FP000000-0000000000-00000",
+  posProviderPTUDateIssued: "01/01/2025",
 };
 
 function clamp(value, min, max) {
