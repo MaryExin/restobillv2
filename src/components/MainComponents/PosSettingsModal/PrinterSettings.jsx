@@ -6,7 +6,7 @@ import ModalSuccessNavToSelf from "../../Modals/ModalSuccessNavToSelf";
 
 const OTHER_ROWS = [
   { id: "duplicate",      label: "Duplicate Order", readKey: "printEscposDuplicate" },
-  { id: "billing",        label: "Billing",          readKey: "printEscposBilling" },
+  { id: "billing",        label: "Bill / Folio",          readKey: "printEscposBilling" },
   { id: "payment",        label: "Payment",           readKey: "printReceipt" },
   { id: "pos-reading",    label: "POS Reading",       readKey: "printEscposXzReading" },
   { id: "sales-per-item", label: "Sales Per Item",    readKey: "printEscposSalesPerProduct" },

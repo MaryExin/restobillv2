@@ -1,6 +1,7 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { getOrderItemDisplayName } from "./orderItemDisplayName";
+import { getBillDocument } from "./billDocument";
 
 const peso = (value) =>
   Number(value || 0).toLocaleString("en-PH", {
@@ -19,6 +20,7 @@ export function BuildPrintableDiscountReceiptHtml({
   businessInfo = {},
 }) {
   const safeTransaction = transaction || {};
+  const billDoc = getBillDocument(safeTransaction?.order_type);
   const safeComputed = computed || {};
   const safeItems = Array.isArray(items) ? items : [];
 
@@ -43,7 +45,7 @@ export function BuildPrintableDiscountReceiptHtml({
     <html>
       <head>
         <meta charSet="UTF-8" />
-        <title>Billing Receipt</title>
+        <title>{billDoc.noun}</title>
         <style>{`
           :root {
             --s: ${Number(scale) || 0.85};
@@ -270,7 +272,7 @@ export function BuildPrintableDiscountReceiptHtml({
           <div className="divider" />
 
           <div className="section keep-together">
-            <div className="mb-8 center black big">BILLING</div>
+            <div className="mb-8 center black big">{billDoc.title}</div>
           </div>
 
           <div className="section">
@@ -283,7 +285,7 @@ export function BuildPrintableDiscountReceiptHtml({
                   </td>
                 </tr>
                 <tr>
-                  <td className="bold label-col">Billing No.:</td>
+                  <td className="bold label-col">{billDoc.numberLabel}:</td>
                   <td className="value-col">
                     {safeTransaction?.billing_no ||
                       safeTransaction?.billingNo ||
@@ -328,6 +330,12 @@ export function BuildPrintableDiscountReceiptHtml({
                     {safeTransaction?.table_number || "-"}
                   </td>
                 </tr>
+                {safeTransaction?.guest_name ? (
+                  <tr>
+                    <td className="bold label-col">Guest:</td>
+                    <td className="value-col">{safeTransaction.guest_name}</td>
+                  </tr>
+                ) : null}
                 <tr>
                   <td className="bold label-col">Cashier:</td>
                   <td className="value-col">

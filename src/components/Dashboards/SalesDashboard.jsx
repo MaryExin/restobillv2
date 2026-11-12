@@ -11,6 +11,7 @@ import React, {
 
 import { LinearProgress } from "@mui/material";
 import useApiHost from "../../hooks/useApiHost";
+import { posAuthenticatedFetch } from "../../utils/posAuthenticatedFetch";
 import {
   FiFilter,
   FiDownload,
@@ -535,10 +536,13 @@ const SalesDashboard = () => {
     setLoading(true);
     setErr("");
     try {
-      const res = await fetch(`${apiBase}/reports_dashboard.php`, {
+      // reports_dashboard.php is behind secure_guard (Bearer token) and
+      // requires a reportKey; "salesDashboard" returns every section.
+      const res = await posAuthenticatedFetch(`${apiBase}/reports_dashboard.php`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          reportKey: "salesDashboard",
           datefrom: dateFrom,
           dateto: dateTo,
           includeVoided,
@@ -547,8 +551,12 @@ const SalesDashboard = () => {
           graph_dateto: graphDateTo,
         }),
       });
-      if (!res.ok) throw new Error("Failed to fetch dashboard");
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(
+          data?.message || data?.error || `Failed to fetch dashboard (${res.status})`,
+        );
+      }
       setPayload(data);
     } catch (e) {
       setErr(e?.message || "Fetch error");

@@ -350,8 +350,9 @@ const OpenNewDay = () => {
       <PosQuickActionTile
         label="Open New Day"
         icon={<FaCalendarPlus className="text-[28px] sm:text-[30px]" />}
-        color={isOpen ? "green" : "orange"}
+        color="amber"
         disabled={isOpen}
+        hint="A shift is already open"
         onClick={() => !isOpen && setOpen(true)}
       />
 

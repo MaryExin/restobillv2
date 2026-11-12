@@ -509,6 +509,14 @@ const PosPaymentReceipt = React.forwardRef(
                 {transaction?.table_number || "-"}
               </td>
             </tr>
+            {transaction?.guest_name ? (
+              <tr>
+                <td style={{ fontWeight: "700", padding: "1px 0" }}>Guest:</td>
+                <td style={{ textAlign: "right", padding: "1px 0" }}>
+                  {transaction.guest_name}
+                </td>
+              </tr>
+            ) : null}
             <tr>
               <td style={{ fontWeight: "700", padding: "1px 0" }}>Cashier:</td>
               <td style={{ textAlign: "right", padding: "1px 0" }}>

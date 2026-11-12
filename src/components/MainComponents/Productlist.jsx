@@ -14,7 +14,6 @@ import {
   FaArrowLeft,
   FaTag,
   FaChartPie,
-  FaLock,
   FaPowerOff,
   FaCheckCircle,
   FaExclamationTriangle,
@@ -28,6 +27,8 @@ import useApiHost from "../../hooks/useApiHost";
 import ProductImage from "../common/ProductImage";
 import TutorialTip from "../common/TutorialTip";
 import AddProductModal from "./ProductListModal/AddProductModal";
+import ProductOptionsModal from "./ProductListModal/ProductOptionsModal";
+import { buildOptionMaps, productOptionsEndpoint, resolveOptionGroups } from "../../utils/productOptions";
 import useZustandLoginCred from "../../context/useZustandLoginCred";
 import { hasPosSettingsAccess } from "../../utils/posRoleAccess";
 import {
@@ -58,6 +59,31 @@ const ProductList = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [roles, roleAccessVersion, developerMode],
   );
+
+  // Suggested options per product (Rice, Egg, Sugar...) edited from the card.
+  const [optionsProduct, setOptionsProduct] = useState(null);
+  const [optionMaps, setOptionMaps] = useState({ byProduct: {}, byCategory: {} });
+  const hasOwnOptions = (item) => Boolean(optionMaps.byProduct[item.product_id]?.length);
+  const productOptionCount = (item) =>
+    optionMaps.byProduct[item.product_id]?.length ||
+    resolveOptionGroups(optionMaps, item.product_id, item.item_category).length;
+  useEffect(() => {
+    if (!apiHost) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch(productOptionsEndpoint(apiHost));
+        const result = await response.json();
+        if (cancelled || !result?.success) return;
+        setOptionMaps(buildOptionMaps(result.data));
+      } catch {
+        /* options are optional; the card just shows "Options" */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiHost]);
   const showPricing = activeView === "pricing" && canUsePricing;
 
   const imageBaseUrl = useMemo(() => {
@@ -361,6 +387,25 @@ const ProductList = () => {
         isDark ? "bg-[#0f172a]" : "bg-[#f8fafc]"
       }`}
     >
+      {optionsProduct && (
+        <ProductOptionsModal
+          product={optionsProduct}
+          apiHost={apiHost}
+          isDark={isDark}
+          onClose={() => setOptionsProduct(null)}
+          onSaved={({ productId, itemCategory, groups }) =>
+            setOptionMaps((prev) =>
+              itemCategory
+                ? {
+                    ...prev,
+                    byCategory: { ...prev.byCategory, [String(itemCategory).trim().toUpperCase()]: groups },
+                  }
+                : { ...prev, byProduct: { ...prev.byProduct, [productId]: groups } },
+            )
+          }
+        />
+      )}
+
       <AddProductModal
         isOpen={showAddProduct}
         onClose={() => setShowAddProduct(false)}
@@ -599,16 +644,6 @@ const ProductList = () => {
                   size={16}
                 />
               </button>
-              <button
-                onClick={() => setIsAuthenticated(false)}
-                className={`p-3.5 rounded-2xl border-2 transition-all ${
-                  isDark
-                    ? "border-white/10 text-rose-500 hover:bg-rose-500/10"
-                    : "border-slate-200 text-rose-500 hover:bg-rose-50"
-                }`}
-              >
-                <FaLock size={16} />
-              </button>
             </div>
             )}
           </div>
@@ -844,6 +879,29 @@ const ProductList = () => {
                           <FaPercent size={8} />
                           {item.isDiscountable === "Yes" ? "Discountable" : "No Discount"}
                         </button>
+
+                        {canUsePricing && (
+                          <button
+                            type="button"
+                            onClick={() => setOptionsProduct(item)}
+                            title="Suggested options shown when this item is ordered"
+                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[8px] font-black uppercase tracking-widest transition-colors ${
+                              productOptionCount(item)
+                                ? isDark
+                                  ? "bg-violet-500/10 border-violet-500/30 text-violet-300"
+                                  : "bg-violet-50 border-violet-200 text-violet-600"
+                                : isDark
+                                  ? "bg-slate-800 border-slate-700 text-slate-500"
+                                  : "bg-slate-50 border-slate-200 text-slate-400"
+                            }`}
+                          >
+                            <FaLayerGroup size={8} />
+                            Options
+                            {productOptionCount(item)
+                              ? ` (${productOptionCount(item)}${hasOwnOptions(item) ? "" : " default"})`
+                              : ""}
+                          </button>
+                        )}
 
                         {/* Active / inactive toggle */}
                         <button

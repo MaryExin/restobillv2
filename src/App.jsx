@@ -19,6 +19,8 @@ const TransactionRecords = lazy(() => import("./components/Dashboards/Transactio
 const PosReadingModal = lazy(() => import("./components/MainComponents/PosReadingModal"));
 const PosSelectBusunit = lazy(() => import("./pages/PosCore/PosSelectBusunit"));
 const PosHomeScreen = lazy(() => import("./pages/PosCore/PosHomeScreen"));
+const PosReservationsPage = lazy(() => import("./pages/PosCore/PosReservationsPage"));
+const PosRoomServicePage = lazy(() => import("./pages/PosCore/PosRoomServicePage"));
 const PosPayment = lazy(() => import("./components/MainComponents/PosPayment"));
 const ProductList = lazy(() => import("./components/MainComponents/Productlist"));
 const SyncProductsAndPricing = lazy(() => import("./components/MainComponents/SyncProductsAndPricing"));
@@ -65,6 +67,18 @@ const AppRoutes = () => {
           element={<PrivateRoute routename="/ordering" />}
         >
           <Route path="/ordering" element={<ViewOrdering />} />
+        </Route>
+        <Route
+          path="/reservations"
+          element={<PrivateRoute routename="/reservations" />}
+        >
+          <Route path="/reservations" element={<PosReservationsPage />} />
+        </Route>
+        <Route
+          path="/room-service"
+          element={<PrivateRoute routename="/room-service" />}
+        >
+          <Route path="/room-service" element={<PosRoomServicePage />} />
         </Route>
         <Route
           path="/printbilling"

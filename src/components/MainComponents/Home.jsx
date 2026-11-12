@@ -29,7 +29,7 @@ const Home = () => {
     },
     {
       id: "billing",
-      title: "Billing",
+      title: "Bill / Folio",
       description: "Process payments and generate billing transactions.",
       image: Billing,
       path: "/printbilling",

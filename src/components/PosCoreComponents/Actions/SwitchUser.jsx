@@ -84,15 +84,9 @@ const SwitchUser = () => {
 
   const users = useMemo(() => {
     if (!Array.isArray(dateselection?.accounts)) return [];
-    return dateselection.accounts.filter(
-      (item) =>
-        item?.uuid !== userId &&
-        ["0", "cashier"].includes(
-          String(item?.userRoleValue ?? item?.userRole ?? "")
-            .trim()
-            .toLowerCase(),
-        ),
-    );
+    // Every active account (Cashier, Admin, Super Admin) can be switched
+    // into; only the currently logged-in user is left out of the list.
+    return dateselection.accounts.filter((item) => item?.uuid !== userId);
   }, [dateselection, userId]);
 
   const filteredUsers = useMemo(() => {
@@ -298,8 +292,9 @@ const SwitchUser = () => {
       <PosQuickActionTile
         label="Switch Users"
         icon={<FaUsers className="text-[28px] sm:text-[30px]" />}
-        color="indigo"
+        color="sky"
         disabled={isClosed}
+        hint="Open a new day first"
         onClick={() => !isClosed && setOpen(true)}
       />
 

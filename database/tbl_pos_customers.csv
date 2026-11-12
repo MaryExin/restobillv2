@@ -1,0 +1,2 @@
+ID,customer_code,Category_Code,Unit_Code,full_name,contact_number,contact_digits,email,address,notes,source,first_visit,last_visit,visit_count,last_transaction_id,status,created_by,date_recorded,date_updated
+1,CU-3f9a1c2b7d4e,Richwell,BU-24cae516f663,Juan Dela Cruz,0917 123 4567,09171234567,,,Window seat,walk-in,2026-11-11 12:10:05,2026-11-11 12:10:05,1,1000000003,Active,ADMIN,2026-11-11 12:10:05,2026-11-11 12:10:05

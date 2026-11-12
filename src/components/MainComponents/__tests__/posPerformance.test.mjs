@@ -10,6 +10,10 @@ import * as menuPlatterCombination from "../../../utils/menuPlatterCombination.j
 import * as menuChickenCombination from "../../../utils/menuChickenCombination.js";
 import * as pizzaCombinationCart from "../../../utils/pizzaCombinationCart.js";
 import * as orderItemDisplayName from "../../../utils/orderItemDisplayName.js";
+import * as salesTypeCategories from "../../../utils/salesTypeCategories.js";
+import * as billDocument from "../../../utils/billDocument.js";
+import * as productOptions from "../../../utils/productOptions.js";
+import * as guestInfo from "../../../utils/guestInfo.js";
 import * as menuCoffeeAddons from "../../../utils/menuCoffeeAddons.js";
 import * as coffeeAddonCart from "../../../utils/coffeeAddonCart.js";
 import * as orderCombinationCart from "../../../utils/orderCombinationCart.js";
@@ -66,6 +70,11 @@ function harness(file, supplied = {}, moduleOverrides = {}) {
     '../../utils/menuChickenCombination': menuChickenCombination,
     '../../utils/pizzaCombinationCart': pizzaCombinationCart,
     '../../utils/orderItemDisplayName': orderItemDisplayName,
+    '../../utils/salesTypeCategories': salesTypeCategories,
+    '../../utils/billDocument': billDocument,
+    '../../utils/productOptions': productOptions,
+    '../../utils/guestInfo': guestInfo,
+    './Common/ProductOptionChips': () => null,
     '../../utils/menuCoffeeAddons': menuCoffeeAddons,
     '../../utils/coffeeAddonCart': coffeeAddonCart,
     '../../utils/orderCombinationCart': orderCombinationCart,

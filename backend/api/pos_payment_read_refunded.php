@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require __DIR__ . "/bootstrap.php";
+require_once __DIR__ . "/pos_guest_columns.php";
 
 $corsPolicy = new CorsPolicy();
 $corsPolicy->cors();
@@ -29,6 +30,7 @@ try {
 
     $pdo = $database->getConnection();
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    posEnsureGuestColumns($pdo);
 
     $sql = "
         SELECT
@@ -50,6 +52,12 @@ try {
             customer_exclusive_id,
             customer_head_count,
             customer_count_for_discount,
+            guest_name,
+            guest_contact,
+            guest_request,
+            guest_payment_mode,
+            guest_payment_reference,
+            guest_payment_amount,
             discount_type,
             TotalSales,
             Discount,

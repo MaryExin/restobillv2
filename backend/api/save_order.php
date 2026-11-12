@@ -18,6 +18,8 @@ require __DIR__ . "/bootstrap.php";
 require_once __DIR__ . "/pos_report_mirror.php";
 require_once __DIR__ . "/pos_report_mirror_activation.php";
 require_once __DIR__ . "/../src/PosOrderItemInstructions.php";
+require_once __DIR__ . "/pos_guest_columns.php";
+require_once __DIR__ . "/pos_customers.php";
 
 date_default_timezone_set('Asia/Manila');
 
@@ -157,6 +159,7 @@ try {
     $discount_type = 'No Discount';
     $payment_method = '';
     $special_instructions = (string)($data["special_instructions"] ?? '');
+    $guest = posReadGuestFields($data);
     $cashier = (string)($data["cashier"] ?? '');
     $remarks = (string)($data["remarks"] ?? '');
     $order_status = (string)($data["order_status"] ?? '');
@@ -189,6 +192,9 @@ try {
     $hasItemInstruction = posOrderHasItemInstructionColumn($pdo);
     posOrderValidateItemInstructions($cart_items, $hasItemInstruction);
 
+    // Schema checks run before the transaction: ALTER/CREATE would commit it.
+    posCustomersPrepareSchema($pdo);
+
     $pdo->beginTransaction();
     $manualTransactionStarted = true;
 
@@ -206,6 +212,19 @@ try {
         'next_order_slip_no'
     );
 
+    // Customer registry: the guest on this order (walk-in details, or the
+    // reservation's guest) is saved once and linked for the Customers report.
+    // Best effort: a registry problem never blocks the order.
+    $guest_customer_code = posCustomerRegisterQuietly(
+        $pdo,
+        $Category_Code,
+        $Unit_Code,
+        $guest,
+        "walk-in",
+        $user_name !== '' ? $user_name : $cashier,
+        ["transaction_id" => (string)$transaction_id, "visited_at" => $date_recorded]
+    );
+
     $sql = "INSERT INTO tbl_pos_transactions (
         transaction_id,
         Category_Code,
@@ -221,6 +240,13 @@ try {
         discount_type,
         payment_method,
         special_instructions,
+        guest_name,
+        guest_contact,
+        guest_request,
+        guest_payment_mode,
+        guest_payment_reference,
+        guest_payment_amount,
+        guest_customer_code,
         cashier,
         remarks,
         order_status,
@@ -243,6 +269,13 @@ try {
         :discount_type,
         :payment_method,
         :special_instructions,
+        :guest_name,
+        :guest_contact,
+        :guest_request,
+        :guest_payment_mode,
+        :guest_payment_reference,
+        :guest_payment_amount,
+        :guest_customer_code,
         :cashier,
         :remarks,
         :order_status,
@@ -268,6 +301,13 @@ try {
         ":discount_type" => $discount_type,
         ":payment_method" => $payment_method,
         ":special_instructions" => $special_instructions,
+        ":guest_name" => $guest["guest_name"],
+        ":guest_contact" => $guest["guest_contact"],
+        ":guest_request" => $guest["guest_request"],
+        ":guest_payment_mode" => $guest["guest_payment_mode"],
+        ":guest_payment_reference" => $guest["guest_payment_reference"],
+        ":guest_payment_amount" => $guest["guest_payment_amount"],
+        ":guest_customer_code" => $guest_customer_code !== '' ? $guest_customer_code : null,
         ":cashier" => $cashier,
         ":remarks" => $remarks,
         ":order_status" => $order_status,

@@ -29,6 +29,11 @@ $isDefaultTable = isset($_GET["isDefaultTable"]) &&
 $onlyPending = isset($_GET["onlyPending"]) &&
     filter_var($_GET["onlyPending"], FILTER_VALIDATE_BOOLEAN);
 
+// Room-service orders show their delivery time on the room cards; the
+// guest columns are added on first use for databases without the migration.
+require_once __DIR__ . "/pos_guest_columns.php";
+posEnsureGuestColumns($conn);
+
 $data = [];
 
 if ($isDefaultTable) {
@@ -41,6 +46,10 @@ if ($isDefaultTable) {
             tpt.transaction_date,
             tpt.remarks,
             tpt.table_number AS transaction_table_number,
+            tpt.order_type,
+            tpt.transaction_time,
+            tpt.guest_name,
+            tpt.guest_request,
             tt.table_name
         FROM tbl_pos_transactions tpt
         LEFT JOIN tbl_pos_tables tt
@@ -91,7 +100,11 @@ if ($isDefaultTable) {
                     WHEN remarks != 'Paid' AND status NOT IN ('Voided', 'Unsplit') THEN 'Pending'
                     ELSE 'Paid'
                 END
-            ) AS status_label
+            ) AS status_label,
+            MAX(order_type) AS order_type,
+            MAX(transaction_time) AS transaction_time,
+            MAX(guest_name) AS guest_name,
+            MAX(guest_request) AS guest_request
         FROM tbl_pos_transactions
     ";
 

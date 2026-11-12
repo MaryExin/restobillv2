@@ -119,6 +119,13 @@ try {
             $source = str_replace('require_once __DIR__ . "/../src/' . $helper . '.php";',
                 'require_once ' . var_export(__DIR__ . '/../src/' . $helper . '.php', true) . ';', $source);
         }
+        // Pure helpers next to the endpoints (guest details, customer registry):
+        // loaded from the real api folder; their schema checks swallow the
+        // fixture's refusal to run SHOW/ALTER statements.
+        foreach (['pos_guest_columns', 'pos_customers'] as $helper) {
+            $source = str_replace('require_once __DIR__ . "/' . $helper . '.php";',
+                'require_once ' . var_export(__DIR__ . '/../api/' . $helper . '.php', true) . ';', $source);
+        }
         file_put_contents($fixture . '/' . $endpoint, $source);
     }
     $loadFixture = 'require_once ' . var_export(__FILE__, true) . ';';
@@ -156,8 +163,12 @@ try {
         $output = stream_get_contents($pipes[1]); $snapshot = stream_get_contents($pipes[2]);
         fclose($pipes[1]); fclose($pipes[2]);
         checkCancelledEndpoint(proc_close($process) === 0, 'Endpoint fixture failed: ' . $output . $snapshot);
+        // The snapshot is the last stderr line; helpers may log a skipped
+        // schema check (the fixture refuses SHOW/ALTER statements) above it.
+        $snapshotLines = preg_split('/\R/', trim($snapshot)) ?: [''];
+        $snapshotJson = (string)end($snapshotLines);
         try {
-            return [json_decode($output, true, 512, JSON_THROW_ON_ERROR), json_decode($snapshot, true, 512, JSON_THROW_ON_ERROR)];
+            return [json_decode($output, true, 512, JSON_THROW_ON_ERROR), json_decode($snapshotJson, true, 512, JSON_THROW_ON_ERROR)];
         } catch (JsonException $error) {
             throw new RuntimeException($endpoint . ' returned invalid fixture JSON: ' . $output . $snapshot, 0, $error);
         }

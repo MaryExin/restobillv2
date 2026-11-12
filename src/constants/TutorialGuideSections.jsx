@@ -25,14 +25,14 @@ export const GUIDE_SECTIONS = [
     steps: [
       "Go to \"New Transaction\" to start taking a customer's order.",
       "Select items from the product list and adjust the quantity for each.",
-      "Apply discounts if applicable, then proceed to \"Billing\" to review the order.",
+      "Apply discounts if applicable, then proceed to \"Bill / Folio\" to review the order.",
     ],
   },
   {
     icon: FiCreditCard,
-    title: "Billing & Payment",
+    title: "Bill / Folio & Payment",
     steps: [
-      "\"Billing\" shows the full order summary and total before payment.",
+      "\"Bill / Folio\" shows the full order summary and total before payment.",
       "Go to \"Payment\" to choose the mode of payment and complete the transaction.",
       "A receipt can be printed once the payment is confirmed.",
     ],

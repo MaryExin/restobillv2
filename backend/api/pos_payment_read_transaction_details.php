@@ -9,6 +9,8 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
 }
 
 require __DIR__ . "/pdo.php";
+require_once __DIR__ . "/pos_guest_columns.php";
+posEnsureGuestColumns($pdo);
 
 function normalizeDiscountTypeKey($value)
 {
@@ -102,6 +104,12 @@ try {
             customer_exclusive_id,
             customer_head_count,
             customer_count_for_discount,
+            guest_name,
+            guest_contact,
+            guest_request,
+            guest_payment_mode,
+            guest_payment_reference,
+            guest_payment_amount,
             discount_type,
             TotalSales,
             Discount,

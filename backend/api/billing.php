@@ -36,6 +36,7 @@ date_default_timezone_set("Asia/Manila");
 ------------------------------ */
 $config = require __DIR__ . "/config.php";
 require_once __DIR__ . "/pos_report_mirror.php";
+require_once __DIR__ . "/pos_customers.php";
 require_once __DIR__ . "/../src/PosBillingCharges.php";
 require_once __DIR__ . "/../src/PosCurrentBillItems.php";
 
@@ -237,11 +238,15 @@ function allocateDocumentNumber(PDO $pdo, string $categoryCode, string $unitCode
 {
     $documentType = strtoupper(trim($documentType));
 
-    $counterColumn = match ($documentType) {
+    // PHP 7 compatible (no match expression): the Windows XAMPP may run PHP 7.4.
+    $counterColumns = [
         'BILLING' => 'next_billing_no',
         'RECEIPT' => 'next_invoice_no',
-        default => throw new Exception("Unsupported document type for counter allocation."),
-    };
+    ];
+    if (!isset($counterColumns[$documentType])) {
+        throw new Exception("Unsupported document type for counter allocation.");
+    }
+    $counterColumn = $counterColumns[$documentType];
 
     $defaultStart = $documentType === 'BILLING' ? 3000000001 : 4000000001;
 
@@ -341,6 +346,9 @@ try {
         $input['Discount'] = $discount;
         $input['TotalAmountDue'] = $totalAmountDue;
     }
+
+    // Schema checks run before the transaction: ALTER/CREATE would commit it.
+    posCustomersPrepareSchema($pdo);
 
     $pdo->beginTransaction();
 
@@ -679,6 +687,21 @@ try {
                 $contactNo = $hasCustomerInfoPayload
                     ? trim((string)($card['contact_no'] ?? ''))
                     : trim((string)($existingRow['contact_no'] ?? ''));
+
+                // Customer registry (best effort, never blocks the bill): discount
+                // card holders are saved too and linked to the order when no guest
+                // was named on it yet.
+                $discountCustomerCode = posCustomerRegisterQuietly(
+                    $pdo,
+                    (string)$category_code,
+                    (string)$unit_code,
+                    ["guest_name" => $customerName, "guest_contact" => $contactNo, "guest_request" => ""],
+                    "discount",
+                    (string)($input['cashier'] ?? 'Store Crew')
+                );
+                if ($discountCustomerCode !== "") {
+                    posCustomerLinkTransaction($pdo, (string)$transaction_id, $discountCustomerCode);
+                }
 
                 if (isset($existingRows[$rowIndex])) {
                     $existingRowId = (int)$existingRows[$rowIndex]['id'];

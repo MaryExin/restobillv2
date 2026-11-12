@@ -31,8 +31,10 @@ function resolveReadingDatabaseName(array $input, string $posDbName, string $rep
         "cnc"
     )));
 
+    // Readings always read the main POS database; the "report" scope
+    // (reports_database) is no longer accepted.
     if ($scope === "report") {
-        return [$reportDbName, "report"];
+        throw new InvalidArgumentException("Readings only use the main POS database.");
     }
 
     if ($scope === "cnc") {

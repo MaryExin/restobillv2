@@ -2078,6 +2078,7 @@ async function buildEscposOrderReceiptBuffer({
   printMode,
   transactionId,
   categoryLabel,
+  guest,
 }) {
   const { getOrderItemDisplayName } = await loadOrderItemDisplayName();
   const LINE_WIDTH = 42;
@@ -2145,6 +2146,21 @@ async function buildEscposOrderReceiptBuffer({
   chunks.push(nl());
   chunks.push(txt(`Room: ${table || "-"}`));
   chunks.push(nl());
+  // Optional guest details (walk-in prompt or reservation)
+  const guestName = String(guest?.name || "").trim();
+  if (guestName) {
+    wrapText(`Guest: ${guestName}`, LINE_WIDTH).forEach((line) => {
+      chunks.push(txt(line));
+      chunks.push(nl());
+    });
+  }
+  const guestRequest = String(guest?.request || "").trim();
+  if (guestRequest) {
+    wrapText(`Request: ${guestRequest}`, LINE_WIDTH).forEach((line) => {
+      chunks.push(txt(line));
+      chunks.push(nl());
+    });
+  }
   chunks.push(txt(new Date().toLocaleString()));
   chunks.push(nl());
   chunks.push(txt(repeat("-", LINE_WIDTH)));
@@ -2647,7 +2663,7 @@ app.whenReady().then(() => {
     try {
       console.log("[ESC/POS PRINT] Payload:", data);
 
-      const { table, items, total, instructions, printMode, transactionId } =
+      const { table, items, total, instructions, printMode, transactionId, guest } =
         data || {};
       const safeItems = Array.isArray(items) ? items : [];
 
@@ -2678,6 +2694,7 @@ app.whenReady().then(() => {
           items,
           total,
           instructions,
+          guest,
           printMode,
           transactionId,
         });
@@ -2718,6 +2735,7 @@ app.whenReady().then(() => {
           items: btItems,
           total: itemTotal(btItems),
           instructions,
+          guest,
           printMode,
           transactionId,
           categoryLabel: label,
@@ -2736,6 +2754,7 @@ app.whenReady().then(() => {
           items: lanItems,
           total: itemTotal(lanItems),
           instructions,
+          guest,
           printMode,
           transactionId,
           categoryLabel: label,
@@ -2754,6 +2773,7 @@ app.whenReady().then(() => {
           items: usbItems,
           total: itemTotal(usbItems),
           instructions,
+          guest,
           printMode,
           transactionId,
           categoryLabel: label,
@@ -2771,6 +2791,7 @@ app.whenReady().then(() => {
           items: otherItems,
           total: itemTotal(otherItems),
           instructions,
+          guest,
           printMode,
           transactionId,
         });
@@ -2805,13 +2826,14 @@ app.whenReady().then(() => {
     try {
       console.log("[ESC/POS DUPLICATE] Payload:", data);
 
-      const { table, items, total, instructions, transactionId } = data || {};
+      const { table, items, total, instructions, transactionId, guest } = data || {};
 
       const payload = await buildEscposOrderReceiptBuffer({
         table,
         items,
         total,
         instructions,
+        guest,
         printMode: "duplicate",
         transactionId,
       });
@@ -2927,7 +2949,7 @@ app.whenReady().then(() => {
       const billingRows = [
         ["Trans. No.", transaction?.transaction_id || "-"],
         [
-          "Billing No.",
+          billDocumentFor(transaction?.order_type).numberLabel,
           transaction?.billing_no || transaction?.billingNo || "-",
         ],
         [
@@ -2939,6 +2961,7 @@ app.whenReady().then(() => {
         ["Terminal No.", transaction?.terminal_number || "-"],
         ["Order Type", transaction?.order_type || "-"],
         ["Ref./Tag #", transaction?.table_number || "-"],
+        ...(transaction?.guest_name ? [["Guest", transaction.guest_name]] : []),
         ["Cashier", transaction?.cashier || "-"],
       ];
 
@@ -3006,7 +3029,7 @@ app.whenReady().then(() => {
       chunks.push(alignCenter);
       chunks.push(boldOn);
       chunks.push(doubleSizeOn);
-      chunks.push(txt("BILLING"));
+      chunks.push(txt(billDocumentFor(transaction?.order_type).title));
       chunks.push(nl());
       chunks.push(normalSize);
       chunks.push(boldOff);
@@ -3414,6 +3437,7 @@ app.whenReady().then(() => {
       );
       pushMetaRow("Order Type:", safeTransaction?.order_type || "-");
       pushMetaRow("Ref./Tag #:", safeTransaction?.table_number || "-");
+      if (safeTransaction?.guest_name) pushMetaRow("Guest:", safeTransaction.guest_name);
       pushMetaRow("Cashier:", safeTransaction?.cashier || "-");
 
       pushDivider();
@@ -4379,12 +4403,13 @@ app.whenReady().then(() => {
 
       const billingRows = [
         ["Trans No", transaction?.transaction_id || "N/A"],
-        ["Billing No", transaction?.billing_no || "N/A"],
+        [billDocumentFor(transaction?.order_type).numberLabel.replace(/\.$/, ""), transaction?.billing_no || "N/A"],
         ["Trans Date", transaction?.transaction_date || "N/A"],
         ["Trans Time", transaction?.transaction_time || "N/A"],
         ["Terminal No", transaction?.terminal_number || "N/A"],
         ["Order Type", transaction?.order_type || "N/A"],
         ["Ref Tag", transaction?.table_number || "N/A"],
+        ...(transaction?.guest_name ? [["Guest", transaction.guest_name]] : []),
         ["Cashier", transaction?.cashier || "N/A"],
       ];
 
@@ -4428,7 +4453,7 @@ app.whenReady().then(() => {
       chunks.push(alignCenter);
       chunks.push(boldOn);
       chunks.push(doubleSizeOn);
-      chunks.push(txt("BILLING"));
+      chunks.push(txt(billDocumentFor(transaction?.order_type).title));
       chunks.push(nl());
       chunks.push(normalSize);
       chunks.push(boldOff);
@@ -4669,6 +4694,7 @@ app.whenReady().then(() => {
         ["Terminal No.:",transaction.terminal_number   || "-"],
         ["Order Type:",  transaction.order_type        || "-"],
         ["Ref./Tag #:",  transaction.table_number      || "-"],
+        ...(transaction.guest_name ? [["Guest:", transaction.guest_name]] : []),
         ["Cashier:",     transaction.cashier           || "-"],
         [`${actionLabel} Date:`, voidRefundInfo.actionDate || "-"],
         [`${actionLabel} Time:`, voidRefundInfo.actionTime || "-"],
@@ -5540,3 +5566,14 @@ app.on("window-all-closed", () => {
     app.quit();
   }
 });
+
+
+// Name of the pre-payment document: Room Service orders print as GUEST FOLIO,
+// every other sales type prints a BILL (display text only).
+function billDocumentFor(orderType) {
+  const folio = String(orderType ?? "").trim().toUpperCase() === "ROOM SERVICE";
+  return {
+    title: folio ? "GUEST FOLIO" : "BILL",
+    numberLabel: folio ? "Folio No." : "Bill No.",
+  };
+}

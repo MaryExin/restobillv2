@@ -4,16 +4,17 @@ import { useNavigate, useLocation } from "react-router-dom";
 import {
   FaHome,
   FaBoxOpen,
-  FaReceipt,
   FaFileAlt,
   FaCog,
-  FaUserCircle,
   FaPowerOff,
-  FaMoneyBill,
   FaChartPie,
-  FaCloudUploadAlt,
+  FaChartBar,
+  FaConciergeBell,
+  FaFileInvoiceDollar,
+  FaCashRegister,
+  FaCalendarCheck,
+  FaDoorOpen,
 } from "react-icons/fa";
-import { HiOutlineStatusOnline } from "react-icons/hi";
 import { IoMdClose } from "react-icons/io";
 
 import OpenNewDay from "../PosCoreComponents/Actions/OpenNewDay";
@@ -55,8 +56,19 @@ const PosReports = lazyDialog(
 const PosSettings = lazyDialog(() => import("../MainComponents/PosSettings"));
 
 const POS_HOME_BG = "./richwell-home-bg.png";
-const HEADER_HEIGHT = 96;
-const FOOTER_HEIGHT = 118;
+const RICHWELL_CREST = "./richwell-icon.png";
+const HEADER_HEIGHT = 88;
+const FOOTER_HEIGHT = 150;
+const ICON_CLASS = "text-[20px]";
+
+const getInitials = (name) =>
+  String(name || "")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0] || "")
+    .join("")
+    .toUpperCase() || "U";
 
 const hexToRgba = (hex, alpha = 1) => {
   if (!hex) return `rgba(59,130,246,${alpha})`;
@@ -239,14 +251,6 @@ const LayoutPos = ({ children }) => {
     () => hasPosRouteAccess(roles, "/productlist", developerMode),
     [roles, roleAccessVersion, developerMode],
   );
-  const canAccessPriceSyncing = useMemo(
-    () => hasPosRouteAccess(roles, "/pricesyncing", developerMode),
-    [roles, roleAccessVersion, developerMode],
-  );
-  const canAccessSalesRecordSyncing = useMemo(
-    () => hasPosRouteAccess(roles, "/salesrecordssyncing", developerMode),
-    [roles, roleAccessVersion, developerMode],
-  );
   const canAccessOpenNewDay = useMemo(
     () => hasPosHomeActionAccess(roles, "openNewDay", developerMode),
     [roles, roleAccessVersion, developerMode],
@@ -257,6 +261,14 @@ const LayoutPos = ({ children }) => {
   );
   const canAccessBilling = useMemo(
     () => hasPosRouteAccess(roles, "/printbilling", developerMode),
+    [roles, roleAccessVersion, developerMode],
+  );
+  const canAccessReservations = useMemo(
+    () => hasPosRouteAccess(roles, "/reservations", developerMode),
+    [roles, roleAccessVersion, developerMode],
+  );
+  const canAccessRoomService = useMemo(
+    () => hasPosRouteAccess(roles, "/room-service", developerMode),
     [roles, roleAccessVersion, developerMode],
   );
   const canAccessPayment = useMemo(
@@ -346,143 +358,161 @@ const LayoutPos = ({ children }) => {
     [],
   );
 
-  const quickActions = (
-    <>
-      <PosQuickActionTile
-        label="Home"
-        icon={<FaHome className="text-[28px] sm:text-[30px]" />}
-        color="green"
-        onClick={() => navigate("/poscorehomescreen")}
-      />
+  const isHomeRoute = location.pathname === "/poscorehomescreen";
+  const closedHint = "Open a new day first";
 
-      {canAccessProductList && (
+  // Dock sections. Access checks and actions are unchanged; only grouping
+  // and styling are new.
+  const dockGroups = [
+    {
+      key: "shift",
+      label: "Shift",
+      items: [
         <PosQuickActionTile
-          label="Product List"
-          icon={<FaBoxOpen className="text-[28px] sm:text-[30px]" />}
+          key="home"
+          label="Home"
+          icon={<FaHome className={ICON_CLASS} />}
           color="violet"
-          onClick={() => navigate("/productlist")}
-        />
-      )}
-
-      {canAccessPriceSyncing && (
-        <PosQuickActionTile
-          label="Products & Price Syncing"
-          icon={<FaMoneyBill className="text-[28px] sm:text-[30px]" />}
-          color="violet"
-          onClick={() => navigate("/pricesyncing")}
-        />
-      )}
-
-      {canAccessSalesRecordSyncing && (
-        <PosQuickActionTile
-          label="Sales Record Syncing"
-          icon={<FaCloudUploadAlt className="text-[28px] sm:text-[30px]" />}
-          color="violet"
-          onClick={() => navigate("/salesrecordssyncing")}
-        />
-      )}
-
-      {canAccessOpenNewDay && <OpenNewDay />}
-
-      {canAccessOrdering && (
-        <PosQuickActionTile
-          label="New Transaction"
-          icon={<FaReceipt className="text-[28px] sm:text-[30px]" />}
-          color="orange"
-          disabled={isClosed}
-          onClick={() => {
-            if (isClosed) return;
-            if (layoutMode === "Kiosk") {
-              navigate("/ordering", { state: { kioskAutoOpen: true } });
-            } else {
-              navigate("/ordering");
-            }
-          }}
-        />
-      )}
-
-      {canAccessBilling && layoutMode !== "Kiosk" && billingEnabled && (
-        <PosQuickActionTile
-          label="Billing"
-          icon={<FaReceipt className="text-[28px] sm:text-[30px]" />}
-          color="violet"
-          disabled={isClosed}
-          onClick={() => !isClosed && navigate("/printbilling")}
-        />
-      )}
-
-      {canAccessPayment && (
-        <PosQuickActionTile
-          label="Payment"
-          icon={<FaReceipt className="text-[28px] sm:text-[30px]" />}
-          color="green"
-          onClick={() => navigate("/payments")}
-          disabled={isClosed}
-        />
-      )}
-
-      <SwitchUser />
-
-      {canAccessPosReading && (
-        <PosQuickActionTile
-          label="POS Reading"
-          icon={<FaFileAlt className="text-[28px] sm:text-[30px]" />}
-          color="indigo"
-          disabled={isClosed}
-          onClick={() => setIsPosReadingOpen(true)}
-        />
-      )}
-
-      {canAccessPosReports && (
-        <PosQuickActionTile
-          label="POS Reports"
-          icon={<FaChartPie className="text-[28px] sm:text-[30px]" />}
-          color="indigo"
-          onClick={() => setIsReportsOpen(true)}
-        />
-      )}
-
-      {menuOptions.map((item) => {
-        if (item.id === "salesdashboard" && !canAccessSalesDashboard) {
-          return null;
-        }
-        const disabled =
-          item.id !== "salesdashboard" &&
-          (item.id === "ordering" ||
-            item.id === "billing" ||
-            item.id === "transactionrecords")
-            ? isClosed
-            : false;
-
-        return (
+          active={isHomeRoute}
+          onClick={() => navigate("/poscorehomescreen")}
+        />,
+        canAccessOpenNewDay ? <OpenNewDay key="opennewday" /> : null,
+        <SwitchUser key="switchuser" />,
+        canAccessPosReading ? (
           <PosQuickActionTile
-            key={item.id}
-            label={item.title}
-            icon={React.cloneElement(item.icon, {
-              className: "text-[28px] sm:text-[30px]",
-            })}
-            color={
-              disabled
-                ? "slate"
-                : item.id === "ordering"
-                  ? "orange"
-                  : item.id === "billing"
-                    ? "violet"
-                    : item.id === "salesdashboard"
-                      ? "indigo"
-                      : item.id === "transactionrecords"
-                        ? "green"
-                        : item.id === "payment"
-                          ? "blue"
-                          : "slate"
-            }
-            disabled={disabled}
-            onClick={() => !disabled && handleCardClick(item)}
+            key="posreading"
+            label="POS Reading"
+            icon={<FaFileAlt className={ICON_CLASS} />}
+            color="indigo"
+            disabled={isClosed}
+            hint={closedHint}
+            onClick={() => setIsPosReadingOpen(true)}
           />
-        );
-      })}
-    </>
-  );
+        ) : null,
+      ],
+    },
+    {
+      key: "service",
+      label: "Service",
+      items: [
+        canAccessOrdering ? (
+          <PosQuickActionTile
+            key="ordering"
+            label="New Transaction"
+            icon={<FaConciergeBell className={ICON_CLASS} />}
+            color="amber"
+            variant="primary"
+            disabled={isClosed}
+            hint={closedHint}
+            onClick={() => {
+              if (isClosed) return;
+              if (layoutMode === "Kiosk") {
+                navigate("/ordering", { state: { kioskAutoOpen: true } });
+              } else {
+                navigate("/ordering");
+              }
+            }}
+          />
+        ) : null,
+        canAccessBilling && layoutMode !== "Kiosk" && billingEnabled ? (
+          <PosQuickActionTile
+            key="folio"
+            label="Bill / Folio"
+            icon={<FaFileInvoiceDollar className={ICON_CLASS} />}
+            color="rose"
+            disabled={isClosed}
+            hint={closedHint}
+            onClick={() => !isClosed && navigate("/printbilling")}
+          />
+        ) : null,
+        canAccessPayment ? (
+          <PosQuickActionTile
+            key="payment"
+            label="Payment"
+            icon={<FaCashRegister className={ICON_CLASS} />}
+            color="green"
+            disabled={isClosed}
+            hint={closedHint}
+            onClick={() => navigate("/payments")}
+          />
+        ) : null,
+        // Reservations work any day (future bookings), so no shift lock.
+        canAccessReservations ? (
+          <PosQuickActionTile
+            key="reservations"
+            label="Reservations"
+            icon={<FaCalendarCheck className={ICON_CLASS} />}
+            color="violet"
+            active={location.pathname === "/reservations"}
+            onClick={() => navigate("/reservations")}
+          />
+        ) : null,
+        // Room service orders are real orders, so the day must be open.
+        canAccessRoomService ? (
+          <PosQuickActionTile
+            key="roomservice"
+            label="Room Service"
+            icon={<FaDoorOpen className={ICON_CLASS} />}
+            color="cyan"
+            disabled={isClosed}
+            hint={closedHint}
+            active={location.pathname === "/room-service"}
+            onClick={() => !isClosed && navigate("/room-service")}
+          />
+        ) : null,
+      ],
+    },
+    {
+      key: "office",
+      label: "Back Office",
+      items: [
+        canAccessProductList ? (
+          <PosQuickActionTile
+            key="productlist"
+            label="Product List"
+            icon={<FaBoxOpen className={ICON_CLASS} />}
+            color="cyan"
+            active={location.pathname === "/productlist"}
+            onClick={() => navigate("/productlist")}
+          />
+        ) : null,
+        // Richwell: "Products & Price Syncing" and "Sales Record Syncing"
+        // tiles are hidden. Their routes (/pricesyncing,
+        // /salesrecordssyncing) still exist in App.jsx.
+        canAccessPosReports ? (
+          <PosQuickActionTile
+            key="posreports"
+            label="POS Reports"
+            icon={<FaChartBar className={ICON_CLASS} />}
+            color="indigo"
+            onClick={() => setIsReportsOpen(true)}
+          />
+        ) : null,
+        ...menuOptions.map((item) =>
+          item.id === "salesdashboard" && !canAccessSalesDashboard ? null : (
+            <PosQuickActionTile
+              key={item.id}
+              label={item.title}
+              icon={React.cloneElement(item.icon, { className: ICON_CLASS })}
+              color="orange"
+              onClick={() => handleCardClick(item)}
+            />
+          ),
+        ),
+        canOpenSettings ? (
+          <PosQuickActionTile
+            key="settings"
+            label="Settings"
+            icon={<FaCog className={ICON_CLASS} />}
+            color="slate"
+            onClick={() => setIsSettingsOpen(true)}
+          />
+        ) : null,
+      ],
+    },
+  ]
+    .map((group) => ({ ...group, items: group.items.filter(Boolean) }))
+    .filter((group) => group.items.length > 0);
 
   return (
     <div
@@ -660,84 +690,75 @@ const LayoutPos = ({ children }) => {
 
       <div className="relative z-10 h-screen w-full overflow-hidden">
         <header
-          className="pos-header-fixed fixed left-0 right-0 top-0 z-40 px-3 py-2 text-white sm:px-4"
-          style={{
-            height: `${HEADER_HEIGHT}px`,
-            background: "transparent",
-            borderColor: "transparent",
-            backdropFilter: "blur(6px)",
-          }}
+          className="fixed left-0 right-0 top-0 z-40 px-3 pt-3 text-[#fff] sm:px-4"
+          style={{ height: `${HEADER_HEIGHT}px` }}
         >
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-[18px] leading-none font-black sm:text-[20px]">
-                {branchInfo.title}
-              </div>
-
-              <div className="mt-1 text-[10px] font-medium sm:text-[12px]">
-                {branchInfo.subtitle}
-              </div>
-
-              <div className="mt-2 flex items-center gap-2">
-                <HiOutlineStatusOnline
-                  className="text-[17px]"
-                  style={{ color: brandSecondary }}
-                />
-                <div className="text-[16px] font-black tracking-tight sm:text-[18px]">
+          <div className="flex items-center justify-between gap-4 rounded-[22px] border border-white/15 bg-[rgba(30,10,60,0.46)] px-3 py-2.5 shadow-[0_18px_44px_rgba(0,0,0,0.30)] backdrop-blur-md sm:px-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <img
+                src={RICHWELL_CREST}
+                alt=""
+                className="h-10 w-10 shrink-0 drop-shadow sm:h-11 sm:w-11"
+              />
+              <div className="min-w-0">
+                <div className="max-w-[46vw] truncate font-[Poppins-Bold] text-[15px] leading-tight sm:text-[17px] xl:max-w-[360px]">
                   {isLoading ? "Loading..." : branchInfo.branch}
                 </div>
+                <div className="max-w-[46vw] truncate font-[Poppins-Medium] text-[10px] text-[rgba(255,255,255,0.7)] sm:text-[11px] xl:max-w-[360px]">
+                  {branchInfo.title} &middot; {branchInfo.subtitle}
+                </div>
+              </div>
+
+              <div className="ml-2 hidden items-center gap-1.5 xl:flex">
+                <span className="rounded-full bg-white/10 px-3 py-1 font-[Poppins-Medium] text-[11px] ring-1 ring-white/15">
+                  Terminal {branchInfo.terminalNo}
+                </span>
+                <span className="rounded-full bg-white/10 px-3 py-1 font-[Poppins-Medium] text-[11px] ring-1 ring-white/15">
+                  Shift {branchInfo.shiftNo}
+                </span>
+                <span
+                  className={`inline-flex items-center gap-2 rounded-full px-3 py-1 font-[Poppins-SemiBold] text-[11px] ring-1 ${
+                    isClosed
+                      ? "bg-amber-400/15 text-amber-200 ring-amber-300/40"
+                      : "bg-emerald-400/15 text-emerald-200 ring-emerald-300/40"
+                  }`}
+                >
+                  <span
+                    className={`h-2 w-2 rounded-full ${
+                      isClosed ? "bg-amber-300" : "bg-emerald-300"
+                    }`}
+                  />
+                  {branchInfo.shiftStatus}
+                </span>
               </div>
             </div>
 
-            <div className="flex items-start gap-2 sm:gap-3">
-              <div className="hidden pr-1 text-right sm:block">
-                <div className="text-[14px] font-black">
+            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+              <div className="hidden text-right sm:block">
+                <div className="max-w-[200px] truncate font-[Poppins-SemiBold] text-[13px] leading-tight">
                   {branchInfo.userName}
                 </div>
-                <div className="text-[12px] font-medium">
+                <div className="font-[Poppins-Medium] text-[11px] text-[#f8dc8b]">
                   {branchInfo.userRole}
                 </div>
               </div>
 
-              <div
-                className={`grid h-11 w-11 place-items-center rounded-full border shadow-[0_10px_24px_rgba(0,0,0,0.12)] sm:h-12 sm:w-12 ${
-                  isDark
-                    ? "border-white/10 bg-white/10"
-                    : "border-white/75 bg-white/20"
-                }`}
-              >
-                <FaUserCircle
-                  className="text-[30px] sm:text-[34px]"
-                  style={{ color: brandPrimary }}
-                />
+              <div className="grid h-10 w-10 place-items-center rounded-full bg-white/15 font-[Poppins-Bold] text-[14px] ring-1 ring-white/25 sm:h-11 sm:w-11">
+                {getInitials(branchInfo.userName)}
               </div>
 
               <button
                 type="button"
                 onClick={handleClose}
-                className="grid h-11 w-11 place-items-center rounded-2xl text-white shadow-[0_10px_24px_rgba(0,0,0,0.16)] sm:h-12 sm:w-12"
+                title="Logout"
+                aria-label="Logout"
+                className="grid h-10 w-10 place-items-center rounded-2xl text-[#fff] shadow-[0_10px_24px_rgba(0,0,0,0.25)] transition-transform hover:scale-105 active:scale-95 sm:h-11 sm:w-11"
                 style={{
-                  background: `linear-gradient(180deg, ${brandPrimary} 0%, ${brandSecondary} 100%)`,
+                  background: `linear-gradient(160deg, ${brandPrimary} 0%, ${brandSecondary} 100%)`,
                 }}
               >
-                <FaPowerOff className="text-[22px]" />
+                <FaPowerOff className="text-[18px]" />
               </button>
-            </div>
-          </div>
-
-          <div className="absolute left-0 right-0 -bottom-6 flex items-center justify-between px-4">
-            <div className="flex gap-4 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-bold text-white backdrop-blur-md">
-              <span>Terminal: {branchInfo.terminalNo}</span>
-              <span>Shift: {branchInfo.shiftNo}</span>
-              <span
-                className={
-                  branchInfo.shiftStatus === "Open"
-                    ? "text-green-400"
-                    : "text-orange-400"
-                }
-              >
-                Status: {branchInfo.shiftStatus}
-              </span>
             </div>
           </div>
         </header>
@@ -745,40 +766,33 @@ const LayoutPos = ({ children }) => {
         <main
           className="h-full overflow-y-auto px-3 sm:px-4"
           style={{
-            paddingTop: `${HEADER_HEIGHT + 28}px`,
+            paddingTop: `${HEADER_HEIGHT + 12}px`,
             paddingBottom: `${FOOTER_HEIGHT + 18}px`,
           }}
         >
           {children}
         </main>
 
-        <div
-          className="fixed bottom-0 left-0 right-0 z-40 px-3 pb-3 pt-2 sm:px-4 sm:pb-4"
-          style={{
-            background: "transparent",
-            backdropFilter: "blur(6px)",
-          }}
-        >
-          <div className="flex flex-wrap gap-2 sm:gap-2.5">{quickActions}</div>
+        <div className="fixed bottom-0 left-0 right-0 z-40 px-3 pb-3 sm:px-4 sm:pb-4">
+          <nav
+            aria-label="POS actions"
+            className="no-scrollbar mx-auto flex w-fit max-w-full items-end gap-3 overflow-x-auto rounded-[26px] border border-white/15 bg-[rgba(30,10,60,0.46)] p-3 shadow-[0_18px_44px_rgba(0,0,0,0.30)] backdrop-blur-md"
+          >
+            {dockGroups.map((group, index) => (
+              <React.Fragment key={group.key}>
+                {index > 0 && (
+                  <div className="mx-1 h-[92px] w-px shrink-0 self-end bg-white/15" />
+                )}
+                <div className="flex shrink-0 flex-col gap-1.5">
+                  <div className="px-1 font-[Poppins-SemiBold] text-[10px] uppercase tracking-[0.2em] text-[rgba(255,255,255,0.6)]">
+                    {group.label}
+                  </div>
+                  <div className="flex gap-2">{group.items}</div>
+                </div>
+              </React.Fragment>
+            ))}
+          </nav>
         </div>
-
-        {canOpenSettings && (
-          <div className="fixed bottom-3 right-3 z-50 sm:bottom-4 sm:right-4">
-            <button
-              onClick={() => setIsSettingsOpen(true)}
-              className={`grid h-12 w-12 place-items-center rounded-full border shadow-[0_12px_30px_rgba(0,0,0,0.18)] transition-transform hover:scale-110 active:scale-95 sm:h-14 sm:w-14 ${
-                isDark
-                  ? "border-white/10 bg-slate-900/85"
-                  : "border-white/75 bg-white/88"
-              }`}
-            >
-              <FaCog
-                className="text-[24px] sm:text-[26px]"
-                style={{ color: brandSecondary }}
-              />
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );

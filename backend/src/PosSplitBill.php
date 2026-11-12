@@ -90,7 +90,7 @@ function posSplitBillReason(array $state): ?string
     }
     foreach (['void_date', 'refund_date'] as $column) {
         $date = trim((string)($header[$column] ?? ''));
-        if ($date !== '' && $date !== '0' && !str_starts_with($date, '0000-00-00')) {
+        if ($date !== '' && $date !== '0' && strncmp($date, '0000-00-00', 10) !== 0) {
             return 'Voided or refunded transactions cannot be split.';
         }
     }

@@ -1,5 +1,6 @@
 import React, { forwardRef } from "react";
 import { getOrderItemDisplayName } from "../../utils/orderItemDisplayName";
+import { getBillDocument } from "../../utils/billDocument";
 
 const rowStyle = { display: "flex", justifyContent: "space-between", margin: "1px 0" };
 const labelStyle = { fontWeight: 600 };
@@ -31,6 +32,7 @@ const Receipt = forwardRef(({ transaction, detailedproduct, businessInfo = {} },
       terminalNo: transaction?.terminal_number || "N/A",
       orderType: transaction?.order_type || "N/A",
       refTag: transaction?.table_number || "N/A",
+      ...(transaction?.guest_name ? { guest: transaction.guest_name } : {}),
       cashier: transaction?.cashier || "N/A",
     },
     items: items.map((item) => {
@@ -105,7 +107,7 @@ const Receipt = forwardRef(({ transaction, detailedproduct, businessInfo = {} },
       <hr style={hrStyle} />
 
       <div style={{ padding: "8px 0", textAlign: "center" }}>
-        <h1 style={{ margin: 0, fontSize: "14px" }}>BILLING</h1>
+        <h1 style={{ margin: 0, fontSize: "14px" }}>{getBillDocument(transaction?.order_type).title}</h1>
       </div>
 
       {Object.entries(receiptData.billing).map(([key, value]) => (

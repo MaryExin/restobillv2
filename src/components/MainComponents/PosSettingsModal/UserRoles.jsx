@@ -189,7 +189,7 @@ const UserRoles = () => {
                 <div className="space-y-2">
                   <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600">
                     <span className="h-2 w-2 rounded-full bg-orange-600" />
-                    Lightem • User Access Control
+                    Richwell • User Access Control
                   </div>
 
                   <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-slate-900">

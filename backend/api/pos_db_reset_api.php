@@ -54,15 +54,29 @@ try {
                 'tbl_pos_transactions_other_charges',
                 'tbl_pos_transactions_payments',
                 'tbl_pos_zreading_archive_log',
-                'tbl_pos_document_counters' // Eto yung nate-truncate kaya nawawalan ng laman
+                'tbl_pos_document_counters' // truncated too, then re-seeded below
         ];
 
         foreach ($tables as $table) {
             $pdo->exec("TRUNCATE TABLE `$table`;");
         }
 
+        // Tables added by newer features (reservations, customer registry) are
+        // transaction data too; they exist only once their migration (or first
+        // use) created them, so they are cleared when present.
+        $optionalTables = ['tbl_pos_reservations', 'tbl_pos_customers'];
+        $truncateIfExists = static function (PDO $db, array $names): void {
+            foreach ($names as $table) {
+                $exists = $db->query("SHOW TABLES LIKE " . $db->quote($table))->fetchColumn() !== false;
+                if ($exists) {
+                    $db->exec("TRUNCATE TABLE `$table`;");
+                }
+            }
+        };
+        $truncateIfExists($pdo, $optionalTables);
+
             // --- INSERT NEW COUNTER VALUES WITH CODES FROM BUSINESS UNITS ---
-            // Gumamit ng SELECT para makuha ang Category_Code at Unit_Code
+            // The business unit supplies the Category_Code and Unit_Code.
         $sql = "INSERT INTO tbl_pos_document_counters (
                         Category_Code,
                         Unit_Code,
@@ -83,7 +97,7 @@ try {
                         :refund_id,
                         :void_id
                     FROM tbl_main_business_units
-                    LIMIT 1"; // LIMIT 1 kung isang row lang ang laman o kailangan mo
+                    LIMIT 1"; // one counter row for the (single) business unit
 
         $stmt = $pdo->prepare($sql);
         $stmt->execute([
@@ -125,6 +139,7 @@ try {
         foreach ($reportTables as $table) {
             $reportPdo->exec("TRUNCATE TABLE `$table`;");
         }
+        $truncateIfExists($reportPdo, $optionalTables);
 
         $reportPdo->exec("SET FOREIGN_KEY_CHECKS = 1;");
 

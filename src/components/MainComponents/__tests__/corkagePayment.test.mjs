@@ -11,6 +11,7 @@ import * as ReactDOMServer from "react-dom/server";
 import { transformSync } from "@swc/core";
 import * as discountMath from "../../../utils/discountLineMath.js";
 import * as displayNames from "../../../utils/orderItemDisplayName.js";
+import * as billDocument from "../../../utils/billDocument.js";
 
 const root = new URL("../../../../", import.meta.url);
 const require = createRequire(import.meta.url);
@@ -51,6 +52,12 @@ function paymentHarness(details) {
     },
     useEffect(effect) { effects.push(effect); },
     useMemo(factory) { return factory(); },
+    // Refs share the slot sequence with state so they persist across renders.
+    useRef(initial) {
+      const slot = index++;
+      if (!(slot in states)) states[slot] = { current: initial };
+      return states[slot];
+    },
   };
   const modules = {
     react: hooks,
@@ -208,7 +215,7 @@ async function nativePrinterHarness() {
 
 test("billing and payment HTML/native receipts print fixed Corkage once and retain the final amount", async () => {
   const modules = { react: React, "react-dom/server": ReactDOMServer,
-    "./orderItemDisplayName": displayNames };
+    "./orderItemDisplayName": displayNames, "./billDocument": billDocument };
   const { BuildPrintableDiscountReceiptHtml } = compile("src/utils/BuildPrintableDiscountReceiptHtml.jsx", modules);
   const { BuildPosPaymentReceiptHtml } = compile("src/utils/BuildPosPaymentReceiptHtml.jsx", modules);
   const PaymentReceipt = compile("src/components/MainComponents/PosPaymentReceipt.jsx", {

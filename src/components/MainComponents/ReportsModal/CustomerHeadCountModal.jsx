@@ -18,6 +18,9 @@ import useReportDateAccess from "../../../hooks/useReportDateAccess";
 import { getCurrentUserRole } from "../../../utils/getCurrentUserRole";
 import { posAuthenticatedFetch } from "../../../utils/posAuthenticatedFetch";
 
+// Richwell: the Print button is hidden; set to true to bring it back.
+const SHOW_PRINT_BUTTON = false;
+
 const number = (value) => Number(value || 0).toLocaleString();
 
 const CustomCalendar = ({
@@ -282,9 +285,12 @@ const CustomerHeadCountModal = ({ isOpen, onClose }) => {
               <button onClick={handleExportExcel} className={`flex h-11 items-center gap-2 rounded-2xl border px-4 text-sm font-semibold transition ${isDark ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500 hover:text-white" : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white"}`}>
                 <FaFileExcel size={14} /> Export Excel
               </button>
-              <button onClick={handlePrint} className={`flex h-11 items-center gap-2 rounded-2xl border px-4 text-sm font-semibold transition ${isDark ? "border-blue-500/20 bg-blue-500/10 text-blue-300 hover:bg-blue-600 hover:text-white" : "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white"}`}>
-                <FaPrint size={14} /> Print
-              </button>
+              {/* Print button: hidden for Richwell (SHOW_PRINT_BUTTON) */}
+              {SHOW_PRINT_BUTTON && (
+                <button onClick={handlePrint} className={`flex h-11 items-center gap-2 rounded-2xl border px-4 text-sm font-semibold transition ${isDark ? "border-blue-500/20 bg-blue-500/10 text-blue-300 hover:bg-blue-600 hover:text-white" : "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white"}`}>
+                  <FaPrint size={14} /> Print
+                </button>
+              )}
               <button onClick={onClose} className={`flex h-11 w-11 items-center justify-center rounded-2xl border transition ${isDark ? "border-white/10 bg-white/[0.04] text-slate-300 hover:bg-rose-500 hover:text-white" : "border-slate-200 bg-white text-slate-500 hover:bg-rose-500 hover:text-white"}`}>
                 <FaTimes size={16} />
               </button>

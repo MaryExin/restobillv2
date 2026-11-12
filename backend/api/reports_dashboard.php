@@ -20,14 +20,18 @@ $raw = file_get_contents("php://input");
 $body = json_decode($raw, true) ?: [];
 
 $reportKey = trim((string)($body["reportKey"] ?? ""));
+// reportKey => [permission group, permission key]
 $permissionByReportKey = [
-  "dashboard" => "dashboard",
-  "dailySales" => "dailySales",
-  "hourlySales" => "hourlySales",
-  "salesPerItem" => "salesPerItem",
-  "monthlySales" => "monthlySales",
-  "salesPerItemPerDate" => "salesPerItemPerDate",
-  "customerHeadCount" => "customerHeadCount",
+  "dashboard" => ["reports", "dashboard"],
+  "dailySales" => ["reports", "dailySales"],
+  "hourlySales" => ["reports", "hourlySales"],
+  "salesPerItem" => ["reports", "salesPerItem"],
+  "monthlySales" => ["reports", "monthlySales"],
+  "salesPerItemPerDate" => ["reports", "salesPerItemPerDate"],
+  "customerHeadCount" => ["reports", "customerHeadCount"],
+  // Full Sales Dashboard page (/salesdashboard): guarded by the same
+  // permission that opens the page itself.
+  "salesDashboard" => ["routes", "salesDashboard"],
 ];
 
 if (!isset($permissionByReportKey[$reportKey])) {
@@ -43,11 +47,12 @@ if (!isset($permissionByReportKey[$reportKey])) {
 // selected from the report database afterwards according to the date range.
 require __DIR__ . "/pdo.php";
 require_once __DIR__ . "/pos_role_authorization.php";
+[$permissionGroup, $permissionKey] = $permissionByReportKey[$reportKey];
 posRoleAuthRequirePermission(
   $pdo,
   (string)($GLOBALS["pos_user_id"] ?? ""),
-  "reports",
-  $permissionByReportKey[$reportKey]
+  $permissionGroup,
+  $permissionKey
 );
 
 $datefrom = $body["datefrom"] ?? date("Y-m-d");
@@ -463,6 +468,15 @@ $response = [
 ];
 
 switch ($reportKey) {
+  case "salesDashboard":
+    // Everything the Sales Dashboard page renders in one response.
+    $response["kpi"] = $kpi;
+    $response["dailySales"] = $dailyRows;
+    $response["dailyGraph"] = $dailyGraphRows;
+    $response["hourlySales"] = $hourlyRows;
+    $response["hourlySalesPerProduct"] = $hourlyPerProductRows;
+    $response["salesPerProduct"] = $perProductRows;
+    break;
   case "dashboard":
     $response["kpi"] = $kpi;
     $response["salesPerProduct"] = $perProductRows;

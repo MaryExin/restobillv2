@@ -20,6 +20,22 @@ if ($requiresMutationAuthorization) {
     require_once __DIR__ . "/pos_role_authorization.php";
 }
 
+// array_is_list() only exists from PHP 8.1; keep this endpoint working on
+// PHP 7.4 / 8.0 installs (e.g. Windows XAMPP).
+if (!function_exists("array_is_list")) {
+    function array_is_list(array $array): bool
+    {
+        $expected = 0;
+        foreach ($array as $key => $_value) {
+            if ($key !== $expected) {
+                return false;
+            }
+            $expected++;
+        }
+        return true;
+    }
+}
+
 const AUTO_SERVICE_TYPE_CATEGORY = "Service";
 const AUTO_SERVICE_TYPE_PREFIX = "Service Charge Auto Types: ";
 

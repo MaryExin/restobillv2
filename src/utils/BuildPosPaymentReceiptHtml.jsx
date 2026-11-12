@@ -498,6 +498,12 @@ export function BuildPosPaymentReceiptHtml({
                     {safeTransaction?.table_number || "-"}
                   </td>
                 </tr>
+                {safeTransaction?.guest_name ? (
+                  <tr>
+                    <td className="bold label-col">Guest:</td>
+                    <td className="value-col">{safeTransaction.guest_name}</td>
+                  </tr>
+                ) : null}
                 <tr>
                   <td className="bold label-col">Cashier:</td>
                   <td className="value-col">

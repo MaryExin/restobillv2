@@ -137,6 +137,33 @@ try {
     $item_categories = $stmt_cats->fetchAll();
 
     /* ------------------------------
+        7b. ITEM CATEGORIES PER SALES TYPE
+        Categories that have at least one priced, active product in each
+        sales type (same joins as get_pricing_selection.php), so the
+        ordering screen only lists sections that have items.
+    ------------------------------ */
+    $sql_cat_sales = "SELECT DISTINCT pbs.sales_type_id, pm.item_category
+                      FROM tbl_pricing_by_sales_type AS pbs
+                      INNER JOIN tbl_pricing_details AS pd
+                        ON pd.pricing_code = pbs.pricing_category
+                      INNER JOIN tbl_inventory_products_masterlist AS pm
+                        ON pm.product_id = pd.inv_code
+                      WHERE pbs.busunitcode = :pbs_unit_code
+                        AND pm.category_code = :pm_cat_code
+                        AND pm.unit_code = :pm_unit_code
+                        AND pm.status = 'Active'
+                      ORDER BY pm.item_category ASC";
+    $stmt_cat_sales = $pdo->prepare($sql_cat_sales);
+    $stmt_cat_sales->bindValue(':pbs_unit_code', $unit_code, PDO::PARAM_STR);
+    $stmt_cat_sales->bindValue(':pm_cat_code', $cat_code, PDO::PARAM_STR);
+    $stmt_cat_sales->bindValue(':pm_unit_code', $unit_code, PDO::PARAM_STR);
+    $stmt_cat_sales->execute();
+    $item_categories_by_sales_type = [];
+    foreach ($stmt_cat_sales->fetchAll() as $row) {
+        $item_categories_by_sales_type[(string)$row['sales_type_id']][] = $row['item_category'];
+    }
+
+    /* ------------------------------
         8. RESPONSE
     ------------------------------ */
     echo json_encode([
@@ -145,6 +172,7 @@ try {
         "inventory_types" => $inventory_types,
         "sales_types" => $sales_types,
         "item_categories" => $item_categories,
+        "item_categories_by_sales_type" => (object) $item_categories_by_sales_type,
         "report_mirror_synced" => $reportMirrorSynced,
         "report_mirror_warning" => $reportMirrorWarning
     ]);

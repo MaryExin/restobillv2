@@ -959,11 +959,11 @@ const LoginComponent = () => {
               className="inline-flex items-center space-x-3 ui-scale-in"
             >
               <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-                <span className="text-white font-bold text-xl">L</span>
+                <span className="text-white font-bold text-xl">R</span>
               </div>
               <h2 className="text-3xl font-bold">
                 <span className="bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
-                  Lightem
+                  Richwell
                 </span>
               </h2>
             </div>

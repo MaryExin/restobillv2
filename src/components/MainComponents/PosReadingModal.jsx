@@ -193,10 +193,8 @@ export default function PosReadingModal({
     return String(shiftingDate || "").split(" ")[0];
   }, [shiftingDate]);
 
-  const readingDatabaseScope = () =>
-    localStorage.getItem("posReadingDatabaseScope") === "report"
-      ? "report"
-      : "cnc";
+  // Readings always use the main POS database.
+  const readingDatabaseScope = () => "cnc";
 
   const resetForm = () => {
     setValues({

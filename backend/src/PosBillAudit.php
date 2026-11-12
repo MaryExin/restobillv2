@@ -2,22 +2,26 @@
 
 declare(strict_types=1);
 
-/** Numeric legacy audit columns cannot store the POS's textual business IDs. */
-function posBillAuditStoredUnit(PDO $pdo, string $table, string $unit): string|int
+/**
+ * Numeric legacy audit columns cannot store the POS's textual business IDs.
+ * Returns string|int (no union return type so PHP 7.4 can load this file).
+ */
+function posBillAuditStoredUnit(PDO $pdo, string $table, string $unit)
 {
     if (!in_array($table, ['tbl_main_activity_logs', 'tbl_main_transaction_logs'], true)) {
         throw new InvalidArgumentException('Unsupported bill audit table.');
     }
-    static $columnTypes;
-    $columnTypes ??= new WeakMap();
-    $types = $columnTypes[$pdo] ?? [];
+    // Per-connection cache keyed by object id (WeakMap is PHP 8+ only).
+    static $columnTypes = [];
+    $pdoKey = spl_object_id($pdo);
+    $types = $columnTypes[$pdoKey] ?? [];
     if (!isset($types[$table])) {
         $column = $pdo->query("SHOW COLUMNS FROM `{$table}` WHERE `Field` = 'Unit_Code'")->fetch(PDO::FETCH_ASSOC);
         if (!is_array($column) || !isset($column['Type'])) {
             throw new RuntimeException('The bill audit business-unit column could not be verified.');
         }
         $types[$table] = (string)$column['Type'];
-        $columnTypes[$pdo] = $types;
+        $columnTypes[$pdoKey] = $types;
     }
     $numeric = preg_match('/^(?:tinyint|smallint|mediumint|int|integer|bigint|decimal|numeric|float|double|real|bit)\b/i', $types[$table]);
     return $numeric && !is_numeric($unit) ? 0 : $unit;
@@ -110,8 +114,11 @@ function posBillAuditScopeRows(array $auditRows, array $transactionHeaders, stri
     return array_values($scoped);
 }
 
-/** Shared by the PDO mutation and mysqli table listing. */
-function posBillAuditReadRows(PDO|mysqli $db, string $category, string $unit, bool $lock = false): array
+/**
+ * Shared by the PDO mutation and mysqli table listing.
+ * @param PDO|mysqli $db (untyped so PHP 7.4 can load this file)
+ */
+function posBillAuditReadRows($db, string $category, string $unit, bool $lock = false): array
 {
     $fetch = static function (string $sql, array $parameters) use ($db): array {
         $read = $db->prepare($sql);

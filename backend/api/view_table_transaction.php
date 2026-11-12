@@ -7,6 +7,7 @@ header("Access-Control-Allow-Headers: Content-Type");
 header("Content-Type: application/json");
 
 $config = require __DIR__ . "/config.php";
+require_once __DIR__ . "/pos_guest_columns.php";
 
 $conn = new mysqli(
     $config["host"],
@@ -35,6 +36,8 @@ if ($transaction_id <= 0) {
 
 try {
     // 1) Read header
+    posEnsureGuestColumns($conn);
+
     $sqlHeader = "SELECT *
                   FROM tbl_pos_transactions
                   WHERE transaction_id = ?
@@ -106,8 +109,13 @@ try {
         "order_type" => $header["order_type"] ?? "DINE IN",
         "customer_head_count" => isset($header["customer_head_count"]) && (int)$header["customer_head_count"] > 0
             ? (int)$header["customer_head_count"]
-            : 1
-
+            : 1,
+        "guest_name" => (string)($header["guest_name"] ?? ""),
+        "guest_contact" => (string)($header["guest_contact"] ?? ""),
+        "guest_request" => (string)($header["guest_request"] ?? ""),
+        "guest_payment_mode" => (string)($header["guest_payment_mode"] ?? ""),
+        "guest_payment_reference" => (string)($header["guest_payment_reference"] ?? ""),
+        "guest_payment_amount" => (string)($header["guest_payment_amount"] ?? ""),
     ];
 
     echo json_encode([

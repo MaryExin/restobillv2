@@ -174,7 +174,7 @@ export default function Pricing() {
               <div className="flex items-center  gap-2">
                 <img src={Logo} width={50} />
                 <h1 className="poppins-black text-md font-semibold drop-shadow-xl text-center">
-                  LIGHTEM
+                  RICHWELL
                 </h1>
               </div>
               <a
@@ -701,7 +701,7 @@ export default function Pricing() {
           </div>
         </div>
         <div className="mt-12 pt-8 border-t border-white/10 text-center text-sm text-white relative z-10">
-          &copy; {new Date().getFullYear()} Lightem Systems. All rights
+          &copy; {new Date().getFullYear()} Richwell Colleges. All rights
           reserved.
         </div>
       </footer>

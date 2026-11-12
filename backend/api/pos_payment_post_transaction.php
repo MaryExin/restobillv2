@@ -172,11 +172,15 @@ function allocateDocumentNumber(PDO $pdo, string $categoryCode, string $unitCode
 {
     $documentType = strtoupper(trim($documentType));
 
-    $counterColumn = match ($documentType) {
+    // PHP 7 compatible (no match expression): the Windows XAMPP may run PHP 7.4.
+    $counterColumns = [
         'BILLING' => 'next_billing_no',
         'RECEIPT' => 'next_invoice_no',
-        default => throw new Exception("Unsupported document type for counter allocation."),
-    };
+    ];
+    if (!isset($counterColumns[$documentType])) {
+        throw new Exception("Unsupported document type for counter allocation.");
+    }
+    $counterColumn = $counterColumns[$documentType];
 
     $defaultStart = $documentType === 'BILLING' ? 3000000001 : 4000000001;
 

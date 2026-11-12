@@ -1,10 +1,10 @@
 {
-  "name": "lightem_app",
+  "name": "richwell_pos",
   "private": true,
   "homepage": ".",
   "version": "0.0.1",
-  "description": "Lightem desktop app",
-  "author": "Lightem",
+  "description": "Richwell Colleges POS desktop app",
+  "author": "Richwell Colleges",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
@@ -100,7 +100,7 @@
   },
   "build": {
     "appId": "com.lenard.restobill",
-    "productName": "Lightem Pos",
+    "productName": "Richwell Colleges POS",
     "directories": {
       "output": "release"
     },

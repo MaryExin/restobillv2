@@ -48,6 +48,10 @@ async function mountTables({ floorLayout = false } = {}) {
     "../../context/useZustandLayoutMode": () => ({ layoutMode: "Restaurant" }),
     "../../context/ThemeContext": { useTheme: () => ({ themeSettings: {} }) },
     "../../hooks/useApiHost": () => "http://pos.test",
+    "../../hooks/useRoomReservations": () => ({ getRoomReservation: () => null }),
+    "../../hooks/usePersistedViewMode": (key, allowed, fallback) => hooks.useState(fallback),
+    "../Reservations/ReservedRoomTag": () => null,
+    "../../utils/guestInfo": { roomServiceCardNote: () => "" },
     "./Orderlist": Orderlist,
   };
   const context = {

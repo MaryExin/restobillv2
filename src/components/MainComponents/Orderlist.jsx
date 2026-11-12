@@ -30,6 +30,7 @@ import {
 } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import useApiHost from "../../hooks/useApiHost";
+import { getBillDocument } from "../../utils/billDocument";
 import { useTheme } from "../../context/ThemeContext";
 import ModalDiscountTransaction from "./ModalDiscountTransaction";
 import useZustandLoginCred from "../../context/useZustandLoginCred";
@@ -53,8 +54,23 @@ import useCoffeeAddonOptions from "../../hooks/useCoffeeAddonOptions";
 import CoffeeAddonModal from "./CoffeeAddonModal";
 import { isCclAddon, isCoffeeAddonDrink } from "../../utils/menuCoffeeAddons";
 import { getCoffeeAddonInstruction } from "../../utils/coffeeAddonCart";
+import {
+  composeOptionInstruction,
+  defaultOptionSelections,
+  buildOptionMaps,
+  parseOptionInstruction,
+  productOptionsEndpoint,
+  resolveOptionGroups,
+} from "../../utils/productOptions";
+import ProductOptionChips from "./Common/ProductOptionChips";
+import { guestHeaderLine, hasGuestInfo, normalizeGuestInfo } from "../../utils/guestInfo";
 import useMenuCombinationHalves from "../../hooks/useMenuPizzaHalves";
 import { getMenuVariantDetails, groupMenuProductVariants } from "../../utils/menuProductVariants";
+import {
+  buildCategoryMap,
+  filterCategoriesForSalesType,
+  isCategoryInList,
+} from "../../utils/salesTypeCategories";
 import { isPizzaVariantGroup, createPizzaCombination, getPizzaCombinationChoices, getPizzaCombinationSizes, getPizzaCombinationInstruction } from "../../utils/menuPizzaCombination";
 import { isPlatterVariantGroup, createPlatterCombination, getPlatterCombinationPair, getPlatterCombinationChoices, getPlatterCombinationInstruction } from "../../utils/menuPlatterCombination";
 import { isChickenVariantGroup, getChickenCombinationSizes, getChickenCombinationChoices, createChickenCombination, getChickenCombinationInstruction } from "../../utils/menuChickenCombination";
@@ -103,6 +119,8 @@ const Orderlist = ({
   transactionId,
   onOrderSaved,
   initialHeadCount,
+  initialPreOrder = null,
+  initialGuestInfo = null,
 }) => {
   const defaultPrinterName = useGetDefaultPrinter();
   const { businessInfo } = useBusinessInfo();
@@ -125,6 +143,8 @@ const Orderlist = ({
   const [headCount, setHeadCount] = useState(
     Number(initialHeadCount) > 0 ? Number(initialHeadCount) : 1,
   );
+  // Optional guest details (name, contact, request) saved with the order.
+  const [guestInfo, setGuestInfo] = useState(() => normalizeGuestInfo(initialGuestInfo));
 
   // Tracks the transaction ID after first save so retries use update_order.php instead of save_order.php
   const internalTransactionIdRef = useRef(null);
@@ -175,6 +195,8 @@ const Orderlist = ({
 
   const [productsearch, setproductsearch] = useState("");
   const [categorylist, setcategorylist] = useState([]);
+  // { [sales_type_id]: Set<CATEGORY> } from new_transactions.php; null = show all
+  const [categoryMapBySalesType, setCategoryMapBySalesType] = useState(null);
   const [selectcategory, setselectcategory] = useState("");
   const [selectedSubcategory, setSelectedSubcategory] = useState("");
   const [productlist, setproductlist] = useState([]);
@@ -229,6 +251,20 @@ const Orderlist = ({
     useState(false);
   const [selectedInstructionItem, setSelectedInstructionItem] = useState(null);
   const [itemInstructionText, setItemInstructionText] = useState("");
+  // Suggested per-product options (Rice, Egg, Sugar...) keyed by product_id.
+  const [productOptionsMap, setProductOptionsMap] = useState({ byProduct: {}, byCategory: {} });
+  const [instructionSelections, setInstructionSelections] = useState({});
+  // "add": opened right after an item was added (Skip keeps the item);
+  // "edit": opened from the note button on an order line.
+  const [instructionMode, setInstructionMode] = useState("edit");
+  const [askOptionsOnAdd, setAskOptionsOnAdd] = useState(() => {
+    try {
+      return localStorage.getItem("posAskItemOptions") !== "false";
+    } catch {
+      return true;
+    }
+  });
+  const cartItemsRef = useRef([]);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [discountTransaction, setDiscountTransaction] = useState(null);
 
@@ -343,9 +379,19 @@ const Orderlist = ({
 
           setSalesTypeList(salesTypes);
           setcategorylist(itemCategories);
+          setCategoryMapBySalesType(
+            buildCategoryMap(result.item_categories_by_sales_type),
+          );
 
           if (salesTypes.length > 0) {
-            setSelectedSalesType(String(salesTypes[0].sales_type_id));
+            // Default to the first type, but keep a type already chosen (a
+            // reservation or room-service pre-order) when the setup is
+            // re-fetched, e.g. once the user id arrives.
+            setSelectedSalesType((current) =>
+              current && salesTypes.some((type) => String(type.sales_type_id) === String(current))
+                ? current
+                : String(salesTypes[0].sales_type_id),
+            );
           }
 
           if (itemCategories.length > 0) {
@@ -360,6 +406,7 @@ const Orderlist = ({
           });
           setSalesTypeList([]);
           setcategorylist([]);
+          setCategoryMapBySalesType(null);
         }
       } catch (error) {
         console.error("Failed to fetch new transaction setup:", error);
@@ -371,11 +418,63 @@ const Orderlist = ({
         });
         setSalesTypeList([]);
         setcategorylist([]);
+        setCategoryMapBySalesType(null);
       }
     };
 
     fetchNewTransaction();
   }, [apiHost, userId]);
+
+  // Suggested options for every product of this business unit, loaded once.
+  useEffect(() => {
+    const categoryCode = newtransaction?.business_info?.Category_Code || "";
+    const unitCode = newtransaction?.business_info?.Unit_Code || "";
+    if (!apiHost || !categoryCode || !unitCode) return undefined;
+    let cancelled = false;
+    const loadProductOptions = async () => {
+      try {
+        const params = new URLSearchParams({ category_code: categoryCode, unit_code: unitCode });
+        const response = await fetch(`${productOptionsEndpoint(apiHost)}?${params.toString()}`);
+        const result = await response.json();
+        if (cancelled) return;
+        setProductOptionsMap(buildOptionMaps(result?.success ? result?.data : null));
+      } catch (error) {
+        if (!cancelled) console.error("Failed to load product options:", error);
+      }
+    };
+    loadProductOptions();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiHost, newtransaction?.business_info?.Category_Code, newtransaction?.business_info?.Unit_Code]);
+
+  // A product's own groups, else its category's defaults (new items get
+  // suggestions automatically).
+  const getProductOptionGroups = useCallback(
+    (productId, itemCategory) => resolveOptionGroups(productOptionsMap, productId, itemCategory),
+    [productOptionsMap],
+  );
+
+  // Menu sections for the selected sales type only (e.g. no BEER or LAUNDRY
+  // under DINE IN). Falls back to every category when the API has no map.
+  const visibleCategoryList = useMemo(
+    () =>
+      filterCategoriesForSalesType(
+        categorylist,
+        categoryMapBySalesType,
+        selectedSalesType,
+      ),
+    [categorylist, categoryMapBySalesType, selectedSalesType],
+  );
+
+  // Switching sales type: keep the current section if it exists there,
+  // otherwise jump to the first section that has items.
+  useEffect(() => {
+    if (!categoryMapBySalesType || visibleCategoryList.length === 0) return;
+    if (!isCategoryInList(visibleCategoryList, selectcategory)) {
+      setselectcategory(visibleCategoryList[0].item_category);
+    }
+  }, [categoryMapBySalesType, visibleCategoryList, selectcategory]);
 
   useEffect(() => {
     const loadPrinters = async () => {
@@ -437,6 +536,7 @@ const Orderlist = ({
             items: additionalCartItems,
             total: additionalTotalPrice,
             instructions,
+            guest: guestInfo,
             transactionId: resolvedTransactionId,
             printMode: resolvedPrintMode,
             printerName: printerName || defaultPrinterName || "",
@@ -450,6 +550,7 @@ const Orderlist = ({
             totalPrice: additionalTotalPrice,
             tableselected,
             instructions,
+            guest: guestInfo,
             transactionId: resolvedTransactionId,
             printMode: resolvedPrintMode,
           }),
@@ -501,6 +602,7 @@ const Orderlist = ({
               items: cartSummaryItems,
               total: totalPrice,
               instructions,
+              guest: guestInfo,
               transactionId,
             });
           }
@@ -510,6 +612,7 @@ const Orderlist = ({
             items: cartSummaryItems,
             total: totalPrice,
             instructions,
+            guest: guestInfo,
             transactionId,
             printerName: printerName || defaultPrinterName || "",
             printMode: resolvedPrintMode,
@@ -524,6 +627,7 @@ const Orderlist = ({
             totalPrice,
             tableselected,
             instructions,
+            guest: guestInfo,
             transactionId,
             printMode: resolvedPrintMode,
           }),
@@ -590,7 +694,7 @@ const Orderlist = ({
       }
 
       if (!printResult?.success) {
-        alert(printResult?.message || "Billing printing failed");
+        alert(printResult?.message || `${getBillDocument(transaction?.order_type).noun} printing failed`);
         return;
       }
 
@@ -938,6 +1042,9 @@ const Orderlist = ({
         }));
 
         setSourceTransactionSummary(data.summary || {});
+        if (data.summary && ("guest_name" in data.summary || "guest_contact" in data.summary)) {
+          setGuestInfo(normalizeGuestInfo(data.summary));
+        }
 
         if (Number(data.summary?.customer_head_count) > 0) {
           setHeadCount(Number(data.summary.customer_head_count));
@@ -1669,7 +1776,10 @@ const Orderlist = ({
     setShowDeleteItemModal(false);
   };
 
-  const addToCart = useCallback((product, regularCoffee = false) => {
+  // Latest cart for addToCart (its memoized closure would otherwise be stale).
+  cartItemsRef.current = productcart?.items || [];
+
+  const addToCart = useCallback((product, regularCoffee = false, addOptions = {}) => {
     if (isCclAddon(product)) {
       alert("This add-on is not available for ordering.");
       setproductsearch("");
@@ -1689,6 +1799,20 @@ const Orderlist = ({
       }
       return;
     }
+    // Suggested options: a product that has option groups gets its own order
+    // line and the option picker opens right away (not for barcode scans,
+    // kiosk/retail layouts, or when the cashier turned the prompt off).
+    const optionGroups = getProductOptionGroups(product.product_id, product.item_category);
+    const promptForOptions =
+      optionGroups.length > 0 &&
+      askOptionsOnAdd &&
+      addOptions.promptOptions !== false &&
+      !regularCoffee &&
+      layoutMode !== "Kiosk" &&
+      !isRetailPosMode &&
+      restoreLoadedQuantityByCode(cartItemsRef.current, product.product_id, 1).restored < 1;
+    const promptLineId = promptForOptions ? makeLineId("new") : null;
+
     syncCartState((items) => {
       const restoredResult = restoreLoadedQuantityByCode(
         items,
@@ -1701,9 +1825,11 @@ const Orderlist = ({
       }
 
       const nextItems = [...restoredResult.items];
-      const existing = nextItems.find(
-        (i) => i.code === product.product_id && i.isLoadedFromDB !== true && !i.itemInstruction,
-      );
+      const existing = promptLineId
+        ? null
+        : nextItems.find(
+            (i) => i.code === product.product_id && i.isLoadedFromDB !== true && !i.itemInstruction,
+          );
 
       if (existing) {
         return nextItems.map((i) =>
@@ -1714,7 +1840,7 @@ const Orderlist = ({
       }
 
       nextItems.push({
-        lineId: makeLineId("new"),
+        lineId: promptLineId || makeLineId("new"),
         code: product.product_id,
         name: product.item_name,
         price: Number(product.selling_price) || 0,
@@ -1730,8 +1856,130 @@ const Orderlist = ({
       return nextItems;
     });
 
+    if (promptLineId) {
+      setSelectedInstructionItem({
+        lineId: promptLineId,
+        code: product.product_id,
+        name: product.item_name,
+        item_category: product.item_category || "",
+        itemInstruction: "",
+      });
+      setInstructionSelections(defaultOptionSelections(optionGroups));
+      setItemInstructionText("");
+      setInstructionMode("add");
+      setShowItemInstructionModal(true);
+    }
+
     setproductsearch("");
-  }, [syncCartState, restoreLoadedQuantityByCode]);
+  }, [
+    syncCartState,
+    restoreLoadedQuantityByCode,
+    getProductOptionGroups,
+    askOptionsOnAdd,
+    layoutMode,
+    isRetailPosMode,
+  ]);
+
+  // Reservation pre-order: when a reserved room is opened from the
+  // Reservations page ("Order"), switch to the pre-order's service type and
+  // fill the cart with those items at today's prices. New orders only.
+  const preOrderAppliedRef = useRef(false);
+  useEffect(() => {
+    if (preOrderAppliedRef.current || transactionId) return;
+    const items = Array.isArray(initialPreOrder?.items) ? initialPreOrder.items : [];
+    if (items.length === 0) return;
+
+    const categoryCode = newtransaction?.business_info?.Category_Code || "";
+    const unitCode = newtransaction?.business_info?.Unit_Code || "";
+    if (!apiHost || !categoryCode || !unitCode || salesTypeList.length === 0) return;
+    preOrderAppliedRef.current = true;
+
+    const wanted = String(initialPreOrder.salesType || "").trim().toUpperCase();
+    const matchedSalesType = salesTypeList.find(
+      (type) =>
+        String(type.sales_type || type.description || "").trim().toUpperCase() === wanted,
+    );
+    const salesTypeDesc = matchedSalesType
+      ? matchedSalesType.sales_type || matchedSalesType.description
+      : selectedSalesTypeObject?.sales_type || selectedSalesTypeObject?.description || "";
+    if (matchedSalesType) {
+      setSelectedSalesType(String(matchedSalesType.sales_type_id));
+    }
+
+    const quantities = new Map(
+      items.map((item) => [
+        String(item.product_id),
+        Math.min(999, Math.max(1, Number(item.quantity) || 1)),
+      ]),
+    );
+    // Options / special instruction chosen with the pre-order.
+    const instructions = new Map(
+      items.map((item) => [String(item.product_id), String(item.item_instruction || "").trim()]),
+    );
+
+    const applyPreOrder = async () => {
+      try {
+        const response = await fetch(`${apiHost}/api/get_pricing_selection.php`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            category_code: categoryCode,
+            unit_code: unitCode,
+            sales_type: salesTypeDesc,
+            codes: Array.from(quantities.keys()),
+          }),
+        });
+        const result = await response.json();
+        const products =
+          result?.status === "success" && Array.isArray(result.products) ? result.products : [];
+        const byId = new Map(products.map((product) => [String(product.product_id), product]));
+
+        const lines = [];
+        quantities.forEach((quantity, productId) => {
+          const product = byId.get(productId);
+          if (!product) return;
+          lines.push({
+            lineId: makeLineId("new"),
+            code: product.product_id,
+            name: product.item_name,
+            price: Number(product.selling_price) || 0,
+            unit_cost: Number(product.unit_cost) || 0,
+            quantity,
+            isDiscountable: product.isDiscountable,
+            itemInstruction: instructions.get(productId) || "",
+            vatable: product.vatable,
+            item_category: product.item_category || "",
+            isLoadedFromDB: false,
+          });
+        });
+        if (lines.length) {
+          syncCartState((cartItems) => [...cartItems, ...lines]);
+        }
+
+        const missing = items
+          .filter((item) => !byId.has(String(item.product_id)))
+          .map((item) => item.item_name || item.product_id);
+        if (missing.length) {
+          alert(
+            `These pre-ordered items are no longer on the ${salesTypeDesc} menu and were not added:\n${missing.join(", ")}`,
+          );
+        }
+      } catch (error) {
+        console.error("Failed to load the reservation pre-order:", error);
+        alert("Could not load the pre-ordered items. Please add them manually.");
+      }
+    };
+
+    applyPreOrder();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    initialPreOrder,
+    transactionId,
+    apiHost,
+    newtransaction?.business_info?.Category_Code,
+    newtransaction?.business_info?.Unit_Code,
+    salesTypeList,
+  ]);
 
   const addCoffeeSelection = (requestedAddon) => {
     const current = activeCoffeeOptionsRef.current;
@@ -1844,7 +2092,7 @@ const Orderlist = ({
     );
 
     if (existingMatch) {
-      addToCart(existingMatch);
+      addToCart(existingMatch, false, { promptOptions: false });
       return;
     }
 
@@ -1887,7 +2135,7 @@ const Orderlist = ({
       );
 
       if (scannedMatch) {
-        addToCart(scannedMatch);
+        addToCart(scannedMatch, false, { promptOptions: false });
       } else {
         alert(`No item found for scanned code: ${scannedCode}`);
         setproductsearch("");
@@ -2013,43 +2261,95 @@ const Orderlist = ({
 
   const openItemInstructionModal = (item) => {
     item = getOrderCombinationSourceItem(item);
-    setSelectedInstructionItem(item);
-    setItemInstructionText(orderCombinationKey(item)
+    const rawText = orderCombinationKey(item)
       ? item.itemInstruction.split("\n").slice(1).join("\n")
-      : item?.itemInstruction || "");
+      : item?.itemInstruction || "";
+    const parsed = parseOptionInstruction(
+      getProductOptionGroups(item?.code, item?.item_category),
+      rawText,
+    );
+    setSelectedInstructionItem(item);
+    setInstructionSelections(parsed.selections);
+    setItemInstructionText(parsed.freeText);
+    setInstructionMode("edit");
     setShowItemInstructionModal(true);
+  };
+
+  const closeItemInstructionModal = () => {
+    setShowItemInstructionModal(false);
+    setSelectedInstructionItem(null);
+    setItemInstructionText("");
+    setInstructionSelections({});
+    setInstructionMode("edit");
+  };
+
+  // A just-added line joins an existing line of the same product and note,
+  // so tapping the same item with the same choices adds up the quantity.
+  const mergeDuplicateLine = (items, lineId) => {
+    const line = items.find((item) => item.lineId === lineId);
+    if (!line) return items;
+    const twin = items.find(
+      (item) =>
+        item.lineId !== lineId &&
+        item.code === line.code &&
+        item.isLoadedFromDB !== true &&
+        String(item.itemInstruction || "") === String(line.itemInstruction || ""),
+    );
+    if (!twin) return items;
+    return items
+      .filter((item) => item.lineId !== lineId)
+      .map((item) =>
+        item.lineId === twin.lineId
+          ? { ...item, quantity: Number(item.quantity || 0) + Number(line.quantity || 0) }
+          : item,
+      );
+  };
+
+  const applyItemInstruction = (itemInstruction) => {
+    if (!selectedInstructionItem) return;
+    const target = selectedInstructionItem;
+    const update = (items) => {
+      const next = items.map((item) =>
+        (item.lineId === target.lineId || isSameOrderCombination(item, target)) &&
+        item.isLoadedFromDB !== true
+          ? { ...item, itemInstruction }
+          : item,
+      );
+      return instructionMode === "add" ? mergeDuplicateLine(next, target.lineId) : next;
+    };
+
+    setproductcart((prev) => ({ ...prev, items: update(prev.items) }));
+    setcartforqr((prev) => ({ ...prev, items: update(prev.items) }));
+    closeItemInstructionModal();
   };
 
   const saveItemInstruction = () => {
     if (!selectedInstructionItem) return;
+    const composed = composeOptionInstruction(
+      getProductOptionGroups(selectedInstructionItem.code, selectedInstructionItem.item_category),
+      instructionSelections,
+      itemInstructionText,
+    );
     const itemInstruction = orderCombinationKey(selectedInstructionItem)
-      ? [selectedInstructionItem.itemInstruction.split("\n")[0], itemInstructionText.trim()].filter(Boolean).join("\n")
-      : itemInstructionText;
-
-    setproductcart((prev) => ({
-      ...prev,
-      items: prev.items.map((item) =>
-        (item.lineId === selectedInstructionItem.lineId || isSameOrderCombination(item, selectedInstructionItem)) &&
-        item.isLoadedFromDB !== true
-          ? { ...item, itemInstruction }
-          : item,
-      ),
-    }));
-
-    setcartforqr((prev) => ({
-      ...prev,
-      items: prev.items.map((item) =>
-        (item.lineId === selectedInstructionItem.lineId || isSameOrderCombination(item, selectedInstructionItem)) &&
-        item.isLoadedFromDB !== true
-          ? { ...item, itemInstruction }
-          : item,
-      ),
-    }));
-
-    setShowItemInstructionModal(false);
-    setSelectedInstructionItem(null);
-    setItemInstructionText("");
+      ? [selectedInstructionItem.itemInstruction.split("\n")[0], composed].filter(Boolean).join("\n")
+      : composed;
+    applyItemInstruction(itemInstruction);
   };
+
+  // Skip on a just-added item keeps it with no note; Cancel on an edit
+  // leaves the line unchanged.
+  const skipItemInstruction = () => {
+    if (instructionMode === "add") {
+      applyItemInstruction("");
+      return;
+    }
+    closeItemInstructionModal();
+  };
+
+  const instructionGroups = getProductOptionGroups(
+    selectedInstructionItem?.code,
+    selectedInstructionItem?.item_category,
+  );
 
   const buildShortQrValue = () => {
     const refTx = transactionId || `NEW-${Date.now()}`;
@@ -2114,7 +2414,7 @@ const Orderlist = ({
 
     const payload = {
       transaction_id: transaction.transaction_id,
-      printTitle: "BILLING", // change to "RECEIPT" if needed
+      printTitle: "BILLING", // API value for numbering; printed name comes from getBillDocument()
       transStatus: "Pending for Payment", // or "Settled" if receipt/payment final
       category_code: transaction.Category_Code || transaction.category_code,
       unit_code: transaction.Unit_Code || transaction.unit_code || "",
@@ -2255,6 +2555,12 @@ const Orderlist = ({
       );
       formData.append("order_type", orderTypeName);
       formData.append("customer_head_count", headCount);
+      formData.append("guest_name", guestInfo.name || "");
+      formData.append("guest_contact", guestInfo.contact || "");
+      formData.append("guest_request", guestInfo.request || "");
+      formData.append("guest_payment_mode", guestInfo.paymentMode || "");
+      formData.append("guest_payment_reference", guestInfo.paymentReference || "");
+      formData.append("guest_payment_amount", guestInfo.paymentAmount || "");
       formData.append("discount_type", "");
       formData.append("payment_method", "");
       formData.append("special_instructions", instructions || "");
@@ -3509,6 +3815,16 @@ const Orderlist = ({
                       </span>
                     </h2>
                   )}
+                  {hasGuestInfo(guestInfo) && (
+                    <p
+                      className={`mt-0.5 text-[12px] font-semibold ${
+                        isDark ? "text-slate-300" : "text-slate-600"
+                      }`}
+                      title="Guest details for this order"
+                    >
+                      {guestHeaderLine(guestInfo)}
+                    </p>
+                  )}
                   <p
                     className={`text-xs uppercase tracking-widest ${
                       isDark ? "text-slate-400" : "text-slate-500"
@@ -3564,7 +3880,7 @@ const Orderlist = ({
                     boxShadow: "0 12px 28px var(--app-accent-glow)",
                   }}
                 >
-                  <FaReceipt /> View Billing
+                  <FaReceipt /> View Bill / Folio
                 </button>
               )}
 
@@ -3690,7 +4006,7 @@ const Orderlist = ({
                     </h3>
 
                     <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain no-scrollbar">
-                      {categorylist.map((cat, idx) => (
+                      {visibleCategoryList.map((cat, idx) => (
                         <button
                           key={idx}
                           onClick={() => {
@@ -6028,11 +6344,7 @@ const Orderlist = ({
                   Item Instruction
                 </h3>
                 <button
-                  onClick={() => {
-                    setShowItemInstructionModal(false);
-                    setSelectedInstructionItem(null);
-                    setItemInstructionText("");
-                  }}
+                  onClick={skipItemInstruction}
                   className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
                     isDark
                       ? "bg-white/10 hover:bg-white/20 text-slate-300"
@@ -6062,16 +6374,44 @@ const Orderlist = ({
                 </div>
               </div>
 
+              {instructionGroups.length > 0 && (
+                <div className="mb-4">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className={`text-sm ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                      Suggested options
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setInstructionSelections(defaultOptionSelections(instructionGroups))}
+                      className={`text-[11px] font-semibold ${
+                        isDark ? "text-slate-400 hover:text-white" : "text-slate-500 hover:text-slate-900"
+                      }`}
+                    >
+                      Reset to default
+                    </button>
+                  </div>
+                  <ProductOptionChips
+                    groups={instructionGroups}
+                    selections={instructionSelections}
+                    onChange={setInstructionSelections}
+                    isDark={isDark}
+                  />
+                  <p className={`mt-2 text-[11px] ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+                    Default choices are the usual serving; only changes are printed on the ticket.
+                  </p>
+                </div>
+              )}
+
               <div className="mb-5">
                 <label
                   className={`text-sm block mb-2 ${
                     isDark ? "text-slate-400" : "text-slate-500"
                   }`}
                 >
-                  Special instruction
+                  {instructionGroups.length > 0 ? "Other request (optional)" : "Special instruction"}
                 </label>
                 <textarea
-                  rows="5"
+                  rows={instructionGroups.length > 0 ? 2 : 5}
                   value={itemInstructionText}
                   onChange={(e) => setItemInstructionText(e.target.value)}
                   placeholder="Example: no onions, extra spicy, less ice..."
@@ -6088,24 +6428,42 @@ const Orderlist = ({
                   onClick={saveItemInstruction}
                   className="w-full py-3 font-bold text-white bg-blue-600 rounded-2xl hover:bg-blue-500"
                 >
-                  Save
+                  {instructionMode === "add" ? "Add to order" : "Save"}
                 </button>
 
                 <button
-                  onClick={() => {
-                    setItemInstructionText("");
-                    setShowItemInstructionModal(false);
-                    setSelectedInstructionItem(null);
-                  }}
+                  onClick={skipItemInstruction}
                   className={`w-full py-3 rounded-2xl font-bold transition-colors ${
                     isDark
                       ? "bg-white/10 text-white hover:bg-white/20"
                       : "bg-slate-200 text-slate-800 hover:bg-slate-300"
                   }`}
                 >
-                  Cancel
+                  {instructionMode === "add" ? "Skip" : "Cancel"}
                 </button>
               </div>
+
+              {instructionGroups.length > 0 && (
+                <label
+                  className={`mt-3 flex cursor-pointer items-center gap-2 text-[11px] ${
+                    isDark ? "text-slate-400" : "text-slate-500"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={askOptionsOnAdd}
+                    onChange={(event) => {
+                      setAskOptionsOnAdd(event.target.checked);
+                      try {
+                        localStorage.setItem("posAskItemOptions", event.target.checked ? "true" : "false");
+                      } catch {
+                        /* storage unavailable */
+                      }
+                    }}
+                  />
+                  Ask for options when adding items (use + on the order line for more of the same)
+                </label>
+              )}
             </div>
           </div>
         )}
@@ -6320,7 +6678,7 @@ const Orderlist = ({
                     onClick={() => navigate("/printbilling")}
                     className="w-full py-3 font-bold text-white transition-all bg-blue-600 rounded-2xl hover:bg-blue-500"
                   >
-                    Go to Billing Page
+                    Go to Bill / Folio Page
                   </button>
 
                   <button

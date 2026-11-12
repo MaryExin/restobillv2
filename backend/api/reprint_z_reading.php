@@ -31,6 +31,10 @@ $authenticatedAccount = posRoleAuthAccount($primaryPdo, $authenticatedUserId);
 $isSuperAdmin = posRoleAuthCanonicalValue(
     $authenticatedAccount["classification"] ?? ""
 ) === "2";
+// Reports and readings always read the main POS database only. In this
+// endpoint $isSuperAdmin only selects the data source (reports_database /
+// hybrid totals); access is enforced by posRoleAuthRequirePermission above.
+$isSuperAdmin = false;
 
 require_once __DIR__ . "/report_db.php";
 require_once __DIR__ . "/pos_z_reading_monthly_data.php";

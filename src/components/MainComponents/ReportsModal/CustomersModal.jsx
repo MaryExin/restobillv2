@@ -10,6 +10,29 @@ import useReportDateAccess from "../../../hooks/useReportDateAccess";
 import { getCurrentUserRole } from "../../../utils/getCurrentUserRole";
 import { posAuthenticatedFetch } from "../../../utils/posAuthenticatedFetch";
 
+// Reports > Customers reads the customer registry (tbl_pos_customers via
+// get_logs.php type "customers"): guests from orders, reservations and
+// discount cards, with their visits and spend inside the date range.
+const SOURCE_LABELS = { "walk-in": "Walk-in", reservation: "Reservation", discount: "Discount card" };
+const sourceLabel = (value) => SOURCE_LABELS[String(value || "").toLowerCase()] || "Walk-in";
+const formatAmount = (value) =>
+  Number(value || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const csvCell = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+const CSV_COLUMNS = [
+  { label: "Customer Code", value: (row) => row["Customer Code"] || "" },
+  { label: "Customer Name", value: (row) => row["Customer Name"] || "" },
+  { label: "Phone", value: (row) => row["Phone"] || "" },
+  { label: "Source", value: (row) => sourceLabel(row["Source"]) },
+  { label: "Registered", value: (row) => row["Registered"] || "" },
+  { label: "Last Visit", value: (row) => row["Last Visit"] || "" },
+  { label: "Visits", value: (row) => row["Visits"] ?? 0 },
+  { label: "Total Transactions", value: (row) => row["Total Transactions"] ?? 0 },
+  { label: "Total Spent", value: (row) => Number(row["Total Spent"] || 0).toFixed(2) },
+  { label: "Notes", value: (row) => row["Notes"] || "" },
+  { label: "Address", value: (row) => row["Address"] || "" },
+  { label: "Email", value: (row) => row["Email"] || "" },
+];
+
 const CustomersModal = ({ isOpen, onClose }) => {
   const { theme } = useTheme();
   const isDark = theme === "dark";
@@ -62,15 +85,9 @@ const CustomersModal = ({ isOpen, onClose }) => {
 
   const handleExportCSV = () => {
     if (filtered.length === 0) return;
-    const headers = ["Customer Name", "Phone", "Address", "Email", "Total Transactions"];
-    const rows = filtered.map(row => [
-      `"${row["Customer Name"] || ''}"`,
-      `"${row["Phone"] || ''}"`,
-      `"${row["Address"] || ''}"`,
-      `"${row["Email"] || ''}"`,
-      row["Total Transactions"] || 0
-    ]);
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+    const headers = CSV_COLUMNS.map((column) => column.label);
+    const rows = filtered.map((row) => CSV_COLUMNS.map((column) => csvCell(column.value(row))));
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((cells) => cells.join(","))].join("\n");
     const link = document.createElement("a");
     link.setAttribute("href", encodeURI(csvContent));
     link.setAttribute("download", `customers_${today}.csv`);
@@ -85,14 +102,18 @@ const CustomersModal = ({ isOpen, onClose }) => {
     doc.text("Customer Registry Report", 14, 15);
     doc.setFontSize(8);
     doc.text(`Range: ${dateRange.from} to ${dateRange.to}`, 14, 20);
-    
-    const tableColumn = ["Customer Name", "Phone", "Address", "Email", "Trans."];
-    const tableRows = filtered.map(item => [
+
+    const tableColumn = ["Customer", "Phone", "Source", "Registered", "Last Visit", "Visits", "Trans.", "Spent", "Notes / Request"];
+    const tableRows = filtered.map((item) => [
       item["Customer Name"],
       item["Phone"],
-      item["Address"],
-      item["Email"],
-      item["Total Transactions"]
+      sourceLabel(item["Source"]),
+      item["Registered"] || "",
+      item["Last Visit"] || "-",
+      item["Visits"] ?? 0,
+      item["Total Transactions"] ?? 0,
+      formatAmount(item["Total Spent"]),
+      item["Notes"] || "",
     ]);
 
     doc.autoTable({
@@ -129,7 +150,7 @@ const CustomersModal = ({ isOpen, onClose }) => {
              </div>
              <div className="flex flex-col">
                 <h2 className={`text-xl font-medium tracking-tight uppercase ${isDark ? "text-white" : "text-slate-800"}`}>Customer Registry</h2>
-                <p className="text-[10px] text-slate-500 tracking-[0.2em] uppercase mt-1">Database of registered clients</p>
+                <p className="text-[10px] text-slate-500 tracking-[0.2em] uppercase mt-1">Guests from orders, reservations and discount cards · {filtered.length} shown</p>
              </div>
           </div>
           
@@ -171,11 +192,15 @@ const CustomersModal = ({ isOpen, onClose }) => {
           <table className="w-full text-left border-separate border-spacing-0">
             <thead>
               <tr>
-                <th className={thClass}>Customer Name</th>
+                <th className={thClass}>Customer</th>
                 <th className={thClass}>Phone Number</th>
-                <th className={thClass}>Home/Office Address</th>
-                <th className={thClass}>Email Address</th>
+                <th className={thClass}>Source</th>
+                <th className={thClass}>Registered</th>
+                <th className={thClass}>Last Visit</th>
+                <th className={`${thClass} text-center`}>Visits</th>
                 <th className={`${thClass} text-center`}>Trans. Count</th>
+                <th className={`${thClass} text-right`}>Total Spent</th>
+                <th className={thClass}>Notes / Request</th>
               </tr>
             </thead>
             <tbody className={`text-[11px] ${isDark ? "text-slate-400" : "text-slate-600"}`}>
@@ -183,13 +208,21 @@ const CustomersModal = ({ isOpen, onClose }) => {
                 <tr key={i} className={`hover:bg-white/[0.02] transition-colors border-b ${isDark ? 'border-white/[0.02]' : 'border-slate-100'}`}>
                   <td className="px-5 py-4 font-medium tracking-tight uppercase text-blue-400/80">{row["Customer Name"]}</td>
                   <td className="px-5 py-4 font-mono text-[10px] opacity-70">{row["Phone"]}</td>
-                  <td className="px-5 py-4 font-light italic truncate max-w-[250px]">{row["Address"]}</td>
-                  <td className="px-5 py-4 font-light opacity-80">{row["Email"]}</td>
-                  <td className="px-5 py-4 text-center">
-                    <span className={`px-3 py-1 rounded-md text-[10px] font-medium ${isDark ? 'bg-white/5 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
-                      {row["Total Transactions"]}
+                  <td className="px-5 py-4">
+                    <span className={`px-2 py-0.5 rounded-md text-[9px] uppercase tracking-wider ${isDark ? 'bg-white/5 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+                      {sourceLabel(row["Source"])}
                     </span>
                   </td>
+                  <td className="px-5 py-4 font-mono text-[10px] opacity-70">{row["Registered"] || "-"}</td>
+                  <td className="px-5 py-4 font-mono text-[10px] opacity-70">{row["Last Visit"] || "-"}</td>
+                  <td className="px-5 py-4 text-center">{row["Visits"] ?? 0}</td>
+                  <td className="px-5 py-4 text-center">
+                    <span className={`px-3 py-1 rounded-md text-[10px] font-medium ${isDark ? 'bg-white/5 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+                      {row["Total Transactions"] ?? 0}
+                    </span>
+                  </td>
+                  <td className="px-5 py-4 text-right font-mono text-[10px]">{formatAmount(row["Total Spent"])}</td>
+                  <td className="px-5 py-4 font-light italic truncate max-w-[260px]" title={row["Notes"] || ""}>{row["Notes"] || ""}</td>
                 </tr>
               ))}
             </tbody>

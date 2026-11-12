@@ -8,6 +8,7 @@ import * as discountLineMath from "../../../utils/discountLineMath.js";
 import * as serviceChargeMath from "../../../utils/serviceChargeMath.js";
 import * as serviceChargeDefaults from "../../../utils/serviceChargeDefaults.js";
 import * as orderItemDisplayName from "../../../utils/orderItemDisplayName.js";
+import * as billDocument from "../../../utils/billDocument.js";
 
 // Run the actual modal's hooks, event handlers, math and API lifecycle using the
 // established Node/SWC approach. API and printer boundaries are isolated; these
@@ -136,6 +137,7 @@ function harness(api = mockApi()) {
     "../../utils/serviceChargeMath": serviceChargeMath,
     "../../utils/serviceChargeDefaults": serviceChargeDefaults,
     "../../utils/orderItemDisplayName": orderItemDisplayName,
+    "../../utils/billDocument": billDocument,
     "../../utils/BuildPrintableDiscountReceiptHtml": { BuildPrintableDiscountReceiptHtml: () => "<html>Receipt</html>" },
     "../../utils/printWithPdfFallback": { printWithPdfFallback: ({ attempt }) => attempt() },
   };
@@ -177,8 +179,8 @@ function harness(api = mockApi()) {
       return this.render();
     },
     async print() {
-      const control = action(tree, "Print Billing");
-      assert(control, "Print Billing action exists");
+      const control = action(tree, "Print Bill");
+      assert(control, "Print Bill action exists");
       await control.props.onClick();
       return this.render();
     },
@@ -288,7 +290,7 @@ test("negative, nonfinite and sub-cent Corkage values cannot be billed or printe
     const app = harness();
     await app.render();
     await app.changeCorkage(value);
-    assert.equal(action(app.tree, "Print Billing").props.disabled, true, `${value} disables print`);
+    assert.equal(action(app.tree, "Print Bill").props.disabled, true, `${value} disables print`);
     // An event handler must also guard against stale/programmatic invocation.
     await app.print();
     assert.equal(lastBilling(app.api), undefined, `${value} sends no billing write`);
@@ -380,7 +382,7 @@ test("an old or failed transaction-load response cannot silently discard saved c
   ]) {
     const app = harness(mockApi({ record }));
     await app.render();
-    assert.equal(action(app.tree, "Print Billing").props.disabled, true);
+    assert.equal(action(app.tree, "Print Bill").props.disabled, true);
     await app.print();
     assert.equal(lastBilling(app.api), undefined);
     assert.equal(app.api.prints.length, 0);
@@ -413,7 +415,7 @@ test("malformed HTTP-200 charge settings block billing and preserve existing AUT
       settingsResponses: { [endpoint]: response } }));
     await app.render();
     const scenario = `${endpoint}: ${JSON.stringify(response)}`;
-    assert.equal(action(app.tree, "Print Billing").props.disabled, true, scenario);
+    assert.equal(action(app.tree, "Print Bill").props.disabled, true, scenario);
     // The handler must independently reject the save even if the disabled
     // control is invoked programmatically or by a previously captured callback.
     await app.print();

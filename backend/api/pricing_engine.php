@@ -172,8 +172,8 @@ try {
         $baseSrp = $first['srp'];
         $baseCost = round($baseSrp * 0.40, 2);
         $sqlM = "INSERT INTO tbl_inventory_products_masterlist
-                (product_id, category_code, unit_code, inventory_type, item_category, item_name, item_description, unit_of_measure, item_brand, unit_cost, selling_price, vatable, isDiscountable, status, beginning_inventory, actual_count, remaining_count, variance, safety_stock, reordering_point)
-                VALUES (:inv, :cc, :uc, :it, :icat, :item_name, :item_desc, :uom, :br, :cost, :srp, :vatable, :discountable, 'Active', 0, 0, 0, 0, 0, 0)";
+                (product_id, category_code, unit_code, inventory_type, item_category, item_name, item_description, unit_of_measure, item_color, item_brand, item_variant, item_size, unit_cost, selling_price, vatable, bar_code, sku, isDiscountable, status, beginning_inventory, actual_count, remaining_count, variance, safety_stock, reordering_point)
+                VALUES (:inv, :cc, :uc, :it, :icat, :item_name, :item_desc, :uom, '', :br, '', '', :cost, :srp, :vatable, '', '', :discountable, 'Active', 0, 0, 0, '0', 0, 0)";
         $pdo->prepare($sqlM)->execute([
             ':inv' => $inv_code, ':cc' => $cc, ':uc' => $uc, ':it' => $it, ':icat' => $category,
             ':item_name' => $itemName, ':item_desc' => $itemName, ':uom' => $uom, ':br' => $br,

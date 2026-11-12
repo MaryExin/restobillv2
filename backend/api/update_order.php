@@ -16,6 +16,8 @@ $config = require __DIR__ . "/config.php";
 require_once __DIR__ . "/pos_report_mirror.php";
 require_once __DIR__ . "/../src/PosOrderItemInstructions.php";
 require_once __DIR__ . "/../src/PosCurrentBillItems.php";
+require_once __DIR__ . "/pos_guest_columns.php";
+require_once __DIR__ . "/pos_customers.php";
 
 $conn = new mysqli(
     $config["host"],
@@ -48,6 +50,12 @@ $customer_head_count = $_POST["customer_head_count"] ?? '';
 $discount_type = 'No Discount';
 $payment_method = $_POST["payment_method"] ?? '';
 $special_instructions = $_POST["special_instructions"] ?? '';
+// Guest details: only replaced when the client sends them (the tablet does
+// not), otherwise the values already on the order are kept.
+$guestPosted = array_key_exists("guest_name", $_POST)
+    || array_key_exists("guest_contact", $_POST)
+    || array_key_exists("guest_request", $_POST);
+$guest = posReadGuestFields($_POST);
 $cashier = $_POST["cashier"] ?? '';
 $remarks = $_POST["remarks"] ?? '';
 $order_status = $_POST["order_status"] ?? '';
@@ -90,6 +98,9 @@ try {
     $hasItemInstruction = posOrderHasItemInstructionColumn($conn);
     posOrderValidateItemInstructions($cart_items, $hasItemInstruction);
 
+    // Schema checks run before the transaction: ALTER/CREATE would commit it.
+    posCustomersPrepareSchema($conn);
+
     if (!$conn->begin_transaction()) {
         throw new Exception("Failed to start transaction: " . $conn->error);
     }
@@ -98,6 +109,13 @@ try {
         SELECT 
             transaction_id,
             order_slip_no,
+            guest_name,
+            guest_contact,
+            guest_request,
+            guest_payment_mode,
+            guest_payment_reference,
+            guest_payment_amount,
+            guest_customer_code,
             remarks,
             status,
             order_status
@@ -126,6 +144,34 @@ try {
 
     posAssertBillNotCancelled($existing);
 
+    // Only the guest fields the client sent are replaced; the rest stay.
+    $guest = posMergeGuestFields($existing, $_POST);
+    $guest_name = $guest["guest_name"];
+    $guest_contact = $guest["guest_contact"];
+    $guest_request = $guest["guest_request"];
+    $guest_payment_mode = $guest["guest_payment_mode"];
+    $guest_payment_reference = $guest["guest_payment_reference"];
+    $guest_payment_amount = $guest["guest_payment_amount"];
+
+    // Customer registry link: kept from the order; refreshed when the client
+    // sends guest details, so a name or number typed later still reaches the
+    // Customers report (the same order is counted as one visit).
+    $guest_customer_code = (string)($existing["guest_customer_code"] ?? '');
+    if ($guestPosted) {
+        $guest_customer_code = posCustomerRegisterQuietly(
+            $conn,
+            (string)$Category_Code,
+            (string)$Unit_Code,
+            $guest,
+            "walk-in",
+            (string)$cashier,
+            ["transaction_id" => (string)$transaction_id, "visited_at" => date("Y-m-d H:i:s")]
+        );
+    }
+    if ($guest_customer_code === '') {
+        $guest_customer_code = null;
+    }
+
     if (
         strcasecmp((string)($existing['remarks'] ?? ''), 'Paid') === 0 ||
         strcasecmp((string)($existing['status'] ?? ''), 'Paid') === 0
@@ -148,6 +194,13 @@ try {
         discount_type=?,
         payment_method=?,
         special_instructions=?,
+        guest_name=?,
+        guest_contact=?,
+        guest_request=?,
+        guest_payment_mode=?,
+        guest_payment_reference=?,
+        guest_payment_amount=?,
+        guest_customer_code=?,
         cashier=?,
         remarks=?,
         order_status=?,
@@ -162,7 +215,7 @@ try {
     }
 
     $stmtUpdate->bind_param(
-        "ssssssssssssssssssi",
+        "sssssssssssssssssssssssssi",
         $Category_Code,
         $Unit_Code,
         $transaction_type,
@@ -175,6 +228,13 @@ try {
         $discount_type,
         $payment_method,
         $special_instructions,
+        $guest_name,
+        $guest_contact,
+        $guest_request,
+        $guest_payment_mode,
+        $guest_payment_reference,
+        $guest_payment_amount,
+        $guest_customer_code,
         $cashier,
         $remarks,
         $order_status,

@@ -28,6 +28,7 @@ import {
   normalizeServiceChargeBasis,
 } from "../../utils/serviceChargeMath";
 import { buildInitialServiceChargeToggles } from "../../utils/serviceChargeDefaults";
+import { getBillDocument } from "../../utils/billDocument";
 
 const peso = (value) =>
   Number(value || 0).toLocaleString("en-PH", {
@@ -998,6 +999,8 @@ const ModalDiscountTransaction = ({
   onSplitRequest,
   onUnsplitRequest,
 }) => {
+  // Folio for Room Service orders, Bill for every other sales type.
+  const billDoc = getBillDocument(transaction?.order_type);
   const defaultPrinterName = useGetDefaultPrinter();
   const { businessInfo, isBusInfoLoading } = useBusinessInfo();
 
@@ -2250,7 +2253,7 @@ const ModalDiscountTransaction = ({
 
     const payload = {
       transaction_id: transaction.transaction_id,
-      printTitle: "BILLING",
+      printTitle: "BILLING", // API value for numbering; printed name comes from billDoc
       transStatus: transaction?.remarks || "Pending for Payment",
 
       category_code:
@@ -3269,11 +3272,11 @@ const ModalDiscountTransaction = ({
                   onClick={handleNativePrint}
                   isLoading={isPrinting}
                   disabled={isPrintDisabled}
-                  loadingText="Printing Billing..."
+                  loadingText={`Printing ${billDoc.noun}...`}
                   variant="primary"
                   icon={<FiPrinter size={14} />}
                 >
-                  Print Billing
+                  Print {billDoc.noun}
                 </ButtonComponent>
               </div>
             </div>

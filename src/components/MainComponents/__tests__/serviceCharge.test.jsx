@@ -185,7 +185,7 @@ describe("Billing calculation and saved charges", () => {
     fireEvent.click(within(chargeRow()).getByRole("button", { name: "OFF" }));
     expect(chargeRow().textContent).toContain(serviceAmount.toFixed(2));
     expect(summaryRow("Amount Due").textContent).toContain(amountDue.toLocaleString("en-PH", { minimumFractionDigits: 2 }));
-    fireEvent.click(screen.getByRole("button", { name: "Print Billing" }));
+    fireEvent.click(screen.getByRole("button", { name: "Print Bill" }));
     await waitFor(() => expect(window.electronAPI.printEscposDiscount).toHaveBeenCalledOnce());
     const billing = requestBody(fetch, "billing.php");
     expect(billing).toMatchObject({

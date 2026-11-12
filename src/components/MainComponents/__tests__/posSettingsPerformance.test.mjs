@@ -150,7 +150,14 @@ test("access filtering and the password gate retain the active form identity", (
   const wrapper = activeWrapper(tree);
   assert.equal(button(tree, "Service Charge"), undefined);
   assert.equal(button(tree, "User Roles"), undefined);
+  // Mode of Payment and Discount Mode are open to everyone who can reach
+  // Settings; Layout Mode still asks for the admin password.
   button(tree, "Mode of Payment").props.onClick();
+  tree = settings.render();
+  assert(!text(tree).includes("Password Required"));
+  button(tree, "My Account").props.onClick();
+  tree = settings.render();
+  button(tree, "Layout Mode").props.onClick();
   tree = settings.render();
   assert(text(tree).includes("Password Required"));
   const password = all(tree, node => node.type === "input" && node.props.type === "password")[0];

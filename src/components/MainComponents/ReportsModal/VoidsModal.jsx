@@ -7,7 +7,10 @@ import useReportDateAccess from "../../../hooks/useReportDateAccess";
 import { getCurrentUserRole } from "../../../utils/getCurrentUserRole";
 import { posAuthenticatedFetch } from "../../../utils/posAuthenticatedFetch";
 
-const VoidsModal = ({ isOpen, onClose }) => {
+// Richwell: the Print button is hidden; set to true to bring it back.
+const SHOW_PRINT_BUTTON = false;
+
+const VoidsModal =({ isOpen, onClose }) => {
   const { theme } = useTheme();
   const darkMode = theme === "dark";
   const apiHost = useApiHost();
@@ -170,8 +173,8 @@ const VoidsModal = ({ isOpen, onClose }) => {
               <FaFileExcel size={16} /> <span className="text-xs uppercase">Excel</span>
             </button>
 
-            {/* Print button: only show when enabled in settings */}
-            {printEnabled && (
+            {/* Print button: hidden for Richwell (SHOW_PRINT_BUTTON); otherwise only when enabled in settings */}
+            {SHOW_PRINT_BUTTON && printEnabled && (
               <button onClick={handlePrint} className="flex items-center gap-2 px-5 py-3 font-bold text-white transition-all bg-blue-600 shadow-lg hover:bg-blue-700 rounded-xl active:scale-95">
                 <FaPrint size={16} /> <span className="text-xs uppercase">Print</span>
               </button>

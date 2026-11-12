@@ -1,6 +1,9 @@
 import React, { useEffect, useState, useRef } from "react";
 import ModalTrans_List from "./ModalTrans_List";
 import { useNavigate } from "react-router-dom";
+import usePersistedViewMode from "../../hooks/usePersistedViewMode";
+
+const BILLING_VIEW_MODES = ["grid", "list"];
 import {
   FaArrowLeft,
   FaSearch,
@@ -35,7 +38,12 @@ const PrintBilling = () => {
   const [tablelist, setTablelist] = useState([]);
   const [searchtable, setsearchtable] = useState("");
   const [statusFilter, setStatusFilter] = useState("pending");
-  const [viewMode, setViewMode] = useState("grid");
+  // Grid or list view: the last choice stays locked in on this terminal.
+  const [viewMode, setViewMode] = usePersistedViewMode(
+    "posBillingViewMode",
+    BILLING_VIEW_MODES,
+    "grid",
+  );
 
   const [tableselected, settableselected] = useState("");
   const [transpertable, settranspertable] = useState([]);
@@ -246,16 +254,16 @@ const PrintBilling = () => {
               className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest"
               style={{ color: "var(--app-accent)" }}
             >
-              <FaPrint /> Billing Center
+              <FaPrint /> Bill / Folio Center
             </div>
-            <TutorialTip section="Billing & Payment" title="How billing works" />
+            <TutorialTip section="Bill / Folio & Payment" title="How bills and folios work" />
           </div>
         </nav>
 
         <header className="mb-10 flex flex-col justify-between gap-6 md:flex-row md:items-end">
           <div>
             <h1 className="mb-2 text-4xl font-black sm:text-5xl">
-              Print Billing
+              Print Bill / Folio
             </h1>
             <p style={{ color: "var(--app-muted-text)" }}>
               Showing {tablelist.length} rooms found for this date.

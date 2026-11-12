@@ -7,14 +7,28 @@ import useApiHost from "../../hooks/useApiHost";
 import useVersionLabel from "../../hooks/useVersionLabel";
 import { getConfiguredRoleLabel } from "../../utils/posRoleAccessConfig";
 import { posAuthenticatedFetch } from "../../utils/posAuthenticatedFetch";
+import { usePosDeveloperSession } from "../../hooks/usePosRoleAccessConfig";
+import {
+  FaCalendarAlt,
+  FaCalendarCheck,
+  FaUser,
+  FaUserCheck,
+} from "react-icons/fa";
 
 const PosHomeScreenComponent = () => {
   const { userId } = useZustandLoginCred();
   const apiHost = useApiHost();
   const versionLabel = useVersionLabel();
+  const developerMode = usePosDeveloperSession();
 
   const [dateselection, setDateSelection] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [now, setNow] = useState(() => new Date());
+
+  // Live clock for the greeting card (minute precision is enough).
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 15000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Fetch data
   useEffect(() => {
@@ -93,46 +107,130 @@ const PosHomeScreenComponent = () => {
     };
   }, [dateselection, versionLabel]);
 
+  const isOpen = branchInfo.shiftStatus.toLowerCase() === "open";
+  const displayName = developerMode
+    ? localStorage.getItem("username") || "POS Developer"
+    : branchInfo.userName;
+
+  const hour = now.getHours();
+  const greeting =
+    hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const timeParts = now
+    .toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
+    .split(" ");
+  const dateLabel = now.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+
+  const glass =
+    "border border-white/15 bg-[rgba(30,10,60,0.46)] shadow-[0_18px_44px_rgba(0,0,0,0.30)] backdrop-blur-md";
+
+  const shiftRows = [
+    { icon: FaCalendarAlt, label: "Opened", value: branchInfo.openingDate },
+    { icon: FaUser, label: "Opened by", value: branchInfo.openedBy },
+    { icon: FaCalendarCheck, label: "Closed", value: branchInfo.closedDate },
+    { icon: FaUserCheck, label: "Closed by", value: branchInfo.closedBy },
+  ];
+
   return (
-    <div className="flex justify-end">
-      <div className="w-full max-w-[390px] rounded-[24px] p-[1px] shadow-[0_20px_50px_rgba(0,0,0,0.18)] sm:rounded-[28px]">
-        <div className="rounded-[24px] px-4 py-4 text-white sm:rounded-[28px] sm:px-6 sm:py-5">
-          <div className=" flex items-start justify-between gap-3">
-            <div className=" pos-terminal-fixed  text-[20px] font-black tracking-tight sm:text-[24px]">
-              Recent Shift
+    <div className="flex flex-col gap-4 text-[#fff] lg:flex-row lg:items-start lg:justify-between">
+      {/* Greeting + live clock */}
+      <section className={`w-full rounded-[26px] p-5 sm:p-6 lg:max-w-[340px] ${glass}`}>
+        <div className="font-[Poppins-Medium] text-[11px] uppercase tracking-[0.2em] text-[#f8dc8b]">
+          {greeting}
+        </div>
+        <div className="mt-1 truncate font-[Poppins-Bold] text-[20px] sm:text-[22px]">
+          {displayName}
+        </div>
+        <div className="mt-5 font-[Poppins-Bold] text-[46px] leading-none tracking-tight tabular-nums sm:text-[54px]">
+          {timeParts[0]}
+          <span className="ml-2 text-[18px] text-[rgba(255,255,255,0.7)] sm:text-[20px]">
+            {timeParts[1]}
+          </span>
+        </div>
+        <div className="mt-2 font-[Poppins-Medium] text-[13px] text-[rgba(255,255,255,0.75)] sm:text-[14px]">
+          {dateLabel}
+        </div>
+      </section>
+
+      {/* Current shift */}
+      <section className={`w-full rounded-[26px] p-5 sm:p-6 lg:max-w-[370px] ${glass}`}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="font-[Poppins-Medium] text-[11px] uppercase tracking-[0.2em] text-[rgba(255,255,255,0.6)]">
+              Current Shift
             </div>
-            {/* FIX: Ensuring the color logic checks for "Open" correctly */}
-            <div
-              className={`text-[24px] font-black leading-none sm:text-[32px] ${
-                branchInfo.shiftStatus.toLowerCase() === "open"
-                  ? "text-[#22c55e]" // bright green
-                  : "text-[#f97316]" // bright orange
-              }`}
-            >
-              {branchInfo.shiftStatus}
+            <div className="mt-1 truncate font-[Poppins-Bold] text-[24px] leading-tight sm:text-[26px]">
+              {isOpen ? `Shift #${branchInfo.shiftNo}` : "No open shift"}
+            </div>
+            <div className="font-[Poppins-Medium] text-[13px] text-[rgba(255,255,255,0.65)]">
+              Terminal {branchInfo.terminalNo}
             </div>
           </div>
 
-          <div className="pos-terminal-fixed  mt-4 space-y-2.5 text-[12px] sm:text-[14px]">
-            {[
-              ["Terminal#:", branchInfo.terminalNo],
-              ["Shift #:", branchInfo.shiftNo],
-              ["Opening Date:", branchInfo.openingDate],
-              ["Opened By:", branchInfo.openedBy],
-              ["Closed Date:", branchInfo.closedDate],
-              ["Closed By:", branchInfo.closedBy],
-            ].map(([label, value]) => (
-              <div
-                key={label}
-                className="grid grid-cols-[92px_minmax(0,1fr)] gap-3 sm:grid-cols-[118px_minmax(0,1fr)]"
-              >
-                <div className="font-semibold text-white/90">{label}</div>
-                <div className="font-medium text-white/85">{value}</div>
-              </div>
-            ))}
-          </div>
+          <span
+            className={`inline-flex shrink-0 items-center gap-2 rounded-full px-3 py-1.5 font-[Poppins-SemiBold] text-[12px] ring-1 ${
+              isOpen
+                ? "bg-emerald-400/15 text-emerald-200 ring-emerald-300/40"
+                : "bg-amber-400/15 text-amber-200 ring-amber-300/40"
+            }`}
+          >
+            <span
+              className={`h-2 w-2 rounded-full ${
+                isOpen ? "bg-emerald-300" : "bg-amber-300"
+              }`}
+            />
+            {branchInfo.shiftStatus}
+          </span>
         </div>
-      </div>
+
+        <div className="mt-5 grid gap-3">
+          {shiftRows.map(({ icon: Icon, label, value }) => (
+            <div key={label} className="flex items-center gap-3">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/10 text-[#f8dc8b]">
+                <Icon className="text-[14px]" />
+              </span>
+              <div className="min-w-0">
+                <div className="font-[Poppins-Medium] text-[10.5px] uppercase tracking-[0.14em] text-[rgba(255,255,255,0.55)]">
+                  {label}
+                </div>
+                <div className="truncate font-[Poppins-SemiBold] text-[14px]">
+                  {value}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div
+          className={`mt-5 rounded-2xl px-4 py-3 font-[Poppins-Medium] text-[12.5px] leading-snug ring-1 ${
+            isOpen
+              ? "bg-emerald-400/10 text-emerald-100 ring-emerald-300/30"
+              : "bg-amber-400/10 text-amber-100 ring-amber-300/30"
+          }`}
+        >
+          {isOpen ? (
+            <>
+              Shift is open. Tap{" "}
+              <span className="font-[Poppins-SemiBold] text-[#f8dc8b]">
+                New Transaction
+              </span>{" "}
+              to take orders.
+            </>
+          ) : (
+            <>
+              Tap{" "}
+              <span className="font-[Poppins-SemiBold] text-amber-200">
+                Open New Day
+              </span>{" "}
+              to start taking orders.
+            </>
+          )}
+        </div>
+      </section>
     </div>
   );
 };

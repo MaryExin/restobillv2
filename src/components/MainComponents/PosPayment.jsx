@@ -1819,7 +1819,7 @@ export default function PosPayment() {
                   Transaction Payment Management
                 </h1>
                 <TutorialTip
-                  section="Billing & Payment"
+                  section="Bill / Folio & Payment"
                   title="How payment works"
                 />
               </div>

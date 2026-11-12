@@ -17,6 +17,12 @@ import {
 import { FiEdit2, FiPlus, FiRotateCcw, FiTrash2, FiX } from "react-icons/fi";
 
 import useApiHost from "../../hooks/useApiHost";
+import useRoomReservations from "../../hooks/useRoomReservations";
+import usePersistedViewMode from "../../hooks/usePersistedViewMode";
+
+const NEW_TRANSACTION_VIEW_MODES = ["card", "table"];
+import ReservedRoomTag from "../Reservations/ReservedRoomTag";
+import { roomServiceCardNote } from "../../utils/guestInfo";
 import { useTheme } from "../../context/ThemeContext";
 
 const FALLBACK_BG = "./richwell-home-bg.png";
@@ -28,6 +34,7 @@ const FLOOR_GROUP_HEIGHT = 280;
 const FLOOR_GROUP_LABEL_HEIGHT = 64;
 const FLOOR_DROP_DISTANCE = 130;
 const DEFAULT_ROOM_KEY = "main-room";
+const EMPTY_GUEST_FORM = { name: "", contact: "", request: "" };
 const DEFAULT_ROOM_NAME = "Main Floor";
 
 const getDefaultFloorLayout = () => ({ positions: {}, groups: [] });
@@ -165,11 +172,18 @@ const ViewOrdering = () => {
   // "Restaurant Version 2" is the stored id behind the "Retail POS" layout option.
   const isRetailPosMode = layoutMode === "Restaurant Version 2";
   const apiHost = useApiHost();
+  // Today's reservations, so reserved rooms are marked on their date only.
+  const { getRoomReservation } = useRoomReservations(apiHost);
   const floorRef = useRef(null);
   const floorLayoutLoadedRef = useRef(false);
   const floorLayoutSaveTimerRef = useRef(null);
 
-  const [viewMode, setViewMode] = useState("card");
+  // Card (floor) or list view: the last choice stays locked in on this terminal.
+  const [viewMode, setViewMode] = usePersistedViewMode(
+    "posNewTransactionViewMode",
+    NEW_TRANSACTION_VIEW_MODES,
+    "card",
+  );
 
   const [originalTableList, setOriginalTableList] = useState([]);
   const [masterTableList, setMasterTableList] = useState([]);
@@ -189,6 +203,11 @@ const ViewOrdering = () => {
   const [pendingOrderTable, setPendingOrderTable] = useState("");
   const [headCountInput, setHeadCountInput] = useState("1");
   const [pendingHeadCount, setPendingHeadCount] = useState(1);
+  // Optional guest details asked when an order is started (walk-ins).
+  const [guestForm, setGuestForm] = useState(EMPTY_GUEST_FORM);
+  const [pendingGuestInfo, setPendingGuestInfo] = useState(null);
+  // Items pre-ordered with a reservation; only used for that new order.
+  const [pendingPreOrder, setPendingPreOrder] = useState(null);
   const [tableMode, setTableMode] = useState("fixed");
   const [fixedSearch, setFixedSearch] = useState("");
   const [mergeSearch, setMergeSearch] = useState("");
@@ -470,6 +489,9 @@ const ViewOrdering = () => {
           : names.join(" & "),
       transaction_id: txIds.length === 1 ? txIds[0] : "",
       transactionIds: txIds,
+      order_type: txIds.length === 1 ? occupiedTable?.order_type || "" : "",
+      guest_name: txIds.length === 1 ? occupiedTable?.guest_name || "" : "",
+      guest_request: txIds.length === 1 ? occupiedTable?.guest_request || "" : "",
       isOccupied:
         txIds.length > 0 || tableRows.some((table) => table.isOccupied),
       hasMixedOrders: txIds.length > 1,
@@ -509,6 +531,10 @@ const ViewOrdering = () => {
           transaction_status_label: pendingRow?.status_label || "",
           transaction_id: pendingRow?.transaction_id || "",
           pending_table_number: pendingRow?.table_number || "",
+          order_type: pendingRow?.order_type || "",
+          transaction_time: pendingRow?.transaction_time || "",
+          guest_name: pendingRow?.guest_name || "",
+          guest_request: pendingRow?.guest_request || "",
           isOccupied,
           isCustomTable: false,
         };
@@ -1457,6 +1483,8 @@ const ViewOrdering = () => {
   }, [fixedSearch, masterTableList]);
 
   const openOrderList = (tableValue, txId = "") => {
+    setPendingPreOrder(null);
+    setPendingGuestInfo(null);
     settableselected(tableValue);
     setTransactionId(txId || "");
     setshoworderlist(true);
@@ -1514,6 +1542,7 @@ const ViewOrdering = () => {
   const promptHeadCount = (tableValue) => {
     setPendingOrderTable(tableValue);
     setHeadCountInput("1");
+    setGuestForm(EMPTY_GUEST_FORM);
     setShowHeadCountModal(true);
   };
 
@@ -1521,18 +1550,69 @@ const ViewOrdering = () => {
     setShowHeadCountModal(false);
     setPendingOrderTable("");
     setHeadCountInput("1");
+    setGuestForm(EMPTY_GUEST_FORM);
   };
 
   const handleConfirmHeadCount = () => {
     const parsed = parseInt(headCountInput, 10);
     const finalCount = Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+    const guest = {
+      name: guestForm.name.trim(),
+      contact: guestForm.contact.trim(),
+      request: guestForm.request.trim(),
+    };
 
     setPendingHeadCount(finalCount);
     openOrderList(pendingOrderTable, "");
+    setPendingGuestInfo(guest);
     setShowHeadCountModal(false);
     setPendingOrderTable("");
     setHeadCountInput("1");
+    setGuestForm(EMPTY_GUEST_FORM);
   };
+
+  // "Order" from a reservation (Reservations page): once the rooms are
+  // loaded, open the reserved room directly. If the room already has an open
+  // order, use the normal "open existing order" flow; otherwise start a new
+  // order with the reservation's number of guests as the head count.
+  const reservationOrderRef = useRef(location.state?.reservationOrder || null);
+  useEffect(() => {
+    const pending = reservationOrderRef.current;
+    if (!pending || isLoading || layoutMode === "Kiosk" || isRetailPosMode) {
+      return;
+    }
+    reservationOrderRef.current = null;
+    navigate(location.pathname, { replace: true, state: {} });
+
+    const target = normalizeTableName(pending.table);
+    if (!target) return;
+
+    const existing = originalTableList.find(
+      (table) =>
+        normalizeTableName(table.table_number) === target ||
+        splitTableNames(getTableMergeValue(table)).some(
+          (name) => normalizeTableName(name) === target,
+        ),
+    );
+
+    if (existing && tableHasOrder(existing)) {
+      handleTableSelect(existing);
+      return;
+    }
+
+    setPendingHeadCount(Math.max(1, Number(pending.guestCount) || 1));
+    openOrderList(pending.table, "");
+    setPendingPreOrder(pending.preOrder || null);
+    setPendingGuestInfo({
+      name: pending.guestName || "",
+      contact: pending.contactNumber || "",
+      request: pending.specialRequest || "",
+      paymentMode: pending.paymentMode || "",
+      paymentReference: pending.paymentReference || "",
+      paymentAmount: pending.paymentAmount || "",
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, originalTableList]);
 
   const getTableMergeValue = (table) =>
     table?.tableNames?.length
@@ -2253,6 +2333,8 @@ const ViewOrdering = () => {
             transactionId={transactionId}
             onOrderSaved={handleOrderSaved}
             initialHeadCount={pendingHeadCount}
+            initialPreOrder={pendingPreOrder}
+            initialGuestInfo={pendingGuestInfo}
           />
         )}
       </>
@@ -2272,18 +2354,25 @@ const ViewOrdering = () => {
               }}
             >
               <h2 className="text-xl font-black mb-1" style={{ color: text }}>
-                Number of Customers
+                Start order
               </h2>
               <p
                 className="text-sm leading-relaxed mb-4"
                 style={{ color: mutedText }}
               >
-                How many guests are seated at{" "}
                 <span style={{ color: text, fontWeight: 700 }}>
-                  {pendingOrderTable || "this room"}
+                  {pendingOrderTable || "This room"}
                 </span>
-                ?
+                {" "}— number of guests is required; the guest details are optional
+                and print on the kitchen ticket and bill.
               </p>
+
+              <label
+                className="mb-1 block text-[11px] font-black uppercase tracking-[0.16em]"
+                style={{ color: mutedText }}
+              >
+                Number of guests
+              </label>
 
               <input
                 type="number"
@@ -2302,6 +2391,70 @@ const ViewOrdering = () => {
                   color: text,
                 }}
               />
+
+              <div className="mt-4 grid gap-3">
+                <div>
+                  <label
+                    className="mb-1 block text-[11px] font-black uppercase tracking-[0.16em]"
+                    style={{ color: mutedText }}
+                  >
+                    Guest name{" "}
+                    <span className="font-semibold normal-case tracking-normal">(optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={150}
+                    value={guestForm.name}
+                    onChange={(e) => setGuestForm((prev) => ({ ...prev, name: e.target.value }))}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleConfirmHeadCount();
+                    }}
+                    placeholder="e.g. Juan Dela Cruz"
+                    className="w-full rounded-xl py-2.5 px-4 text-sm font-semibold focus:outline-none transition-all border"
+                    style={{ backgroundColor: surfaceSoft, borderColor: border, color: text }}
+                  />
+                </div>
+                <div>
+                  <label
+                    className="mb-1 block text-[11px] font-black uppercase tracking-[0.16em]"
+                    style={{ color: mutedText }}
+                  >
+                    Contact number{" "}
+                    <span className="font-semibold normal-case tracking-normal">(optional)</span>
+                  </label>
+                  <input
+                    type="tel"
+                    inputMode="tel"
+                    maxLength={30}
+                    value={guestForm.contact}
+                    onChange={(e) => setGuestForm((prev) => ({ ...prev, contact: e.target.value }))}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleConfirmHeadCount();
+                    }}
+                    placeholder="0917 123 4567"
+                    className="w-full rounded-xl py-2.5 px-4 text-sm font-semibold focus:outline-none transition-all border"
+                    style={{ backgroundColor: surfaceSoft, borderColor: border, color: text }}
+                  />
+                </div>
+                <div>
+                  <label
+                    className="mb-1 block text-[11px] font-black uppercase tracking-[0.16em]"
+                    style={{ color: mutedText }}
+                  >
+                    Special request{" "}
+                    <span className="font-semibold normal-case tracking-normal">(optional)</span>
+                  </label>
+                  <textarea
+                    rows={2}
+                    maxLength={500}
+                    value={guestForm.request}
+                    onChange={(e) => setGuestForm((prev) => ({ ...prev, request: e.target.value }))}
+                    placeholder="Birthday setup, high chair, allergies, window seat…"
+                    className="w-full resize-none rounded-xl py-2.5 px-4 text-sm font-semibold focus:outline-none transition-all border"
+                    style={{ backgroundColor: surfaceSoft, borderColor: border, color: text }}
+                  />
+                </div>
+              </div>
 
               <div className="flex gap-3 pt-6">
                 <button
@@ -2348,7 +2501,7 @@ const ViewOrdering = () => {
               }}
             >
               <h2 className="text-xl font-black mb-3" style={{ color: text }}>
-                Pending Billing
+                Pending Bill / Folio
               </h2>
               <p className="leading-relaxed" style={{ color: mutedText }}>
                 This room has a pending bill. Do you want to proceed and edit
@@ -2998,7 +3151,7 @@ const ViewOrdering = () => {
                           }}
                         >
                           <span className="flex items-center justify-between gap-2">
-                            <span className="block truncate text-sm font-black">
+                            <span className="block break-words text-sm font-black leading-snug">
                               {room.room_name}
                             </span>
                             {isActive ? (
@@ -3508,7 +3661,7 @@ const ViewOrdering = () => {
                           return (
                             <div
                               key={room.room_key}
-                              className="group flex items-center gap-2 rounded-xl border p-1.5"
+                              className="group rounded-xl border p-1.5"
                               style={{
                                 backgroundColor: isActive
                                   ? accent
@@ -3518,13 +3671,15 @@ const ViewOrdering = () => {
                                   : pageBorder,
                               }}
                             >
+                              {/* Name gets the full card width so floor names stay readable */}
                               <button
                                 type="button"
                                 onClick={() => setActiveRoomKey(room.room_key)}
-                                className="min-w-0 flex-1 rounded-xl px-3 py-3 text-left transition-all"
+                                title={room.room_name}
+                                className="block w-full rounded-lg px-2.5 pb-1 pt-2 text-left transition-all"
                               >
                                 <span
-                                  className="block truncate text-sm font-black"
+                                  className="block break-words text-sm font-black leading-snug"
                                   style={{
                                     color: isActive
                                       ? getContrastText(accent, "#ffffff")
@@ -3533,49 +3688,60 @@ const ViewOrdering = () => {
                                 >
                                   {room.room_name}
                                 </span>
-                                <span
-                                  className="mt-1 block text-[10px] font-bold uppercase tracking-[0.18em]"
+                              </button>
+
+                              <div className="flex items-center justify-between gap-2 px-2.5 pb-1">
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveRoomKey(room.room_key)}
+                                  className="min-w-0 whitespace-nowrap text-left text-[10px] font-bold uppercase tracking-[0.12em]"
                                   style={{
                                     color: isActive
                                       ? toRgba(
                                           getContrastText(accent, "#ffffff"),
-                                          0.72,
+                                          0.78,
                                         )
                                       : pageSoftText,
                                   }}
                                 >
-                                  {roomCount} rooms
-                                </span>
-                              </button>
+                                  {roomCount} {roomCount === 1 ? "room" : "rooms"}
+                                </button>
 
-                              <button
-                                type="button"
-                                onClick={() => handleRenameRoom(room.room_key)}
-                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition-all"
-                                style={{
-                                  color: isActive
-                                    ? getContrastText(accent, "#ffffff")
-                                    : pageText,
-                                  backgroundColor: toRgba(pageText, 0.08),
-                                }}
-                              >
-                                <FiEdit2 size={13} />
-                              </button>
+                                <div className="flex shrink-0 items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRenameRoom(room.room_key)}
+                                    title="Rename floor"
+                                    aria-label={`Rename ${room.room_name}`}
+                                    className="flex h-7 w-7 items-center justify-center rounded-lg transition-all"
+                                    style={{
+                                      color: isActive
+                                        ? getContrastText(accent, "#ffffff")
+                                        : pageText,
+                                      backgroundColor: toRgba(pageText, 0.08),
+                                    }}
+                                  >
+                                    <FiEdit2 size={12} />
+                                  </button>
 
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteRoom(room.room_key)}
-                                disabled={floorRooms.length <= 1}
-                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition-all disabled:cursor-not-allowed disabled:opacity-35"
-                                style={{
-                                  color: isActive
-                                    ? getContrastText(accent, "#ffffff")
-                                    : pageText,
-                                  backgroundColor: toRgba(pageText, 0.08),
-                                }}
-                              >
-                                <FiTrash2 size={13} />
-                              </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteRoom(room.room_key)}
+                                    disabled={floorRooms.length <= 1}
+                                    title="Delete floor"
+                                    aria-label={`Delete ${room.room_name}`}
+                                    className="flex h-7 w-7 items-center justify-center rounded-lg transition-all disabled:cursor-not-allowed disabled:opacity-35"
+                                    style={{
+                                      color: isActive
+                                        ? getContrastText(accent, "#ffffff")
+                                        : pageText,
+                                      backgroundColor: toRgba(pageText, 0.08),
+                                    }}
+                                  >
+                                    <FiTrash2 size={12} />
+                                  </button>
+                                </div>
+                              </div>
                             </div>
                           );
                         })}
@@ -3678,6 +3844,11 @@ const ViewOrdering = () => {
                           const tableTone = item.isOccupied
                             ? occupiedColor
                             : availableColor;
+                          const itemReservation = (
+                            item.tableNames || [item.table_number]
+                          )
+                            .map((name) => getRoomReservation(name))
+                            .find(Boolean);
                           const isDropTarget = dropTargetTable === item.id;
                           const isDragging = floorDrag?.itemId === item.id;
                           const groupBounds = item.isGroup
@@ -4068,6 +4239,20 @@ const ViewOrdering = () => {
                                 >
                                   {item.status_label}
                                 </p>
+                                {itemReservation && (
+                                  <div className="mt-1.5">
+                                    <ReservedRoomTag reservation={itemReservation} />
+                                  </div>
+                                )}
+                                {roomServiceCardNote(item, true) && (
+                                  <p
+                                    className="mt-1 text-[10px] font-bold uppercase tracking-[0.12em]"
+                                    style={{ color: availableColor }}
+                                    title={item.guest_request || ""}
+                                  >
+                                    {roomServiceCardNote(item, true)}
+                                  </p>
+                                )}
                                 {item.hasMixedOrders && (
                                   <p
                                     className="mt-1 text-[10px] font-bold uppercase tracking-[0.12em]"
@@ -4105,6 +4290,15 @@ const ViewOrdering = () => {
                           style={{ color: toRgba(text, 0.06) }}
                         />
 
+                        {getRoomReservation(table.table_number) && (
+                          <div className="absolute inset-x-3 top-3 z-20 flex justify-center">
+                            <ReservedRoomTag
+                              reservation={getRoomReservation(table.table_number)}
+                              compact
+                            />
+                          </div>
+                        )}
+
                         <div className="relative z-10 flex flex-col items-center">
                           <span
                             className="text-[10px] font-black tracking-[0.3em] uppercase mb-1 transition-colors"
@@ -4116,6 +4310,20 @@ const ViewOrdering = () => {
                             {table.table_number}
                           </span>
                         </div>
+
+                        {roomServiceCardNote(table) && (
+                          <span
+                            className="relative z-10 mt-2 max-w-[90%] truncate rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em]"
+                            style={{
+                              borderColor: toRgba(accent, 0.35),
+                              backgroundColor: toRgba(accent, 0.12),
+                              color: accent,
+                            }}
+                            title={table.guest_request || ""}
+                          >
+                            {roomServiceCardNote(table)}
+                          </span>
+                        )}
                         <div
                           className="absolute bottom-6 w-1 h-1 rounded-full group-hover:w-8 transition-all"
                           style={{ backgroundColor: accent }}
@@ -4222,6 +4430,22 @@ const ViewOrdering = () => {
                                 />
                                 {table.status_label}
                               </span>
+                              {getRoomReservation(table.table_number) && (
+                                <div className="mt-2">
+                                  <ReservedRoomTag
+                                    reservation={getRoomReservation(table.table_number)}
+                                  />
+                                </div>
+                              )}
+                              {roomServiceCardNote(table, true) && (
+                                <p
+                                  className="mt-2 text-[11px] font-bold uppercase tracking-[0.08em]"
+                                  style={{ color: accent }}
+                                  title={table.guest_request || ""}
+                                >
+                                  {roomServiceCardNote(table, true)}
+                                </p>
+                              )}
                             </td>
                             <td className="p-8 text-right">
                               <button

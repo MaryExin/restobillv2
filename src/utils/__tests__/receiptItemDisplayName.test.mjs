@@ -7,6 +7,7 @@ import * as ReactDOMServer from "react-dom/server";
 import * as QRCode from "qrcode.react";
 import { transformSync } from "@swc/core";
 import * as displayNames from "../orderItemDisplayName.js";
+import * as billDocument from "../billDocument.js";
 import { buildVoidRefundHtml } from "../BuildVoidRefundHtml.js";
 
 // Render the production receipt templates with existing project dependencies.
@@ -27,6 +28,7 @@ function loadJsx(relativePath) {
       if (name === "react-dom/server") return ReactDOMServer;
       if (name === "qrcode.react") return QRCode;
       if (name.endsWith("/orderItemDisplayName")) return displayNames;
+      if (name.endsWith("/billDocument")) return billDocument;
       if (name.endsWith("/Receipt")) return loadJsx("../../components/MainComponents/Receipt.jsx");
       if (name.endsWith("/posAuthenticatedFetch")) return {
         posAuthenticatedFetch: () => assert.fail("Rendering a receipt must not perform a request"),

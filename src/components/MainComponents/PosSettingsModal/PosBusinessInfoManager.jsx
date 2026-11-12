@@ -481,7 +481,7 @@ const PosBusinessInfoManager = ({ isDark, accent, getContrastText }) => {
 
                       <div className="my-5 border-t border-black" />
 
-                      <div className="text-[18px] font-black">BILLING</div>
+                      <div className="text-[18px] font-black">BILL</div>
                     </div>
                   </div>
 

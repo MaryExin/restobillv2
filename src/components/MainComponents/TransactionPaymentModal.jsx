@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   FiX,
   FiTag,
@@ -164,6 +164,28 @@ const createEmptyPaymentRow = () => ({
   payment_amount: "",
   payment_reference: "",
 });
+
+// A room-service order carries the mode of payment (and reference number)
+// taken at the front desk; the payment starts with that row so the cashier
+// only confirms it.
+const intendedPaymentRows = (transaction) => {
+  const method = String(transaction?.guest_payment_mode || "").trim();
+  if (!method) return [];
+  // Cash: only the amount the front desk recorded as received (so the change
+  // shows); otherwise the cashier types it. Online / card: the amount due.
+  const received = Number(transaction?.guest_payment_amount || 0);
+  const isCash = method.toLowerCase() === "cash";
+  return [
+    {
+      ...createEmptyPaymentRow(),
+      payment_method: method,
+      payment_amount: received > 0 ? String(received) : "",
+      payment_reference: String(transaction?.guest_payment_reference || "").trim(),
+      __intended: true,
+      __fillDue: !isCash && !(received > 0),
+    },
+  ];
+};
 
 const createEmptyOtherChargeRow = () => ({
   particulars: "",
@@ -3593,7 +3615,7 @@ export default function TransactionPaymentModal({
                 payment_amount: row.payment_amount || "",
                 payment_reference: row.payment_reference || "",
               }))
-            : [],
+            : intendedPaymentRows(transaction),
         );
         setHasExistingPaymentRow(detailPayments.length > 0);
 
@@ -4409,6 +4431,27 @@ export default function TransactionPaymentModal({
     }),
     [computed, groupedPaymentMethodText, transaction?.payment_method],
   );
+
+  // A room-service order arrives with its intended payment (mode and
+  // reference) but the amount is only known once the totals are computed:
+  // fill it in once, so the cashier just confirms.
+  const intendedPaymentFilledRef = useRef(false);
+  useEffect(() => {
+    if (!isOpen) {
+      intendedPaymentFilledRef.current = false;
+      return;
+    }
+    if (intendedPaymentFilledRef.current) return;
+    const due = Number(computed?.totalAmountDue || 0);
+    if (!(due > 0)) return;
+    intendedPaymentFilledRef.current = true;
+    setPayments((prev) => {
+      if (prev.length !== 1 || !prev[0]?.__fillDue || String(prev[0].payment_amount ?? "").trim() !== "") {
+        return prev;
+      }
+      return [{ ...prev[0], payment_amount: String(Math.round(due * 100) / 100) }];
+    });
+  }, [isOpen, computed?.totalAmountDue]);
 
   // If QR is active and the payment method or totals change, keep the
   // second screen's QR + payment summary in sync.

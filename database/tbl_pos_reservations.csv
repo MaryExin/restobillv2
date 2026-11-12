@@ -1,0 +1,2 @@
+ID,category_code,unit_code,guest_name,contact_number,guest_count,reservation_date,reservation_time,table_name,special_request,pre_order_sales_type,pre_order_json,customer_code,status,created_by,updated_by,date_recorded,date_updated
+1,Richwell,BU-24cae516f663,Juan Dela Cruz,0917 123 4567,4,2026-11-12,18:30:00,Room 101,Window seat,ST-36d8565b11d5,"[{""product_id"":""BD-8ffe0145ef09"",""item_name"":""PRINTING AND PHOTOCOPY"",""quantity"":2,""price"":5}]",CU-3f9a1c2b7d4e,Booked,ADMIN,ADMIN,2026-11-11 09:15:00,2026-11-11 09:15:00

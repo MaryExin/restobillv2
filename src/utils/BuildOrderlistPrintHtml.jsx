@@ -19,6 +19,7 @@ export function BuildOrderReceiptHtml({
   instructions,
   transactionId,
   printMode = "auto",
+  guest = null,
 }) {
   let cartItems = [];
 
@@ -330,6 +331,8 @@ export function BuildOrderReceiptHtml({
               Order Summary
             </div>
             <div className="bold big mt-2">Room: {tableselected}</div>
+            {guest?.name ? <div className="bold mt-1">Guest: {guest.name}</div> : null}
+            {guest?.request ? <div className="text-10 mt-1">Request: {guest.request}</div> : null}
             <div className="text-10 mt-1">{new Date().toLocaleString()}</div>
           </div>
 
@@ -444,7 +447,7 @@ export function BuildBillingReceiptHtml({
   transaction,
   detailedproduct,
   businessInfo = {},
-  title = "Billing Receipt",
+  title = "Bill",
 }) {
   const receipt = (
     <html>

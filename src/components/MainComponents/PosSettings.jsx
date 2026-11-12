@@ -61,7 +61,9 @@ const PosReportMirrorSettings = lazy(() => import("./PosSettingsModal/PosReportM
 const PosTutorialGuide = lazy(() => import("./PosSettingsModal/PosTutorialGuide"));
 
 const MASTER_PASS    = "LESI_POSPASS@2023";
-const PROTECTED_TABS = new Set(["Mode of Payment", "Discount Mode", "Layout Mode"]);
+// Settings tabs behind the admin password gate. Mode of Payment and Discount
+// Mode are open to everyone who can reach Settings (no password asked).
+const PROTECTED_TABS = new Set(["Layout Mode"]);
 // LightemAdmin is a trusted POS account -- skip the password gate on
 // protected settings tabs entirely for this user.
 const UNGATED_USERNAME = "lightemadmin";

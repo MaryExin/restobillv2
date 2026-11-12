@@ -111,7 +111,7 @@ const ModalTrialExpiration = ({
               Your 1-Month Trial Has Ended
             </h3>
             <p className="text-gray-300 text-sm">
-              Choose a plan below to continue enjoying full access to Lightem.
+              Choose a plan below to continue enjoying full access to Richwell Colleges POS.
             </p>
           </div>
 
