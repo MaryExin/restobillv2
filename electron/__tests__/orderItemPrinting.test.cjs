@@ -17,6 +17,7 @@ async function loadPrinting({ categories = {}, printerConfig = "" } = {}) {
   Object.assign(app, {
     isPackaged: false,
     whenReady: () => Promise.resolve(),
+    getPath: () => "/fake-user-data",
     quit() {},
   });
   class Window extends EventEmitter {
@@ -35,6 +36,10 @@ async function loadPrinting({ categories = {}, printerConfig = "" } = {}) {
   const context = vm.createContext({
     require: (name) => {
       if (name === "electron") return electron;
+      if (name === "./qrOrderingServer.cjs") return { QrOrderingServer: class {
+        start() { return Promise.resolve({ running: true }); }
+        stop() { return Promise.resolve({ running: false }); }
+      } };
       if (name === "fs") return {
         existsSync: () => true,
         readFileSync: (filename) => filename.endsWith("printer_categories.json")

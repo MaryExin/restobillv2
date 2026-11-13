@@ -115,7 +115,7 @@ try {
         $source = preg_replace('/\A<\?php/', '<?php require_once ' . var_export(__FILE__, true) . ';', $source, 1);
         $source = str_replace(['file_get_contents("php://input")', 'new PDO(', 'new mysqli('],
             ['file_get_contents("php://stdin")', 'new CancelledEndpointPdo(', 'new CancelledEndpointMysqli('], $source);
-        foreach (['PosCurrentBillItems', 'PosOrderItemInstructions', 'PosBillingCharges'] as $helper) {
+        foreach (['PosCurrentBillItems', 'PosOrderItemInstructions', 'PosBillingCharges', 'PosOrderSnapshot'] as $helper) {
             $source = str_replace('require_once __DIR__ . "/../src/' . $helper . '.php";',
                 'require_once ' . var_export(__DIR__ . '/../src/' . $helper . '.php', true) . ';', $source);
         }

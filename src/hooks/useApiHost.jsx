@@ -10,6 +10,8 @@ let cachedApiHost;
 let apiHostPromise = null;
 
 const loadApiHost = () => {
+  // LAN customers only use the QR host's same-origin public API.
+  if (document.querySelector('meta[name="restobill-qr-guest"]')?.content === "true" || window.location.hash.split("?")[0] === "#/qr-order") return Promise.resolve("");
   if (cachedApiHost !== undefined) {
     return Promise.resolve(cachedApiHost);
   }

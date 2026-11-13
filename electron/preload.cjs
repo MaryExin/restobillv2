@@ -2,6 +2,13 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 const cartUpdateListeners = new Map();
 
+// The guest HTTP site never receives this bridge or the private host token.
+contextBridge.exposeInMainWorld("qrOrdering", {
+  status: () => ipcRenderer.invoke("qr-ordering:status"),
+  configure: (payload) => ipcRenderer.invoke("qr-ordering:configure", payload),
+  stop: () => ipcRenderer.invoke("qr-ordering:stop"),
+});
+
 function offCartUpdate(callback) {
   const listener = cartUpdateListeners.get(callback);
   if (!listener) return;

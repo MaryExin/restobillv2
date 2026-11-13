@@ -17,6 +17,8 @@ function getSerialPort() {
 
 const path = require("path");
 const fs = require("fs");
+const { pathToFileURL } = require("node:url");
+const { QrOrderingServer } = require("./qrOrderingServer.cjs");
 
 let orderItemDisplayNameModule;
 function loadOrderItemDisplayName() {
@@ -59,6 +61,7 @@ protocol.registerSchemesAsPrivileged([
 
 let win = null;
 let secondScreenWin = null;
+let qrOrderingServer = null;
 
 // Reopening the installed POS should focus the running terminal instead of
 // allocating another Chromium process tree on a low-memory laptop.
@@ -2421,6 +2424,36 @@ async function buildEscposQrItemsBuffer(data = {}) {
 
 app.whenReady().then(() => {
   if (!hasSingleInstanceLock) return;
+
+  qrOrderingServer = new QrOrderingServer({
+    distDirectory: path.join(__dirname, "..", "dist"),
+    configPath: path.join(app.getPath("userData"), "config", "qr-ordering.json"),
+  });
+  // Start independently of the window. Persisted setup reconnects on every POS launch.
+  void qrOrderingServer.start();
+  const assertQrOperator = (event) => {
+    const frame = event.senderFrame;
+    const source = String(frame?.url || "").split("#")[0].split("?")[0];
+    const expected = app.isPackaged
+      ? pathToFileURL(path.join(__dirname, "..", "dist", "index.html")).href
+      : `${DEV_SERVER_URL}/`;
+    if (!win || win.isDestroyed() || event.sender !== win.webContents ||
+      frame !== win.webContents.mainFrame || source !== expected) {
+      throw new Error("QR host settings are available only in the main POS window.");
+    }
+  };
+  ipcMain.handle("qr-ordering:status", (event) => {
+    assertQrOperator(event);
+    return qrOrderingServer.status();
+  });
+  ipcMain.handle("qr-ordering:configure", (event, payload) => {
+    assertQrOperator(event);
+    return qrOrderingServer.configure(payload);
+  });
+  ipcMain.handle("qr-ordering:stop", (event) => {
+    assertQrOperator(event);
+    return qrOrderingServer.stop();
+  });
 
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     const existingHeaders = details.responseHeaders || {};
@@ -5538,4 +5571,8 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
   }
+});
+
+app.on("before-quit", () => {
+  if (qrOrderingServer) void qrOrderingServer.stop();
 });

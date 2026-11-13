@@ -363,6 +363,7 @@ try {
     if (!$existing) {
         throw new Exception("Transaction not found.");
     }
+    posAssertBillReadyForPayment($existing);
 
     $Category_Code = trim((string)($existing["Category_Code"] ?? ""));
     $Unit_Code = trim((string)($existing["Unit_Code"] ?? ""));

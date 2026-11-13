@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import useZustandLayoutMode from "../../context/useZustandLayoutMode";
 import Orderlist from "./Orderlist";
+import QrOrdersButton from "../QrOrdering/QrOrdersButton";
 import TutorialTip from "../common/TutorialTip";
 import {
   FaSearch,
@@ -3228,6 +3229,7 @@ const ViewOrdering = () => {
           </button>
 
           <div className="flex items-center gap-4">
+            {layoutMode !== "Kiosk" && <QrOrdersButton onAccepted={() => setTableRefreshKey((value) => value + 1)} />}
             <div
               className="flex p-1 rounded-2xl border"
               style={{

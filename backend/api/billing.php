@@ -38,6 +38,8 @@ $config = require __DIR__ . "/config.php";
 require_once __DIR__ . "/pos_report_mirror.php";
 require_once __DIR__ . "/../src/PosBillingCharges.php";
 require_once __DIR__ . "/../src/PosCurrentBillItems.php";
+$productGroupsPath = dirname(__DIR__) . '/src/PosOrderProductGroups.php';
+if (is_file($productGroupsPath)) require_once $productGroupsPath;
 
 try {
     $dsn = "mysql:host={$config['host']};dbname={$config['db']};charset={$config['charset']}";
@@ -64,6 +66,9 @@ $input = is_array($decoded) ? $decoded : $_POST;
 $transaction_id  = isset($input['transaction_id']) ? (int)$input['transaction_id'] : 0;
 $printTitle      = trim((string)($input['printTitle'] ?? ""));
 $transStatus     = $input['transStatus'] ?? "Settled";
+// The billing UI recalls the current remarks verbatim. A successful fresh
+// billing save clears the QR re-bill marker after validating current items.
+if ($transStatus === 'Pending QR Rebill') $transStatus = 'Pending for Payment';
 $category_code   = trim((string)($input['category_code'] ?? ""));
 $unit_code       = trim((string)($input['unit_code'] ?? ""));
 
@@ -497,6 +502,9 @@ try {
         8. UPDATE DETAIL ITEMS
     ------------------------------ */
     if (!empty($cartItems)) {
+        if (class_exists('PosOrderProductGroups', false)) {
+            (new PosOrderProductGroups($pdo))->assertBillingPrices($cartItems, (string)$transaction_id, $category_code, $unit_code);
+        }
         $sqlDetail = "UPDATE tbl_pos_transactions_detailed
                       SET selling_price = :price
                       WHERE ID = :id

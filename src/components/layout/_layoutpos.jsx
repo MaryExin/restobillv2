@@ -43,6 +43,7 @@ import {
 } from "../../hooks/usePosRoleAccessConfig";
 import { getConfiguredRoleLabel } from "../../utils/posRoleAccessConfig";
 import { posAuthenticatedFetch } from "../../utils/posAuthenticatedFetch";
+import QrOrdersButton from "../QrOrdering/QrOrdersButton";
 
 const PosReadingModal = lazyDialog(
   () => import("../MainComponents/PosReadingModal"),
@@ -410,6 +411,8 @@ const LayoutPos = ({ children }) => {
           onClick={() => !isClosed && navigate("/printbilling")}
         />
       )}
+
+      {canAccessOrdering && layoutMode !== "Kiosk" && <QrOrdersButton tile />}
 
       {canAccessPayment && (
         <PosQuickActionTile

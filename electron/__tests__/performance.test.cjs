@@ -19,6 +19,7 @@ async function loadMain({ packaged = true, lock = true, network = true } = {}) {
     requestSingleInstanceLock: () => { metrics.locks++; return lock; },
     quit: () => { metrics.quits++; },
     whenReady: () => Promise.resolve(),
+    getPath: () => "/fake-user-data",
   });
 
   class Window extends EventEmitter {
@@ -80,6 +81,11 @@ async function loadMain({ packaged = true, lock = true, network = true } = {}) {
     require: (name) => {
       metrics.loaded.push(name);
       if (name === "electron") return electron;
+      if (name === "./qrOrderingServer.cjs") return { QrOrderingServer: class {
+        start() { metrics.qrStarted = true; return Promise.resolve({ running: true }); }
+        stop() { metrics.qrStopped = true; return Promise.resolve({ running: false }); }
+        status() { return { running: true }; }
+      } };
       if (name === "net") return { Socket };
       if (name === "os") return {
         networkInterfaces: () => network
@@ -122,11 +128,31 @@ test("a duplicate packaged launch quits without creating a window or IPC handler
 test("relaunch restores and focuses the existing operator window", async () => {
   const { app, metrics } = await loadMain();
   assert.equal(metrics.windows.length, 1);
+  assert.equal(metrics.qrStarted, true);
   assert(!metrics.loaded.includes("serialport"));
   app.emit("second-instance");
   const window = metrics.windows[0];
   assert(window.restored && window.focused && window.shown);
   assert.equal(metrics.windows.length, 1);
+});
+
+test("closing the app shuts down the local QR host", async () => {
+  const { app, metrics } = await loadMain();
+  app.emit("before-quit");
+  assert.equal(metrics.qrStopped, true);
+});
+
+test("QR host controls accept only the trusted main POS frame", async () => {
+  const { handlers, metrics } = await loadMain();
+  const operator = metrics.windows[0].webContents;
+  const frame = { url: require("node:url").pathToFileURL(path.join(electronDirectory, "..", "dist", "index.html")).href + "#/poscorehomescreen" };
+  operator.mainFrame = frame;
+  const status = handlers.get("qr-ordering:status");
+  assert.equal(status({ sender: operator, senderFrame: frame }).running, true);
+  assert.throws(() => status({ sender: {}, senderFrame: frame }), /main POS window/);
+  assert.throws(() => status({ sender: operator, senderFrame: { ...frame } }), /main POS window/);
+  frame.url = "https://untrusted.example/";
+  assert.throws(() => status({ sender: operator, senderFrame: frame }), /main POS window/);
 });
 
 test("development launches do not acquire the packaged app lock", async () => {

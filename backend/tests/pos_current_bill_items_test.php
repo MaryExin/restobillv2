@@ -45,6 +45,9 @@ function rejectCurrentBill(callable $operation, string $message): void
 }
 
 $pdo = new CurrentBillItemsPdo();
+rejectCurrentBill(fn() => posAssertBillReadyForPayment(['remarks' => 'Pending QR Rebill']), 'QR additions to a billed transaction require re-billing even when gross is unchanged.');
+posAssertBillReadyForPayment(['remarks' => 'Pending for Payment']);
+checkCurrentBill(true, 'A newly saved bill can proceed to normal payment validation.');
 $source = ['transaction_id' => 'SOURCE', 'Category_Code' => 'CAT', 'Unit_Code' => 'UNIT'];
 $cart = [
     ['databaseID' => 1, 'sales_quantity' => 3, 'selling_price' => 100],

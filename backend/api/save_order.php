@@ -2,24 +2,30 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . "/cors.php";
-
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
-header("Content-Type: application/json");
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit;
+// Library mode is used by QR acceptance so both writes share one transaction.
+if (!defined('RESTOBILL_SAVE_ORDER_LIBRARY')) {
+    require_once __DIR__ . "/cors.php";
+    header("Access-Control-Allow-Origin: *");
+    header("Access-Control-Allow-Methods: POST, OPTIONS");
+    header("Access-Control-Allow-Headers: Content-Type, Authorization");
+    header("Content-Type: application/json");
+    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+        http_response_code(200);
+        exit;
+    }
+    require __DIR__ . "/bootstrap.php";
 }
 
-require __DIR__ . "/bootstrap.php";
 require_once __DIR__ . "/pos_report_mirror.php";
 require_once __DIR__ . "/pos_report_mirror_activation.php";
 require_once __DIR__ . "/../src/PosOrderItemInstructions.php";
+// Preserve optional product-group support on installed terminals that provide it.
+$productGroupsPath = dirname(__DIR__) . '/src/PosOrderProductGroups.php';
+if (is_file($productGroupsPath)) {
+    require_once $productGroupsPath;
+}
 
-date_default_timezone_set('Asia/Manila');
+
 
 /**
  * Allocate and increment a named counter from tbl_pos_document_counters.
@@ -123,28 +129,11 @@ function allocateDocumentCounter(
     return $allocatedNumber;
 }
 
-$manualTransactionStarted = false;
-$reportMirrorActivation = null;
-
-try {
-    $raw = file_get_contents("php://input");
-    $json = json_decode($raw, true);
-    $data = is_array($json) ? $json : $_POST;
-
-    $config = require __DIR__ . "/config.php";
-
-    $database = new Database(
-        $config["host"] ?? "localhost",
-        $config["db"] ?? "",
-        $config["user"] ?? "",
-        $config["pass"] ?? "",
-        $config["driver"] ?? "mysql",
-        $config["sqlite_path"] ?? ""
-    );
-
-    $pdo = $database->getConnection();
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-
+/** Save a POS order, optionally inside a transaction owned by a caller. */
+function posSaveOrder(PDO $pdo, array $config, array $data, bool $manageTransaction = true): array
+{
+    $reportMirrorActivation = null;
+    try {
     $Category_Code = (string)($data["Category_Code"] ?? '');
     $Unit_Code = (string)($data["Unit_Code"] ?? '');
     $transaction_type = (string)($data["transaction_type"] ?? '');
@@ -179,18 +168,27 @@ try {
     }
 
     if (!is_array($cart_items) || empty($cart_items)) {
-        echo json_encode([
-            "status" => "error",
-            "message" => "No cart items received"
-        ]);
-        exit;
+        throw new InvalidArgumentException("No cart items received");
     }
 
     $hasItemInstruction = posOrderHasItemInstructionColumn($pdo);
     posOrderValidateItemInstructions($cart_items, $hasItemInstruction);
 
-    $pdo->beginTransaction();
-    $manualTransactionStarted = true;
+    if ($manageTransaction) {
+        $pdo->beginTransaction();
+    } elseif (!$pdo->inTransaction()) {
+        throw new LogicException("The caller must own the order transaction.");
+    }
+    if (strcasecmp(trim($order_type), 'DINE IN') === 0 && $table_number !== '') {
+        // QR acceptance checks occupancy under this same scoped table lock.
+        $tableLock = $pdo->prepare('SELECT ID FROM tbl_pos_tables WHERE category_code=? AND unit_code=? AND table_name=? FOR UPDATE');
+        $tableLock->execute([$Category_Code, $Unit_Code, $table_number]);
+        $tableLock->fetchAll(PDO::FETCH_COLUMN);
+    }
+    $productGroups = class_exists('PosOrderProductGroups', false) ? new PosOrderProductGroups($pdo) : null;
+    if ($productGroups !== null) {
+        $cart_items = $productGroups->prepareItems($cart_items, $Category_Code, $Unit_Code, $order_type);
+    }
 
     $transaction_id = allocateDocumentCounter(
         $pdo,
@@ -335,6 +333,9 @@ try {
             $detailParams[':item_instruction'] = posOrderItemInstruction($item);
         }
         $stmtDetails->execute($detailParams);
+        if ($productGroups !== null) {
+            $productGroups->storePart((string)$pdo->lastInsertId(), (string)$transaction_id, $Category_Code, $Unit_Code, $item);
+        }
 
         $lineTotal = round($sales_quantity * $selling_price, 2);
         $totalAmount += $lineTotal;
@@ -532,32 +533,49 @@ try {
         );
     }
 
-    $pdo->commit();
-    $manualTransactionStarted = false;
+    if ($manageTransaction) {
+        $pdo->commit();
+    }
 
-    echo json_encode([
+    return [
         "status" => "success",
         "message" => "Transaction saved successfully",
         "transaction_id" => $transaction_id,
         "order_slip_no" => $order_slip_no,
         "total_amount" => round($totalAmount, 2),
         "report_mirror_activation" => $reportMirrorActivation
-    ]);
-} catch (Throwable $e) {
-    if (
-        isset($pdo) &&
-        $pdo instanceof PDO &&
-        $manualTransactionStarted
-    ) {
-        try {
+    ];
+    } catch (Throwable $error) {
+        if ($manageTransaction && $pdo->inTransaction()) {
             $pdo->rollBack();
-        } catch (Throwable $rollbackError) {
         }
+        throw $error;
     }
+}
 
-    http_response_code(500);
-    echo json_encode([
-        "status" => "error",
-        "message" => $e->getMessage()
-    ]);
+if (defined('RESTOBILL_SAVE_ORDER_LIBRARY')) {
+    return;
+}
+
+date_default_timezone_set('Asia/Manila');
+try {
+    $raw = file_get_contents("php://input");
+    $json = json_decode($raw, true);
+    $data = is_array($json) ? $json : $_POST;
+    $config = require __DIR__ . "/config.php";
+    $database = new Database(
+        $config["host"] ?? "localhost",
+        $config["db"] ?? "",
+        $config["user"] ?? "",
+        $config["pass"] ?? "",
+        $config["driver"] ?? "mysql",
+        $config["sqlite_path"] ?? ""
+    );
+    $pdo = $database->getConnection();
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    echo json_encode(posSaveOrder($pdo, $config, $data));
+} catch (Throwable $error) {
+    // Retain the legacy empty-cart response status for existing POS callers.
+    http_response_code($error instanceof InvalidArgumentException && $error->getMessage() === 'No cart items received' ? 200 : 500);
+    echo json_encode(["status" => "error", "message" => $error->getMessage()]);
 }

@@ -2,6 +2,14 @@
 
 declare(strict_types=1);
 
+/** Appending QR items preserves a billed snapshot until a real billing save. */
+function posAssertBillReadyForPayment(array $transaction): void
+{
+    if (($transaction['remarks'] ?? '') === 'Pending QR Rebill') {
+        throw new InvalidArgumentException('QR items were added after billing. Reopen Billing and save the updated bill before payment.');
+    }
+}
+
 /** Check the locked header before a stale screen can recreate a cancelled bill. */
 function posAssertBillNotCancelled(array $transaction): void
 {

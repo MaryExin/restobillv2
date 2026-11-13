@@ -112,6 +112,7 @@ try {
         $pdo->rollBack();
         respond(false, "Transaction was not found for this branch.", 404);
     }
+    posAssertBillReadyForPayment($transaction);
 
     if ((int)($transaction["void_id"] ?? 0) > 0) {
         $pdo->rollBack();

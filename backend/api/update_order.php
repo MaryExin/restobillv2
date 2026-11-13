@@ -16,6 +16,11 @@ $config = require __DIR__ . "/config.php";
 require_once __DIR__ . "/pos_report_mirror.php";
 require_once __DIR__ . "/../src/PosOrderItemInstructions.php";
 require_once __DIR__ . "/../src/PosCurrentBillItems.php";
+require_once __DIR__ . "/../src/PosOrderSnapshot.php";
+$productGroupsPath = dirname(__DIR__) . '/src/PosOrderProductGroups.php';
+if (is_file($productGroupsPath)) {
+    require_once $productGroupsPath;
+}
 
 $conn = new mysqli(
     $config["host"],
@@ -87,6 +92,18 @@ $stmtTransactionLog = null;
 $lockTransaction = null;
 
 try {
+    $originalCartItems = null;
+    if (array_key_exists('original_cart_items', $_POST)) {
+        if (!is_string($_POST['original_cart_items'])) throw new InvalidArgumentException('original_cart_items must be a JSON array.', 400);
+        try {
+            $originalCartItems = json_decode($_POST['original_cart_items'], true, 64, JSON_THROW_ON_ERROR);
+        } catch (JsonException $error) {
+            throw new InvalidArgumentException('original_cart_items must be a JSON array.', 400);
+        }
+        if (!is_array($originalCartItems) || !str_starts_with(ltrim($_POST['original_cart_items']), '[')) {
+            throw new InvalidArgumentException('original_cart_items must be a JSON array.', 400);
+        }
+    }
     $hasItemInstruction = posOrderHasItemInstructionColumn($conn);
     posOrderValidateItemInstructions($cart_items, $hasItemInstruction);
 
@@ -103,6 +120,8 @@ try {
             order_status
         FROM tbl_pos_transactions
         WHERE transaction_id = ?
+          AND Category_Code = ?
+          AND Unit_Code = ?
         LIMIT 1
         FOR UPDATE
     ");
@@ -110,7 +129,7 @@ try {
         throw new Exception("Lock prepare error: " . $conn->error);
     }
 
-    $lockTransaction->bind_param("i", $transaction_id);
+    $lockTransaction->bind_param("iss", $transaction_id, $Category_Code, $Unit_Code);
     if (!$lockTransaction->execute()) {
         throw new Exception("Lock execute error: " . $lockTransaction->error);
     }
@@ -134,6 +153,13 @@ try {
     }
 
     $order_slip_no = $existing["order_slip_no"] ?? '';
+    posOrderAssertCurrentSnapshot($conn, (string)$transaction_id, (string)$Category_Code, (string)$Unit_Code, $originalCartItems);
+    $remarks = posOrderPreserveRebillRemarks($existing, (string)$remarks);
+    $productGroups = class_exists('PosOrderProductGroups', false) ? new PosOrderProductGroups($conn) : null;
+    if ($productGroups !== null) {
+        $cart_items = $productGroups->prepareItems($cart_items, (string)$Category_Code, (string)$Unit_Code, (string)$order_type, (string)$transaction_id);
+        posOrderValidateItemInstructions($cart_items, $hasItemInstruction);
+    }
 
     $sqlUpdate = "UPDATE tbl_pos_transactions SET
         Category_Code=?,
@@ -154,7 +180,7 @@ try {
         status=?,
         void_date=?,
         refund_date=?
-        WHERE transaction_id=?";
+        WHERE transaction_id=? AND Category_Code=? AND Unit_Code=?";
 
     $stmtUpdate = $conn->prepare($sqlUpdate);
     if (!$stmtUpdate) {
@@ -162,7 +188,7 @@ try {
     }
 
     $stmtUpdate->bind_param(
-        "ssssssssssssssssssi",
+        "ssssssssssssssssssiss",
         $Category_Code,
         $Unit_Code,
         $transaction_type,
@@ -181,7 +207,9 @@ try {
         $status,
         $void_date,
         $refund_date,
-        $transaction_id
+        $transaction_id,
+        $Category_Code,
+        $Unit_Code
     );
 
     if (!$stmtUpdate->execute()) {
@@ -190,12 +218,15 @@ try {
     $stmtUpdate->close();
     $stmtUpdate = null;
 
-    $stmtDelete = $conn->prepare("DELETE FROM tbl_pos_transactions_detailed WHERE transaction_id=?");
+    if ($productGroups !== null) {
+        $productGroups->clearOrder((string)$transaction_id, (string)$Category_Code, (string)$Unit_Code);
+    }
+    $stmtDelete = $conn->prepare("DELETE FROM tbl_pos_transactions_detailed WHERE transaction_id=? AND Category_Code=? AND Unit_Code=?");
     if (!$stmtDelete) {
         throw new Exception("Delete Prepare Error: " . $conn->error);
     }
 
-    $stmtDelete->bind_param("i", $transaction_id);
+    $stmtDelete->bind_param("iss", $transaction_id, $Category_Code, $Unit_Code);
     if (!$stmtDelete->execute()) {
         throw new Exception("Delete Execute Error: " . $stmtDelete->error);
     }
@@ -248,6 +279,9 @@ try {
 
         if (!$stmtDetails->execute()) {
             throw new Exception("Details Execute Error: " . $stmtDetails->error);
+        }
+        if ($productGroups !== null) {
+            $productGroups->storePart((string)$conn->insert_id, (string)$transaction_id, (string)$Category_Code, (string)$Unit_Code, $item);
         }
 
         $lineTotal = $sales_quantity * $selling_price;
@@ -378,6 +412,7 @@ try {
     $stmtTransactionLog->close();
     $stmtTransactionLog = null;
 
+    $savedOriginalCartItems = posOrderReadSnapshot($conn, (string)$transaction_id, (string)$Category_Code, (string)$Unit_Code);
     if (!$conn->commit()) {
         throw new Exception("Commit failed: " . $conn->error);
     }
@@ -400,6 +435,8 @@ try {
         "transaction_id" => $transaction_id,
         "order_slip_no" => $order_slip_no,
         "total_amount" => $totalAmount,
+        "original_cart_items" => $savedOriginalCartItems,
+        "requires_rebilling" => $remarks === 'Pending QR Rebill',
         "report_mirror_warning" => $reportMirrorWarning
     ]);
 } catch (Throwable $e) {
@@ -408,7 +445,8 @@ try {
     } catch (Throwable $rollbackError) {
     }
 
-    http_response_code(500);
+    $errorStatus = (int)$e->getCode();
+    http_response_code(in_array($errorStatus, [400, 409], true) ? $errorStatus : 500);
     echo json_encode([
         "status" => "error",
         "message" => $e->getMessage()

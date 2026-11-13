@@ -1,4 +1,4 @@
-import { Routes, Route, HashRouter, useLocation } from "react-router-dom";
+import { Routes, Route, HashRouter, useLocation, Navigate } from "react-router-dom";
 import { lazy, Suspense, useEffect } from "react";
 import GlobalThemeToggle from "./components/common/GlobalThemeToggle";
 import GlobalSync from "./components/common/GlobalSync";
@@ -27,6 +27,7 @@ const CmpEmployeeInfo = lazy(() => import("./components/Hris/CmpEmployeeInfo"));
 const MemberQueings = lazy(() => import("./pages/Admin/MemberQueings"));
 const MemberProfile = lazy(() => import("./components/Hris/MemberProfile"));
 const SecondScreenCart = lazy(() => import("./components/KioskSecondScreen/SecondScreenCart"));
+const QrOrderingPage = lazy(() => import("./pages/QrOrderingPage"));
 
 const PrimaryWindowServices = () => {
   // Auto-launch second screen the moment the app opens, if Kiosk Mode is active.
@@ -50,15 +51,31 @@ const PrimaryWindowServices = () => {
 };
 
 const AppRoutes = () => {
-  const isCustomerDisplay = useLocation().pathname === "/kiosk-display";
+  const location = useLocation();
+  const pathname = location.pathname;
+  const isCustomerDisplay = pathname === "/kiosk-display";
+  const isGuestOrdering = pathname === "/qr-order";
+  const isLanGuest = document.querySelector('meta[name="restobill-qr-guest"]')?.content === "true";
+
+  if (isLanGuest) {
+    return (
+      <Suspense fallback={<ScreenLoader />}>
+        <Routes>
+          <Route path="/qr-order" element={<QrOrderingPage />} />
+          <Route path="*" element={<Navigate to={{ pathname: "/qr-order", search: location.search }} replace />} />
+        </Routes>
+      </Suspense>
+    );
+  }
 
   return (
     <>
       {/* A customer display must not start a second backup scheduler or control the main window. */}
-      {!isCustomerDisplay && <PrimaryWindowServices />}
+      {!isCustomerDisplay && !isGuestOrdering && <PrimaryWindowServices />}
 
       <Suspense fallback={<ScreenLoader />}>
       <Routes>
+        <Route path="/qr-order" element={<QrOrderingPage />} />
         <Route exact path="/" element={<PosLogin />} />
         <Route
           path="/ordering"

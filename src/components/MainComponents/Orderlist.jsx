@@ -128,6 +128,9 @@ const Orderlist = ({
 
   // Tracks the transaction ID after first save so retries use update_order.php instead of save_order.php
   const internalTransactionIdRef = useRef(null);
+  // Keep the loaded database rows separate from cart edits so a newer QR batch
+  // cannot be overwritten by an order screen that was already open.
+  const originalOrderItemsRef = useRef(null);
   // Flags the next updateCart push as a manual clear (suppresses success animation on second screen)
   const isClearRef = useRef(false);
   // Retail POS: keeps the scan/SKU box focused so a barcode scanner always has somewhere to type into
@@ -897,6 +900,7 @@ const Orderlist = ({
   ]);
 
   useEffect(() => {
+    originalOrderItemsRef.current = null;
     if (!apiHost || !transactionId) return;
 
     fetch(
@@ -922,6 +926,11 @@ const Orderlist = ({
         }
 
         if (!Array.isArray(data.order_details)) return;
+        originalOrderItemsRef.current = data.order_details.map((item) => ({
+          databaseID: item.ID,
+          sales_quantity: item.sales_quantity,
+          selling_price: item.selling_price,
+        }));
 
         const mappedCart = data.order_details.map((item, index) => ({
           lineId: item.ID ? `db-${item.ID}` : `db-${item.product_id}-${index}`,
@@ -2288,6 +2297,9 @@ const Orderlist = ({
       const endpoint = currentTransactionId
         ? `${apiHost}/api/update_order.php`
         : `${apiHost}/api/save_order.php`;
+      if (currentTransactionId && originalOrderItemsRef.current) {
+        formData.append("original_cart_items", JSON.stringify(originalOrderItemsRef.current));
+      }
 
       const response = await fetch(endpoint, {
         method: "POST",
@@ -2306,6 +2318,10 @@ const Orderlist = ({
       if (!currentTransactionId && result.transaction_id) {
         internalTransactionIdRef.current = result.transaction_id;
       }
+      // Replacement saves allocate fresh detail IDs. Use the snapshot returned
+      // under the server's lock, never a later read that could include new QR items.
+      originalOrderItemsRef.current = Array.isArray(result.original_cart_items)
+        ? result.original_cart_items : null;
 
       return {
         ok: true,

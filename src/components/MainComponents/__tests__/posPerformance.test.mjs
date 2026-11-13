@@ -920,11 +920,12 @@ test("increasing a reopened grouped row copies individual HALF prices into new a
   const saved = [cheeseVariants[1], cheeseVariants[7]].map((product, index) => ({
     ...product, item_category: undefined, ID: index + 1, sales_quantity: 1, item_instruction: instruction,
   }));
-  let savedItems;
+  let savedItems, originalItems;
   const orders = harness('src/components/MainComponents/Orderlist.jsx', {
     fetch: async (url, options) => {
       if (url.includes('/update_order.php')) {
         savedItems = JSON.parse(options.body.get('cart_items'));
+        originalItems = JSON.parse(options.body.get('original_cart_items'));
         return { ok: true, json: async () => ({ status: 'success', transaction_id: 'SAVED' }) };
       }
       assert(url.includes('view_table_transaction.php'));
@@ -949,6 +950,9 @@ test("increasing a reopened grouped row copies individual HALF prices into new a
   assert.deepEqual(savedItems.map(item => [item.product_id, item.selling_price, item.sales_quantity]), [
     ['CHEESE-12-HALF', 475, 2], ['ALOHA-12-HALF', 205, 2],
   ]);
+  assert.deepEqual(originalItems, saved.map(item => ({
+    databaseID: item.ID, sales_quantity: 1, selling_price: item.selling_price,
+  })), 'concurrency snapshot must preserve the loaded rows before local quantity edits');
 });
 
 const platterProducts = [
