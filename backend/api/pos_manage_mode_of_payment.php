@@ -1,6 +1,6 @@
 <?php
 header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, PATCH, OPTIONS");
+header("Access-Control-Allow-Methods: GET, POST, PATCH, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
 header("Content-Type: application/json; charset=UTF-8");
 
@@ -10,7 +10,7 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
 }
 
 $method = $_SERVER["REQUEST_METHOD"];
-$requiresMutationAuthorization = $method === "PATCH";
+$requiresMutationAuthorization = $method === "PATCH" || $method === "POST";
 if ($requiresMutationAuthorization) {
     require __DIR__ . "/secure_guard.php";
 }
@@ -58,6 +58,52 @@ try {
         respond(true, "OK", fetchMops($pdo));
     }
 
+    // POST: add a new mode of payment
+    // body: { mop, sl_code, reference_On_Off?, MOP_On_Off? }
+    if ($method === "POST") {
+        $body    = json_decode(file_get_contents("php://input"), true) ?: [];
+        $mopName = trim(preg_replace('/\s+/', ' ', (string)($body["mop"] ?? "")));
+        $slCode  = trim((string)($body["sl_code"] ?? ""));
+
+        if ($mopName === "") {
+            respond(false, "Payment method name is required.", null, 400);
+        }
+        if (mb_strlen($mopName) > 45) {
+            respond(false, "Payment method name must be 45 characters or less.", null, 400);
+        }
+        if ($slCode === "") {
+            respond(false, "SL code is required.", null, 400);
+        }
+        if (mb_strlen($slCode) > 45) {
+            respond(false, "SL code must be 45 characters or less.", null, 400);
+        }
+
+        $dup = $pdo->prepare("SELECT seq FROM tbl_mode_of_payment WHERE LOWER(TRIM(mop)) = LOWER(:mop) LIMIT 1");
+        $dup->execute([":mop" => $mopName]);
+        if ($dup->fetch()) {
+            respond(false, "\"{$mopName}\" already exists.", null, 409);
+        }
+
+        $idCheck = $pdo->prepare("SELECT seq FROM tbl_mode_of_payment WHERE mop_id = :id LIMIT 1");
+        do {
+            $newId = "MP-" . bin2hex(random_bytes(6));
+            $idCheck->execute([":id" => $newId]);
+        } while ($idCheck->fetch());
+
+        $pdo->prepare("
+            INSERT INTO tbl_mode_of_payment (mop_id, mop, sl_code, reference_On_Off, MOP_On_Off)
+            VALUES (:id, :mop, :sl_code, :ref, :mop_onoff)
+        ")->execute([
+            ":id"        => $newId,
+            ":mop"       => $mopName,
+            ":sl_code"   => $slCode,
+            ":ref"       => (int)(bool)($body["reference_On_Off"] ?? 1),
+            ":mop_onoff" => (int)(bool)($body["MOP_On_Off"] ?? 1),
+        ]);
+
+        respond(true, "Mode of payment added.", fetchMops($pdo), 201);
+    }
+
     if ($method !== "PATCH") {
         respond(false, "Method not allowed.", null, 405);
     }
@@ -86,6 +132,14 @@ try {
     if (array_key_exists("MOP_On_Off", $body)) {
         $fields[] = "MOP_On_Off = :mop_onoff";
         $params[":mop_onoff"] = (int)(bool)$body["MOP_On_Off"];
+    }
+    if (array_key_exists("sl_code", $body)) {
+        $slCode = trim((string)$body["sl_code"]);
+        if ($slCode === "" || mb_strlen($slCode) > 45) {
+            respond(false, "SL code is required (45 characters or less).", null, 400);
+        }
+        $fields[] = "sl_code = :sl_code";
+        $params[":sl_code"] = $slCode;
     }
 
     if (empty($fields)) {

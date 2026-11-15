@@ -92,3 +92,21 @@ export const reservationOrderBlockedReason = ({ shiftOpen, shiftDateKey, reserva
   if (!reservation?.table_name) return "Assign a room first (Edit) to start the order.";
   return "";
 };
+
+/**
+ * Why a booking cannot be marked Arrived yet; "" when it can. A guest can
+ * only arrive on the reservation's own date, counted by the open day (the
+ * open shift's business date) like orders: not before that day is opened.
+ * The backend (pos_reservations.php "status") applies the same rule.
+ */
+export const reservationArrivalBlockedReason = ({ shiftOpen, shiftDateKey, reservation }) => {
+  if (!shiftOpen) return "Open a new day first to mark the guest as arrived.";
+  const reservationDate = String(reservation?.reservation_date ?? "");
+  if (!shiftDateKey || !reservationDate || reservationDate === shiftDateKey) return "";
+  const openDay = formatShortDate(shiftDateKey);
+  const bookedDay = formatShortDate(reservationDate);
+  if (reservationDate > shiftDateKey) {
+    return `This reservation is for ${bookedDay} and the open day is ${openDay}. The guest can be marked Arrived once the ${bookedDay} day is open.`;
+  }
+  return `This reservation was for ${bookedDay} (the open day is ${openDay}). Mark it No show, or reschedule it (Edit).`;
+};

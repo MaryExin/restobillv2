@@ -49,6 +49,7 @@ export const POS_PERMISSION_GROUPS = [
       { key: "billing", label: "Bill / Folio" },
       { key: "payment", label: "Payment" },
       { key: "reservations", label: "Reservations" },
+      { key: "frontDesk", label: "Front Desk" },
       { key: "registrySales", label: "Registry Sales" },
       { key: "posReports", label: "POS Reports" },
       { key: "salesDashboard", label: "Sales Dashboard" },
@@ -137,6 +138,8 @@ export const POS_ROUTE_PERMISSION_BY_PATH = {
   "/reservations": ["routes", "reservations"],
   // Room service orders are ordinary orders, so ordering access is enough.
   "/room-service": ["routes", "newTransaction"],
+  // Front desk: check-in/out, folios, night audit, city ledger (pos_front_desk.php).
+  "/front-desk": ["routes", "frontDesk"],
   "/transactionrecords": ["routes", "registrySales"],
   "/posreports": ["routes", "posReports"],
   "/salesdashboard": ["routes", "salesDashboard"],
@@ -232,6 +235,7 @@ const cashierPermissions = () => {
     ["routes", "billing"],
     ["routes", "payment"],
     ["routes", "reservations"],
+    ["routes", "frontDesk"],
     ["routes", "registrySales"],
     ["routes", "posReports"],
     ["reading", "xReading"],

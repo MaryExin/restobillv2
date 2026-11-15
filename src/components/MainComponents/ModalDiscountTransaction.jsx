@@ -2175,7 +2175,8 @@ const ModalDiscountTransaction = ({
           category_code:
             transaction?.Category_Code ||
             transaction?.category_code ||
-            "Crab & Crack",
+            localStorage.getItem("posBusinessCategoryCode") ||
+            "",
           unit_code: transaction?.Unit_Code || transaction?.unit_code || "",
           user_id: localStorage.getItem("user_id") || "",
           user_name:
@@ -2259,7 +2260,8 @@ const ModalDiscountTransaction = ({
       category_code:
         transaction?.Category_Code ||
         transaction?.category_code ||
-        "Crab & Crack",
+        localStorage.getItem("posBusinessCategoryCode") ||
+        "",
       unit_code: transaction?.Unit_Code || transaction?.unit_code || "",
 
       user_id: loggedUserId,

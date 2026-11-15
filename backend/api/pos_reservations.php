@@ -408,6 +408,53 @@ function assertNoRoomConflict(PDO $pdo, array $scope, array $fields, int $exclud
     }
 }
 
+/**
+ * Business date (Y-m-d) of the open shift, or null when no day is open.
+ * Orders are recorded under this date, and a guest can only arrive on it.
+ */
+function reservationOpenBusinessDate(PDO $pdo, array $scope): ?string
+{
+    $stmt = $pdo->prepare("
+        SELECT DATE(Opening_DateTime)
+        FROM tbl_pos_shifting_records
+        WHERE Shift_Status = 'Open'
+          AND Status = 'Active'
+          AND Category_Code = :category_code
+          AND Unit_Code = :unit_code
+        ORDER BY Opening_DateTime DESC
+        LIMIT 1
+    ");
+    $stmt->execute([
+        ":category_code" => $scope["category_code"],
+        ":unit_code" => $scope["unit_code"],
+    ]);
+    $date = $stmt->fetchColumn();
+    return $date ? (string)$date : null;
+}
+
+/** Same rule as reservationArrivalBlockedReason() in reservationUtils.js. */
+function assertReservationCanArrive(PDO $pdo, array $scope, array $reservation): void
+{
+    $openDay = reservationOpenBusinessDate($pdo, $scope);
+    if ($openDay === null) {
+        throw new ReservationValidationException("Open a new day first to mark the guest as arrived.");
+    }
+    $bookedDay = (string)$reservation["reservation_date"];
+    if ($bookedDay === $openDay) {
+        return;
+    }
+    $booked = date("M j", strtotime($bookedDay));
+    $open = date("M j", strtotime($openDay));
+    if ($bookedDay > $openDay) {
+        throw new ReservationValidationException(
+            "This reservation is for {$booked} and the open day is {$open}. The guest can be marked Arrived once the {$booked} day is open."
+        );
+    }
+    throw new ReservationValidationException(
+        "This reservation was for {$booked} (the open day is {$open}). Mark it No show, or reschedule it (Edit)."
+    );
+}
+
 function findReservation(PDO $pdo, array $scope, int $id): ?array
 {
     $stmt = $pdo->prepare("
@@ -704,6 +751,9 @@ try {
         $status = trim((string)($body["status"] ?? ""));
         if (!in_array($status, RESERVATION_STATUSES, true)) {
             throw new ReservationValidationException("Invalid reservation status.");
+        }
+        if ($status === "Arrived" && $existing["status"] !== "Arrived") {
+            assertReservationCanArrive($pdo, $scope, $existing);
         }
         if ($status === "Booked" || $status === "Arrived") {
             // Re-opening a reservation must not double-book its room.

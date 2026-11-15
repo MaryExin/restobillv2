@@ -122,7 +122,7 @@ try {
         // Pure helpers next to the endpoints (guest details, customer registry):
         // loaded from the real api folder; their schema checks swallow the
         // fixture's refusal to run SHOW/ALTER statements.
-        foreach (['pos_guest_columns', 'pos_customers'] as $helper) {
+        foreach (['pos_guest_columns', 'pos_customers', 'pos_hotel_ledger'] as $helper) {
             $source = str_replace('require_once __DIR__ . "/' . $helper . '.php";',
                 'require_once ' . var_export(__DIR__ . '/../api/' . $helper . '.php', true) . ';', $source);
         }

@@ -942,6 +942,10 @@ function buildXReadingEscposBuffer(data = {}) {
     peso(data.summaryPaymentsReceived),
     width,
   );
+  // Front desk cash collections (folio / city ledger payments, not sales).
+  if (Number(data.summaryCashCollections || 0) !== 0) {
+    pushRow(chunks, "Cash Collections", peso(data.summaryCashCollections), width);
+  }
 
   chunks.push(Buffer.from([0x1b, 0x45, 0x01]));
   pushRow(chunks, "Short / Over", peso(data.summaryShortOver), width);
@@ -1084,6 +1088,9 @@ function buildZReadingEscposBuffer(data = {}) {
   pushRow(chunks, "Opening Fund", peso(data.openingFund), width);
   pushRow(chunks, "Less Withdrawal", peso(data.lessWithdrawal), width);
   pushRow(chunks, "Payments Received", peso(data.paymentsReceived), width);
+  if (Number(data.cashCollections || 0) !== 0) {
+    pushRow(chunks, "Cash Collections", peso(data.cashCollections), width);
+  }
 
   chunks.push(Buffer.from([0x1b, 0x45, 0x01]));
   pushRow(chunks, "Short / Over", peso(data.shortOver), width);
@@ -2985,7 +2992,7 @@ app.whenReady().then(() => {
       chunks.push(boldOn);
       chunks.push(
         txt(
-          escposSafeText(business.companyName, "CRABS N CRACK SEAFOOD HOUSE"),
+          escposSafeText(business.companyName, ""),
         ),
       );
       chunks.push(nl());
@@ -3978,6 +3985,9 @@ app.whenReady().then(() => {
           "Payments Received:",
           escposPeso(safeData.paymentsReceived),
         );
+        if (Number(safeData.cashCollections || 0) !== 0) {
+          pushMetaRow("Cash Collections:", escposPeso(safeData.cashCollections));
+        }
 
         chunks.push(boldOn);
         pushMetaRow("Short / Over:", escposPeso(safeData.shortOver));
@@ -4059,6 +4069,9 @@ app.whenReady().then(() => {
           "Payments Received:",
           escposPeso(safeData.summaryPaymentsReceived),
         );
+        if (Number(safeData.summaryCashCollections || 0) !== 0) {
+          pushMetaRow("Cash Collections:", escposPeso(safeData.summaryCashCollections));
+        }
 
         chunks.push(boldOn);
         pushMetaRow("Short / Over:", escposPeso(safeData.summaryShortOver));
@@ -4558,6 +4571,145 @@ app.whenReady().then(() => {
         success: false,
         message: error?.message || "ESC/POS billing print failed",
       };
+    }
+  });
+
+  // Front desk documents (guest folio, city ledger statement, collection
+  // receipt): one generic layout on the receipt printer.
+  // data: { title, subtitle, infoRows: [[label, value]], sections:
+  //   [{ title, rows: [[left, right]], emptyText, total: [label, value] }],
+  //   summary: [[label, value]], highlight: [label, value], notes: [text],
+  //   signature: bool, printerName }
+  ipcMain.handle("print-escpos-front-desk", async (_event, data) => {
+    const LINE_WIDTH = 42;
+    // ESC/POS text is ASCII: replace the symbols the screens use.
+    const clean = (value) =>
+      String(value ?? "")
+        .replace(/\u20b1/g, "P")
+        .replace(/[\u00b7\u2022]/g, "-")
+        .replace(/[\u2013\u2014]/g, "-")
+        .replace(/[\u2018\u2019]/g, "'")
+        .replace(/[\u201c\u201d]/g, '"')
+        .normalize("NFKD")
+        .replace(/[^\x20-\x7e]/g, "");
+    const formatLeftRight = (left, right) => {
+      const r = clean(right);
+      let l = clean(left);
+      const room = LINE_WIDTH - r.length - 1;
+      if (l.length > room) l = l.slice(0, Math.max(room, 0));
+      return l + " ".repeat(Math.max(LINE_WIDTH - l.length - r.length, 1)) + r;
+    };
+    const wrap = (text, width = LINE_WIDTH) => {
+      const words = clean(text).trim().split(/\s+/).filter(Boolean);
+      const lines = [];
+      let current = "";
+      words.forEach((word) => {
+        while (word.length > width) {
+          if (current) { lines.push(current); current = ""; }
+          lines.push(word.slice(0, width));
+          word = word.slice(width);
+        }
+        const test = current ? `${current} ${word}` : word;
+        if (test.length <= width) current = test;
+        else { if (current) lines.push(current); current = word; }
+      });
+      if (current) lines.push(current);
+      return lines;
+    };
+
+    try {
+      const doc = data || {};
+      const bi = readJsonFileSafe(getBusinessInfoFilePath(), DEFAULT_BUSINESS_INFO);
+      const splitBiLines = (v) =>
+        String(v || "").split(/\r?\n|\|/).map((l) => l.trim()).filter(Boolean);
+
+      const chunks = [];
+      const alignLeft = Buffer.from([0x1b, 0x61, 0x00]);
+      const alignCenter = Buffer.from([0x1b, 0x61, 0x01]);
+      const boldOn = Buffer.from([0x1b, 0x45, 0x01]);
+      const boldOff = Buffer.from([0x1b, 0x45, 0x00]);
+      const doubleSizeOn = Buffer.from([0x1d, 0x21, 0x11]);
+      const normalSize = Buffer.from([0x1d, 0x21, 0x00]);
+      const nl = (n = 1) => Buffer.from("\n".repeat(n), "ascii");
+      const txt = (v) => Buffer.from(clean(v), "ascii");
+      const div = () => txt("-".repeat(LINE_WIDTH));
+      const row = (left, right) => chunks.push(txt(formatLeftRight(left, right)), nl());
+
+      chunks.push(Buffer.from([0x1b, 0x40]));
+
+      // Business header (same as the receipts)
+      chunks.push(alignCenter, boldOn, txt(bi.companyName || "COMPANY"), nl());
+      if (bi.storeName) chunks.push(txt(bi.storeName), nl());
+      chunks.push(boldOff);
+      if (bi.corpName) chunks.push(txt(bi.corpName), nl());
+      splitBiLines(bi.address).forEach((line) => chunks.push(txt(line), nl()));
+      if (bi.tin) chunks.push(txt(`VAT REG TIN: ${bi.tin}`), nl());
+
+      chunks.push(nl(), boldOn);
+      wrap(doc.title || "FRONT DESK").forEach((line) => chunks.push(txt(line), nl()));
+      chunks.push(boldOff);
+      if (doc.subtitle) wrap(doc.subtitle).forEach((line) => chunks.push(txt(line), nl()));
+      chunks.push(nl(), alignLeft);
+
+      (Array.isArray(doc.infoRows) ? doc.infoRows : []).forEach(([label, value]) => {
+        const left = `${clean(label)}:`;
+        const value_ = clean(value);
+        if (left.length + 1 + value_.length <= LINE_WIDTH) {
+          row(left, value_);
+        } else {
+          chunks.push(txt(left), nl());
+          wrap(value_, LINE_WIDTH - 2).forEach((line) => chunks.push(txt(`  ${line}`), nl()));
+        }
+      });
+      chunks.push(div(), nl());
+
+      (Array.isArray(doc.sections) ? doc.sections : []).forEach((section) => {
+        chunks.push(boldOn, txt(section.title || ""), nl(), boldOff);
+        const rows = Array.isArray(section.rows) ? section.rows : [];
+        if (rows.length === 0 && section.emptyText) {
+          chunks.push(txt(section.emptyText), nl());
+        }
+        rows.forEach(([left, right]) => {
+          const r = clean(right);
+          const lines = wrap(left, LINE_WIDTH - r.length - 1);
+          if (lines.length === 0) lines.push("");
+          lines.forEach((line, i) => {
+            if (i === lines.length - 1) row(line, r);
+            else chunks.push(txt(line), nl());
+          });
+        });
+        if (Array.isArray(section.total)) {
+          chunks.push(boldOn);
+          row(section.total[0], section.total[1]);
+          chunks.push(boldOff);
+        }
+        chunks.push(div(), nl());
+      });
+
+      (Array.isArray(doc.summary) ? doc.summary : []).forEach(([label, value]) => row(label, value));
+
+      if (Array.isArray(doc.highlight)) {
+        chunks.push(alignCenter, nl(), boldOn, txt(doc.highlight[0]), nl());
+        chunks.push(doubleSizeOn, txt(doc.highlight[1]), nl(), normalSize, boldOff, alignLeft);
+      }
+
+      (Array.isArray(doc.notes) ? doc.notes : []).forEach((note) => {
+        chunks.push(nl());
+        wrap(note).forEach((line) => chunks.push(txt(line), nl()));
+      });
+
+      if (doc.signature) {
+        chunks.push(nl(3), txt("_".repeat(LINE_WIDTH - 10)), nl(), txt(doc.signatureLabel || "Signature"), nl());
+      }
+
+      chunks.push(nl(3), Buffer.from([0x1d, 0x56, 0x00]));
+      return await writeEscposBuffer(Buffer.concat(chunks), {
+        printerName: data?.printerName,
+        configKey: "printEscpospospaymentreceipt",
+      });
+    } catch (error) {
+      console.error("[ESC/POS FRONT DESK] Print failed:", error);
+      return { success: false, message: error?.message || "Front desk print failed." };
     }
   });
 

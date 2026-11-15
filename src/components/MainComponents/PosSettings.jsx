@@ -9,7 +9,7 @@ import {
   FiUser,
   FiTrendingUp,
   FiCreditCard,
-  FiMail,
+  // FiMail, // used only by the hidden Email Reports tab
   FiMenu,
   FiDatabase,
   FiPercent,
@@ -40,8 +40,9 @@ const PosAppearance = lazy(() => import("./PosSettingsModal/PosAppearance"));
 const PosUserAccounts = lazy(() => import("./PosSettingsModal/PosUserAccounts"));
 const PosUserRoles = lazy(() => import("./PosSettingsModal/PosUserRoles"));
 const PosSystemLogs = lazy(() => import("./PosSettingsModal/PosSystemLogs"));
-const PosExpenses = lazy(() => import("./PosSettingsModal/PosExpenses"));
-const PosReportingModal = lazy(() => import("./PosSettingsModal/PosReportingModal"));
+// Expenses & Petty and Email Reports tabs hidden for now (commented out, not deleted).
+// const PosExpenses = lazy(() => import("./PosSettingsModal/PosExpenses"));
+// const PosReportingModal = lazy(() => import("./PosSettingsModal/PosReportingModal"));
 const PosDataSecurity = lazy(() => import("./PosSettingsModal/PosDataSecurity"));
 const PosDiscountCeiling = lazy(() => import("./PosSettingsModal/PosDiscountCeiling"));
 const PosDiscountMode = lazy(() => import("./PosSettingsModal/PosDiscountMode"));
@@ -57,7 +58,8 @@ const PosSecondScreen = lazy(() => import("./PosSettingsModal/PosSecondScreen"))
 const PosTableLayout = lazy(() => import("./PosSettingsModal/PosTableLayout"));
 const PosLoyaltyConfig = lazy(() => import("./PosSettingsModal/PosLoyaltyConfig"));
 const PosSalesTypeOrder = lazy(() => import("./PosSettingsModal/PosSalesTypeOrder"));
-const PosReportMirrorSettings = lazy(() => import("./PosSettingsModal/PosReportMirrorSettings"));
+// Report Database tab hidden for now (commented out, not deleted).
+// const PosReportMirrorSettings = lazy(() => import("./PosSettingsModal/PosReportMirrorSettings"));
 const PosTutorialGuide = lazy(() => import("./PosSettingsModal/PosTutorialGuide"));
 
 const MASTER_PASS    = "LESI_POSPASS@2023";
@@ -68,12 +70,12 @@ const PROTECTED_TABS = new Set(["Layout Mode"]);
 // protected settings tabs entirely for this user.
 const UNGATED_USERNAME = "lightemadmin";
 const ALL_NAV_ITEMS = [
-  { id: "Report Database", icon: FiDatabase },
+  // { id: "Report Database", icon: FiDatabase },
   { id: "My Account", icon: FiUser },
   { id: "User Accounts", icon: FiUsers },
   { id: "User Roles", icon: FiShield },
   { id: "Registry Sales", icon: FiTrendingUp },
-  { id: "Expenses & Petty", icon: FiCreditCard },
+  // { id: "Expenses & Petty", icon: FiCreditCard },
   { id: "Mode of Payment", icon: FiCreditCard },
   { id: "Service Charge", icon: FiPercent },
   { id: "Discount Ceiling", icon: FiPercent },
@@ -82,7 +84,7 @@ const ALL_NAV_ITEMS = [
   { id: "Room Layout", icon: FiGrid },
   { id: "Sales Type Order", icon: FiList },
   { id: "Loyalty Configuration", icon: FiAward },
-  { id: "Email Reports", icon: FiMail },
+  // { id: "Email Reports", icon: FiMail },
   { id: "Data & Security", icon: FiDatabase },
   { id: "Appearance", icon: FiLayers },
   { id: "Printer Settings", icon: FiPrinter },
@@ -275,9 +277,9 @@ const PosSettings = ({ isOpen, onClose, branchInfo, initialTab = null }) => {
       );
     }
 
-    if (activeTab === "Report Database") {
-      return <PosReportMirrorSettings isDark={isDark} accent={accentColor} />;
-    }
+    // if (activeTab === "Report Database") {
+    //   return <PosReportMirrorSettings isDark={isDark} accent={accentColor} />;
+    // }
 
     if (activeTab === "User Accounts") {
       return (
@@ -304,15 +306,15 @@ const PosSettings = ({ isOpen, onClose, branchInfo, initialTab = null }) => {
       return <PosSystemLogs isDark={isDark} accent={accentColor} />;
     }
 
-    if (activeTab === "Expenses & Petty") {
-      return (
-        <PosExpenses
-          isDark={isDark}
-          accent={accentColor}
-          getContrastText={getContrastText}
-        />
-      );
-    }
+    // if (activeTab === "Expenses & Petty") {
+    //   return (
+    //     <PosExpenses
+    //       isDark={isDark}
+    //       accent={accentColor}
+    //       getContrastText={getContrastText}
+    //     />
+    //   );
+    // }
 
     if (activeTab === "Discount Ceiling") {
       return <PosDiscountCeiling isDark={isDark} accent={accentColor} />;
@@ -348,9 +350,9 @@ const PosSettings = ({ isOpen, onClose, branchInfo, initialTab = null }) => {
       return <PosLoyaltyConfig isDark={isDark} accent={accentColor} />;
     }
 
-    if (activeTab === "Email Reports") {
-      return <PosReportingModal isDark={isDark} accent={accentColor} />;
-    }
+    // if (activeTab === "Email Reports") {
+    //   return <PosReportingModal isDark={isDark} accent={accentColor} />;
+    // }
 
     if (activeTab === "Data & Security") {
       return (

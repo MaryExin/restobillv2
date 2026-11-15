@@ -482,7 +482,16 @@ const PosUserAccounts = ({ isDark, accent, getContrastText }) => {
                       }
                       className={`w-full p-5 rounded-[25px] border outline-none font-bold text-[12px] ${theme.input}`}
                     >
-                      {roleOptions.map((role) => (
+                      {roleOptions
+                        // Super Admin (value "2") is not offered when creating
+                        // an account; it only shows when editing a user who is
+                        // already Super Admin, so their role is kept on save.
+                        .filter(
+                          (role) =>
+                            String(role.value) !== "2" ||
+                            (editingUuid && String(formData.position) === "2"),
+                        )
+                        .map((role) => (
                         <option key={role.value} value={role.value}>
                           {role.label}
                         </option>

@@ -32,6 +32,7 @@ import {
   relativeDayLabel,
   reservationsEndpoint,
   reservationOrderBlockedReason,
+  reservationArrivalBlockedReason,
   shiftBusinessDateKey,
 } from "./reservationUtils";
 
@@ -405,6 +406,11 @@ const ReservationsBoard = ({ apiHost }) => {
                       shiftDateKey,
                       reservation: row,
                     });
+                    // Arrived only on the reservation's own (open) day.
+                    const arrivalBlockedReason =
+                      row.status === "Booked"
+                        ? reservationArrivalBlockedReason({ shiftOpen, shiftDateKey, reservation: row })
+                        : "";
                     return (
                       <article
                         key={row.id}
@@ -484,6 +490,13 @@ const ReservationsBoard = ({ apiHost }) => {
                             >
                               {orderBlockedReason}
                             </p>
+                          ) : arrivalBlockedReason && row.reservation_date === todayKey ? (
+                            <p
+                              className="mt-2 font-[Poppins-Medium] text-[12px]"
+                              style={{ color: "#b45309" }}
+                            >
+                              {arrivalBlockedReason}
+                            </p>
                           ) : null}
                         </div>
 
@@ -508,7 +521,8 @@ const ReservationsBoard = ({ apiHost }) => {
                           {row.status === "Booked" ? (
                             <ActionButton
                               tone="success"
-                              disabled={isChangingStatus}
+                              disabled={isChangingStatus || Boolean(arrivalBlockedReason)}
+                              title={arrivalBlockedReason || "Mark the guest as arrived"}
                               onClick={() => askStatusChange(row, "Arrived")}
                             >
                               Arrived

@@ -14,6 +14,7 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
 
 require __DIR__ . "/pdo.php";
 require_once __DIR__ . "/pos_report_mirror.php";
+require_once __DIR__ . "/pos_hotel_ledger.php";
 require_once __DIR__ . "/../src/PosCurrentBillItems.php";
 
 function respond(bool $success, string $message, int $status = 200, array $extra = []): void {
@@ -180,6 +181,9 @@ try {
         WHERE Category_Code = :cat AND Unit_Code = :unit
     ")->execute([":cat" => $categoryCode, ":unit" => $unitCode]);
 
+    // Reverse Charge to Room / City Ledger / Complimentary records of this bill.
+    posHotelReverseTransaction($pdo, $categoryCode, $unitCode, $transactionId, "Voided #" . $voidNumber);
+
     mirrorPosTransactionToReport($pdo, $config, $transactionId, $categoryCode, $unitCode);
 
     $pdo->commit();
@@ -191,6 +195,9 @@ try {
             : $selectedAdminId,
     ]);
 
+} catch (PosHotelLedgerException $e) {
+    if ($pdo->inTransaction()) $pdo->rollBack();
+    respond(false, $e->getMessage(), 409);
 } catch (Throwable $e) {
     if ($pdo->inTransaction()) $pdo->rollBack();
     error_log("POS void failed: " . $e->getMessage());

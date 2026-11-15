@@ -463,6 +463,12 @@ const ZReadingView = ({ isOpen, onClose, reportData, isLoading, onFilter }) => {
                     <span>Payments Received:</span>
                     <span>{f(displayData.paymentsReceived)}</span>
                   </div>
+                  {Number(displayData.cashCollections || 0) !== 0 ? (
+                    <div className="flex justify-between">
+                      <span>Cash Collections:</span>
+                      <span>{f(displayData.cashCollections)}</span>
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="my-2 text-slate-400">{line}</div>

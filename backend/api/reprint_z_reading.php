@@ -37,6 +37,7 @@ $isSuperAdmin = posRoleAuthCanonicalValue(
 $isSuperAdmin = false;
 
 require_once __DIR__ . "/report_db.php";
+require_once __DIR__ . "/pos_hotel_ledger.php";
 require_once __DIR__ . "/pos_z_reading_monthly_data.php";
 
 try {
@@ -468,7 +469,16 @@ try {
     $openingFund = (float)($shift["Opening_Cash_Count"] ?: 0);
     $withdrawal = 0.00;
     $paymentsReceived = $paymentCash + $paymentCheque + $paymentCreditCard + $paymentOthers;
-    $shortOver = $cashInDrawer + $paymentCheque + $paymentCreditCard + $paymentOthers - $openingFund - $paymentsReceived;
+    // Front desk cash collections (live database) in the shift's drawer.
+    $cashCollections = posHotelCashCollections(
+        $primaryPdo,
+        $categoryCode,
+        $unitCode,
+        (string)$terminalNumber,
+        date("Y-m-d H:i:s", strtotime((string)$shift["Opening_DateTime"])),
+        date("Y-m-d H:i:s", strtotime((string)$shift["Closing_DateTime"]))
+    );
+    $shortOver = $cashInDrawer + $paymentCheque + $paymentCreditCard + $paymentOthers - $openingFund - $paymentsReceived - $cashCollections;
 
     $tinLabel = $businessUnitVATRegistration === "Non-VAT Registered"
         ? "NON-VAT REG TIN: " . $businessUnitTIN
@@ -570,6 +580,7 @@ try {
             "lessWithdrawal" => $withdrawal,
             "withdrawal" => $withdrawal,
             "paymentsReceived" => $paymentsReceived,
+            "cashCollections" => $cashCollections,
             "shortOver" => $shortOver,
 
             "corpName" => $corpName,

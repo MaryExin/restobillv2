@@ -2,6 +2,7 @@
 require_once __DIR__ . "/bootstrap.php";
 require_once __DIR__ . "/pos_developer_auth.php";
 require_once __DIR__ . "/pos_role_authorization.php";
+require_once __DIR__ . "/pos_hotel_ledger.php";
 
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
@@ -847,7 +848,17 @@ try {
     $openingFund = (float)$row["Opening_Cash_Count"];
     $withdrawal = 0.00;
     $paymentsReceived = $cashAmount + $chequeAmount + $creditCardAmount + $otherPaymentsAmount;
-    $shortOver = $cashDrawerAmount + $chequeAmount + $creditCardAmount + $otherPaymentsAmount - $openingFund - $paymentsReceived;
+    // Cash taken at the front desk for folios / company accounts (not sales)
+    // is in the drawer too, so it is expected cash for the short/over.
+    $cashCollections = posHotelCashCollections(
+        $pdo,
+        $categoryCode,
+        $unitCode,
+        (string)$terminalNumber,
+        date("Y-m-d H:i:s", strtotime((string)$row["Opening_DateTime"])),
+        date("Y-m-d H:i:s", strtotime((string)($row["Closing_DateTime"] ?: $closingDateTime)))
+    );
+    $shortOver = $cashDrawerAmount + $chequeAmount + $creditCardAmount + $otherPaymentsAmount - $openingFund - $paymentsReceived - $cashCollections;
 
     $tinLabel = $businessUnitVATRegistration === "Non-VAT Registered"
         ? "NON-VAT REG TIN: " . $businessUnitTIN
@@ -1071,6 +1082,7 @@ try {
             "openingFund" => $openingFund,
             "lessWithdrawal" => $withdrawal,
             "paymentsReceived" => $paymentsReceived,
+            "cashCollections" => $cashCollections,
             "shortOver" => $shortOver,
 
             "corpName" => $corpName,

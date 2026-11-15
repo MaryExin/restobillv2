@@ -22,6 +22,16 @@ import useBusinessInfo from "../../hooks/useBusinessInfo";
 import { resolveDiscountLineAmount } from "../../utils/discountLineMath";
 import { posAuthenticatedFetch } from "../../utils/posAuthenticatedFetch";
 import { getOrderItemDisplayName } from "../../utils/orderItemDisplayName";
+import {
+  ComplimentaryApproval,
+  EMPTY_COMPLIMENTARY,
+  HotelReferenceField,
+  hotelKindOf,
+  hotelPaymentProblem,
+  useHotelPaymentData,
+  usesComplimentary,
+  usesHotelModes,
+} from "../FrontDesk/HotelPaymentFields";
 
 // Read fresh from localStorage on every call so a mid-shift user switch
 // (SwitchUser) is reflected immediately, instead of a stale value captured
@@ -1840,6 +1850,9 @@ const InputPaymentsModal = ({
   modeOfPayments = [],
   onShowQR = null,
   qrActive = false,
+  hotelData = { inHouse: [], accounts: [], approvers: [], loading: false, error: "" },
+  complimentary = EMPTY_COMPLIMENTARY,
+  setComplimentary = () => {},
 }) => {
   const [activePaymentIndex, setActivePaymentIndex] = useState(0);
 
@@ -1892,6 +1905,7 @@ const InputPaymentsModal = ({
   const remaining = Math.max(toNumLocal(totalAmountDue) - totalPaid, 0);
 
   const hasRefsMissing = payments.some((row) => {
+    if (hotelKindOf(modeOfPayments, row.payment_method)) return !row.payment_reference;
     const mopEntry = modeOfPayments.find((m) => m.mop === row.payment_method);
     if (Number(mopEntry?.reference_On_Off ?? 0) !== 1) return false;
     return !String(row.payment_reference ?? "").trim();
@@ -2232,6 +2246,31 @@ const InputPaymentsModal = ({
 
                                 <div>
                                   {(() => {
+                                    const hotelKind = hotelKindOf(
+                                      modeOfPayments,
+                                      row.payment_method,
+                                    );
+                                    if (hotelKind) {
+                                      return (
+                                        <HotelReferenceField
+                                          kind={hotelKind}
+                                          row={row}
+                                          onReference={(value) =>
+                                            updateRow(index, "payment_reference", value)
+                                          }
+                                          data={hotelData}
+                                          complimentary={complimentary}
+                                          setComplimentary={setComplimentary}
+                                          inputClass={inputClass}
+                                          invalidClass={
+                                            isDark
+                                              ? "bg-red-950/40 border-2 border-red-500/60 text-white"
+                                              : "bg-red-50 border-2 border-red-400 text-slate-900"
+                                          }
+                                          disabled={readOnly}
+                                        />
+                                      );
+                                    }
                                     const mopEntry = modeOfPayments.find(
                                       (m) => m.mop === row.payment_method,
                                     );
@@ -2280,6 +2319,16 @@ const InputPaymentsModal = ({
                                   })()}
                                 </div>
                               </div>
+                              {hotelKindOf(modeOfPayments, row.payment_method) ===
+                                "COMPLIMENTARY" && (
+                                <ComplimentaryApproval
+                                  data={hotelData}
+                                  complimentary={complimentary}
+                                  setComplimentary={setComplimentary}
+                                  inputClass={inputClass}
+                                  disabled={readOnly}
+                                />
+                              )}
                             </div>
                           </div>
                         </div>
@@ -2863,6 +2912,12 @@ export default function TransactionPaymentModal({
   const [otherCharges, setOtherCharges] = useState([]);
   const [payments, setPayments] = useState([]);
   const [hasExistingPaymentRow, setHasExistingPaymentRow] = useState(false);
+  // Hotel modes of payment: Charge to Room / City Ledger / Complimentary.
+  const [complimentary, setComplimentary] = useState(EMPTY_COMPLIMENTARY);
+  const hotelData = useHotelPaymentData(
+    apiHost,
+    isOpen && !isPaidMode && usesHotelModes(payments, modeOfPayments),
+  );
 
   // Discount types active for this transaction's sales type -- what the
   // "+ Add Discount" picker offers, resolved via lkp_discount_type +
@@ -3329,7 +3384,8 @@ export default function TransactionPaymentModal({
       corpName:
         terminal?.corpName ||
         shiftDetails?.corpName ||
-        "Crabs N Crack Seafood House",
+        businessInfo?.corpName ||
+        "",
       unitAddress:
         shiftDetails?.Unit_Address ||
         terminal?.unitAddress ||
@@ -3365,7 +3421,7 @@ export default function TransactionPaymentModal({
         shiftDetails?.ptu_date_issued ||
         "",
     };
-  }, [shiftDetails, transaction]);
+  }, [shiftDetails, transaction, businessInfo]);
 
   const handleElectronPrint = async (snapshotOverride = null) => {
     try {
@@ -3617,6 +3673,7 @@ export default function TransactionPaymentModal({
               }))
             : intendedPaymentRows(transaction),
         );
+        setComplimentary(EMPTY_COMPLIMENTARY);
         setHasExistingPaymentRow(detailPayments.length > 0);
 
         setOtherCharges(
@@ -4541,6 +4598,8 @@ export default function TransactionPaymentModal({
     });
     if (!allRefsProvided) return false;
 
+    if (hotelPaymentProblem(payments, modeOfPayments, complimentary)) return false;
+
     return true;
   }, [
     items,
@@ -4549,6 +4608,7 @@ export default function TransactionPaymentModal({
     computed.totalAmountDue,
     isPaidMode,
     modeOfPayments,
+    complimentary,
   ]);
 
   const canMarkAsPaid =
@@ -4693,6 +4753,11 @@ export default function TransactionPaymentModal({
             payment_amount: Number(toNum(row.payment_amount)),
             payment_reference: row.payment_reference || "",
           })),
+
+        // Approval for a Complimentary payment (checked again by the server).
+        complimentary: usesComplimentary(payments, modeOfPayments)
+          ? complimentary
+          : undefined,
 
         other_charges: [
           ...validManualOtherCharges,
@@ -5300,6 +5365,9 @@ export default function TransactionPaymentModal({
         onAddPaymentMethod={() => setShowPaymentMethodsModal(true)}
         readOnly={isPaidMode}
         modeOfPayments={modeOfPayments}
+        hotelData={hotelData}
+        complimentary={complimentary}
+        setComplimentary={setComplimentary}
         onShowQR={onShowQR ? (method) => {
           if (qrActive) {
             setQrActive(false);

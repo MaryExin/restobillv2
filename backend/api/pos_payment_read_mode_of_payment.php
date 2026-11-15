@@ -9,8 +9,12 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
 }
 
 require __DIR__ . "/pdo.php";
+require_once __DIR__ . "/pos_hotel_ledger.php";
 
 try {
+    // mop_kind marks the hotel modes (Charge to Room / City Ledger / Complimentary).
+    posHotelEnsureMopKindColumn($pdo);
+
     $sql = "
         SELECT
             seq,
@@ -18,7 +22,8 @@ try {
             mop,
             sl_code,
             reference_On_Off,
-            MOP_On_Off
+            MOP_On_Off,
+            mop_kind
         FROM tbl_mode_of_payment
         ORDER BY seq ASC
     ";

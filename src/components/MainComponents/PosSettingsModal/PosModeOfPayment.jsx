@@ -1,8 +1,8 @@
 "use client";
 /* eslint-disable react/prop-types */
 
-import { useEffect, useState, useCallback, useRef } from "react";
-import { FiCreditCard, FiLoader, FiToggleLeft, FiToggleRight, FiBookmark, FiUpload, FiCheck } from "react-icons/fi";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { FiCreditCard, FiLoader, FiToggleLeft, FiToggleRight, FiBookmark, FiUpload, FiCheck, FiPlus } from "react-icons/fi";
 import useApiHost from "../../../hooks/useApiHost";
 
 const mutationHeaders = (headers = {}) => {
@@ -25,6 +25,15 @@ const PosModeOfPayment = ({ isDark, accent = "#3b82f6" }) => {
   const [uploadingQrId, setUploadingQrId] = useState(null);
   const [qrDone, setQrDone]               = useState({}); // mop_id → brief success flash
   const [existingQrNames, setExistingQrNames] = useState(new Set()); // sanitized names that already have a QR file
+
+  // Add new mode of payment
+  const [newMop, setNewMop] = useState({ mop: "", sl_code: "", reference_On_Off: true });
+  const [isAdding, setIsAdding] = useState(false);
+  const [addError, setAddError] = useState("");
+  const [addedName, setAddedName] = useState("");
+  // Inline SL code edit: { mop_id, value }
+  const [slEdit, setSlEdit] = useState(null);
+  const [slSaving, setSlSaving] = useState(false);
 
   const t = {
     panel:     isDark ? "bg-slate-900/40 border-white/5"   : "bg-white border-slate-200 shadow-sm",
@@ -192,6 +201,77 @@ const PosModeOfPayment = ({ isDark, accent = "#3b82f6" }) => {
     }
   };
 
+  const saveSlCode = async () => {
+    if (!slEdit) return;
+    const value = slEdit.value.trim();
+    const current = mops.find((m) => m.mop_id === slEdit.mop_id);
+    if (!value || value === String(current?.sl_code || "")) {
+      if (!value) setError("SL code cannot be blank.");
+      setSlEdit(null);
+      return;
+    }
+    setSlSaving(true);
+    setError("");
+    try {
+      const res = await fetch(`${apiHost}/api/pos_manage_mode_of_payment.php`, {
+        method: "PATCH",
+        headers: mutationHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ mop_id: slEdit.mop_id, sl_code: value }),
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok || !result?.success) throw new Error(result?.message || "Failed to save SL code.");
+      if (Array.isArray(result.data)) setMops(result.data);
+      setSlEdit(null);
+    } catch (err) {
+      setError(err.message || "Failed to save SL code.");
+    } finally {
+      setSlSaving(false);
+    }
+  };
+
+  const slCodeOptions = useMemo(
+    () => [...new Set(mops.map((m) => String(m.sl_code || "").trim()).filter(Boolean))].sort(),
+    [mops],
+  );
+
+  const addMop = async (e) => {
+    e.preventDefault();
+    const mop = newMop.mop.trim().replace(/\s+/g, " ");
+    const slCode = newMop.sl_code.trim();
+    if (!mop) return setAddError("Enter the payment method name.");
+    if (!slCode) return setAddError("Enter the SL code.");
+    if (mops.some((m) => String(m.mop || "").trim().toLowerCase() === mop.toLowerCase())) {
+      return setAddError(`"${mop}" already exists.`);
+    }
+
+    setIsAdding(true);
+    setAddError("");
+    try {
+      const res = await fetch(`${apiHost}/api/pos_manage_mode_of_payment.php`, {
+        method: "POST",
+        headers: mutationHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({
+          mop,
+          sl_code: slCode,
+          reference_On_Off: newMop.reference_On_Off ? 1 : 0,
+          MOP_On_Off: 1,
+        }),
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok || !result?.success) {
+        throw new Error(result?.message || "Failed to add payment method.");
+      }
+      if (Array.isArray(result.data)) setMops(result.data);
+      setNewMop({ mop: "", sl_code: "", reference_On_Off: true });
+      setAddedName(mop);
+      setTimeout(() => setAddedName(""), 2500);
+    } catch (err) {
+      setAddError(err.message || "Failed to add payment method.");
+    } finally {
+      setIsAdding(false);
+    }
+  };
+
   const enabledCount  = mops.filter((m) => m.MOP_On_Off).length;
   const disabledCount = mops.length - enabledCount;
 
@@ -235,6 +315,88 @@ const PosModeOfPayment = ({ isDark, accent = "#3b82f6" }) => {
           </p>
         )}
       </div>
+
+      {/* Add payment method */}
+      <form
+        onSubmit={addMop}
+        className={`rounded-[28px] border p-5 sm:p-6 ${t.panel}`}
+      >
+        <p className={`mb-4 text-[10px] font-black uppercase tracking-[0.18em] ${t.soft}`}>
+          Add Payment Method
+        </p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_10rem_auto_auto] sm:items-end">
+          <label className="block">
+            <span className={`mb-1.5 block text-[10px] font-black uppercase tracking-[0.14em] ${t.muted}`}>
+              Name
+            </span>
+            <input
+              type="text"
+              maxLength={45}
+              value={newMop.mop}
+              onChange={(e) => {
+                setAddError("");
+                setNewMop((prev) => ({ ...prev, mop: e.target.value }));
+              }}
+              placeholder="e.g. UNIONBANK QR"
+              className={`w-full rounded-2xl border px-4 py-2.5 text-sm font-bold outline-none transition-all ${t.panelSoft} ${t.primary}`}
+            />
+          </label>
+          <label className="block">
+            <span className={`mb-1.5 block text-[10px] font-black uppercase tracking-[0.14em] ${t.muted}`}>
+              SL Code
+            </span>
+            <input
+              type="text"
+              maxLength={45}
+              list="mop-sl-code-options"
+              value={newMop.sl_code}
+              onChange={(e) => {
+                setAddError("");
+                setNewMop((prev) => ({ ...prev, sl_code: e.target.value }));
+              }}
+              placeholder="e.g. 110005"
+              className={`w-full rounded-2xl border px-4 py-2.5 text-sm font-bold outline-none transition-all ${t.panelSoft} ${t.primary}`}
+            />
+            <datalist id="mop-sl-code-options">
+              {slCodeOptions.map((code) => (
+                <option key={code} value={code} />
+              ))}
+            </datalist>
+          </label>
+          <button
+            type="button"
+            onClick={() => setNewMop((prev) => ({ ...prev, reference_On_Off: !prev.reference_On_Off }))}
+            className={`flex items-center justify-center gap-1.5 rounded-2xl border px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.14em] transition-all ${
+              newMop.reference_On_Off
+                ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-500"
+                : `${t.panelSoft} ${t.muted}`
+            }`}
+            title="Require a reference number for this payment method"
+          >
+            {newMop.reference_On_Off ? <FiToggleRight size={14} /> : <FiToggleLeft size={14} />}
+            Reference {newMop.reference_On_Off ? "ON" : "OFF"}
+          </button>
+          <button
+            type="submit"
+            disabled={isAdding || !apiHost}
+            className="flex items-center justify-center gap-1.5 rounded-2xl px-5 py-2.5 text-[10px] font-black uppercase tracking-[0.14em] text-white transition-all active:scale-95 disabled:opacity-50"
+            style={{ backgroundColor: accent }}
+          >
+            {isAdding ? <FiLoader size={13} className="animate-spin" /> : <FiPlus size={13} />}
+            {isAdding ? "Adding..." : "Add"}
+          </button>
+        </div>
+        {addError && (
+          <p className="mt-3 rounded-xl bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-500">
+            {addError}
+          </p>
+        )}
+        {addedName && (
+          <p className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-500">
+            <FiCheck size={14} /> {addedName} added and turned ON.
+          </p>
+        )}
+      </form>
 
       {/* Hidden QR file input — shared across all rows */}
       <input
@@ -305,18 +467,40 @@ const PosModeOfPayment = ({ isDark, accent = "#3b82f6" }) => {
                   </div>
                 </div>
 
-                {/* SL Code */}
+                {/* SL Code (click to edit) */}
                 <div className="flex justify-center">
-                  <span
-                    className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-bold ${
-                      isDark
-                        ? "bg-slate-800 text-slate-400"
-                        : "bg-slate-100 text-slate-500"
-                    }`}
-                  >
-                    <FiBookmark size={9} />
-                    {m.sl_code}
-                  </span>
+                  {slEdit?.mop_id === m.mop_id ? (
+                    <input
+                      autoFocus
+                      maxLength={45}
+                      value={slEdit.value}
+                      disabled={slSaving}
+                      list="mop-sl-code-options"
+                      onChange={(e) => setSlEdit({ mop_id: m.mop_id, value: e.target.value })}
+                      onBlur={saveSlCode}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") e.currentTarget.blur();
+                        if (e.key === "Escape") setSlEdit(null);
+                      }}
+                      className={`w-24 rounded-lg border px-2 py-0.5 text-center text-[11px] font-bold outline-none ${t.panelSoft} ${t.primary}`}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setSlEdit({ mop_id: m.mop_id, value: String(m.sl_code || "") })}
+                      title="Edit SL code"
+                      className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-bold ${
+                        m.sl_code
+                          ? isDark
+                            ? "bg-slate-800 text-slate-400"
+                            : "bg-slate-100 text-slate-500"
+                          : "bg-amber-500/15 text-amber-600"
+                      }`}
+                    >
+                      <FiBookmark size={9} />
+                      {m.sl_code || "Set"}
+                    </button>
+                  )}
                 </div>
 
                 {/* Reference toggle */}

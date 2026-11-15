@@ -196,6 +196,7 @@ export const buildXPrintHtml = (data) => {
           <tr><td class="label">Opening Fund</td><td class="value">${money(data.summaryOpeningFund)}</td></tr>
           <tr><td class="label">Withdrawal</td><td class="value">${money(data.summaryWithdrawal)}</td></tr>
           <tr><td class="label">Payments Received</td><td class="value">${money(data.summaryPaymentsReceived)}</td></tr>
+          ${Number(data.summaryCashCollections || 0) !== 0 ? `<tr><td class="label">Cash Collections</td><td class="value">${money(data.summaryCashCollections)}</td></tr>` : ""}
           <tr><td class="label strong">Short / Over</td><td class="value strong">${money(data.summaryShortOver)}</td></tr>
         </table>
       </div>
@@ -310,6 +311,7 @@ export const buildZPrintHtml = (data) => {
             <tr><td class="label">Opening Fund</td><td class="value">${money(data.openingFund)}</td></tr>
             <tr><td class="label">Less Withdrawal</td><td class="value">${money(data.lessWithdrawal)}</td></tr>
             <tr><td class="label">Payments Received</td><td class="value">${money(data.paymentsReceived)}</td></tr>
+            ${Number(data.cashCollections || 0) !== 0 ? `<tr><td class="label">Cash Collections</td><td class="value">${money(data.cashCollections)}</td></tr>` : ""}
             <tr><td class="label strong">Short / Over</td><td class="value strong">${money(data.shortOver)}</td></tr>
           </table>
         </div>

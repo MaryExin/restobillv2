@@ -14,6 +14,7 @@ import {
   FaCashRegister,
   FaCalendarCheck,
   FaDoorOpen,
+  FaHotel,
 } from "react-icons/fa";
 import { IoMdClose } from "react-icons/io";
 
@@ -271,6 +272,10 @@ const LayoutPos = ({ children }) => {
     () => hasPosRouteAccess(roles, "/room-service", developerMode),
     [roles, roleAccessVersion, developerMode],
   );
+  const canAccessFrontDesk = useMemo(
+    () => hasPosRouteAccess(roles, "/front-desk", developerMode),
+    [roles, roleAccessVersion, developerMode],
+  );
   const canAccessPayment = useMemo(
     () => hasPosRouteAccess(roles, "/payments", developerMode),
     [roles, roleAccessVersion, developerMode],
@@ -458,6 +463,17 @@ const LayoutPos = ({ children }) => {
             hint={closedHint}
             active={location.pathname === "/room-service"}
             onClick={() => !isClosed && navigate("/room-service")}
+          />
+        ) : null,
+        // Check-in / check-out and folio payments are not sales, so no shift lock.
+        canAccessFrontDesk ? (
+          <PosQuickActionTile
+            key="frontdesk"
+            label="Front Desk"
+            icon={<FaHotel className={ICON_CLASS} />}
+            color="amber"
+            active={location.pathname === "/front-desk"}
+            onClick={() => navigate("/front-desk")}
           />
         ) : null,
       ],

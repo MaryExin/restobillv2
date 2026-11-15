@@ -36,6 +36,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   printEscPos: (data) => ipcRenderer.invoke("print-escpos", data),
   printEscPosQr: (data) => ipcRenderer.invoke("print-escposqr", data),
   printEscPosVoidRefund: (data) => ipcRenderer.invoke("print-escpos-void-refund", data),
+  printEscPosFrontDesk: (data) => ipcRenderer.invoke("print-escpos-front-desk", data),
   printEscPosBilling: (data) => ipcRenderer.invoke("print-escposbilling", data),
   printEscposDiscount: (data) =>
     ipcRenderer.invoke("print-escposdiscount", data),

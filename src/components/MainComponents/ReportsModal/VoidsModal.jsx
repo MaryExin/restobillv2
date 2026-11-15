@@ -6,6 +6,7 @@ import useApiHost from "../../../hooks/useApiHost";
 import useReportDateAccess from "../../../hooks/useReportDateAccess";
 import { getCurrentUserRole } from "../../../utils/getCurrentUserRole";
 import { posAuthenticatedFetch } from "../../../utils/posAuthenticatedFetch";
+import { printAreaWithPdfFallback } from "../../../utils/printAreaWithPdfFallback";
 
 // Richwell: the Print button is hidden; set to true to bring it back.
 const SHOW_PRINT_BUTTON = false;
@@ -73,7 +74,9 @@ const VoidsModal =({ isOpen, onClose }) => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const handlePrint = () => { window.print(); };
+  // No printer installed (desktop app): save the print area as a PDF instead.
+  const handlePrint = () =>
+    printAreaWithPdfFallback({ areaId: "void-print-area", fileName: `void_report_${new Date().toISOString().slice(0, 10)}.pdf` });
 
   const exportToExcel = () => {
     const ws = XLSX.utils.json_to_sheet(filteredData);

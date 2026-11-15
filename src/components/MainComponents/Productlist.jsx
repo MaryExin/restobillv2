@@ -21,12 +21,14 @@ import {
   FaPercent,
   FaLayerGroup,
   FaPlus,
+  FaFileUpload,
 } from "react-icons/fa";
 import { useTheme } from "../../context/ThemeContext";
 import useApiHost from "../../hooks/useApiHost";
 import ProductImage from "../common/ProductImage";
 import TutorialTip from "../common/TutorialTip";
 import AddProductModal from "./ProductListModal/AddProductModal";
+import BatchUploadProductModal from "./ProductListModal/BatchUploadProductModal";
 import ProductOptionsModal from "./ProductListModal/ProductOptionsModal";
 import { buildOptionMaps, productOptionsEndpoint, resolveOptionGroups } from "../../utils/productOptions";
 import useZustandLoginCred from "../../context/useZustandLoginCred";
@@ -104,6 +106,7 @@ const ProductList = () => {
   // MODAL STATES
   const [showConfirm, setShowConfirm] = useState(false);
   const [showAddProduct, setShowAddProduct] = useState(false);
+  const [showBatchUpload, setShowBatchUpload] = useState(false);
   const [addedNotice, setAddedNotice] = useState("");
   const [pendingStatus, setPendingStatus] = useState(null);
 
@@ -290,6 +293,11 @@ const ProductList = () => {
     [categories],
   );
 
+  const existingProductNames = useMemo(
+    () => products.map((p) => p.item_name),
+    [products],
+  );
+
   const productUnitOptions = useMemo(
     () =>
       [...new Set(products.map((p) => String(p.unit_of_measure || "").trim().toUpperCase()))]
@@ -420,6 +428,19 @@ const ProductList = () => {
         apiHost={apiHost}
         categories={productCategoryOptions}
         units={productUnitOptions}
+      />
+
+      <BatchUploadProductModal
+        isOpen={showBatchUpload}
+        onClose={() => setShowBatchUpload(false)}
+        onUploaded={({ added }) => {
+          setAddedNotice(`${added} product${added === 1 ? "" : "s"} uploaded.`);
+          setTimeout(() => setAddedNotice(""), 3500);
+          fetchProducts();
+        }}
+        isDark={isDark}
+        apiHost={apiHost}
+        existingNames={existingProductNames}
       />
 
       {addedNotice && (
@@ -586,6 +607,20 @@ const ProductList = () => {
                 >
                   <FaPlus size={11} />
                   Add Product
+                </button>
+              )}
+              {canUsePricing && (
+                <button
+                  type="button"
+                  onClick={() => setShowBatchUpload(true)}
+                  className={`flex items-center gap-2 px-4 py-3 text-[10px] font-black tracking-widest uppercase transition-all border-2 rounded-2xl active:scale-95 whitespace-nowrap ${
+                    isDark
+                      ? "border-blue-500/60 text-blue-400 hover:bg-blue-500/10"
+                      : "border-blue-500 text-blue-600 hover:bg-blue-50"
+                  }`}
+                >
+                  <FaFileUpload size={11} />
+                  Batch Upload
                 </button>
               )}
               <div

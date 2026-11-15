@@ -69,6 +69,17 @@ function paymentHarness(details) {
     "../../utils/discountLineMath": discountMath,
     "../../utils/orderItemDisplayName": displayNames,
     "../../utils/posAuthenticatedFetch": { posAuthenticatedFetch: () => assert.fail("Unexpected authenticated request") },
+    // Hotel modes of payment (Charge to Room / City Ledger / Complimentary) are not used here.
+    "../FrontDesk/HotelPaymentFields": {
+      ComplimentaryApproval: noop,
+      HotelReferenceField: noop,
+      EMPTY_COMPLIMENTARY: { comp_type: "", reason: "", approver_id: "", approver_password: "" },
+      hotelKindOf: () => "",
+      hotelPaymentProblem: () => "",
+      useHotelPaymentData: () => ({ inHouse: [], accounts: [], approvers: [], loading: false, error: "" }),
+      usesComplimentary: () => false,
+      usesHotelModes: () => false,
+    },
   };
   const component = compile("src/components/MainComponents/TransactionPaymentModal.jsx", modules, {
     AbortController, setTimeout: noop,

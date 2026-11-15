@@ -21,6 +21,7 @@ import {
   roomServiceRequestLine,
   validateRoomServiceForm,
 } from "./roomServiceUtils";
+import { HOTEL_KIND, frontDeskGet, mopKind } from "../FrontDesk/frontDeskUtils";
 
 const fieldClass =
   "w-full rounded-xl border px-3.5 py-2.5 font-[Poppins-Regular] text-[14px] outline-none";
@@ -103,8 +104,15 @@ const RoomServiceBoard = ({ apiHost }) => {
           .map((mode) => ({
             mop: String(mode.mop || "").trim(),
             reference_On_Off: Number(mode.reference_On_Off ?? 0),
+            mop_kind: String(mode.mop_kind || "").trim().toUpperCase(),
           }))
-          .filter((mode) => mode.mop);
+          // City Ledger / Complimentary need a company or an approval: chosen at payment.
+          .filter(
+            (mode) =>
+              mode.mop &&
+              mode.mop_kind !== HOTEL_KIND.CITY_LEDGER &&
+              mode.mop_kind !== HOTEL_KIND.COMPLIMENTARY,
+          );
         setModes(list);
         setForm((prev) => (prev.paymentMode || !list.length ? prev : { ...prev, paymentMode: list[0].mop }));
       })
@@ -115,6 +123,24 @@ const RoomServiceBoard = ({ apiHost }) => {
       cancelled = true;
     };
   }, [apiHost]);
+
+  // Checked-in guests (Front Desk): fills the guest name and the folio for
+  // Charge to Room. Quietly empty when the front desk is not used.
+  const [inHouse, setInHouse] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    frontDeskGet(apiHost, { view: "in_house" })
+      .then((data) => {
+        if (!cancelled) setInHouse(Array.isArray(data?.in_house) ? data.in_house : []);
+      })
+      .catch(() => {
+        if (!cancelled) setInHouse([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiHost]);
+  const stayForRoom = (room) => inHouse.find((stay) => stay.room_name === room) || null;
 
   // Today's room-service orders that are not paid yet.
   const loadOrders = useCallback(async () => {
@@ -146,18 +172,22 @@ const RoomServiceBoard = ({ apiHost }) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  // The guest name follows today's reservation for the room (still editable).
+  // The guest name follows the checked-in guest, else today's reservation
+  // for the room (still editable).
   const onRoomChange = (event) => {
     const room = event.target.value;
     setForm((prev) => {
+      const stay = stayForRoom(room);
       const reservation = getRoomReservation(room);
       return {
         ...prev,
         room,
-        guestName: prev.guestName || String(reservation?.guest_name || ""),
+        guestName: stay ? stay.guest_name : prev.guestName || String(reservation?.guest_name || ""),
       };
     });
   };
+  const isRoomCharge = mopKind(modes, form.paymentMode) === HOTEL_KIND.ROOM_CHARGE;
+  const roomStay = stayForRoom(form.room);
 
   // Online, card and gift-certificate modes need the reference number here
   // (same rule as the payment screen); switching to a mode without one
@@ -183,12 +213,18 @@ const RoomServiceBoard = ({ apiHost }) => {
 
   const submit = () => {
     setShowErrors(true);
-    const firstError = Object.values(errors)[0];
+    const firstError =
+      Object.values(errors)[0] ||
+      (isRoomCharge && form.room && !roomStay
+        ? `${form.room} has no checked-in guest. Check the guest in at the Front Desk, or choose another mode of payment.`
+        : "");
     if (firstError) {
       executeToast(firstError, 3500, "error");
       return;
     }
-    navigate("/ordering", { state: roomServiceOrderState(form) });
+    // Charge to Room: the folio number is the payment reference.
+    const order = isRoomCharge ? { ...form, paymentReference: roomStay.folio_no } : form;
+    navigate("/ordering", { state: roomServiceOrderState(order) });
   };
 
   const openOrder = (row) => navigate("/ordering", { state: openRoomOrderState(row) });
@@ -314,6 +350,13 @@ const RoomServiceBoard = ({ apiHost }) => {
                 ))}
               </select>
               <FieldError message={visibleErrors.paymentMode} />
+              {isRoomCharge && form.room ? (
+                <p className="mt-1 font-[Poppins-Medium] text-[12px]" style={{ color: roomStay ? "var(--app-muted-text)" : "#be123c" }}>
+                  {roomStay
+                    ? `Charged to folio ${roomStay.folio_no} (${roomStay.guest_name})`
+                    : `${form.room} has no checked-in guest.`}
+                </p>
+              ) : null}
             </div>
 
             {isCashMode(form.paymentMode) ? (

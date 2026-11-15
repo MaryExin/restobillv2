@@ -75,6 +75,20 @@ try {
         };
         $truncateIfExists($pdo, $optionalTables);
 
+        // Hotel front desk (pos_hotel_ledger.php): folios, room / city ledger
+        // charges, collections and the complimentary log are transaction data.
+        // City ledger accounts are master data (companies) and stay, so their
+        // account-code counter stays too; folio and collection numbers restart.
+        $truncateIfExists($pdo, [
+            'tbl_pos_hotel_stays',
+            'tbl_pos_ar_charges',
+            'tbl_pos_ar_collections',
+            'tbl_pos_complimentary',
+        ]);
+        if ($pdo->query("SHOW TABLES LIKE " . $pdo->quote('tbl_pos_hotel_counters'))->fetchColumn() !== false) {
+            $pdo->exec("DELETE FROM tbl_pos_hotel_counters WHERE counter_key <> 'city_ledger'");
+        }
+
             // --- INSERT NEW COUNTER VALUES WITH CODES FROM BUSINESS UNITS ---
             // The business unit supplies the Category_Code and Unit_Code.
         $sql = "INSERT INTO tbl_pos_document_counters (

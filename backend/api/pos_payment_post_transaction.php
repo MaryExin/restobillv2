@@ -15,6 +15,8 @@ date_default_timezone_set("Asia/Manila");
 require __DIR__ . "/pdo.php";
 require_once __DIR__ . "/pos_report_mirror.php";
 require_once __DIR__ . "/../src/PosCurrentBillItems.php";
+require_once __DIR__ . "/pos_hotel_ledger.php";
+require_once __DIR__ . "/pos_guest_columns.php";
 
 function normalizeDiscountType($value)
 {
@@ -317,6 +319,41 @@ try {
 
     if ($payment_amount < $TotalAmountDue) {
         throw new Exception("Total payment amount is less than total amount due.");
+    }
+
+    // Hotel special modes of payment (Charge to Room / City Ledger /
+    // Complimentary). Schema checks run before the DB transaction (DDL commits).
+    $hotelKinds = posHotelPaymentKinds($pdo);
+    $usesHotelLedger = false;
+    foreach ($payments as $paymentRow) {
+        $rowMethodKey = strtolower(trim((string)($paymentRow["payment_method"] ?? "")));
+        if ($rowMethodKey === "" || (float)($paymentRow["payment_amount"] ?? 0) <= 0) {
+            continue;
+        }
+        if ($hotelKinds === null) {
+            // Modes could not be read: never post a hotel mode without its ledger entry.
+            foreach (POS_HOTEL_SPECIAL_MOPS as $specialName) {
+                if ($rowMethodKey === strtolower($specialName)) {
+                    throw new Exception("Unable to verify the {$specialName} payment. Please try again.");
+                }
+            }
+            continue;
+        }
+        if (isset($hotelKinds[$rowMethodKey])) {
+            $usesHotelLedger = true;
+            break;
+        }
+    }
+    $hotelKinds = $hotelKinds ?? [];
+    if ($usesHotelLedger) {
+        posHotelEnsureSchema($pdo);
+        posEnsureGuestColumns($pdo);
+    }
+    $complimentaryInput = is_array($body["complimentary"] ?? null) ? $body["complimentary"] : [];
+    // Night audit room invoice: {folio_no, service_date}; must be paid with Charge to Room.
+    $roomNightInput = is_array($body["room_night"] ?? null) ? $body["room_night"] : [];
+    if ($roomNightInput && !$usesHotelLedger) {
+        throw new Exception("A room night must be charged to the room.");
     }
 
     $pdo->beginTransaction();
@@ -1027,6 +1064,39 @@ try {
     $finalTxn = $stmtFinal->fetch(PDO::FETCH_ASSOC);
 
     $savedInvoiceNo = (int)($finalTxn['invoice_no'] ?? 0);
+
+    if ($usesHotelLedger) {
+        $labelStmt = $pdo->prepare("
+            SELECT table_number, order_type, guest_name
+            FROM tbl_pos_transactions
+            WHERE transaction_id = :transaction_id AND Category_Code = :cc AND Unit_Code = :uc
+            LIMIT 1
+        ");
+        $labelStmt->execute([':transaction_id' => $transaction_id, ':cc' => $Category_Code, ':uc' => $Unit_Code]);
+        $labelRow = $labelStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $labelParts = array_filter([
+            trim((string)($labelRow['table_number'] ?? '')),
+            trim((string)($labelRow['order_type'] ?? '')),
+        ], 'strlen');
+
+        posHotelApplyTransactionPayments(
+            $pdo,
+            $hotelKinds,
+            [
+                "Category_Code" => $Category_Code,
+                "Unit_Code" => $Unit_Code,
+                "transaction_id" => (string)$transaction_id,
+                "invoice_no" => $savedInvoiceNo,
+                "total_amount_due" => $TotalAmountDue,
+                "label" => implode(" · ", $labelParts),
+                "guest_name" => (string)($labelRow['guest_name'] ?? ''),
+            ],
+            $payments,
+            $complimentaryInput,
+            $cashier,
+            $roomNightInput
+        );
+    }
 
     mirrorPosTransactionToReport($pdo, $config, (string)$transaction_id, $Category_Code, $Unit_Code);
 

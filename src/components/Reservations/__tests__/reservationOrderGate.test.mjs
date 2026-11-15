@@ -39,3 +39,23 @@ test("the room is checked after the day", () => {
     /open day is Nov 10/,
   );
 });
+
+test("a guest can only be marked Arrived on the reservation's open day", async () => {
+  const { reservationArrivalBlockedReason } = await import("../reservationUtils.js");
+  const future = { reservation_date: "2026-11-15", table_name: "Room 307" };
+  assert.equal(
+    reservationArrivalBlockedReason({ shiftOpen: false, shiftDateKey: "", reservation: future }),
+    "Open a new day first to mark the guest as arrived.",
+  );
+  const early = reservationArrivalBlockedReason({ shiftOpen: true, shiftDateKey: "2026-11-12", reservation: future });
+  assert.match(early, /reservation is for Nov 15/);
+  assert.match(early, /open day is Nov 12/);
+  const late = reservationArrivalBlockedReason({ shiftOpen: true, shiftDateKey: "2026-11-16", reservation: future });
+  assert.match(late, /No show/);
+  assert.equal(reservationArrivalBlockedReason({ shiftOpen: true, shiftDateKey: "2026-11-15", reservation: future }), "");
+  // Unlike ordering, arriving does not need a room.
+  assert.equal(
+    reservationArrivalBlockedReason({ shiftOpen: true, shiftDateKey: "2026-11-15", reservation: { reservation_date: "2026-11-15" } }),
+    "",
+  );
+});

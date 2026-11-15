@@ -2,6 +2,7 @@
 require_once __DIR__ . "/bootstrap.php";
 require_once __DIR__ . "/pos_developer_auth.php";
 require_once __DIR__ . "/pos_role_authorization.php";
+require_once __DIR__ . "/pos_hotel_ledger.php";
 
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
@@ -763,13 +764,25 @@ try {
     $parSummaryOpeningFund = $parOpeningFund;
     $parSummaryWithdrawal = 0;
     $parSummaryPaymentsReceived = $parCash + $parCheque + $parCreditCard + $parOtherPayments;
+    // Cash taken at the front desk for folios / company accounts (not sales)
+    // is in the drawer too, so it is expected cash for the short/over.
+    $parSummaryCashCollections = posHotelCashCollections(
+        $pdo,
+        $categoryCode,
+        $unitCode,
+        (string)$terminalNumber,
+        date("Y-m-d H:i:s", strtotime((string)$shift["Opening_DateTime"])),
+        date("Y-m-d H:i:s"),
+        $cashierLike
+    );
     $parSummaryShortOver =
         $parSummaryCashInDrawer +
         $parSummaryCheque +
         $parSummaryCreditCard +
         $parSummaryOtherPayments -
         $parSummaryOpeningFund -
-        $parSummaryPaymentsReceived;
+        $parSummaryPaymentsReceived -
+        $parSummaryCashCollections;
 
     $tinLabel = $businessUnitVATRegistration === "Non-VAT Registered"
         ? "NON-VAT REG TIN: " . $businessUnitTIN
@@ -804,6 +817,7 @@ try {
             "gross_amount" => (float)$active["Gross_Amount"],
             "discount" => (float)$active["Discount"],
             "summary_short_over" => $parSummaryShortOver,
+            "summary_cash_collections" => $parSummaryCashCollections,
             "beg_or" => $parBegOR,
             "end_or" => $parEndOR,
             "machine_number" => $machineNumber,
@@ -942,6 +956,7 @@ try {
             "summaryWithdrawal" => $parSummaryWithdrawal,
             "summaryPaymentsReceived" => $parSummaryPaymentsReceived,
             "summaryShortOver" => $parSummaryShortOver,
+            "summaryCashCollections" => $parSummaryCashCollections,
 
             "salesForTheDay" => (float)$active["Sales_For_The_Day"],
             "vatableSales" => (float)$active["VATableSales"],
