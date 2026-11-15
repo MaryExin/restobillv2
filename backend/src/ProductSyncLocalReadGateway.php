@@ -187,6 +187,7 @@ class ProductSyncLocalReadGateway
                 deletestatus
             FROM tbl_pricing_details
             WHERE pricing_code IN ($placeholders)
+              AND deletestatus = 'Active'
             ORDER BY pricing_code ASC, inv_code ASC
         ");
 

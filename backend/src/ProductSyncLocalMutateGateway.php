@@ -43,6 +43,10 @@ class ProductSyncLocalMutateGateway
         $inactivatedProducts = 0;
         $syncedSalesTypes = 0;
         $syncedSalesTypeMappings = 0;
+        // Products whose price rows were turned off in this batch: each is set
+        // Inactive only when it has no Active price row left (a product still
+        // priced online under another pricing code stays active).
+        $inactiveCandidates = [];
 
         try {
             $this->conn->beginTransaction();
@@ -90,13 +94,23 @@ class ProductSyncLocalMutateGateway
                 }
 
                 if ($action === 'inactive_product') {
-                    $productAffected = $this->setOfflineProductInactive($productId);
-                    $pricingAffected = $this->setAllOfflinePricingInactive($productId, $userId);
-
-                    $affected += $productAffected + $pricingAffected;
-                    $inactivatedProducts++;
+                    // Only the price row that is missing online is turned off,
+                    // not every pricing code of the product.
+                    $affected += $pricingCode === ''
+                        ? $this->setAllOfflinePricingInactive($productId, $userId)
+                        : $this->setOfflinePricingInactive($productId, $pricingCode, $userId);
+                    $inactiveCandidates[$productId] = true;
                     continue;
                 }
+            }
+
+            foreach (array_keys($inactiveCandidates) as $candidateId) {
+                $candidateId = (string) $candidateId;
+                if ($this->countActiveOfflinePricing($candidateId) > 0) {
+                    continue;
+                }
+                $affected += $this->setOfflineProductInactive($candidateId);
+                $inactivatedProducts++;
             }
 
             $this->conn->commit();
@@ -438,6 +452,41 @@ class ProductSyncLocalMutateGateway
         ]);
 
         return $stmt->rowCount();
+    }
+
+    private function setOfflinePricingInactive(string $productId, string $pricingCode, int|string $userId): int
+    {
+        $stmt = $this->conn->prepare("
+            UPDATE tbl_pricing_details
+            SET
+                deletestatus = 'Inactive',
+                usertracker = :usertracker
+            WHERE inv_code = :inv_code
+              AND pricing_code = :pricing_code
+              AND deletestatus = 'Active'
+        ");
+        $stmt->execute([
+            'inv_code' => $productId,
+            'pricing_code' => $pricingCode,
+            'usertracker' => (string) $userId,
+        ]);
+
+        return $stmt->rowCount();
+    }
+
+    private function countActiveOfflinePricing(string $productId): int
+    {
+        $stmt = $this->conn->prepare("
+            SELECT COUNT(*)
+            FROM tbl_pricing_details
+            WHERE inv_code = :inv_code
+              AND deletestatus = 'Active'
+        ");
+        $stmt->execute([
+            'inv_code' => $productId,
+        ]);
+
+        return (int) $stmt->fetchColumn();
     }
 
     private function setAllOfflinePricingInactive(string $productId, int|string $userId): int
